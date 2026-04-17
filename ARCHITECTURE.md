@@ -139,6 +139,8 @@ GitHub Actions -> CI/CD pipelines
 Основной путь:
 
 - `Supabase Postgres` как primary DB;
+- `SQLAlchemy 2` как основной backend data access layer;
+- `Alembic` как migration layer;
 - schema design проектируется под домены;
 - миграции должны быть дисциплинированными;
 - auth-пользователь и доменные сущности разделяются концептуально.

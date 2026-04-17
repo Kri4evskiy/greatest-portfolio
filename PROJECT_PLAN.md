@@ -18,7 +18,7 @@
 - frontend + BFF/API: `Next.js` последней стабильной версии;
 - основная БД: `PostgreSQL`;
 - hosted database/platform: `Supabase`;
-- ORM/typed DB layer: `Drizzle ORM` как основной кандидат;
+- backend ORM and migrations: `SQLAlchemy 2` + `Alembic`;
 - валидация: `Zod`;
 - формы: `react-hook-form`;
 - клиентский data fetching/state sync: `TanStack Query`;
@@ -251,23 +251,24 @@ Supabase даёт:
 
 - `Supabase` как платформу и managed Postgres;
 - `PostgreSQL` как основную БД;
-- `Drizzle ORM` как типобезопасный ORM/query layer.
+- `SQLAlchemy 2` как основной backend ORM/data access layer;
+- `Alembic` для миграций.
 
-### Почему `Drizzle ORM`
+### Почему `SQLAlchemy 2`
 
-- очень хорошо сочетается с TypeScript-first разработкой;
-- даёт хороший контроль над SQL;
-- не слишком тяжёлый;
-- хорошо подходит для архитектуры, где важна прозрачность схемы;
-- проще держать дисциплину вокруг миграций и typed schema.
+- это production-grade стандарт для Python ecosystem;
+- даёт зрелый контроль над моделями и запросами;
+- хорошо ложится на модульный backend;
+- отлично сочетается с PostgreSQL;
+- это более естественный выбор, если core backend пишется на Python.
 
-### Когда можно рассмотреть Prisma
+### Почему не `Drizzle` как основной ORM
 
-- если приоритетом станет удобство DX именно Prisma-экосистемы;
-- если понадобится широкая база community recipes;
-- если команда уже плотно работает через Prisma.
+- `Drizzle` хорош для TypeScript-centric backend/platform слоя;
+- но у нас основной backend runtime - `Python`;
+- поэтому главный ORM должен жить в Python-слое, а не рядом с frontend.
 
-Но для этого проекта стартовый фаворит: `Drizzle`.
+Итог: для этого проекта стартовый фаворит - `SQLAlchemy 2 + Alembic`.
 
 ### Что продумать сразу по БД
 
@@ -299,7 +300,8 @@ Supabase даёт:
 - TanStack Query: `https://tanstack.com/query/latest`
 - Supabase: `https://supabase.com/docs`
 - PostgreSQL: `https://www.postgresql.org/docs/`
-- Drizzle ORM: `https://orm.drizzle.team/docs/overview`
+- SQLAlchemy: `https://docs.sqlalchemy.org/`
+- Alembic: `https://alembic.sqlalchemy.org/`
 - LinguiJS: `https://lingui.dev`
 - Vitest: `https://vitest.dev`
 - pytest: `https://docs.pytest.org/`
@@ -1085,7 +1087,8 @@ tests/
 Решение:
 
 - Supabase = платформа и managed Postgres;
-- ORM = `Drizzle`.
+- ORM = `SQLAlchemy 2`;
+- migrations = `Alembic`.
 
 ### Конфликт 3: `Python backend сразу` vs `простота старта`
 
@@ -1142,7 +1145,8 @@ tests/
 
 - Supabase project;
 - PostgreSQL schema;
-- Drizzle setup;
+- SQLAlchemy setup;
+- Alembic setup;
 - migrations;
 - auth;
 - profile model.
@@ -1197,7 +1201,7 @@ tests/
 - `Next.js` как основной application framework;
 - `TypeScript strict`;
 - `Tailwind + RHF + Zod + TanStack Query`;
-- `Supabase + PostgreSQL + Drizzle`;
+- `Supabase + PostgreSQL + SQLAlchemy 2 + Alembic`;
 - `LinguiJS` для i18n;
 - `Biome` для качества кода;
 - `pytest + Playwright` как основной testing strategy;

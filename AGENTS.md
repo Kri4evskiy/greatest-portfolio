@@ -55,7 +55,10 @@
 
 1. `PROJECT_PLAN.md`
 2. `ARCHITECTURE.md`
-3. `AGENTS.md`
+3. `STACK_DECISIONS.md`
+4. `docs/PROJECT_STRUCTURE.md`, если меняется структура проекта
+5. `AGENTS.md`
+6. `README.md`, если изменился список ключевых точек входа
 
 Только затем реализация.
 
@@ -67,5 +70,5 @@
 
 - любое изменение архитектурного решения должно сопровождаться обновлением документации;
 - устаревшая документация считается дефектом проекта;
-- `README.md`, `PROJECT_PLAN.md`, `ARCHITECTURE.md`, `STACK_DECISIONS.md`, `AGENTS.md` должны поддерживаться в актуальном состоянии;
+- `README.md`, `PROJECT_PLAN.md`, `ARCHITECTURE.md`, `STACK_DECISIONS.md`, `AGENTS.md`, `docs/README.md`, `docs/PROJECT_STRUCTURE.md` должны поддерживаться в актуальном состоянии;
 - definition of done для архитектурных и инфраструктурных изменений включает обновление релевантных `.md` файлов.

@@ -78,17 +78,27 @@
 
 ### Decision
 
-Пока зафиксирован основной кандидат: `Drizzle ORM`.
+Основной backend data access stack:
+
+- `SQLAlchemy 2`
+- `Alembic`
 
 ### Why
 
-- прозрачность схемы;
-- TypeScript-friendly слой для frontend/web-side integration;
-- хорошая дисциплина вокруг typed schema и migrations.
+- это естественный production-grade выбор для `Python backend`;
+- зрелый и устойчивый стек для PostgreSQL;
+- хорошо подходит под модульный backend с явным data access;
+- даёт сильную миграционную дисциплину.
 
-### Note
+### Rejected alternative
 
-Так как основной backend будет на `Python`, этот decision ещё может быть уточнён после финального проектирования data access boundaries.
+`Drizzle ORM` как основной ORM проекта.
+
+### Why rejected
+
+- основной backend у проекта на `Python`, а не на `TypeScript`;
+- главный ORM должен жить в том runtime, где будет основная доменная логика;
+- `Drizzle` имел бы смысл только при TypeScript-first backend стратегии.
 
 ## 5. Auth strategy
 
@@ -187,6 +197,8 @@
 - `ARCHITECTURE.md`
 - `STACK_DECISIONS.md`
 - `AGENTS.md`
+- `docs/README.md`
+- `docs/PROJECT_STRUCTURE.md`
 
 ## 10. Current final baseline
 
@@ -196,6 +208,8 @@
 - `Python backend` (`FastAPI` как основной кандидат)
 - `Supabase`
 - `PostgreSQL`
+- `SQLAlchemy 2`
+- `Alembic`
 - `Tailwind CSS`
 - `react-hook-form`
 - `Zod`
