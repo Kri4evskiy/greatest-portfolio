@@ -10,6 +10,7 @@
 - если меняется структура проекта, нужно обновлять `docs/PROJECT_STRUCTURE.md`;
 - если меняется стек или baseline-решение, нужно обновлять `STACK_DECISIONS.md`.
 - если меняется root-level workflow запуска, проверки или тестирования, нужно обновлять `README.md` и профильные docs.
+- если меняется git hook workflow, нужно обновлять `README.md` и `AGENTS.md`.
 
 ## Documents
 

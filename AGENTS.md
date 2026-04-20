@@ -40,6 +40,14 @@
 - frontend unit runner не добавляется в стек без доказанной пользы;
 - каждая серьёзная фича должна иметь понятный testing story.
 
+## Git Hooks Rules
+
+- `pre-commit` должен оставаться быстрым;
+- в `pre-commit` допускаются staged-only autofix и быстрые quality checks;
+- тяжёлые тесты и долгие проверки не должны жить в `pre-commit`;
+- `pre-push` используется для более серьёзных локальных проверок;
+- hooks не заменяют CI, а дополняют его.
+
 ## Agent Workflow
 
 - перед архитектурными и творческими задачами использовать `.agents/skills/brainstorming`;

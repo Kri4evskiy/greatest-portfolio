@@ -21,6 +21,11 @@ npm run test
 
 `npm run dev` запускает `frontend` и `backend` вместе из корня репозитория.
 
+Git workflow quality gates:
+
+- `pre-commit` запускает быстрый staged-only `Biome` autofix для frontend-файлов
+- `pre-push` запускает `npm run check`
+
 Endpoints during local development:
 
 - frontend: `http://localhost:3000`
