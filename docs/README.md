@@ -9,6 +9,7 @@
 - если в `docs/` появляется новая важная точка входа, корневой `README.md` должен быть обновлён;
 - если меняется структура проекта, нужно обновлять `docs/PROJECT_STRUCTURE.md`;
 - если меняется стек или baseline-решение, нужно обновлять `STACK_DECISIONS.md`.
+- если меняется root-level workflow запуска, проверки или тестирования, нужно обновлять `README.md` и профильные docs.
 
 ## Documents
 
@@ -17,6 +18,7 @@
 - `../STACK_DECISIONS.md` - зафиксированные стековые решения
 - `../AGENTS.md` - AI-first правила работы по проекту
 - `PROJECT_STRUCTURE.md` - целевая структура репозитория
+- `PYTHON_BACKEND.md` - что читать по FastAPI, SQLAlchemy, Alembic и pytest
 
 ## Intent
 

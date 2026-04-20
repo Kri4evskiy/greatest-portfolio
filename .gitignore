@@ -1,0 +1,25 @@
+# Root
+.DS_Store
+node_modules/
+
+# Frontend
+frontend/node_modules/
+frontend/.next/
+frontend/test-results/
+frontend/playwright-report/
+
+# Backend
+backend/.venv/
+backend/.pytest_cache/
+backend/.mypy_cache/
+backend/__pycache__/
+backend/**/*.pyc
+
+# Environment files
+.env
+.env.local
+.env.*.local
+backend/.env
+backend/.env.*
+frontend/.env.local
+frontend/.env.*

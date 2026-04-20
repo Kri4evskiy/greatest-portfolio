@@ -9,6 +9,23 @@ Engineering-first portfolio platform.
 - `Supabase` + `PostgreSQL`
 - AI-first workflow with local agent docs
 
+## Main commands
+
+```bash
+npm install
+npm run dev
+npm run build
+npm run check
+npm run test
+```
+
+`npm run dev` запускает `frontend` и `backend` вместе из корня репозитория.
+
+Endpoints during local development:
+
+- frontend: `http://localhost:3000`
+- backend: `http://127.0.0.1:8000`
+
 ## Core docs
 
 - `PROJECT_PLAN.md`
@@ -17,6 +34,7 @@ Engineering-first portfolio platform.
 - `AGENTS.md`
 - `docs/README.md`
 - `docs/PROJECT_STRUCTURE.md`
+- `docs/PYTHON_BACKEND.md`
 
 ## Documentation rule
 

@@ -199,6 +199,7 @@
 - `AGENTS.md`
 - `docs/README.md`
 - `docs/PROJECT_STRUCTURE.md`
+- `docs/PYTHON_BACKEND.md`
 
 ## 10. Current final baseline
 

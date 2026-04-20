@@ -70,5 +70,5 @@
 
 - любое изменение архитектурного решения должно сопровождаться обновлением документации;
 - устаревшая документация считается дефектом проекта;
-- `README.md`, `PROJECT_PLAN.md`, `ARCHITECTURE.md`, `STACK_DECISIONS.md`, `AGENTS.md`, `docs/README.md`, `docs/PROJECT_STRUCTURE.md` должны поддерживаться в актуальном состоянии;
+- `README.md`, `PROJECT_PLAN.md`, `ARCHITECTURE.md`, `STACK_DECISIONS.md`, `AGENTS.md`, `docs/README.md`, `docs/PROJECT_STRUCTURE.md`, `docs/PYTHON_BACKEND.md` должны поддерживаться в актуальном состоянии;
 - definition of done для архитектурных и инфраструктурных изменений включает обновление релевантных `.md` файлов.
