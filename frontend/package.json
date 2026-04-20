@@ -9,7 +9,14 @@
     "typecheck": "tsc --noEmit",
     "check": "biome check .",
     "format": "biome check --write .",
-    "test:e2e": "playwright test"
+    "lint-staged": "lint-staged",
+    "test:e2e": "playwright test",
+    "test:e2e:headed": "playwright test --headed"
+  },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx,cjs,mjs,cts,mts,json,jsonc,css}": [
+      "bunx @biomejs/biome check --write --files-ignore-unknown=true --no-errors-on-unmatched"
+    ]
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -28,10 +35,10 @@
     "@biomejs/biome": "^2.4.12",
     "@playwright/test": "^1.59.1",
     "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
+    "@types/node": "^24.0.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^6.0.0"
   }
 }

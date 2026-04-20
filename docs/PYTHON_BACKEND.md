@@ -95,9 +95,9 @@
 ### From repo root
 
 ```bash
-npm run dev
-npm run check
-npm run test
+bun run dev
+bun run check
+bun run test
 ```
 
 Это поднимает или проверяет проект через root-level orchestration.

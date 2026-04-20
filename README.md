@@ -7,24 +7,33 @@ Engineering-first portfolio platform.
 - `Next.js` frontend platform
 - `Python` backend platform
 - `Supabase` + `PostgreSQL`
+- `Bun` for JS/TS package management and script execution
+- `TypeScript 6` on the frontend
 - AI-first workflow with local agent docs
 
 ## Main commands
 
 ```bash
-npm install
-npm run dev
-npm run build
-npm run check
-npm run test
+bun install
+bun run dev
+bun run build
+bun run check
+bun run test
+bun run format
 ```
 
-`npm run dev` запускает `frontend` и `backend` вместе из корня репозитория.
+`bun run dev` запускает `frontend` и `backend` вместе из корня репозитория.
 
 Git workflow quality gates:
 
 - `pre-commit` запускает быстрый staged-only `Biome` autofix для frontend-файлов
-- `pre-push` запускает `npm run check`
+- `pre-push` запускает `bun run check`
+
+Repository workflow model:
+
+- корень репозитория оркестрирует общий workflow
+- `frontend/` владеет JS/TS quality tooling, включая `Biome` и `lint-staged`
+- `backend/` живёт отдельно как Python application layer
 
 Endpoints during local development:
 

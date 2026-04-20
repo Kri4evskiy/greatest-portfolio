@@ -1,17 +1,16 @@
 {
   "$schema": "https://biomejs.dev/schemas/2.4.12/schema.json",
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true,
+    "defaultBranch": "main"
+  },
   "files": {
-    "includes": [
-      "**",
-      "!.next",
-      "!.next",
-      "!node_modules",
-      "!node_modules",
-      "!playwright-report",
-      "!playwright-report",
-      "!test-results",
-      "!test-results"
-    ]
+    "includes": ["**", "!.next", "!node_modules", "!playwright-report", "!test-results"]
+  },
+  "assist": {
+    "enabled": true
   },
   "formatter": {
     "enabled": true,
@@ -22,7 +21,13 @@
   "linter": {
     "enabled": true,
     "rules": {
-      "recommended": true
+      "recommended": true,
+      "style": {
+        "useImportType": "error"
+      },
+      "suspicious": {
+        "noExplicitAny": "error"
+      }
     }
   },
   "javascript": {
@@ -30,6 +35,16 @@
       "quoteStyle": "double",
       "semicolons": "always",
       "trailingCommas": "all"
+    },
+    "globals": ["React"]
+  },
+  "json": {
+    "parser": {
+      "allowComments": true,
+      "allowTrailingCommas": true
+    },
+    "formatter": {
+      "trailingCommas": "none"
     }
   },
   "css": {

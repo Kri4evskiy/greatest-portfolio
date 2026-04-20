@@ -14,6 +14,7 @@
 - `Next.js` - frontend platform
 - `Python` - backend platform
 - `Supabase` - managed Postgres/storage/auth infrastructure
+- `Bun` - primary JS/TS package manager and script runner
 - `Playwright` - основной frontend e2e/smoke layer
 - `pytest` - основной backend test layer
 - frontend unit runner не входит в обязательный baseline стека
@@ -47,6 +48,7 @@
 - тяжёлые тесты и долгие проверки не должны жить в `pre-commit`;
 - `pre-push` используется для более серьёзных локальных проверок;
 - hooks не заменяют CI, а дополняют его.
+- root-level hooks могут оркестрировать процессы, но frontend-specific JS quality tooling должен запускаться из `frontend/` контекста.
 
 ## Agent Workflow
 

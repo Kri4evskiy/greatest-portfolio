@@ -178,7 +178,36 @@
 - в начале важнее собрать сам продукт и стабильные UI primitives;
 - Storybook полезен, когда UI-system уже начал оформляться.
 
-## 9. Documentation policy
+## 9. JavaScript package manager
+
+### Decision
+
+Используем `Bun` как основной package manager и script runner для JS/TS-части проекта.
+
+### Why
+
+- современный DX;
+- быстрые install и script execution;
+- хорошо сочетается с нашим `Next.js`/tooling stack;
+- позволяет держать единый `bun.lock` на root-level.
+
+### Repository operation model
+
+- root repository acts as orchestration layer;
+- `frontend/` owns JavaScript tooling configuration and staged-file quality workflows;
+- `backend/` remains an independent Python application layer inside the same repo.
+
+### Note about lint-staged
+
+`lint-staged` intentionally lives in `frontend/package.json`, even though hooks are triggered from the root repository.
+
+Why:
+
+- `Biome` configuration for staged frontend files should resolve from the `frontend` context;
+- this avoids cross-root configuration conflicts;
+- root-level workflow stays simple while frontend tooling remains locally coherent.
+
+## 10. Documentation policy
 
 ### Decision
 
@@ -201,11 +230,12 @@
 - `docs/PROJECT_STRUCTURE.md`
 - `docs/PYTHON_BACKEND.md`
 
-## 10. Current final baseline
+## 11. Current final baseline
 
 На текущий момент базовый стек проекта считается таким:
 
 - `Next.js`
+- `Bun`
 - `Python backend` (`FastAPI` как основной кандидат)
 - `Supabase`
 - `PostgreSQL`

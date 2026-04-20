@@ -7,20 +7,20 @@
 From repo root:
 
 ```bash
-npm run dev
-npm run build
-npm run check
-npm run test:e2e
+bun run dev
+bun run build
+bun run check
+bun run test:e2e
 ```
 
 Directly from `frontend/`:
 
 ```bash
-npm run dev
-npm run build
-npm run typecheck
-npm run check
-npm run test:e2e
+bun run dev
+bun run build
+bun run typecheck
+bun run check
+bun run test:e2e
 ```
 
 ## Stack
