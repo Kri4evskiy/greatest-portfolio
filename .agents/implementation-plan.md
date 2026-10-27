@@ -15,7 +15,7 @@
 
 ## ЭПИК 1: Фундамент монорепозитория, Каскадный ИИ-контекст и DX
 
-### [ ] Шаг 1.1: Инициализация Workspace (`pnpm` + `Turborepo`)
+### [x] Шаг 1.1: Инициализация Workspace (`pnpm` + `Turborepo`)
 - **Контекст ИИ:** `.agents/architecture/adr-stack.md`
 - **Что именно делаем (Implementation Notes):**
   1. Создаем корневой `package.json` (`"name": "greatest-portfolio"`, `"version": "0.0.1"`, `"private": true`, `"packageManager": "pnpm@..."`) со скриптами `dev`, `build`, `lint`, `typecheck`, `format`.
@@ -29,9 +29,10 @@
 - **Что именно делаем (Implementation Notes):**
   1. Корневой роутер `AGENTS.md` с жесткой таблицей маршрутизации контекста.
   2. Полное дерево правил `.agents/{architecture,frontend,backend}` и этот файл `.agents/implementation-plan.md`.
+  3. Интеграция официальных гайдов Next.js AI Agents (`nextjs.org/docs/app/guides/ai-agents`) и Vercel Engineering React Best Practices (`vercel-labs/agent-skills`) в `.agents/skills/react-next-best-practices/SKILL.md`.
 - **Критерий готовности:** Все файлы контекста созданы, очищены старые шаблонные папки и связаны с `AGENTS.md` *(Выполнено)*.
 
-### [ ] Шаг 1.3: Строгий TypeScript и `Biome.js`
+### [x] Шаг 1.3: Строгий TypeScript и `Biome.js`
 - **Контекст ИИ:** `.agents/architecture/adr-stack.md`
 - **Что именно делаем (Implementation Notes):**
   1. Создаем корневой `tsconfig.base.json` с флагами максимальной строгости:
@@ -44,7 +45,7 @@
   3. Создаем `biome.json`: включаем `organizeImports`, `linter` (правила `recommended`, `correctness`, `suspicious`, запрет `noExplicitAny`) и `formatter` (отступы 2 пробела, одинарные кавычки).
 - **Критерий готовности:** Команда `pnpm biome check .` выполняется за ~50–100 мс без ошибок.
 
-### [ ] Шаг 1.4: Pre-commit хуки (`Lefthook`) и Авто-версионирование
+### [x] Шаг 1.4: Pre-commit хуки (`Lefthook`) и Авто-версионирование
 - **Контекст ИИ:** `.agents/architecture/adr-stack.md`
 - **Что именно делаем (Implementation Notes):**
   1. Пишем Node.js скрипт `scripts/bump-patch-version.mjs`, который:

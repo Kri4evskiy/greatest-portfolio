@@ -16,8 +16,8 @@
 | **Архитектура / Почему выбрана технология (15 ADR)** | `.agents/architecture/adr-stack.md` | `turbo.json`, `biome.json`, `tsconfig.base.json` |
 | **Общие Zod-схемы и контракты API** | `.agents/architecture/shared-contracts.md` | `packages/shared-schemas/*` |
 | **UI-компоненты, Tailwind, shadcn/ui, Storybook, Workfolio UI** | `.agents/frontend/ui-storybook.md` | `packages/ui/*`, `apps/web/src/components/*` |
-| **Next.js, Workfolio CV, Роутинг, SSR/SSG, MDX, D3.js, Redact** | `.agents/frontend/development.md` | `apps/web/src/app/*`, `apps/web/content/*` |
-| **Стейт, Формы, Кэш (Zustand, TanStack Query, IndexedDB)** | `.agents/frontend/state-and-forms.md` | `apps/web/src/store/*`, `apps/web/src/hooks/*` |
+| **Next.js, Workfolio CV, Роутинг, SSR/SSG, MDX, D3.js, Redact** | `.agents/frontend/development.md` + `.agents/skills/react-next-best-practices/SKILL.md` | `apps/web/src/app/*`, `apps/web/content/*` |
+| **Стейт, Формы, Кэш (Zustand, TanStack Query, IndexedDB)** | `.agents/frontend/state-and-forms.md` + `.agents/skills/react-hook-form/SKILL.md` | `apps/web/src/store/*`, `apps/web/src/hooks/*` |
 | **Фронтенд Security (Middleware, RBAC UI, Guest Pass Modal)** | `.agents/frontend/security-auth.md` | `apps/web/src/middleware.ts`, `apps/web/src/features/auth/*` |
 | **NestJS Core, Модули, DTO, Пайпы** | `.agents/backend/development.md` | `apps/api/src/*` |
 | **Бэкенд Security (JWT, HttpOnly Cookies, Guards)** | `.agents/backend/security-jwt.md` | `apps/api/src/modules/auth/*` |

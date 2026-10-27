@@ -1,0 +1,11 @@
+pre-commit:
+  piped: true
+  commands:
+    1-biome-check:
+      glob: "*.{js,ts,cjs,mjs,d.cts,d.mts,jsx,tsx,json,jsonc}"
+      run: npx @biomejs/biome check --write --no-errors-on-unmatched --files-ignore-unknown=true {staged_files}
+      stage_fixed: true
+    2-typecheck:
+      run: pnpm turbo typecheck
+    3-bump-version:
+      run: node scripts/bump-patch-version.mjs --stage
