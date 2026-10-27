@@ -23,6 +23,18 @@ const CATEGORIES: ReadonlyArray<'All' | TechCategory> = [
   'Architecture',
 ];
 
+function formatYearsLabel(years: number): string {
+  const mod10 = years % 10;
+  const mod100 = years % 100;
+  if (mod10 === 1 && mod100 !== 11) {
+    return `${years} год`;
+  }
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) {
+    return `${years} года`;
+  }
+  return `${years} лет`;
+}
+
 export function TechRadarTable(): React.JSX.Element {
   const openAdrInspector = useUIStore((s) => s.openAdrInspector);
   const [selectedCategory, setSelectedCategory] = React.useState<'All' | TechCategory>('All');
@@ -58,7 +70,7 @@ export function TechRadarTable(): React.JSX.Element {
         accessorKey: 'name',
         header: 'Технология / Стек',
         cell: ({ row }) => (
-          <div>
+          <div className="min-w-[200px]">
             <p className="font-medium text-foreground">{row.original.name}</p>
             <p className="line-clamp-1 text-xs text-muted-foreground">{row.original.summary}</p>
           </div>
@@ -67,7 +79,11 @@ export function TechRadarTable(): React.JSX.Element {
       {
         accessorKey: 'category',
         header: 'Домен',
-        cell: ({ row }) => <Badge variant="secondary">{row.original.category}</Badge>,
+        cell: ({ row }) => (
+          <Badge variant="secondary" className="whitespace-nowrap">
+            {row.original.category}
+          </Badge>
+        ),
       },
       {
         accessorKey: 'level',
@@ -76,7 +92,11 @@ export function TechRadarTable(): React.JSX.Element {
           const level = row.original.level;
           const variant =
             level === 'Core' ? 'core' : level === 'Production' ? 'production' : 'experimental';
-          return <Badge variant={variant}>{level}</Badge>;
+          return (
+            <Badge variant={variant} className="whitespace-nowrap">
+              {level}
+            </Badge>
+          );
         },
       },
       {
@@ -85,29 +105,31 @@ export function TechRadarTable(): React.JSX.Element {
           <button
             type="button"
             onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
-            className="inline-flex items-center gap-1 font-medium hover:text-foreground"
+            className="inline-flex items-center gap-1 whitespace-nowrap font-medium hover:text-foreground"
           >
             <span>Опыт</span>
             <ArrowUpDown className="h-3.5 w-3.5" />
           </button>
         ),
         cell: ({ row }) => (
-          <span className="font-mono text-xs font-medium">{row.original.experienceYears} лет</span>
+          <span className="whitespace-nowrap font-mono text-xs font-medium">
+            {formatYearsLabel(row.original.experienceYears)}
+          </span>
         ),
       },
       {
         id: 'adrAction',
-        header: 'Архитектурное решение (ADR)',
+        header: 'Архитектурное решение',
         cell: ({ row }) => (
           <Button
             type="button"
             variant="outline"
             size="sm"
             onClick={() => openAdrInspector(row.original)}
-            className="h-7 text-xs"
+            className="h-7 whitespace-nowrap text-xs"
           >
-            <BookOpenCheck className="h-3.5 w-3.5 text-emerald-600" />
-            Почему в стеке? (ADR)
+            <BookOpenCheck className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
+            <span>Почему в стеке? (ADR)</span>
           </Button>
         ),
       },
@@ -168,7 +190,7 @@ export function TechRadarTable(): React.JSX.Element {
                 {headerGroup.headers.map((header) => (
                   <th
                     key={header.id}
-                    className="px-3.5 py-2.5 text-xs font-medium text-muted-foreground"
+                    className="whitespace-nowrap px-3.5 py-2.5 text-xs font-medium text-muted-foreground"
                   >
                     {header.isPlaceholder
                       ? null
