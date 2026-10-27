@@ -1,0 +1,16 @@
+---
+title: "Единые контракты API: Strict TypeScript + Zod между фронтендом и бэкендом"
+summary: "Как пакет @repo/shared-schemas исключает рассинхронизацию DTO между React Hook Form и NestJS ZodValidationPipe."
+readTime: "5 мин"
+embedGraph: "none"
+---
+
+## Главная боль Full-Stack проектов
+
+Когда фронтенд (`Next.js`) и бэкенд (`NestJS`) живут в отдельных репозиториях или описывают типы вручную, неизбежно возникает дрейф контрактов: поле переименовали в DTO на бэкенде, а форма на клиенте узнает об этом только в продакшене.
+
+## Единый источник истины в `@repo/shared-schemas`
+
+1. **Схема первична, тип вторичен:** Мы описываем валидацию один раз через `Zod` (`GuestPassFormSchema`, `ArticleMetaSchema`, `TelemetryEventSchema`) и выводим строгие типы через `z.infer<typeof Schema>`.
+2. **Экстремальная строгость TypeScript (`tsconfig.base.json`):** Включены флаги `strict: true`, `noUncheckedIndexedAccess: true` и `noImplicitOverride: true` — любой обращение к элементу массива по индексу обязано учитывать `T | undefined`.
+3. **Двойной контур защиты:** На клиенте схема подключена к `React Hook Form` через `@hookform/resolvers/zod`, а в `NestJS` — через `ZodValidationPipe`.

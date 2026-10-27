@@ -1,0 +1,16 @@
+---
+title: "Безопасность без компромиссов: JWT в HttpOnly Cookies, Next.js Edge и RBAC"
+summary: "Почему хранить JWT в LocalStorage опасно и как устроена сквозная авторизация GUEST -> USER -> ADMIN между Next.js и NestJS."
+readTime: "7 мин"
+embedGraph: "architecture-flow"
+---
+
+## Почему LocalStorage — антипаттерн для JWT
+
+Любой сторонний скрипт, браузерное расширение или уязвимость XSS на странице имеет полный доступ к `window.localStorage.getItem('token')`. Кроме того, `LocalStorage` недоступен на сервере во время выполнения `Next.js Edge Middleware` и `React Server Components`.
+
+## Архитектура защиты в нашем монорепозитории
+
+1. **Выпуск сессии (`POST /api/auth/guest-pass`):** Микро-форма в шапке сайта валидируется через `GuestPassFormSchema`, сохраняет запись `VisitorSession` в `Prisma ORM` (`Neon.tech PostgreSQL`) и выставляет заголовок `Set-Cookie: kb_access_token=<JWT>; HttpOnly; Secure; SameSite=Lax; Path=/`.
+2. **Проверка на границе (`apps/web/src/middleware.ts`):** При запросе к `/knowledge-base/*` Edge Middleware проверяет наличие куки за `~1 мс` до рендера страницы.
+3. **Ролевая защита API (`JwtRolesGuard` + `@Roles()`):** На стороне `NestJS` каждый эндпоинт `/api/knowledge/*` защищен декоратором `@Roles('USER', 'ADMIN')`.

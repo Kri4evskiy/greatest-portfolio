@@ -1,0 +1,19 @@
+---
+title: "Полный ADR-каталог: Почему, Где и Как выбраны 15 технологий нашего стека"
+summary: "Архитектурная защита каждого решения: от монорепозитория pnpm + Turborepo до разделения Zustand / TanStack Query и микросервисного SSE."
+readTime: "8 мин"
+embedGraph: "architecture-flow"
+---
+
+## Зачем нужен Architecture Decision Record (ADR)
+
+На техническом интервью уровня Senior / Staff Engineer главный вопрос звучит не *«Знаешь ли ты API библиотеки?»*, а **«Почему ты выбрал именно это решение и от каких альтернатив отказался?»**.
+
+В этом монорепозитории каждое из 15 архитектурных решений зафиксировано по формуле **Why (Почему) / Where (Где) / How (Как)**.
+
+## Ключевые архитектурные связки
+
+1. **pnpm + Turborepo + @repo/shared-schemas:** Полное устранение рассинхронизации типов между `Next.js` и `NestJS`. Схема валидации пишется один раз на `Zod` и одновременно работает в `React Hook Form` на клиенте и в `ZodValidationPipe` на сервере.
+2. **TanStack Query v5 + IndexedDB Persister vs Zustand:** Серверные данные никогда не смешиваются с клиентским UI-стейтом. Кэш запросов автоматически сохраняется в асинхронную транзакционную БД `IndexedDB` с политикой `TTL 24 часа` (Offline-First).
+3. **JWT в HttpOnly Cookies + Next.js Edge Middleware:** Полный отказ от хранения токенов в уязвимом к XSS `LocalStorage`. Кука `kb_access_token` с флагами `HttpOnly; SameSite=Lax` проверяется на уровне Edge до рендера закрытых страниц.
+4. **@nestjs/microservices + Server-Sent Events (@Sse):** Вынос аналитики в отдельный микросервис `apps/telemetry-ms` (TCP `:4001`) и стриминг живых событий в браузер поверх стандартного HTTP без оверхеда WebSockets.

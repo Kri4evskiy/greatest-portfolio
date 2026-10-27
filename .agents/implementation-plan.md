@@ -175,7 +175,7 @@
 
 ## ЭПИК 6: Закрытая База Знаний (`SSG` + `MDX` + `WebP` + `D3.js` + `TanStack Redact`)
 
-### [ ] Шаг 6.1: Layout Базы Знаний с Sidebar и MDX-движком (`SSG`)
+### [x] Шаг 6.1: Layout Базы Знаний с Sidebar и MDX-движком (`SSG`)
 - **Контекст ИИ:** `.agents/frontend/development.md`
 - **Что именно делаем (Implementation Notes):**
   1. Создаем защищенный Layout `/knowledge-base` с древовидным сайдбаром по 4 инженерным разделам:
@@ -187,7 +187,7 @@
   3. Создаем кастомный MDX-компонент `<ArticleImageGrid />` для рендера массивов изображений в формате `WebP` в адаптивной сетке, а также виджет метрик статьи (счетчик просмотров + кнопка `Helpful` с Optimistic UI через `TanStack Query` и кэшем в `IndexedDB`).
 - **Критерий готовности:** Любая новая статья добавляется простым созданием `.mdx` файла в `apps/web/content/` и автоматически появляется в сайдбаре и статической сборке.
 
-### [ ] Шаг 6.2: Интерактивные визуализации на `D3.js` и наполнение стартовых статей
+### [x] Шаг 6.2: Интерактивные визуализации на `D3.js` и наполнение стартовых статей
 - **Контекст ИИ:** `.agents/frontend/development.md`, `.agents/frontend/ui-storybook.md`
 - **Что именно делаем (Implementation Notes):**
   1. Разрабатываем 2 интерактивных компонента на `D3.js` (управляемых фильтрами из `Zustand`) для встраивания прямо внутрь `.mdx` статей:
@@ -196,7 +196,7 @@
   2. Наполняем стартовые инженерные статьи в `apps/web/content/` (включая полный каталог 15 ADR, разбор React 18 vs 19, JWT HttpOnly Security и TanStack Redact).
 - **Критерий готовности:** Внутри статей базы знаний работают живые интерактивные `D3.js`-графики, реагирующие на клики и переключатели режимов.
 
-### [ ] Шаг 6.3: Эксперимент с бандлом через `TanStack Redact`
+### [x] Шаг 6.3: Эксперимент с бандлом через `TanStack Redact`
 - **Контекст ИИ:** `.agents/frontend/development.md`
 - **Что именно делаем (Implementation Notes):**
   1. В `apps/web/next.config.ts` подключаем `@next/bundle-analyzer` и обертку экспериментального рантайма `TanStack Redact` (`ENABLE_REDACT=true`) с безопасным fallback на стандартный сборщик Next.js.
@@ -207,7 +207,7 @@
 
 ## ЭПИК 7: `Docker`, Мониторинг (`Sentry` + `PostHog`) и Релиз
 
-### [ ] Шаг 7.1: Контейнеризация (`Docker` + `docker-compose.yml`)
+### [x] Шаг 7.1: Контейнеризация (`Docker` + `docker-compose.yml`)
 - **Контекст ИИ:** `.agents/architecture/docker-deploy.md`
 - **Что именно делаем (Implementation Notes):**
   1. Пишем оптимизированные 3-ступенчатые `Dockerfile` (с использованием `turbo prune --docker` и `node:22-alpine` под `non-root` пользователем) в папке `docker/`:
@@ -217,7 +217,7 @@
   2. Собираем корневой `docker-compose.yml`, поднимающий `postgres`, `telemetry-ms`, `api` и `web` в единой сети с healthcheck'ами.
 - **Критерий готовности:** Конфигурация `docker compose` валидна и поднимает все сервисы монорепозитория одной командой.
 
-### [ ] Шаг 7.2: Интеграция `Sentry` и `PostHog`
+### [x] Шаг 7.2: Интеграция `Sentry` и `PostHog`
 - **Контекст ИИ:** `.agents/architecture/docker-deploy.md`
 - **Что именно делаем (Implementation Notes):**
   1. Подключаем перехват ошибок `Sentry` (`ErrorBoundary` / `global-error.tsx` в `apps/web` и `SentryExceptionFilter` в `apps/api`).

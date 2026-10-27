@@ -17,7 +17,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@repo/ui';
-import { ArrowLeft, BookOpen, Eye, ShieldCheck, ThumbsUp } from 'lucide-react';
+import { ArrowRight, BookOpen, Eye, ShieldCheck, ThumbsUp } from 'lucide-react';
 import Link from 'next/link';
 import type * as React from 'react';
 
@@ -78,51 +78,42 @@ export default function KnowledgeBasePage(): React.JSX.Element {
   const metricsBySlug = new Map((metrics ?? []).map((m) => [m.slug, m]));
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <Button asChild variant="ghost" size="sm">
-          <Link href="/">
-            <ArrowLeft className="h-4 w-4" />
-            Назад к Workfolio CV
-          </Link>
-        </Button>
-
-        <div className="flex items-center gap-2">
+    <div className="space-y-8">
+      <div className="space-y-2 border-b border-border pb-5">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2 text-xs font-mono text-muted-foreground">
+            <BookOpen className="h-4 w-4 text-emerald-600" />
+            <span>/knowledge-base • Protected by Edge Middleware & NestJS JwtRolesGuard</span>
+          </div>
           <Badge variant="core">
             <ShieldCheck className="h-3.5 w-3.5" />
-            Сессия активна: {session?.displayName ?? 'Authorized Guest'} ({session?.role})
+            {session?.displayName ?? 'Authorized Guest'} ({session?.role})
           </Badge>
         </div>
-      </div>
 
-      <div className="space-y-2 border-b border-border pb-6">
-        <div className="flex items-center gap-2 text-xs font-mono text-muted-foreground">
-          <BookOpen className="h-4 w-4 text-emerald-600" />
-          <span>/knowledge-base • Protected by Next.js Edge Middleware & NestJS JwtRolesGuard</span>
-        </div>
-        <h1 className="text-3xl font-bold tracking-tight">Engineering Base of Knowledge</h1>
+        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
+          Engineering Base of Knowledge (MDX + D3.js + IndexedDB)
+        </h1>
         <p className="max-w-2xl text-sm text-muted-foreground">
-          Закрытая база архитектурных разборов, ADR-документов и живых метрик. Все запросы метрик
-          кэшируются в браузерной БД <code className="font-mono">IndexedDB</code> (Offline-First,
-          TTL 24ч), а кнопка «Полезно» работает через Optimistic UI и транслирует событие в{' '}
-          <code className="font-mono">SSE</code>.
+          Выберите любую статью ниже или в древовидном сайдбаре слева, чтобы открыть полный
+          инженерный разбор с живыми графами <code className="font-mono">D3.js</code> и диаграммами{' '}
+          <code className="font-mono">&lt;ArticleImageGrid /&gt;</code>.
         </p>
       </div>
 
-      <div className="mt-6">
-        <Callout icon="⚡" title="Протестируйте Optimistic UI + Microservice SSE прямо сейчас">
-          Нажмите кнопку <strong>«Полезно»</strong> на любой карточке статьи ниже: счетчик мгновенно
-          обновится через <code className="font-mono">TanStack Query onMutate</code>, сохранится в{' '}
-          <code className="font-mono">NestJS + Prisma</code> и отправит real-time событие в футер
-          через микросервис <code className="font-mono">telemetry-ms</code>!
-        </Callout>
-      </div>
+      <Callout icon="⚡" title="Offline-First IndexedDB + Optimistic UI + SSE">
+        Все метрики кэшируются в браузерной БД <code className="font-mono">IndexedDB</code> на 24
+        часа. Нажмите <strong>«Полезно»</strong> или откройте статью — счетчик мгновенно обновится
+        через <code className="font-mono">TanStack Query onMutate</code> и отправит real-time ивент
+        в микросервис <code className="font-mono">telemetry-ms</code>.
+      </Callout>
 
-      <div className="mt-8 grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-2">
         {INITIAL_ARTICLES.map((article) => {
           const meta = metricsBySlug.get(article.slug);
           const viewsCount = meta?.viewsCount ?? 100;
           const helpfulCount = meta?.helpfulCount ?? 25;
+          const href = `/knowledge-base/${article.category}/${article.slug}`;
 
           return (
             <Card key={article.slug} className="flex flex-col justify-between">
@@ -133,35 +124,42 @@ export default function KnowledgeBasePage(): React.JSX.Element {
                     {article.readTime}
                   </span>
                 </div>
-                <CardTitle className="mt-2 text-lg leading-snug">{article.title}</CardTitle>
+                <CardTitle className="mt-2 text-base leading-snug">
+                  <Link href={href} className="hover:underline">
+                    {article.title}
+                  </Link>
+                </CardTitle>
                 <CardDescription className="mt-1 text-xs leading-relaxed">
                   {article.summary}
                 </CardDescription>
               </CardHeader>
               <CardContent className="flex items-center justify-between border-t border-border/60 pt-4">
-                <div className="flex items-center gap-3 text-xs text-muted-foreground font-mono">
+                <div className="flex items-center gap-2 text-xs text-muted-foreground font-mono">
                   <span className="inline-flex items-center gap-1">
                     <Eye className="h-3.5 w-3.5" />
-                    {viewsCount} views
+                    {viewsCount}
                   </span>
                   <span>•</span>
-                  <span>{helpfulCount} helpful</span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      helpfulMutation.mutate({
+                        slug: article.slug,
+                        category: article.category,
+                      })
+                    }
+                    className="inline-flex items-center gap-1 text-emerald-600 hover:underline"
+                  >
+                    <ThumbsUp className="h-3 w-3" />
+                    {helpfulCount}
+                  </button>
                 </div>
 
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={() =>
-                    helpfulMutation.mutate({
-                      slug: article.slug,
-                      category: article.category,
-                    })
-                  }
-                  className="h-8 gap-1.5 text-xs"
-                >
-                  <ThumbsUp className="h-3.5 w-3.5 text-emerald-600" />
-                  Полезно ({helpfulCount})
+                <Button asChild size="sm" variant="outline" className="h-8 gap-1 text-xs">
+                  <Link href={href}>
+                    Читать и открыть D3.js
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </Link>
                 </Button>
               </CardContent>
             </Card>
@@ -170,8 +168,8 @@ export default function KnowledgeBasePage(): React.JSX.Element {
       </div>
 
       {/* Built-in Full 15 ADR Quick Reference inside Knowledge Base */}
-      <section className="mt-12 space-y-4">
-        <h2 className="text-xl font-semibold tracking-tight">
+      <section className="pt-4 space-y-4">
+        <h2 className="text-lg font-semibold tracking-tight">
           Реестр всех 15 Архитектурных Решений (ADR Summary)
         </h2>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
