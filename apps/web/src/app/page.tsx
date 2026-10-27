@@ -1,15 +1,7 @@
 import { AdrInspectorModal } from '@/components/cv/adr-inspector-modal';
 import { TechRadarTable } from '@/components/cv/tech-radar-table';
 import { UnlockKbBanner } from '@/components/cv/unlock-kb-banner';
-import {
-  Badge,
-  Callout,
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@repo/ui';
+import { Badge, Card, CardContent, CardDescription, CardHeader, CardTitle } from '@repo/ui';
 import {
   Award,
   Briefcase,
@@ -295,25 +287,8 @@ export default function WorkfolioLandingPage(): React.JSX.Element {
         </div>
       </div>
 
-      {/* Notion Callout: Live Architecture Overview */}
-      <Callout icon="🧭" title="Live Architecture Inspector (Why this Workfolio is unique)">
-        Вы находитесь внутри живого монорепозитория{' '}
-        <span className="font-mono text-xs font-medium text-foreground">pnpm + Turborepo</span>:
-        верхний хедер проверяет вашу роль через{' '}
-        <span className="font-mono text-xs font-medium text-foreground">
-          NestJS JWT HttpOnly Cookies
-        </span>
-        , клиентский кэш синхронизируется с браузерной БД{' '}
-        <span className="font-mono text-xs font-medium text-foreground">IndexedDB (TTL 24h)</span>,
-        а в футере работает реактивный поток{' '}
-        <span className="font-mono text-xs font-medium text-foreground">
-          Server-Sent Events (@Sse)
-        </span>{' '}
-        от микросервиса телеметрии.
-      </Callout>
-
-      {/* Protected Knowledge Base Quick Unlock Banner */}
-      <section className="mt-8">
+      {/* Unified Interactive Knowledge Base Callout & 1-Click Unlock */}
+      <section className="mt-6">
         <UnlockKbBanner />
       </section>
 

@@ -46,7 +46,7 @@ export function LiveSseFooter(): React.JSX.Element {
 
   return (
     <footer className="mt-20 border-t border-border/80 bg-muted/40">
-      <div className="mx-auto flex max-w-5xl flex-col justify-between gap-4 px-4 py-6 text-xs text-muted-foreground sm:flex-row sm:items-center sm:px-6">
+      <div className="mx-auto flex max-w-4xl flex-col justify-between gap-4 px-4 py-6 text-xs text-muted-foreground sm:flex-row sm:items-center sm:px-6">
         <div className="flex flex-wrap items-center gap-3">
           <Badge variant="secondary" className="font-mono">
             <Cpu className="h-3 w-3" />
