@@ -1,59 +1,53 @@
-# greatest-portfolio
+# Greatest Portfolio & Engineering Knowledge Base
 
-Engineering-first portfolio platform.
+Production-grade Full-Stack монорепозиторий персонального портфолио (в эстетике **Notion Workfolio**) и закрытой интерактивной Инженерной Базы Знаний с демонстрацией современной Enterprise-архитектуры.
 
-## What this repo is becoming
+## 🏛️ Архитектурный стек (15 ключевых решений)
 
-- `Next.js` frontend platform
-- `Python` backend platform
-- `Supabase` + `PostgreSQL`
-- `Bun` for JS/TS package management and script execution
-- `TypeScript 6` on the frontend
-- AI-first workflow with local agent docs
+1. **Монорепозиторий:** `pnpm` Workspaces + `Turborepo`
+2. **DX и качество кода:** `TypeScript (Strict)` + `Biome.js` + `Lefthook` (с авто-инкрементом патч-версии при коммите)
+3. **Frontend-платформа:** `Next.js (App Router)` — гибрид SSG + SSR + RSC + Edge Middleware
+4. **Разделение стейта:** `TanStack Query v5` (серверный кэш) + `Zustand` (клиентский UI-стейт)
+5. **Offline-First БД в браузере:** `IndexedDB` (`idb-keyval` + TanStack Query Persister с TTL 24 часа)
+6. **Формы и сквозная валидация:** `React Hook Form` + `Zod` (`packages/shared-schemas`)
+7. **UI-система и документация:** `Tailwind CSS` + `shadcn/ui` (Radix UI) + `Storybook`
+8. **Таблицы и экспериментальный рантайм:** `TanStack Table` (Tech Radar + ADR) & `TanStack Redact`
+9. **Контент и визуализация:** `MDX` + `WebP` (`next/image` гриды) + интерактивные графы `D3.js`
+10. **Основной Backend:** `NestJS` (модульная DI-архитектура)
+11. **Безопасность:** `JWT` в `HttpOnly Cookies` (`kb_access_token`) + `RBAC` (`GUEST` / `USER` / `ADMIN`)
+12. **База данных и ORM:** `PostgreSQL` (`Neon.tech`) + `Prisma ORM`
+13. **Микросервисы и Real-Time:** `@nestjs/microservices` (`apps/telemetry-ms`) + `Server-Sent Events (@Sse)`
+14. **Инфраструктура:** `Docker` (Multi-stage builds с `turbo prune`) + `Docker Compose`
+15. **Наблюдаемость:** `Sentry` (Error Tracking) + `PostHog` (Product Analytics & Feature Flags)
 
-## Main commands
+## 📂 Структура монорепозитория
 
-```bash
-bun install
-bun run dev
-bun run build
-bun run check
-bun run test
-bun run format
+```text
+greatest-portfolio/
+├── .agents/                    # Каскадная система контекста и ADR для ИИ-агентов
+│   ├── implementation-plan.md  # Пошаговый план реализации (Эпики 1–7)
+│   ├── architecture/           # ADR-каталог, общие контракты, Docker & Observability
+│   ├── frontend/               # Правила Next.js, Workfolio UI, Storybook, State, Auth
+│   └── backend/                # Правила NestJS, JWT Security, Prisma, Microservices & SSE
+├── apps/
+│   ├── web/                    # Next.js App Router (Workfolio CV + закрытая Knowledge Base)
+│   ├── api/                    # Основной бэкенд NestJS + Prisma + SSE Stream
+│   └── telemetry-ms/           # Микросервис телеметрии и аналитики (@nestjs/microservices)
+├── packages/
+│   ├── shared-schemas/         # Единые Zod-схемы и TS-типы для фронта и бэка
+│   └── ui/                     # UI-кит (Tailwind + shadcn/ui + Storybook)
+├── docker/                     # Multi-stage Dockerfiles
+├── scripts/                    # Скрипты автоматизации (авто-бамп версии и др.)
+├── AGENTS.md                   # Корневой роутер контекста для ИИ
+├── biome.json                  # Единый линтер и форматтер (Rust)
+├── lefthook.yml                # Git-хуки (Biome + Typecheck + Semver bump)
+├── pnpm-workspace.yaml         # Конфигурация пакетов монорепозитория
+├── tsconfig.base.json          # Строгий базовый конфиг TypeScript
+└── turbo.json                  # Пайплайны сборки и кэширования Turborepo
 ```
 
-`bun run dev` запускает `frontend` и `backend` вместе из корня репозитория.
+## 🚀 Навигация по документации
 
-Git workflow quality gates:
-
-- `pre-commit` запускает быстрый staged-only `Biome` autofix для frontend-файлов
-- `pre-push` запускает `bun run check`
-
-Repository workflow model:
-
-- корень репозитория оркестрирует общий workflow
-- `frontend/` владеет JS/TS quality tooling, включая `Biome` и `lint-staged`
-- `backend/` живёт отдельно как Python application layer
-
-Endpoints during local development:
-
-- frontend: `http://localhost:3000`
-- backend: `http://127.0.0.1:8000`
-
-## Core docs
-
-- `PROJECT_PLAN.md`
-- `ARCHITECTURE.md`
-- `STACK_DECISIONS.md`
-- `AGENTS.md`
-- `docs/README.md`
-- `docs/PROJECT_STRUCTURE.md`
-- `docs/PYTHON_BACKEND.md`
-
-## Documentation rule
-
-Документация обязательна к актуализации.
-
-Если меняется архитектура, стек, структура проекта или базовые правила работы, нужно обновлять релевантные `.md` файлы.
-
-`README.md` должен оставаться коротким и служить входной точкой. Детали должны жить в документах внутри `docs/` и в профильных root-level спецификациях.
+- [Корневой роутер контекста ИИ (`AGENTS.md`)](./AGENTS.md)
+- [Пошаговый план реализации и Implementation Notes (`.agents/implementation-plan.md`)](./.agents/implementation-plan.md)
+- [Полный каталог ADR: Почему, Где и Как (`.agents/architecture/adr-stack.md`)](./.agents/architecture/adr-stack.md)
