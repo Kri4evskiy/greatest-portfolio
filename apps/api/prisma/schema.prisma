@@ -1,0 +1,41 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model VisitorSession {
+  id          String   @id @default(uuid())
+  displayName String
+  visitorType String
+  role        String   @default("USER")
+  userAgent   String?
+  createdAt   DateTime @default(now())
+  expiresAt   DateTime
+
+  @@index([role])
+  @@map("visitor_sessions")
+}
+
+model ArticleMetrics {
+  slug         String   @id
+  category     String
+  viewsCount   Int      @default(0)
+  helpfulCount Int      @default(0)
+  updatedAt    DateTime @updatedAt
+
+  @@map("article_metrics")
+}
+
+model SystemEventLog {
+  id        String   @id @default(uuid())
+  eventType String
+  payload   Json
+  createdAt DateTime @default(now())
+
+  @@index([eventType, createdAt])
+  @@map("system_event_logs")
+}

@@ -62,7 +62,7 @@
 
 ## ЭПИК 2: Общие контракты (`packages/shared-schemas`) и UI-Kit (`packages/ui`)
 
-### [ ] Шаг 2.1: Создание пакета `packages/shared-schemas` (`Zod`)
+### [x] Шаг 2.1: Создание пакета `packages/shared-schemas` (`Zod`)
 - **Контекст ИИ:** `.agents/architecture/shared-contracts.md`
 - **Что именно делаем (Implementation Notes):**
   1. Инициализируем пакет `@repo/shared-schemas` (`packages/shared-schemas/package.json`, `tsconfig.json`).
@@ -74,7 +74,7 @@
      - `TechRadarItemSchema` + массив всех 15 технологий нашего стека с заполненными полями `adrWhy`, `adrWhere`, `adrHow`.
 - **Критерий готовности:** Пакет `@repo/shared-schemas` успешно проходит `pnpm --filter @repo/shared-schemas typecheck`.
 
-### [ ] Шаг 2.2: Создание пакета `packages/ui` (`Tailwind CSS` + `shadcn/ui` + `Storybook`)
+### [x] Шаг 2.2: Создание пакета `packages/ui` (`Tailwind CSS` + `shadcn/ui` + `Storybook`)
 - **Контекст ИИ:** `.agents/frontend/ui-storybook.md`
 - **Что именно делаем (Implementation Notes):**
   1. Инициализируем пакет `@repo/ui` (`packages/ui`).
@@ -88,7 +88,7 @@
 
 ## ЭПИК 3: Бэкенд — `NestJS`, `PostgreSQL (Neon)` и `Prisma` (`apps/api`)
 
-### [ ] Шаг 3.1: Инициализация `apps/api` (`NestJS`) и подключение `Prisma ORM`
+### [x] Шаг 3.1: Инициализация `apps/api` (`NestJS`) и подключение `Prisma ORM`
 - **Контекст ИИ:** `.agents/backend/development.md`, `.agents/backend/database-prisma.md`
 - **Что именно делаем (Implementation Notes):**
   1. Создаем приложение `@repo/api` (`apps/api`) на `NestJS` (порт `4000`, префикс `/api`).
@@ -99,7 +99,7 @@
   3. Создаем глобальный `PrismaModule` и `PrismaService`, а также `ZodValidationPipe` для валидации DTO через `@repo/shared-schemas`.
 - **Критерий готовности:** `prisma generate` генерирует типы `PrismaClient`, миграция готова к применению, `apps/api` успешно собирается.
 
-### [ ] Шаг 3.2: Модуль Авторизации (`AuthModule`), `JWT` в `HttpOnly Cookies` и `RBAC Guards`
+### [x] Шаг 3.2: Модуль Авторизации (`AuthModule`), `JWT` в `HttpOnly Cookies` и `RBAC Guards`
 - **Контекст ИИ:** `.agents/backend/security-jwt.md`
 - **Что именно делаем (Implementation Notes):**
   1. Подключаем `@nestjs/jwt` и `cookie-parser`.
@@ -110,7 +110,7 @@
   3. Создаем декоратор `@Roles(...)` и `JwtRolesGuard`.
 - **Критерий готовности:** Запрос к `POST /api/auth/guest-pass` возвращает заголовок `Set-Cookie: kb_access_token=...; HttpOnly` и сохраняет сессию.
 
-### [ ] Шаг 3.3: Модуль метаданных Базы Знаний (`KnowledgeModule`)
+### [x] Шаг 3.3: Модуль метаданных Базы Знаний (`KnowledgeModule`)
 - **Контекст ИИ:** `.agents/backend/development.md`
 - **Что именно делаем (Implementation Notes):**
   1. Реализуем защищенные декоратором `@Roles('USER', 'ADMIN')` и `JwtRolesGuard` эндпоинты:
@@ -123,14 +123,14 @@
 
 ## ЭПИК 4: Микросервис и Server-Sent Events (`apps/telemetry-ms` + `SSE`)
 
-### [ ] Шаг 4.1: Создание микросервиса `apps/telemetry-ms` (`@nestjs/microservices`)
+### [x] Шаг 4.1: Создание микросервиса `apps/telemetry-ms` (`@nestjs/microservices`)
 - **Контекст ИИ:** `.agents/backend/microservices-sse.md`
 - **Что именно делаем (Implementation Notes):**
   1. Создаем приложение `@repo/telemetry-ms` (`apps/telemetry-ms`) на базе `@nestjs/microservices` (транспорт `Transport.TCP`, порт `4001`).
   2. Реализуем контроллер с `@EventPattern('telemetry.event')` и `@MessagePattern('telemetry.stats')`, который валидирует и обогащает события (`GUEST_PASS_ISSUED`, `ARTICLE_VIEWED`, `ARTICLE_HELPFUL`).
 - **Критерий готовности:** Микросервис запускается и принимает события от основного бэкенда `apps/api`.
 
-### [ ] Шаг 4.2: Эндпоинт Server-Sent Events (`@Sse('/api/telemetry/stream')`)
+### [x] Шаг 4.2: Эндпоинт Server-Sent Events (`@Sse('/api/telemetry/stream')`)
 - **Контекст ИИ:** `.agents/backend/microservices-sse.md`
 - **Что именно делаем (Implementation Notes):**
   1. В `apps/api` создаем `TelemetryModule`, который связывается с `apps/telemetry-ms` через `ClientsModule` (`ClientProxy`).
@@ -141,7 +141,7 @@
 
 ## ЭПИК 5: Фронтенд — Ядро `Next.js`, Авторизация и Публичное CV в стиле Workfolio (`apps/web`)
 
-### [ ] Шаг 5.1: Инициализация `apps/web` (`Next.js App Router`) и Провайдеров
+### [x] Шаг 5.1: Инициализация `apps/web` (`Next.js App Router`) и Провайдеров
 - **Контекст ИИ:** `.agents/frontend/development.md`, `.agents/frontend/state-and-forms.md`
 - **Что именно делаем (Implementation Notes):**
   1. Инициализируем приложение `@repo/web` (`apps/web`), подключаем `@repo/ui` и `@repo/shared-schemas`.
@@ -150,7 +150,7 @@
      - `useUIStore` (открытие модалки Guest Pass, активная карточка ADR Inspector, фильтр таблицы, состояние сайдбара Базы Знаний и контролов D3.js).
 - **Критерий готовности:** Во вкладке `Application -> IndexedDB` в DevTools создается хранилище кэша запросов `TanStack Query`.
 
-### [ ] Шаг 5.2: Защита роутов (`Next.js Middleware`) и Микро-форма для Team Lead
+### [x] Шаг 5.2: Защита роутов (`Next.js Middleware`) и Микро-форма для Team Lead
 - **Контекст ИИ:** `.agents/frontend/security-auth.md`, `.agents/frontend/state-and-forms.md`
 - **Что именно делаем (Implementation Notes):**
   1. Пишем `apps/web/src/middleware.ts`, проверяющий наличие куки `kb_access_token` при переходе на `/knowledge-base/*`. Если куки нет — редирект на `/?unlock=knowledge-base`.
@@ -160,7 +160,7 @@
      - После сабмита замок меняется на `🔓` и открывается переход в `/knowledge-base`.
 - **Критерий готовности:** Полный цикл от клика по заблокированной вкладке до получения `HttpOnly` куки и перехода в `/knowledge-base` работает бесшовно.
 
-### [ ] Шаг 5.3: Верстка главной страницы CV в стиле Notion Workfolio и матрицы навыков (`TanStack Table`)
+### [x] Шаг 5.3: Верстка главной страницы CV в стиле Notion Workfolio и матрицы навыков (`TanStack Table`)
 - **Контекст ИИ:** `.agents/frontend/development.md`, `.agents/frontend/ui-storybook.md`
 - **Что именно делаем (Implementation Notes):**
   1. Реализуем стартовую страницу `/` по визуальному канону **Notion Workfolio** (`https://www.notion.com/templates/workfolio`):

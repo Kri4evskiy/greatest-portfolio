@@ -44,11 +44,14 @@
       "style": {
         "noNonNullAssertion": "error",
         "useConst": "error",
-        "useImportType": "error"
+        "useImportType": "off"
       }
     }
   },
   "javascript": {
+    "parser": {
+      "unsafeParameterDecoratorsEnabled": true
+    },
     "formatter": {
       "quoteStyle": "single",
       "jsxQuoteStyle": "double",

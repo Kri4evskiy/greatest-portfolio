@@ -1,6 +1,6 @@
 {
   "name": "greatest-portfolio",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "private": true,
   "description": "Senior Full-Stack Portfolio (Workfolio UI) & Protected Engineering Knowledge Base",
   "packageManager": "pnpm@10.6.5",
@@ -15,6 +15,7 @@
     "format": "biome format --write .",
     "typecheck": "turbo run typecheck",
     "bump:version": "node scripts/bump-patch-version.mjs",
+    "postinstall": "pnpm --filter @repo/shared-schemas build",
     "prepare": "lefthook install"
   },
   "devDependencies": {
