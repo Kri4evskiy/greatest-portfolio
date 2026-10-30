@@ -1,41 +1,36 @@
-import { KNOWLEDGE_CATEGORY_LABELS } from '@repo/shared-schemas'
+import { DEFAULT_LOCALE, KNOWLEDGE_CATEGORY_LABELS, SupportedLocaleEnum } from '@repo/shared-schemas'
 import { Badge, Callout, Card, CardContent, CardDescription, CardHeader, CardTitle } from '@repo/ui'
 import { ArrowRight, Clock, Database, ShieldCheck, Sparkles } from 'lucide-react'
-import Link from 'next/link'
+import { getTranslations, setRequestLocale } from 'next-intl/server'
+import { Link } from '@/i18n/navigation'
 import { getAllKnowledgeArticles } from '@/lib/mdx-content'
 
-export default function KnowledgeBaseIndexPage() {
-  const articles = getAllKnowledgeArticles()
+export default async function KnowledgeBaseIndexPage({ params }: { params: Promise<{ locale: string }> }) {
+  const { locale } = await params
+  const parsed = SupportedLocaleEnum.safeParse(locale)
+  const resolvedLocale = parsed.success ? parsed.data : DEFAULT_LOCALE
+  setRequestLocale(resolvedLocale)
+
+  const t = await getTranslations({ locale: resolvedLocale, namespace: 'KnowledgeBase' })
+  const articles = getAllKnowledgeArticles(resolvedLocale)
 
   return (
     <div className="space-y-8">
       <div className="space-y-3 border-b border-border/70 pb-6">
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant="success" className="font-mono text-xs">
-            🔓 Protected Engineering Knowledge Base
+            {t('protectedBadge')}
           </Badge>
           <Badge variant="outline" className="font-mono text-xs">
             SSG + MDX + D3.js + WebP + IndexedDB
           </Badge>
         </div>
-        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
-          Инженерная База Знаний и Архитектурные Разборы
-        </h1>
-        <p className="text-sm text-muted-foreground leading-relaxed">
-          Все статьи ниже скомпилированы статически на этапе сборки (<code>SSG</code> из{' '}
-          <code>apps/web/content/*.mdx</code>), содержат интерактивные симуляции на <code>D3.js</code> и кэшируют
-          пользовательские метрики в браузерной БД <code>IndexedDB</code> через <code>TanStack Query v5</code>.
-        </p>
+        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{t('title')}</h1>
+        <p className="text-sm text-muted-foreground leading-relaxed">{t('description')}</p>
       </div>
 
-      <Callout
-        variant="success"
-        title="Доступ подтвержден (Next.js Edge Middleware + NestJS JWT HttpOnly Cookie)"
-        icon={<ShieldCheck className="h-4 w-4" />}
-      >
-        Вы успешно прошли проверку куки <code>kb_access_token</code>. Откройте вкладку{' '}
-        <code>Application → IndexedDB</code> в Chrome DevTools, чтобы увидеть клиентский кэш{' '}
-        <code>greatest-portfolio-query-cache</code>.
+      <Callout variant="success" title={t('calloutTitle')} icon={<ShieldCheck className="h-4 w-4" />}>
+        {t('calloutBody')}
       </Callout>
 
       <div className="grid gap-4 sm:grid-cols-2">
@@ -65,7 +60,7 @@ export default function KnowledgeBaseIndexPage() {
                 <div className="flex items-center justify-between border-t border-border/60 pt-3 font-mono text-xs text-primary">
                   <span className="flex items-center gap-1">
                     <Sparkles className="h-3.5 w-3.5" />
-                    Открыть статью и D3-граф
+                    {t('openArticleCta')}
                   </span>
                   <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-1" />
                 </div>
@@ -78,13 +73,9 @@ export default function KnowledgeBaseIndexPage() {
       <div className="rounded-xl border border-border bg-muted/30 p-4 text-xs text-muted-foreground">
         <div className="flex items-center gap-2 font-mono font-semibold text-foreground">
           <Database className="h-4 w-4 text-primary" />
-          <span>Как добавить новую статью в Базу Знаний:</span>
+          <span>{t('howToAddTitle')}</span>
         </div>
-        <p className="mt-1">
-          Достаточно создать файл <code>.mdx</code> в любой из папок{' '}
-          <code>apps/web/content/&#123;typescript,react,nestjs-prisma,architecture-devops&#125;/</code>. Функция{' '}
-          <code>generateStaticParams()</code> автоматически включит его в SSG-сборку и древовидный сайдбар.
-        </p>
+        <p className="mt-1">{t('howToAddBody')}</p>
       </div>
     </div>
   )

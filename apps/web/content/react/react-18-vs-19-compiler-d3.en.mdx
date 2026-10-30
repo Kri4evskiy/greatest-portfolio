@@ -1,0 +1,31 @@
+---
+title: "React 18 vs React 19: React Compiler, the use() Hook, and Interactive D3.js Graphs"
+summary: "Comparing manual memoization (useMemo / useCallback) in React 18 with automatic React 19 Compiler optimization and streaming promises."
+category: "react"
+readingTime: "10 min"
+publishedAt: "2026-10-18"
+---
+
+## 1. Evolution of the Rendering Model: From Manual `useMemo` to the Compiler
+
+In **React 18**, engineers had to manually wrap computations in `useMemo`, callbacks in `useCallback`, and child components in `React.memo`. Missing a single object or function reference caused local filter updates to trigger cascading re-renders across the entire subtree (such as a complex `TanStack Table`).
+
+In **React 19** combined with **Next.js 16 App Router**, we gain:
+- Automatic dependency graph memoization at compile time.
+- First-class promise unwrapping via the `use(promise)` hook inside `<Suspense>` boundaries.
+- Asynchronous server contracts (`await params`, `await searchParams`, `await cookies()`).
+
+<ReactRenderGraphD3 />
+
+## 2. Integrating `D3.js` and `Zustand` with Zero Wasted Re-renders
+
+Interactive SVG graphs built with `D3.js` often clash with React's Virtual DOM if transient animation coordinates are stored in `useState`. Our implementation follows strict rules from `react-next-best-practices`:
+
+```typescript
+// Atomic Zustand selector (never destructure the entire store)
+const mode = useUIStore((s) => s.reactGraphMode);
+const svgRef = useRef<SVGSVGElement | null>(null);
+```
+
+1. **DOM Isolation:** React owns only the root `<svg ref={svgRef} />` element, while tree layout math (`d3.tree()`, `d3.linkHorizontal()`) runs imperatively inside `useEffect`.
+2. **Lazy Chunk Loading (`next/dynamic`):** Heavy `D3.js` modules load on demand only when opening a Knowledge Base article, keeping the initial CV bundle minimal.

@@ -1,6 +1,6 @@
 'use client'
 
-import { TECH_RADAR_ITEMS, type TechCategory, type TechRadarItem } from '@repo/shared-schemas'
+import { getTechRadarItems, type SupportedLocale, type TechCategory, type TechRadarItem } from '@repo/shared-schemas'
 import { Badge, Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Input } from '@repo/ui'
 import {
   type ColumnDef,
@@ -11,6 +11,7 @@ import {
   useReactTable,
 } from '@tanstack/react-table'
 import { ArrowUpDown, BookOpenCheck, Compass, Layers, Search, Sparkles } from 'lucide-react'
+import { useLocale, useTranslations } from 'next-intl'
 import { useMemo, useState } from 'react'
 import { trackEvent } from '@/lib/analytics'
 import { useUIStore } from '@/store/use-ui-store'
@@ -25,6 +26,10 @@ const CATEGORIES: ReadonlyArray<TechCategory | 'ALL'> = [
 ]
 
 export function TechRadarTable() {
+  const locale = useLocale() as SupportedLocale
+  const t = useTranslations('TechRadar')
+  const localizedItems = useMemo(() => getTechRadarItems(locale), [locale])
+
   const categoryFilter = useUIStore((s) => s.techRadarCategoryFilter)
   const searchQuery = useUIStore((s) => s.techRadarSearch)
   const selectedAdrItem = useUIStore((s) => s.selectedAdrItem)
@@ -35,9 +40,14 @@ export function TechRadarTable() {
 
   const [sorting, setSorting] = useState<SortingState>([{ id: 'adrNumber', desc: false }])
 
+  const activeDialogItem = useMemo(() => {
+    if (!selectedAdrItem) return null
+    return localizedItems.find((item) => item.id === selectedAdrItem.id) ?? selectedAdrItem
+  }, [localizedItems, selectedAdrItem])
+
   const filteredData = useMemo(() => {
     const normalizedQuery = searchQuery.trim().toLowerCase()
-    return TECH_RADAR_ITEMS.filter((item) => {
+    return localizedItems.filter((item) => {
       const matchesCategory = categoryFilter === 'ALL' || item.category === categoryFilter
       if (!matchesCategory) return false
       if (!normalizedQuery) return true
@@ -47,7 +57,7 @@ export function TechRadarTable() {
         item.category.toLowerCase().includes(normalizedQuery)
       )
     })
-  }, [categoryFilter, searchQuery])
+  }, [categoryFilter, localizedItems, searchQuery])
 
   const columns = useMemo<ColumnDef<TechRadarItem>[]>(
     () => [
@@ -71,7 +81,7 @@ export function TechRadarTable() {
       },
       {
         accessorKey: 'name',
-        header: 'Технология / Инструмент',
+        header: t('colTech'),
         cell: ({ row }) => (
           <div>
             <div className="font-medium text-sm text-foreground">{row.original.name}</div>
@@ -81,7 +91,7 @@ export function TechRadarTable() {
       },
       {
         accessorKey: 'category',
-        header: 'Домен',
+        header: t('colDomain'),
         cell: ({ row }) => (
           <Badge variant="secondary" className="font-mono text-[11px] whitespace-nowrap">
             {row.original.category}
@@ -90,7 +100,7 @@ export function TechRadarTable() {
       },
       {
         accessorKey: 'level',
-        header: 'Статус',
+        header: t('colStatus'),
         cell: ({ row }) => {
           const level = row.original.level
           const variant = level === 'Core' ? 'success' : level === 'Production' ? 'default' : 'warning'
@@ -109,11 +119,15 @@ export function TechRadarTable() {
             onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
             className="flex items-center gap-1 font-mono text-xs font-semibold text-muted-foreground hover:text-foreground"
           >
-            <span>Опыт</span>
+            <span>{t('colExp')}</span>
             <ArrowUpDown className="h-3 w-3" />
           </button>
         ),
-        cell: ({ row }) => <span className="font-mono text-xs font-medium">{row.original.experienceYears}+ лет</span>,
+        cell: ({ row }) => (
+          <span className="font-mono text-xs font-medium">
+            {t('yearsSuffix', { years: row.original.experienceYears })}
+          </span>
+        ),
       },
       {
         id: 'actions',
@@ -134,13 +148,13 @@ export function TechRadarTable() {
               className="h-7 gap-1 font-mono text-xs"
             >
               <BookOpenCheck className="h-3.5 w-3.5" />
-              <span>Почему / Где / Как</span>
+              <span>{t('inspectBtn')}</span>
             </Button>
           </div>
         ),
       },
     ],
-    [openAdrInspector],
+    [openAdrInspector, t],
   )
 
   const table = useReactTable({
@@ -160,16 +174,12 @@ export function TechRadarTable() {
         <div>
           <div className="flex items-center gap-2">
             <Compass className="h-5 w-5 text-primary" />
-            <h2 className="text-xl font-bold tracking-tight">Tech Radar Database (15 Architecture Decision Records)</h2>
+            <h2 className="text-xl font-bold tracking-tight">{t('title')}</h2>
           </div>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Интерактивная база данных в стиле Notion на движке{' '}
-            <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">TanStack Table</code>. Нажмите{' '}
-            <strong>«Почему / Где / Как»</strong> на любой строке для просмотра ADR.
-          </p>
+          <p className="mt-1 text-sm text-muted-foreground">{t('subtitle')}</p>
         </div>
         <Badge variant="outline" className="w-fit font-mono text-xs">
-          Показано: {filteredData.length} из {TECH_RADAR_ITEMS.length}
+          {t('shownCount', { filtered: filteredData.length, total: localizedItems.length })}
         </Badge>
       </div>
 
@@ -188,7 +198,7 @@ export function TechRadarTable() {
                     : 'bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground'
                 }`}
               >
-                {category === 'ALL' ? 'Все домены (15)' : category}
+                {category === 'ALL' ? t('allDomains') : category}
               </button>
             )
           })}
@@ -199,7 +209,7 @@ export function TechRadarTable() {
           <Input
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Поиск по стеку или ADR..."
+            placeholder={t('searchPlaceholder')}
             className="h-8 pl-8 text-xs"
           />
         </div>
@@ -232,7 +242,7 @@ export function TechRadarTable() {
             ) : (
               <tr>
                 <td colSpan={columns.length} className="py-8 text-center text-sm text-muted-foreground">
-                  Ничего не найдено по вашему запросу.
+                  {t('emptyResult')}
                 </td>
               </tr>
             )}
@@ -241,53 +251,56 @@ export function TechRadarTable() {
       </div>
 
       <Dialog
-        open={selectedAdrItem !== null}
+        open={activeDialogItem !== null}
         onOpenChange={(open) => {
           if (!open) closeAdrInspector()
         }}
       >
         <DialogContent className="sm:max-w-xl">
-          {selectedAdrItem ? (
+          {activeDialogItem ? (
             <>
               <DialogHeader>
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge variant="outline" className="font-mono text-xs">
-                    ADR-{String(selectedAdrItem.adrNumber).padStart(2, '0')}
+                    ADR-{String(activeDialogItem.adrNumber).padStart(2, '0')}
                   </Badge>
                   <Badge variant="secondary" className="font-mono text-xs">
-                    {selectedAdrItem.category}
+                    {activeDialogItem.category}
                   </Badge>
                   <Badge variant="success" className="font-mono text-xs">
-                    {selectedAdrItem.experienceYears}+ лет опыта • {selectedAdrItem.level}
+                    {t('dialogExpBadge', {
+                      years: activeDialogItem.experienceYears,
+                      level: activeDialogItem.level,
+                    })}
                   </Badge>
                 </div>
-                <DialogTitle className="mt-2 text-xl">{selectedAdrItem.name}</DialogTitle>
-                <DialogDescription>{selectedAdrItem.summary}</DialogDescription>
+                <DialogTitle className="mt-2 text-xl">{activeDialogItem.name}</DialogTitle>
+                <DialogDescription>{activeDialogItem.summary}</DialogDescription>
               </DialogHeader>
 
               <div className="space-y-3 py-2 text-sm">
                 <div className="rounded-lg border border-border bg-muted/30 p-3.5">
                   <div className="mb-1 flex items-center gap-1.5 font-mono text-xs font-semibold uppercase tracking-wider text-primary">
                     <Sparkles className="h-3.5 w-3.5" />
-                    <span>1. ПОЧЕМУ ВЫБРАНО (WHY)</span>
+                    <span>{t('whyHeading')}</span>
                   </div>
-                  <p className="text-muted-foreground leading-relaxed">{selectedAdrItem.adrWhy}</p>
+                  <p className="text-muted-foreground leading-relaxed">{activeDialogItem.adrWhy}</p>
                 </div>
 
                 <div className="rounded-lg border border-border bg-muted/30 p-3.5">
                   <div className="mb-1 flex items-center gap-1.5 font-mono text-xs font-semibold uppercase tracking-wider text-primary">
                     <Layers className="h-3.5 w-3.5" />
-                    <span>2. ГДЕ ПРИМЕНЕНО В МОНОРЕПОЗИТОРИИ (WHERE)</span>
+                    <span>{t('whereHeading')}</span>
                   </div>
-                  <p className="text-muted-foreground leading-relaxed">{selectedAdrItem.adrWhere}</p>
+                  <p className="text-muted-foreground leading-relaxed">{activeDialogItem.adrWhere}</p>
                 </div>
 
                 <div className="rounded-lg border border-border bg-muted/30 p-3.5">
                   <div className="mb-1 flex items-center gap-1.5 font-mono text-xs font-semibold uppercase tracking-wider text-primary">
                     <BookOpenCheck className="h-3.5 w-3.5" />
-                    <span>3. КАК РЕАЛИЗОВАНО (HOW)</span>
+                    <span>{t('howHeading')}</span>
                   </div>
-                  <p className="text-muted-foreground leading-relaxed">{selectedAdrItem.adrHow}</p>
+                  <p className="text-muted-foreground leading-relaxed">{activeDialogItem.adrHow}</p>
                 </div>
               </div>
             </>

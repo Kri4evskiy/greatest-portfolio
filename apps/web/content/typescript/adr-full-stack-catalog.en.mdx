@@ -1,0 +1,42 @@
+---
+title: "Full Catalog of 15 ADRs: Monorepo, Strict TypeScript, and End-to-End Zod"
+summary: "Why we chose pnpm + Turborepo, Rust-powered Biome.js, Lefthook, and a shared Zod contract package over duplicated DTO interfaces."
+category: "typescript"
+readingTime: "8 min"
+publishedAt: "2026-10-15"
+---
+
+## 1. The Problem with Traditional Full-Stack Repositories
+
+In most product teams, the frontend (`Next.js`) and backend (`NestJS`) live in separate repositories or communicate through manually copied TypeScript interfaces. Whenever a field changes on the backend, the frontend build still succeeds and the bug only surfaces at runtime in production.
+
+We solved this at the monorepo architecture level (`pnpm workspaces` + `Turborepo`) backed by a single shared schema package `@repo/shared-schemas`.
+
+<ArchitectureFlowD3 />
+
+## 2. Single Source of Truth: `packages/shared-schemas`
+
+Instead of writing `class-validator` decorators on the backend and separate `React Hook Form` schemas on the frontend, we export a single `Zod` schema:
+
+```typescript
+export const GuestPassFormSchema = z.object({
+  displayName: z.string().trim().min(2).max(50),
+  visitorType: VisitorRoleTypeEnum,
+  adminPasscode: z.string().trim().max(100).optional(),
+});
+export type GuestPassFormInput = z.infer<typeof GuestPassFormSchema>;
+```
+
+- **On the frontend (`apps/web`):** The schema is passed directly into `zodResolver(GuestPassFormSchema)`.
+- **On the backend (`apps/api`):** The exact same schema is validated inside `ZodValidationPipe(GuestPassFormSchema)`.
+
+<ArticleImageGrid />
+
+## 3. Code Quality Gates: `Biome.js` + `Lefthook`
+
+We replaced the slow `ESLint + Prettier` toolchain (120+ packages in `node_modules`) with a single Rust binary — **Biome.js**, which lints and formats the entire monorepo in **~50ms**.
+
+On every `git commit`, **Lefthook** automatically:
+1. Runs `biome check --write` on staged files.
+2. Verifies strict types via `pnpm turbo typecheck` (`noUncheckedIndexedAccess: true`, `exactOptionalPropertyTypes: true`).
+3. Increments the patch version in root `package.json` and syncs the `APP_VERSION` constant displayed in the site footer.

@@ -75,7 +75,7 @@ docker compose up --build
 
 ---
 
-## 🏛️ Архитектурный стек (15 ключевых решений — ADR)
+## 🏛️ Архитектурный стек (16 ключевых решений — ADR)
 
 1. **Монорепозиторий:** `pnpm` Workspaces + `Turborepo`
 2. **DX и качество кода:** `TypeScript (Strict)` + `Biome.js` + `Lefthook` (с авто-инкрементом патч-версии в корневом `package.json` при каждом коммите)
@@ -92,6 +92,7 @@ docker compose up --build
 13. **Микросервисы и Real-Time:** `@nestjs/microservices` (`apps/telemetry-ms`, TCP `:4001`) + `Server-Sent Events (@Sse)`
 14. **Инфраструктура:** `Docker` (Multi-stage builds с `turbo prune`) + `Docker Compose`
 15. **Наблюдаемость:** `Sentry` (Error Tracking) + `PostHog` (Product Analytics)
+16. **Мультиязычность (i18n):** `next-intl` (App Router RSC, `EN` default + `UA` / `RU`) + локализованные статьи `*.{en,uk,ru}.mdx`
 
 ---
 
@@ -126,4 +127,4 @@ greatest-portfolio/
 
 - [Корневой роутер контекста ИИ (`AGENTS.md`)](./AGENTS.md)
 - [Бэклог, Tech Debt и Post-MVP план развития (`.agents/tech-debt-backlog.md`)](./.agents/tech-debt-backlog.md)
-- [Полный каталог 15 ADR: Почему, Где и Как (`.agents/architecture/adr-stack.md`)](./.agents/architecture/adr-stack.md)
+- [Полный каталог 16 ADR: Почему, Где и Как (`.agents/architecture/adr-stack.md`)](./.agents/architecture/adr-stack.md)

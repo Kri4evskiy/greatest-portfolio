@@ -20,10 +20,12 @@ import {
   Input,
 } from '@repo/ui'
 import { KeyRound, LockOpen, ShieldCheck, Sparkles, Terminal } from 'lucide-react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import { useEffect, useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { useIssueGuestPassMutation } from '@/hooks/use-visitor-profile'
+import { useRouter } from '@/i18n/navigation'
 import { trackEvent } from '@/lib/analytics'
 import { useUIStore } from '@/store/use-ui-store'
 
@@ -52,6 +54,7 @@ const ONE_CLICK_PRESETS: ReadonlyArray<{
 const VISITOR_ROLES: readonly VisitorRoleType[] = ['TEAM_LEAD', 'RECRUITER', 'DEVELOPER', 'FOUNDER', 'OTHER']
 
 export function GuestPassModal() {
+  const t = useTranslations('GuestPassModal')
   const router = useRouter()
   const searchParams = useSearchParams()
   const isOpen = useUIStore((s) => s.isGuestPassModalOpen)
@@ -86,7 +89,8 @@ export function GuestPassModal() {
     const unlockParam = searchParams.get('unlock')
     const redirectParam = searchParams.get('redirect')
     if (unlockParam === 'knowledge-base') {
-      openModal(redirectParam ?? '/knowledge-base')
+      const normalizedRedirect = redirectParam?.replace(/^\/(en|uk|ru)(?=\/|$)/, '') || '/knowledge-base'
+      openModal(normalizedRedirect)
       trackEvent('guest_pass_modal_opened', { source: 'middleware_redirect' })
     }
   }, [searchParams, openModal])
@@ -98,7 +102,8 @@ export function GuestPassModal() {
       role: profile.role,
     })
     closeModal()
-    router.push(pendingRedirectPath ?? '/knowledge-base')
+    const targetPath = pendingRedirectPath?.replace(/^\/(en|uk|ru)(?=\/|$)/, '') || '/knowledge-base'
+    router.push(targetPath)
     router.refresh()
   }
 
@@ -126,30 +131,22 @@ export function GuestPassModal() {
           </div>
           <DialogTitle className="mt-2 flex items-center gap-2 text-xl">
             <LockOpen className="h-5 w-5 text-primary" />
-            Гостевой пропуск в Базу Знаний (1-Click Guest Pass)
+            {t('title')}
           </DialogTitle>
-          <DialogDescription>
-            Раздел инженерных разборов и D3.js-симуляций защищен на уровне{' '}
-            <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">Next.js Edge Middleware</code> и{' '}
-            <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">JwtRolesGuard</code>.
-          </DialogDescription>
+          <DialogDescription>{t('description')}</DialogDescription>
         </DialogHeader>
 
         <Callout
           variant="info"
-          title="Живое архитектурное демо без паролей и спама"
+          title={t('calloutTitle')}
           icon={<Terminal className="h-4 w-4" />}
           className="my-1 text-xs"
         >
-          Выбери пресет в <strong>1 клик</strong> или укажи свое имя — это демонстрация связки{' '}
-          <code>React Hook Form</code> + <code>Zod</code> + <code>NestJS JWT HttpOnly Cookie</code> + <code>RBAC</code>{' '}
-          + <code>SSE Telemetry</code>.
+          {t('calloutBody')}
         </Callout>
 
         <div className="space-y-2">
-          <p className="text-xs font-medium text-muted-foreground">
-            Быстрый вход в 1 клик (мгновенная выдача куки и редирект):
-          </p>
+          <p className="text-xs font-medium text-muted-foreground">{t('presetsLabel')}</p>
           <div className="flex flex-wrap gap-1.5">
             {ONE_CLICK_PRESETS.map((preset) => (
               <Button
@@ -170,14 +167,14 @@ export function GuestPassModal() {
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 pt-1">
           <div className="space-y-1.5">
             <label htmlFor="guest-display-name" className="text-xs font-medium">
-              Имя или никнейм гостя
+              {t('nameLabel')}
             </label>
-            <Input id="guest-display-name" placeholder="Например: Alex (Team Lead)" {...register('displayName')} />
+            <Input id="guest-display-name" placeholder={t('namePlaceholder')} {...register('displayName')} />
             {errors.displayName ? <p className="text-xs text-red-600">{errors.displayName.message}</p> : null}
           </div>
 
           <div className="space-y-1.5">
-            <span className="text-xs font-medium">Ваша роль в команде</span>
+            <span className="text-xs font-medium">{t('roleLabel')}</span>
             <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
               {VISITOR_ROLES.map((roleKey) => {
                 const isSelected = selectedVisitorType === roleKey
@@ -206,18 +203,14 @@ export function GuestPassModal() {
               className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
             >
               <KeyRound className="h-3.5 w-3.5" />
-              {showAdminInput ? 'Скрыть поле Admin Passcode' : 'Я владелец портфолио (Admin Passcode → роль ADMIN)'}
+              {showAdminInput ? t('hideAdmin') : t('showAdmin')}
             </button>
 
             {showAdminInput ? (
               <div className="mt-2 space-y-1">
-                <Input
-                  type="password"
-                  placeholder="Введите секретный ключ администратора (опционально)"
-                  {...register('adminPasscode')}
-                />
+                <Input type="password" placeholder={t('adminPlaceholder')} {...register('adminPasscode')} />
                 <p className="text-[11px] text-muted-foreground">
-                  Демо-ключ для проверяющего тимлида: <code>workfolio-admin-2026</code>
+                  {t('adminHint')} <code>workfolio-admin-2026</code>
                 </p>
               </div>
             ) : null}
@@ -225,7 +218,7 @@ export function GuestPassModal() {
 
           {issuePassMutation.isError ? (
             <p className="rounded-md bg-red-500/10 p-2 text-xs text-red-600">
-              {issuePassMutation.error instanceof Error ? issuePassMutation.error.message : 'Ошибка соединения с API'}
+              {issuePassMutation.error instanceof Error ? issuePassMutation.error.message : t('errorFallback')}
             </p>
           ) : null}
 
@@ -236,7 +229,7 @@ export function GuestPassModal() {
             </div>
             <Button type="submit" disabled={isSubmitting || issuePassMutation.isPending} className="gap-1.5">
               <Sparkles className="h-4 w-4" />
-              {issuePassMutation.isPending ? 'Выпускаем JWT пропуск...' : 'Разблокировать Базу Знаний'}
+              {issuePassMutation.isPending ? t('submittingBtn') : t('submitBtn')}
             </Button>
           </DialogFooter>
         </form>

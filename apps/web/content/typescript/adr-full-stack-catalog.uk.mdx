@@ -1,0 +1,42 @@
+---
+title: "Повний каталог 15 ADR: Монорепозиторій, Суворий TypeScript та End-to-End Zod"
+summary: "Чому ми обрали pnpm + Turborepo, Biome.js на Rust, Lefthook та єдиний пакет Zod-контрактів замість дублювання інтерфейсів."
+category: "typescript"
+readingTime: "8 хв"
+publishedAt: "2026-10-15"
+---
+
+## 1. Проблема класичних Full-Stack репозиторіїв
+
+У більшості продуктових команд фронтенд (`Next.js`) та бекенд (`NestJS`) живуть у різних репозиторіях або спілкуються через вручну скопійовані інтерфейси TypeScript. При будь-якій зміні поля на бекенді збірка фронтенду продовжує проходити успішно, а помилка спливає лише в рантаймі у користувача.
+
+Ми вирішили цю проблему на рівні архітектури монорепозиторію (`pnpm workspaces` + `Turborepo`) та єдиного пакета схем `@repo/shared-schemas`.
+
+<ArchitectureFlowD3 />
+
+## 2. Єдине джерело істини: `packages/shared-schemas`
+
+Замість того щоб писати `class-validator` декоратори на бекенді та окремі схеми для `React Hook Form` на фронтенді, ми експортуємо одну схему `Zod`:
+
+```typescript
+export const GuestPassFormSchema = z.object({
+  displayName: z.string().trim().min(2).max(50),
+  visitorType: VisitorRoleTypeEnum,
+  adminPasscode: z.string().trim().max(100).optional(),
+});
+export type GuestPassFormInput = z.infer<typeof GuestPassFormSchema>;
+```
+
+- **На фронтенді (`apps/web`):** Схема передається напряму в `zodResolver(GuestPassFormSchema)`.
+- **На бекенді (`apps/api`):** Та сама схема передається в кастомний `ZodValidationPipe(GuestPassFormSchema)`.
+
+<ArticleImageGrid />
+
+## 3. Стандарти якості коду: `Biome.js` + `Lefthook`
+
+Ми повністю відмовилися від повільної зв’язки `ESLint + Prettier` (120+ пакетів у `node_modules`) на користь єдиного бінарника **Biome.js** на Rust, який перевіряє та форматує весь монорепозиторій за **~50 мс**.
+
+На кожен `git commit` хук **Lefthook** автоматично:
+1. Запускає `biome check --write` на індексованих файлах.
+2. Перевіряє суворі типи `pnpm turbo typecheck` (`noUncheckedIndexedAccess: true`, `exactOptionalPropertyTypes: true`).
+3. Інкрементує патч-версію в кореневому `package.json` та синхронізує константу `APP_VERSION` для відображення у футері сайту.

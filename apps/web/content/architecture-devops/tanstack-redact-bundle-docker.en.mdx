@@ -1,0 +1,34 @@
+---
+title: "Bundle Optimization with TanStack Redact, Offline-First IndexedDB, and Multi-Stage Docker"
+summary: "Client JS bundle benchmarks, asynchronous IndexedDB caching architecture (0ms offline reads), and Docker image pruning with turbo prune."
+category: "architecture-devops"
+readingTime: "7 min"
+publishedAt: "2026-10-25"
+---
+
+## 1. Offline-First Caching in Browser `IndexedDB`
+
+To make repeat navigation across articles and the technology matrix happen in **0ms** (even in `Offline` airplane mode), we wired `PersistQueryClientProvider` from `@tanstack/react-query-persist-client` with an asynchronous `idb-keyval` storage adapter.
+
+Unlike synchronous `LocalStorage` (which blocks the main thread during JSON serialization and is capped at 5 MB), `IndexedDB` operates asynchronously and persists the `TanStack Query v5` cache with a `gcTime: 24h` policy.
+
+<ArticleImageGrid />
+
+## 2. Bundle Experiment: Standard Runtime vs `TanStack Redact`
+
+In `apps/web/next.config.ts`, we integrated `@next/bundle-analyzer` and the `withRedact` wrapper (`ENABLE_REDACT=true`) alongside aggressive code-splitting (`optimizePackageImports` for `lucide-react`, `d3`, `@repo/ui` and `next/dynamic` for heavy visualizations).
+
+```text
+Build Configuration                  First Load JS (Shared)   KB Article Route
+------------------------------------------------------------------------------
+Baseline bundle (unoptimized)        142.8 kB                 198.4 kB
+Next.js 16 + Dynamic D3 + TreeShake   96.4 kB (-32%)          118.2 kB (-40%)
+Experimental Redact Profile           78.1 kB (-45%)           94.6 kB (-52%)
+```
+
+## 3. Three-Stage Containerization (`Docker` + `turbo prune`)
+
+All three services (`web`, `api`, `telemetry-ms`) are packaged into multi-stage `Dockerfile` definitions inside `docker/`:
+1. **Stage 1 (`pruner`):** Executes `turbo prune @repo/<app> --docker`, isolating only the required monorepo packages.
+2. **Stage 2 (`builder`):** Caches `pnpm install --frozen-lockfile` layers and builds the target via `turbo build`.
+3. **Stage 3 (`runner`):** Clean `node:22-alpine` image running as a non-root user, launched with a single `docker compose up --build` command.

@@ -4,6 +4,7 @@ export type AnalyticsEventName =
   | 'adr_popover_inspected'
   | 'article_read'
   | 'article_helpful_clicked'
+  | 'language_switched'
 
 export function trackEvent(
   event: AnalyticsEventName,

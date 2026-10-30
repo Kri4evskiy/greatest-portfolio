@@ -3,9 +3,11 @@
 import { APP_VERSION, type TelemetryEvent, TelemetryEventSchema } from '@repo/shared-schemas'
 import { Badge } from '@repo/ui'
 import { Activity, Database, Radio, Server } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 import { useEffect, useState } from 'react'
 
 export function WorkfolioFooter() {
+  const t = useTranslations('Footer')
   const [sseConnected, setSseConnected] = useState(false)
   const [latestEvent, setLatestEvent] = useState<TelemetryEvent | null>(null)
 
@@ -85,7 +87,7 @@ export function WorkfolioFooter() {
             ) : (
               <>
                 <Server className="h-3.5 w-3.5 shrink-0" />
-                <span className="font-mono text-[11px]">/api/telemetry/stream • Waiting for pulse...</span>
+                <span className="font-mono text-[11px]">{t('waitingPulse')}</span>
               </>
             )}
           </div>

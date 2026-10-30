@@ -1,11 +1,20 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { KNOWLEDGE_CATEGORY_LABELS, type KnowledgeCategory, KnowledgeCategoryEnum } from '@repo/shared-schemas'
+import {
+  DEFAULT_LOCALE,
+  KNOWLEDGE_CATEGORY_LABELS,
+  type KnowledgeCategory,
+  KnowledgeCategoryEnum,
+  type SupportedLocale,
+  SupportedLocaleEnum,
+} from '@repo/shared-schemas'
 import { cache } from 'react'
 
 export interface MdxArticleFrontmatter {
   slug: string
   category: KnowledgeCategory
+  locale: SupportedLocale
+  isFallback: boolean
   title: string
   summary: string
   readingTime: string
@@ -33,7 +42,17 @@ function resolveContentRoot(): string {
   return join(process.cwd(), 'content')
 }
 
-function parseRawMdx(raw: string, fallbackCategory: KnowledgeCategory, slug: string): MdxArticleDocument {
+function extractBaseSlug(filename: string): string {
+  return filename.replace(/\.(en|uk|ru)\.mdx$/, '').replace(/\.mdx$/, '')
+}
+
+function parseRawMdx(
+  raw: string,
+  fallbackCategory: KnowledgeCategory,
+  slug: string,
+  locale: SupportedLocale,
+  isFallback: boolean,
+): MdxArticleDocument {
   let body = raw.trim()
   const meta: Record<string, string> = {}
 
@@ -132,15 +151,23 @@ function parseRawMdx(raw: string, fallbackCategory: KnowledgeCategory, slug: str
   return {
     slug,
     category,
+    locale,
+    isFallback,
     title: meta.title ?? slug,
     summary: meta.summary ?? '',
-    readingTime: meta.readingTime ?? '5 мин',
+    readingTime: meta.readingTime ?? '5 min',
     publishedAt: meta.publishedAt ?? '2026-10-15',
     blocks,
   }
 }
 
-export const getAllKnowledgeArticles = cache((): MdxArticleDocument[] => {
+function normalizeLocale(localeInput?: string): SupportedLocale {
+  const parsed = SupportedLocaleEnum.safeParse(localeInput)
+  return parsed.success ? parsed.data : DEFAULT_LOCALE
+}
+
+export const getAllKnowledgeArticles = cache((localeInput?: string): MdxArticleDocument[] => {
+  const requestedLocale = normalizeLocale(localeInput)
   const root = resolveContentRoot()
   const categories = Object.keys(KNOWLEDGE_CATEGORY_LABELS) as KnowledgeCategory[]
   const articles: MdxArticleDocument[] = []
@@ -150,18 +177,44 @@ export const getAllKnowledgeArticles = cache((): MdxArticleDocument[] => {
     if (!existsSync(categoryDir)) continue
 
     const files = readdirSync(categoryDir).filter((f) => f.endsWith('.mdx'))
-    for (const file of files) {
-      const slug = file.replace(/\.mdx$/, '')
-      const fullPath = join(categoryDir, file)
-      const raw = readFileSync(fullPath, 'utf-8')
-      articles.push(parseRawMdx(raw, category, slug))
+    const uniqueSlugs = Array.from(new Set(files.map(extractBaseSlug)))
+
+    for (const slug of uniqueSlugs) {
+      const exactCandidate = join(categoryDir, `${slug}.${requestedLocale}.mdx`)
+      const defaultLocaleCandidate = join(categoryDir, `${slug}.${DEFAULT_LOCALE}.mdx`)
+      const legacyCandidate = join(categoryDir, `${slug}.mdx`)
+
+      let targetPath = ''
+      let resolvedLocale: SupportedLocale = requestedLocale
+      let isFallback = false
+
+      if (existsSync(exactCandidate)) {
+        targetPath = exactCandidate
+        resolvedLocale = requestedLocale
+        isFallback = false
+      } else if (existsSync(defaultLocaleCandidate)) {
+        targetPath = defaultLocaleCandidate
+        resolvedLocale = DEFAULT_LOCALE
+        isFallback = requestedLocale !== DEFAULT_LOCALE
+      } else if (existsSync(legacyCandidate)) {
+        targetPath = legacyCandidate
+        resolvedLocale = DEFAULT_LOCALE
+        isFallback = requestedLocale !== DEFAULT_LOCALE
+      }
+
+      if (targetPath) {
+        const raw = readFileSync(targetPath, 'utf-8')
+        articles.push(parseRawMdx(raw, category, slug, resolvedLocale, isFallback))
+      }
     }
   }
 
   return articles
 })
 
-export const getArticleByCategoryAndSlug = cache((category: string, slug: string): MdxArticleDocument | null => {
-  const all = getAllKnowledgeArticles()
-  return all.find((a) => a.category === category && a.slug === slug) ?? null
-})
+export const getArticleByCategoryAndSlug = cache(
+  (category: string, slug: string, localeInput?: string): MdxArticleDocument | null => {
+    const all = getAllKnowledgeArticles(localeInput)
+    return all.find((a) => a.category === category && a.slug === slug) ?? null
+  },
+)

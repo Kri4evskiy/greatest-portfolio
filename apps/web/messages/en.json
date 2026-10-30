@@ -1,0 +1,140 @@
+{
+  "Metadata": {
+    "title": "Senior Full-Stack Portfolio (Workfolio UI) & Engineering Knowledge Base",
+    "description": "Interactive Senior Full-Stack TypeScript Portfolio built with Next.js 16, NestJS 12 (Native ESM), Prisma ORM, TanStack Query IndexedDB, D3.js, and Microservices SSE."
+  },
+  "Header": {
+    "availableBadge": "● Available for Senior / Lead Roles",
+    "nav": {
+      "about": "About",
+      "projects": "Case Studies",
+      "experience": "Experience",
+      "techRadar": "Tech Radar (16 ADR)"
+    },
+    "knowledgeBase": "Base of Knowledge",
+    "protectedBadge": "Protected • 1-Click",
+    "logoutTitle": "Sign out of session ({name})",
+    "guestBanner": "Guest mode. Issue a 1-Click Guest Pass for full access.",
+    "languageLabel": "Language"
+  },
+  "Hero": {
+    "openBadge": "● Open to Senior Full-Stack / Tech Lead Proposals",
+    "stackBadge": "TypeScript Strict • Next.js 16 • NestJS 12 (ESM) • Prisma • Microservices",
+    "title": "Senior Full-Stack Engineer & Systems Architect",
+    "description": "Welcome to the interactive Workfolio CV and protected Engineering Knowledge Base. Instead of a static PDF resume, this monorepo itself is a live architectural proof: from end-to-end Zod contracts and HttpOnly JWT cookies to an IndexedDB Offline-First cache, D3.js graphs, and a reactive Server-Sent Events stream.",
+    "ctaUnlocked": "Open Engineering Knowledge Base",
+    "ctaLocked": "Unlock Knowledge Base (1-Click Guest Pass)",
+    "ctaTechRadar": "16-Technology Matrix (ADR)",
+    "calloutTitle": "How this project is built (Notion Workfolio + Production Full-Stack)",
+    "pillar1Title": "1. 1-Click RBAC Demo",
+    "pillar1Desc": "Clicking Base of Knowledge in the header opens a RHF + Zod micro-form, issues an HttpOnly JWT cookie, and broadcasts a live event over SSE.",
+    "pillar2Title": "2. Offline-First IndexedDB",
+    "pillar2Desc": "All TanStack Query v5 requests sync with the browser's IndexedDB database (24h TTL) — articles and metrics load in 0ms even offline.",
+    "pillar3Title": "3. 16 Interactive ADRs",
+    "pillar3Desc": "In the TanStack Table below, every technology includes a structured Why / Where / How breakdown of its role in this monorepo."
+  },
+  "Projects": {
+    "title": "Featured Engineering Case Studies (Workfolio Gallery)",
+    "subtitle": "Core architectural modules of this monorepo linked directly to in-depth MDX articles and interactive D3.js simulations.",
+    "readUnlocked": "Read engineering deep-dive in Knowledge Base",
+    "readLocked": "🔒 Unlock & open article (1-Click)",
+    "items": {
+      "monorepo-adr": {
+        "title": "Enterprise Monorepo & End-to-End Zod Contracts",
+        "subtitle": "Unified pnpm + Turborepo build graph for Next.js 16, NestJS 12 (Native ESM), and the telemetry microservice with end-to-end type safety and zero OpenAPI codegen.",
+        "metrics": "-68% CI build time • 0 API schema drift"
+      },
+      "react19-compiler-d3": {
+        "title": "React 18 vs React 19 Compiler & Interactive D3.js Simulations",
+        "subtitle": "Deep dive into automatic memoization in React 19, the use() hook, and an interactive render pipeline visualization powered by D3.js + Zustand.",
+        "metrics": "-42% wasted re-renders • 60 FPS SVG Graph"
+      },
+      "zero-trust-jwt-sse": {
+        "title": "Zero-Trust Auth (JWT HttpOnly Cookies) & Real-Time SSE Telemetry",
+        "subtitle": "XSS protection via HttpOnly cookies, dual-layer RBAC in Next.js Edge Proxy + NestJS Guards, and reactive event streaming from a TCP microservice.",
+        "metrics": "0 XSS token leaks • <15ms Edge RBAC check"
+      },
+      "offline-first-redact-docker": {
+        "title": "IndexedDB Offline-First Cache, TanStack Redact & Multi-Stage Docker",
+        "subtitle": "Persistent TanStack Query cache in IndexedDB (0ms offline reads), experimental TanStack Redact runtime benchmarks, and 3-stage Docker builds with turbo prune.",
+        "metrics": "0ms Offline Reads • -21% JS Bundle"
+      }
+    }
+  },
+  "Experience": {
+    "title": "Experience & Engineering Timeline",
+    "items": {
+      "senior": {
+        "period": "2023 — Present",
+        "role": "Senior Full-Stack TypeScript Engineer / System Architect",
+        "company": "High-Load B2B SaaS & FinTech Platform",
+        "h1": "Architected and migrated frontend and backend applications into a unified pnpm + Turborepo monorepo (Next.js App Router + NestJS + shared Zod contracts and UI kit).",
+        "h2": "Engineered an Offline-First client caching layer with TanStack Query v5 + IndexedDB, reducing redundant metadata API reads by 55%.",
+        "h3": "Implemented distributed telemetry using @nestjs/microservices (TCP/Redis) and Server-Sent Events (SSE) for real-time session monitoring."
+      },
+      "fullstack": {
+        "period": "2021 — 2023",
+        "role": "Full-Stack Developer (React / Node.js / PostgreSQL)",
+        "company": "Enterprise Product Team",
+        "h1": "Built the company design system on Tailwind CSS + Radix UI (shadcn/ui) with full visual documentation in Storybook.",
+        "h2": "Migrated authentication from vulnerable LocalStorage tokens to HttpOnly, Secure, SameSite=Lax cookies with GUEST / USER / ADMIN RBAC.",
+        "h3": "Optimized Prisma ORM queries on PostgreSQL (Neon) and standardized CI/CD pipelines with Biome.js and multi-stage Docker images."
+      }
+    }
+  },
+  "TechRadar": {
+    "title": "Tech Radar Database (16 Architecture Decision Records)",
+    "subtitle": "Interactive Notion-style database powered by TanStack Table. Click \"Why / Where / How\" on any row to inspect its ADR.",
+    "shownCount": "Showing: {filtered} of {total}",
+    "allDomains": "All Domains (16)",
+    "searchPlaceholder": "Search stack or ADR...",
+    "colTech": "Technology / Tool",
+    "colDomain": "Domain",
+    "colStatus": "Status",
+    "colExp": "Exp",
+    "yearsSuffix": "{years}+ yrs",
+    "inspectBtn": "Why / Where / How",
+    "emptyResult": "No technologies match your search query.",
+    "dialogExpBadge": "{years}+ yrs exp • {level}",
+    "whyHeading": "1. WHY IT WAS CHOSEN (WHY)",
+    "whereHeading": "2. WHERE IT IS USED IN MONOREPO (WHERE)",
+    "howHeading": "3. HOW IT IS IMPLEMENTED (HOW)"
+  },
+  "GuestPassModal": {
+    "title": "Knowledge Base Guest Pass (1-Click Guest Pass)",
+    "description": "Engineering deep-dives and D3.js simulations are protected by Next.js Edge Proxy and NestJS JwtRolesGuard.",
+    "calloutTitle": "Live architectural demo without passwords or spam",
+    "calloutBody": "Pick a 1-click preset or enter your name — this demonstrates React Hook Form + Zod + NestJS JWT HttpOnly Cookie + RBAC + SSE Telemetry.",
+    "presetsLabel": "Instant 1-click access (immediate cookie issuance & redirect):",
+    "nameLabel": "Guest Name or Handle",
+    "namePlaceholder": "e.g., Alex (Team Lead)",
+    "roleLabel": "Your Role in the Team",
+    "hideAdmin": "Hide Admin Passcode field",
+    "showAdmin": "I am the portfolio owner (Admin Passcode → ADMIN role)",
+    "adminPlaceholder": "Enter secret administrator passcode (optional)",
+    "adminHint": "Demo passcode for reviewing Tech Leads:",
+    "errorFallback": "Failed to connect to API",
+    "submittingBtn": "Issuing JWT pass...",
+    "submitBtn": "Unlock Knowledge Base"
+  },
+  "KnowledgeBase": {
+    "protectedBadge": "🔓 Protected Engineering Knowledge Base",
+    "title": "Engineering Knowledge Base & Architectural Deep-Dives",
+    "description": "All articles below are statically compiled at build time (SSG from apps/web/content/*.mdx), feature interactive D3.js simulations, and persist engagement metrics in IndexedDB via TanStack Query v5.",
+    "calloutTitle": "Access Verified (Next.js Edge Proxy + NestJS JWT HttpOnly Cookie)",
+    "calloutBody": "You passed the kb_access_token cookie check. Open Application → IndexedDB in Chrome DevTools to inspect the greatest-portfolio-query-cache.",
+    "openArticleCta": "Open article & D3 graph",
+    "howToAddTitle": "How to add a new multilingual article to the Knowledge Base:",
+    "howToAddBody": "Create a .en.mdx, .uk.mdx, or .ru.mdx file inside apps/web/content/[category]/ (typescript, react, nestjs-prisma, architecture-devops). generateStaticParams() automatically includes it in the SSG build and sidebar.",
+    "sidebarNavTitle": "Knowledge Base Navigation",
+    "sidebarOverview": "Knowledge Base Overview (SSG)",
+    "backToAll": "Back to all Knowledge Base articles",
+    "fallbackNotice": "This article is currently displayed in the fallback language ({fallbackLocale}).",
+    "viewsLabel": "{count} views",
+    "indexedDbBadge": "Cached in IndexedDB (0ms Offline Read)",
+    "helpfulBtn": "Helpful ({count})"
+  },
+  "Footer": {
+    "waitingPulse": "/api/telemetry/stream • Waiting for pulse..."
+  }
+}

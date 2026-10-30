@@ -1,0 +1,140 @@
+{
+  "Metadata": {
+    "title": "Senior Full-Stack Портфолио (Workfolio UI) и Инженерная База Знаний",
+    "description": "Интерактивное Senior Full-Stack TypeScript портфолио на базе Next.js 16, NestJS 12 (Native ESM), Prisma ORM, TanStack Query IndexedDB, D3.js и микросервисов с SSE."
+  },
+  "Header": {
+    "availableBadge": "● Открыт к предложениям Senior / Lead",
+    "nav": {
+      "about": "Обо мне",
+      "projects": "Кейсы",
+      "experience": "Опыт",
+      "techRadar": "Tech Radar (16 ADR)"
+    },
+    "knowledgeBase": "Base of Knowledge",
+    "protectedBadge": "Защищено • 1-Клик",
+    "logoutTitle": "Выйти из сессии ({name})",
+    "guestBanner": "Гостевой режим. Выпустите 1-Click Guest Pass для полного доступа.",
+    "languageLabel": "Язык"
+  },
+  "Hero": {
+    "openBadge": "● Открыт к предложениям Senior Full-Stack / Tech Lead",
+    "stackBadge": "TypeScript Strict • Next.js 16 • NestJS 12 (ESM) • Prisma • Microservices",
+    "title": "Senior Full-Stack Engineer & Systems Architect",
+    "description": "Добро пожаловать в интерактивное Workfolio CV и защищенную Инженерную Базу Знаний. Вместо статичного PDF-резюме этот монорепозиторий сам является живым доказательством архитектуры: от сквозных Zod-контрактов и HttpOnly JWT до IndexedDB Offline-First кэша, D3.js графов и реактивного стрима Server-Sent Events.",
+    "ctaUnlocked": "Открыть Инженерную Базу Знаний",
+    "ctaLocked": "Разблокировать Базу Знаний (1-Click Guest Pass)",
+    "ctaTechRadar": "Матрица 16 технологий (ADR)",
+    "calloutTitle": "Как устроен этот проект (Notion Workfolio + Production Full-Stack)",
+    "pillar1Title": "1. 1-Click RBAC Demo",
+    "pillar1Desc": "Клик по кнопке Base of Knowledge в шапке открывает микро-форму на RHF + Zod, выписывает HttpOnly JWT куку и пушит событие в SSE.",
+    "pillar2Title": "2. Offline-First IndexedDB",
+    "pillar2Desc": "Все запросы TanStack Query v5 синхронизируются с браузерной БД IndexedDB (TTL 24ч) — статьи и метрики открываются за 0 мс.",
+    "pillar3Title": "3. 16 интерактивных ADR",
+    "pillar3Desc": "Ниже в таблице TanStack Table у каждого инструмента есть разбор Почему / Где / Как он применен в этом репозитории."
+  },
+  "Projects": {
+    "title": "Featured Engineering Case Studies (Workfolio Gallery)",
+    "subtitle": "Ключевые архитектурные модули этого монорепозитория с переходом к подробным MDX-статьям и интерактивным графам D3.js.",
+    "readUnlocked": "Читать инженерный разбор в Базе Знаний",
+    "readLocked": "🔒 Разблокировать и открыть статью (1 клик)",
+    "items": {
+      "monorepo-adr": {
+        "title": "Enterprise Monorepo & End-to-End Zod Contracts",
+        "subtitle": "Единый граф сборки pnpm + Turborepo для Next.js 16, NestJS 12 (Native ESM) и микросервиса телеметрии со сквозной типизацией без кодогенерации OpenAPI.",
+        "metrics": "-68% времени CI • 0 рассинхронизаций API"
+      },
+      "react19-compiler-d3": {
+        "title": "React 18 vs React 19 Compiler & Interactive D3.js Simulations",
+        "subtitle": "Глубокое исследование автоматической мемоизации в React 19, хука use() и визуализация графа рендера на базе D3.js + Zustand.",
+        "metrics": "-42% лишних ререндеров • 60 FPS SVG Graph"
+      },
+      "zero-trust-jwt-sse": {
+        "title": "Zero-Trust Auth (JWT HttpOnly Cookies) & Real-Time SSE Telemetry",
+        "subtitle": "Защита от XSS через HttpOnly куки, проверка ролей на уровне Next.js Edge Proxy + NestJS Guards и реактивный стрим событий из TCP-микросервиса.",
+        "metrics": "0 XSS token leaks • <15ms Edge RBAC check"
+      },
+      "offline-first-redact-docker": {
+        "title": "IndexedDB Offline-First Cache, TanStack Redact & Multi-Stage Docker",
+        "subtitle": "Персистентный кэш TanStack Query в IndexedDB (отдача за 0 мс в авиарежиме), эксперимент с рантаймом TanStack Redact и 3-ступенчатая сборка с turbo prune.",
+        "metrics": "0ms Offline Reads • -21% JS Bundle"
+      }
+    }
+  },
+  "Experience": {
+    "title": "Experience & Engineering Timeline",
+    "items": {
+      "senior": {
+        "period": "2023 — Настоящее время",
+        "role": "Senior Full-Stack TypeScript Engineer / System Architect",
+        "company": "High-Load B2B SaaS & FinTech Platform",
+        "h1": "Спроектировал и мигрировал фронтенд и бэкенд в монорепозиторий pnpm + Turborepo (Next.js App Router + NestJS + пакеты общих Zod-контрактов и UI-кита).",
+        "h2": "Внедрил Offline-First архитектуру клиентского кэша через TanStack Query v5 + IndexedDB, снизив нагрузку на чтение метаданных API на 55%.",
+        "h3": "Реализовал распределенную телеметрию на базе @nestjs/microservices (TCP/Redis) и Server-Sent Events (SSE) для живого мониторинга сессий."
+      },
+      "fullstack": {
+        "period": "2021 — 2023",
+        "role": "Full-Stack Developer (React / Node.js / PostgreSQL)",
+        "company": "Enterprise Product Team",
+        "h1": "Разработал дизайн-систему компании на базе Tailwind CSS + Radix UI (shadcn/ui) с полным покрытием документацией в Storybook.",
+        "h2": "Перевел авторизацию с уязвимого LocalStorage на защищенные HttpOnly, Secure, SameSite=Lax куки с ролевой моделью RBAC (GUEST / USER / ADMIN).",
+        "h3": "Оптимизировал запросы Prisma ORM в PostgreSQL (Neon) и настроил CI/CD пайплайны с Biome.js и Multi-stage Docker образами."
+      }
+    }
+  },
+  "TechRadar": {
+    "title": "Tech Radar Database (16 Architecture Decision Records)",
+    "subtitle": "Интерактивная база данных в стиле Notion на движке TanStack Table. Нажмите «Почему / Где / Как» на любой строке для просмотра ADR.",
+    "shownCount": "Показано: {filtered} из {total}",
+    "allDomains": "Все домены (16)",
+    "searchPlaceholder": "Поиск по стеку или ADR...",
+    "colTech": "Технология / Инструмент",
+    "colDomain": "Домен",
+    "colStatus": "Статус",
+    "colExp": "Опыт",
+    "yearsSuffix": "{years}+ лет",
+    "inspectBtn": "Почему / Где / Как",
+    "emptyResult": "Ничего не найдено по вашему запросу.",
+    "dialogExpBadge": "{years}+ лет опыта • {level}",
+    "whyHeading": "1. ПОЧЕМУ ВЫБРАНО (WHY)",
+    "whereHeading": "2. ГДЕ ПРИМЕНЕНО В МОНОРЕПОЗИТОРИИ (WHERE)",
+    "howHeading": "3. КАК РЕАЛИЗОВАНО (HOW)"
+  },
+  "GuestPassModal": {
+    "title": "Гостевой пропуск в Базу Знаний (1-Click Guest Pass)",
+    "description": "Раздел инженерных разборов и D3.js-симуляций защищен на уровне Next.js Edge Proxy и JwtRolesGuard.",
+    "calloutTitle": "Живое архитектурное демо без паролей и спама",
+    "calloutBody": "Выбери пресет в 1 клик или укажи свое имя — это демонстрация связки React Hook Form + Zod + NestJS JWT HttpOnly Cookie + RBAC + SSE Telemetry.",
+    "presetsLabel": "Быстрый вход в 1 клик (мгновенная выдача куки и редирект):",
+    "nameLabel": "Имя или никнейм гостя",
+    "namePlaceholder": "Например: Alex (Team Lead)",
+    "roleLabel": "Ваша роль в команде",
+    "hideAdmin": "Скрыть поле Admin Passcode",
+    "showAdmin": "Я владелец портфолио (Admin Passcode → роль ADMIN)",
+    "adminPlaceholder": "Введите секретный ключ администратора (опционально)",
+    "adminHint": "Демо-ключ для проверяющего тимлида:",
+    "errorFallback": "Ошибка соединения с API",
+    "submittingBtn": "Выпускаем JWT пропуск...",
+    "submitBtn": "Разблокировать Базу Знаний"
+  },
+  "KnowledgeBase": {
+    "protectedBadge": "🔓 Protected Engineering Knowledge Base",
+    "title": "Инженерная База Знаний и Архитектурные Разборы",
+    "description": "Все статьи ниже скомпилированы статически на этапе сборки (SSG из apps/web/content/*.mdx), содержат интерактивные симуляции на D3.js и кэшируют пользовательские метрики в браузерной БД IndexedDB через TanStack Query v5.",
+    "calloutTitle": "Доступ подтвержден (Next.js Edge Proxy + NestJS JWT HttpOnly Cookie)",
+    "calloutBody": "Вы успешно прошли проверку куки kb_access_token. Откройте вкладку Application → IndexedDB в Chrome DevTools, чтобы увидеть клиентский кэш greatest-portfolio-query-cache.",
+    "openArticleCta": "Открыть статью и D3-граф",
+    "howToAddTitle": "Как добавить новую статью в Базу Знаний:",
+    "howToAddBody": "Достаточно создать файл .en.mdx, .uk.mdx или .ru.mdx в любой из папок apps/web/content/[category]/ (typescript, react, nestjs-prisma, architecture-devops). Функция generateStaticParams() автоматически включит его в SSG-сборку и сайдбар.",
+    "sidebarNavTitle": "Навигация Базы Знаний",
+    "sidebarOverview": "Обзор Базы Знаний (SSG)",
+    "backToAll": "Назад ко всем статьям Базы Знаний",
+    "fallbackNotice": "Эта статья сейчас отображается на резервном языке ({fallbackLocale}).",
+    "viewsLabel": "{count} просмотров",
+    "indexedDbBadge": "Cached in IndexedDB (0ms Offline Read)",
+    "helpfulBtn": "Полезно ({count})"
+  },
+  "Footer": {
+    "waitingPulse": "/api/telemetry/stream • Waiting for pulse..."
+  }
+}

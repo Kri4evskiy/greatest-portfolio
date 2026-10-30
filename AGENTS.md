@@ -11,20 +11,20 @@
 
 ## 🗺️ Каскадная таблица маршрутизации контекста (`.agents/`)
 
-| Домен задачи                                                    | Какой файл читать ПЕРВЫМ                                                                | Какие папки кода трогать                                     |
-| :-------------------------------------------------------------- | :-------------------------------------------------------------------------------------- | :----------------------------------------------------------- |
-| **Бэклог, Tech Debt и план развития (Post-MVP Roadmap)**        | `.agents/tech-debt-backlog.md`                                                          | Зависит от выбранной задачи из бэклога                       |
-| **Архитектура / Почему выбрана технология (15 ADR)**            | `.agents/architecture/adr-stack.md`                                                     | `turbo.json`, `biome.json`, `tsconfig.base.json`             |
-| **Общие Zod-схемы и контракты API**                             | `.agents/architecture/shared-contracts.md`                                              | `packages/shared-schemas/*`                                  |
-| **UI-компоненты, Tailwind, shadcn/ui, Storybook, Workfolio UI** | `.agents/frontend/ui-storybook.md`                                                      | `packages/ui/*`, `apps/web/src/components/*`                 |
-| **Next.js, Workfolio CV, Роутинг, SSR/SSG, MDX, D3.js, Redact** | `.agents/frontend/development.md` + `.agents/skills/react-next-best-practices/SKILL.md` | `apps/web/src/app/*`, `apps/web/content/*`                   |
-| **Стейт, Формы, Кэш (Zustand, TanStack Query, IndexedDB)**      | `.agents/frontend/state-and-forms.md` + `.agents/skills/react-hook-form/SKILL.md`       | `apps/web/src/store/*`, `apps/web/src/hooks/*`               |
-| **Фронтенд Security (Middleware, RBAC UI, Guest Pass Modal)**   | `.agents/frontend/security-auth.md`                                                     | `apps/web/src/middleware.ts`, `apps/web/src/features/auth/*` |
-| **NestJS Core, Модули, DTO, Пайпы**                             | `.agents/backend/development.md`                                                        | `apps/api/src/*`                                             |
-| **Бэкенд Security (JWT, HttpOnly Cookies, Guards)**             | `.agents/backend/security-jwt.md`                                                       | `apps/api/src/modules/auth/*`                                |
-| **База данных (PostgreSQL, Neon.tech, Prisma ORM)**             | `.agents/backend/database-prisma.md`                                                    | `apps/api/prisma/*`, `apps/api/src/prisma/*`                 |
-| **Микросервисы и Server-Sent Events (SSE)**                     | `.agents/backend/microservices-sse.md`                                                  | `apps/telemetry-ms/*`, `apps/api/src/modules/telemetry/*`    |
-| **Docker, CI/CD, Мониторинг (Sentry, PostHog)**                 | `.agents/architecture/docker-deploy.md`                                                 | `docker/*`, `docker-compose.yml`                             |
+| Домен задачи                                                    | Какой файл читать ПЕРВЫМ                                                                | Какие папки кода трогать                                                   |
+| :-------------------------------------------------------------- | :-------------------------------------------------------------------------------------- | :------------------------------------------------------------------------- |
+| **Бэклог, Tech Debt и план развития (Post-MVP Roadmap)**        | `.agents/tech-debt-backlog.md`                                                          | Зависит от выбранной задачи из бэклога                                     |
+| **Архитектура / Почему выбрана технология (16 ADR)**            | `.agents/architecture/adr-stack.md`                                                     | `turbo.json`, `biome.json`, `tsconfig.base.json`                           |
+| **Общие Zod-схемы и контракты API / Локалей**                   | `.agents/architecture/shared-contracts.md`                                              | `packages/shared-schemas/*`                                                |
+| **UI-компоненты, Tailwind, shadcn/ui, Storybook, Workfolio UI** | `.agents/frontend/ui-storybook.md`                                                      | `packages/ui/*`, `apps/web/src/components/*`                               |
+| **Next.js, i18n (`next-intl`), Роутинг `[locale]`, MDX, D3.js** | `.agents/frontend/development.md` + `.agents/skills/react-next-best-practices/SKILL.md` | `apps/web/src/app/[locale]/*`, `apps/web/messages/*`, `apps/web/content/*` |
+| **Стейт, Формы, Кэш (Zustand, TanStack Query, IndexedDB)**      | `.agents/frontend/state-and-forms.md` + `.agents/skills/react-hook-form/SKILL.md`       | `apps/web/src/store/*`, `apps/web/src/hooks/*`                             |
+| **Фронтенд Security (Middleware, RBAC UI, Guest Pass Modal)**   | `.agents/frontend/security-auth.md`                                                     | `apps/web/src/middleware.ts`, `apps/web/src/features/auth/*`               |
+| **NestJS Core, Модули, DTO, Пайпы**                             | `.agents/backend/development.md`                                                        | `apps/api/src/*`                                                           |
+| **Бэкенд Security (JWT, HttpOnly Cookies, Guards)**             | `.agents/backend/security-jwt.md`                                                       | `apps/api/src/modules/auth/*`                                              |
+| **База данных (PostgreSQL, Neon.tech, Prisma ORM)**             | `.agents/backend/database-prisma.md`                                                    | `apps/api/prisma/*`, `apps/api/src/prisma/*`                               |
+| **Микросервисы и Server-Sent Events (SSE)**                     | `.agents/backend/microservices-sse.md`                                                  | `apps/telemetry-ms/*`, `apps/api/src/modules/telemetry/*`                  |
+| **Docker, CI/CD, Мониторинг (Sentry, PostHog)**                 | `.agents/architecture/docker-deploy.md`                                                 | `docker/*`, `docker-compose.yml`                                           |
 
 ## 🛠️ Базовые команды монорепозитория
 

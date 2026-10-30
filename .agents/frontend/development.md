@@ -26,10 +26,15 @@
    - Автоматически проброшенная версия сборки из `package.json` (инкрементируется хуком `Lefthook` на каждый коммит, например `v0.0.14`).
    - Живой индикатор `Server-Sent Events (SSE)` из микросервиса `telemetry-ms` (показывает пульс сервера и последние обезличенные события в реальном времени).
 
-## 2. Закрытая База Знаний (`/knowledge-base/*`) — SSG + MDX + WebP + D3.js
+## 2. Закрытая База Знаний (`/[locale]/knowledge-base/*`) — SSG + MDX + WebP + D3.js + i18n (`next-intl`)
 
+- **Мультиязычность (`next-intl`, `en` по умолчанию, `uk`, `ru` — ADR #16):**
+  - Маршрутизация настроена в `apps/web/src/i18n/routing.ts` с режимом `localePrefix: 'as-needed'` и `localeDetection: false`: дефолтный английский язык открывается по чистым ссылкам (`/`, `/knowledge-base/...`), а украинский и русский — с префиксами `/uk/...` и `/ru/...`.
+  - Для всех внутренних переходов в клиентских и серверных компонентах используй типизированные хелперы `Link`, `useRouter`, `usePathname` из `@/i18n/navigation` (а не напрямую из `next/link` или `next/navigation`), чтобы сохранять активную локаль.
+  - **Правило ICU MessageFormat в `apps/web/messages/*.json`:** Фигурные скобки `{...}` в строках JSON-словарей зарезервированы под переменные интерполяции (`{count}`, `{years}`). **ЗАПРЕЩЕНО** использовать неэкранированные фигурные скобки для обычного текста (например, `{a,b}` вызовет ошибку `INVALID_MESSAGE: INVALID_ARGUMENT_TYPE`) — используй квадратные скобки `[category]` или экранирование `'{'...'}`.
+  - В шапке `WorkfolioHeader` встроен переключатель `LanguageSwitcher` (`EN | UA | RU`).
 - **Layout с древовидным Sidebar:** Разделы `TypeScript`, `React 18 vs 19`, `NestJS & Prisma`, `Architecture & DevOps`. Состояние открытых секций сайдбара хранится в `Zustand` (`useUIStore`).
-- **SSG (`generateStaticParams`):** Все статьи `.mdx` из папки `apps/web/content/` компилируются на этапе сборки в быстрый статический HTML, а динамические метрики (просмотры, кнопка «Полезно») подгружаются и кэшируются через `TanStack Query` + `IndexedDB`.
+- **SSG (`generateStaticParams`) и Colocated MDX:** Все статьи `.mdx` из папки `apps/web/content/` хранятся рядом с суффиксом локали (`*.en.mdx`, `*.uk.mdx`, `*.ru.mdx`) с автоматическим fallback на `.en.mdx` и компилируются на этапе сборки в быстрый статический HTML, а динамические метрики (просмотры, кнопка «Полезно») подгружаются и кэшируются через `TanStack Query` + `IndexedDB`.
 - **Кастомные MDX-компоненты:**
   - `<ArticleImageGrid />`: Обертка над `next/image` с автоматической отдачей в формате `WebP`, адаптивными сетками (`1-col`, `2-col`, `masonry`) и зумом по клику.
   - `<D3Playground />`: Интерактивные визуализации на `D3.js` (управляются через `useRef` + `Zustand`-фильтры):

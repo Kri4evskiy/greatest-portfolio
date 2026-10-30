@@ -3,12 +3,13 @@
 import { KNOWLEDGE_CATEGORY_LABELS, type KnowledgeCategory } from '@repo/shared-schemas'
 import { Badge, Button } from '@repo/ui'
 import { BookOpen, ChevronRight, FolderGit2, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
-import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { useTranslations } from 'next-intl'
+import { Link, usePathname } from '@/i18n/navigation'
 import type { MdxArticleFrontmatter } from '@/lib/mdx-content'
 import { useUIStore } from '@/store/use-ui-store'
 
 export function KnowledgeSidebar({ articles }: { articles: readonly MdxArticleFrontmatter[] }) {
+  const t = useTranslations('KnowledgeBase')
   const pathname = usePathname()
   const isSidebarOpen = useUIStore((s) => s.isKbSidebarOpen)
   const toggleSidebar = useUIStore((s) => s.toggleKbSidebar)
@@ -18,7 +19,7 @@ export function KnowledgeSidebar({ articles }: { articles: readonly MdxArticleFr
   return (
     <aside className="w-full shrink-0 md:w-72">
       <div className="mb-3 flex items-center justify-between md:hidden">
-        <span className="font-mono text-xs font-semibold uppercase text-muted-foreground">Навигация Базы Знаний</span>
+        <span className="font-mono text-xs font-semibold uppercase text-muted-foreground">{t('sidebarNavTitle')}</span>
         <Button type="button" variant="outline" size="sm" onClick={toggleSidebar} className="h-7">
           {isSidebarOpen ? <PanelLeftClose className="h-3.5 w-3.5" /> : <PanelLeftOpen className="h-3.5 w-3.5" />}
         </Button>
@@ -35,7 +36,7 @@ export function KnowledgeSidebar({ articles }: { articles: readonly MdxArticleFr
             >
               <span className="flex items-center gap-2">
                 <BookOpen className="h-3.5 w-3.5" />
-                <span>Обзор Базы Знаний (SSG)</span>
+                <span>{t('sidebarOverview')}</span>
               </span>
               <Badge variant="outline" className="font-mono text-[10px]">
                 {articles.length} MDX

@@ -2,13 +2,15 @@
 
 import { Badge, Button } from '@repo/ui'
 import { BookOpen, FileText, Lock, LockOpen, LogOut, ShieldAlert } from 'lucide-react'
-import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import { useLogoutMutation, useVisitorProfile } from '@/hooks/use-visitor-profile'
+import { Link, usePathname, useRouter } from '@/i18n/navigation'
 import { trackEvent } from '@/lib/analytics'
 import { useUIStore } from '@/store/use-ui-store'
+import { LanguageSwitcher } from './language-switcher'
 
 export function WorkfolioHeader() {
+  const t = useTranslations('Header')
   const pathname = usePathname()
   const router = useRouter()
   const { data: profile } = useVisitorProfile()
@@ -52,27 +54,29 @@ export function WorkfolioHeader() {
             </>
           ) : (
             <Badge variant="success" className="hidden md:inline-flex text-[11px]">
-              ● Available for Senior / Lead Roles
+              {t('availableBadge')}
             </Badge>
           )}
         </div>
 
         <nav className="hidden lg:flex items-center gap-5 text-xs font-medium text-muted-foreground">
           <Link href="/#about" className="hover:text-foreground transition-colors">
-            About
+            {t('nav.about')}
           </Link>
           <Link href="/#projects" className="hover:text-foreground transition-colors">
-            Case Studies
+            {t('nav.projects')}
           </Link>
           <Link href="/#experience" className="hover:text-foreground transition-colors">
-            Experience
+            {t('nav.experience')}
           </Link>
           <Link href="/#tech-radar" className="hover:text-foreground transition-colors">
-            Tech Radar (15 ADR)
+            {t('nav.techRadar')}
           </Link>
         </nav>
 
         <div className="flex items-center gap-2">
+          <LanguageSwitcher />
+
           {isUnlocked ? (
             <div className="flex items-center gap-1.5">
               <Button
@@ -83,10 +87,10 @@ export function WorkfolioHeader() {
                 className="gap-1.5 text-xs"
               >
                 <LockOpen className="h-3.5 w-3.5 text-emerald-400" />
-                <span>Base of Knowledge</span>
+                <span className="hidden sm:inline">{t('knowledgeBase')}</span>
                 <Badge
                   variant={currentRole === 'ADMIN' ? 'warning' : 'success'}
-                  className="ml-1 px-1.5 py-0 font-mono text-[10px]"
+                  className="ml-0.5 px-1.5 py-0 font-mono text-[10px]"
                 >
                   {currentRole}
                 </Badge>
@@ -95,7 +99,7 @@ export function WorkfolioHeader() {
                 type="button"
                 variant="ghost"
                 size="sm"
-                title={`Выйти из сессии (${profile?.displayName ?? 'Guest'})`}
+                title={t('logoutTitle', { name: profile?.displayName ?? 'Guest' })}
                 onClick={() => {
                   void logoutMutation.mutateAsync().then(() => {
                     if (isInsideKnowledgeBase) {
@@ -118,21 +122,21 @@ export function WorkfolioHeader() {
               className="group gap-2 border-primary/30 bg-background text-xs font-medium hover:border-primary hover:bg-accent"
             >
               <Lock className="h-3.5 w-3.5 text-amber-600 transition-transform group-hover:scale-110" />
-              <span>Base of Knowledge</span>
-              <Badge variant="warning" className="px-1.5 py-0 font-mono text-[10px]">
-                Protected • 1-Click
+              <span>{t('knowledgeBase')}</span>
+              <Badge variant="warning" className="hidden sm:inline-flex px-1.5 py-0 font-mono text-[10px]">
+                {t('protectedBadge')}
               </Badge>
             </Button>
           )}
 
           {!isInsideKnowledgeBase ? (
-            <Link
+            <a
               href="#tech-radar"
               className="hidden sm:inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 font-mono text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
             >
               <FileText className="h-3.5 w-3.5" />
               <span>ADR</span>
-            </Link>
+            </a>
           ) : (
             <Link
               href="/"
@@ -148,7 +152,7 @@ export function WorkfolioHeader() {
       {!isUnlocked && isInsideKnowledgeBase ? (
         <div className="border-t border-amber-500/30 bg-amber-500/10 px-4 py-1 text-center text-xs text-amber-800">
           <ShieldAlert className="mr-1 inline h-3.5 w-3.5" />
-          Гостевой режим. Выпустите 1-Click Guest Pass для полного доступа.
+          {t('guestBanner')}
         </div>
       ) : null}
     </header>

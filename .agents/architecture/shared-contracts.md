@@ -62,3 +62,9 @@
   - `adrWhy`: `z.string()`
   - `adrWhere`: `z.string()`
   - `adrHow`: `z.string()`
+
+### 6. Мультиязычность и локали (`locale.schema.ts`)
+
+- `SupportedLocaleEnum = z.enum(['en', 'uk', 'ru'])`
+- `DEFAULT_LOCALE = 'en'`
+- `LOCALE_METADATA`: словарь кодов, коротких меток (`EN`, `UA`, `RU`) и нативных названий языков.

@@ -1,0 +1,36 @@
+---
+title: "Zero-Trust Security: JWT in HttpOnly Cookies, Prisma ORM, and SSE Telemetry"
+summary: "Why storing tokens in LocalStorage is vulnerable to XSS, how Next.js Edge Proxy + NestJS Guards work together, and reactive @Sse streaming."
+category: "nestjs-prisma"
+readingTime: "9 min"
+publishedAt: "2026-10-21"
+---
+
+## 1. Why We Banned `LocalStorage` for JWT Tokens
+
+Storing `accessToken` in `window.localStorage` or `sessionStorage` exposes the application to any XSS vector: a third-party script or compromised npm dependency can exfiltrate the token with a single `localStorage.getItem('token')` call.
+
+Our monorepo implements **HttpOnly Cookie + Dual-Layer RBAC**:
+
+1. When the `POST /api/auth/guest-pass` micro-form is submitted, the **NestJS** backend records a `VisitorSession` in PostgreSQL via **Prisma ORM**.
+2. The server signs a JWT and sets the `Set-Cookie` header:
+   - `HttpOnly` — client-side JavaScript cannot access `kb_access_token` via `document.cookie`.
+   - `SameSite=Lax` and `Secure` — mitigates CSRF and network interception.
+3. **Layer 1 (Next.js Edge Proxy):** Verifies cookie presence and structure at the Edge before rendering any `/knowledge-base/*` route.
+4. **Layer 2 (NestJS `JwtRolesGuard`):** Verifies the cryptographic JWT signature and role (`USER` / `ADMIN`) on `/api/knowledge/*` endpoints.
+
+<ArchitectureFlowD3 />
+
+## 2. Atomic Increments in `Prisma ORM` and `Server-Sent Events`
+
+When a Tech Lead opens an article or clicks `Helpful`, the backend performs an atomic `upsert` in PostgreSQL (`Neon.tech`), preventing race conditions:
+
+```typescript
+await this.prisma.articleMetrics.upsert({
+  where: { slug },
+  update: { helpfulCount: { increment: 1 } },
+  create: { slug, category, viewsCount: 1, helpfulCount: 1 },
+});
+```
+
+Immediately after writing, `apps/api` emits an event over TCP (`port 4001`) to the dedicated `apps/telemetry-ms` microservice, and subscribers of `GET /api/telemetry/stream` (`@Sse`) see the live update in the footer indicator.
