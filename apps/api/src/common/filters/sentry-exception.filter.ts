@@ -1,11 +1,4 @@
-import {
-  ArgumentsHost,
-  Catch,
-  ExceptionFilter,
-  HttpException,
-  HttpStatus,
-  Logger,
-} from '@nestjs/common'
+import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus, Logger } from '@nestjs/common'
 import type { Request, Response } from 'express'
 
 @Catch()
@@ -17,13 +10,10 @@ export class SentryExceptionFilter implements ExceptionFilter {
     const response = ctx.getResponse<Response>()
     const request = ctx.getRequest<Request>()
 
-    const status =
-      exception instanceof HttpException ? exception.getStatus() : HttpStatus.INTERNAL_SERVER_ERROR
+    const status = exception instanceof HttpException ? exception.getStatus() : HttpStatus.INTERNAL_SERVER_ERROR
 
     const exceptionResponse =
-      exception instanceof HttpException
-        ? exception.getResponse()
-        : { message: 'Internal server error' }
+      exception instanceof HttpException ? exception.getResponse() : { message: 'Internal server error' }
 
     if (status >= 500) {
       const sentryDsn = process.env.SENTRY_DSN

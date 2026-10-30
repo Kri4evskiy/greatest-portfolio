@@ -1,12 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { Inject, Injectable, Logger, MessageEvent } from '@nestjs/common'
 import { ClientProxy } from '@nestjs/microservices'
-import {
-  TelemetryEvent,
-  TelemetryEventSchema,
-  TelemetryEventType,
-  VisitorRoleType,
-} from '@repo/shared-schemas'
+import { TelemetryEvent, TelemetryEventSchema, TelemetryEventType, VisitorRoleType } from '@repo/shared-schemas'
 import { firstValueFrom, interval, map, merge, Observable, of, Subject, timeout } from 'rxjs'
 import { PrismaService } from '../../prisma/prisma.service.js'
 

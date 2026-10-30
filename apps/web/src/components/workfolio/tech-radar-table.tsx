@@ -1,16 +1,7 @@
 'use client'
 
 import { TECH_RADAR_ITEMS, type TechCategory, type TechRadarItem } from '@repo/shared-schemas'
-import {
-  Badge,
-  Button,
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  Input,
-} from '@repo/ui'
+import { Badge, Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Input } from '@repo/ui'
 import {
   type ColumnDef,
   flexRender,
@@ -102,8 +93,7 @@ export function TechRadarTable() {
         header: 'Статус',
         cell: ({ row }) => {
           const level = row.original.level
-          const variant =
-            level === 'Core' ? 'success' : level === 'Production' ? 'default' : 'warning'
+          const variant = level === 'Core' ? 'success' : level === 'Production' ? 'default' : 'warning'
           return (
             <Badge variant={variant} className="font-mono text-[10px]">
               {level}
@@ -123,9 +113,7 @@ export function TechRadarTable() {
             <ArrowUpDown className="h-3 w-3" />
           </button>
         ),
-        cell: ({ row }) => (
-          <span className="font-mono text-xs font-medium">{row.original.experienceYears}+ лет</span>
-        ),
+        cell: ({ row }) => <span className="font-mono text-xs font-medium">{row.original.experienceYears}+ лет</span>,
       },
       {
         id: 'actions',
@@ -172,14 +160,12 @@ export function TechRadarTable() {
         <div>
           <div className="flex items-center gap-2">
             <Compass className="h-5 w-5 text-primary" />
-            <h2 className="text-xl font-bold tracking-tight">
-              Tech Radar Database (15 Architecture Decision Records)
-            </h2>
+            <h2 className="text-xl font-bold tracking-tight">Tech Radar Database (15 Architecture Decision Records)</h2>
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
             Интерактивная база данных в стиле Notion на движке{' '}
-            <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">TanStack Table</code>.
-            Нажмите <strong>«Почему / Где / Как»</strong> на любой строке для просмотра ADR.
+            <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">TanStack Table</code>. Нажмите{' '}
+            <strong>«Почему / Где / Как»</strong> на любой строке для просмотра ADR.
           </p>
         </div>
         <Badge variant="outline" className="w-fit font-mono text-xs">
@@ -225,13 +211,8 @@ export function TechRadarTable() {
             {table.getHeaderGroups().map((headerGroup) => (
               <tr key={headerGroup.id} className="border-b border-border bg-muted/40">
                 {headerGroup.headers.map((header) => (
-                  <th
-                    key={header.id}
-                    className="px-3.5 py-2.5 font-mono text-xs font-semibold text-muted-foreground"
-                  >
-                    {header.isPlaceholder
-                      ? null
-                      : flexRender(header.column.columnDef.header, header.getContext())}
+                  <th key={header.id} className="px-3.5 py-2.5 font-mono text-xs font-semibold text-muted-foreground">
+                    {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
                   </th>
                 ))}
               </tr>
@@ -250,10 +231,7 @@ export function TechRadarTable() {
               ))
             ) : (
               <tr>
-                <td
-                  colSpan={columns.length}
-                  className="py-8 text-center text-sm text-muted-foreground"
-                >
+                <td colSpan={columns.length} className="py-8 text-center text-sm text-muted-foreground">
                   Ничего не найдено по вашему запросу.
                 </td>
               </tr>
@@ -301,9 +279,7 @@ export function TechRadarTable() {
                     <Layers className="h-3.5 w-3.5" />
                     <span>2. ГДЕ ПРИМЕНЕНО В МОНОРЕПОЗИТОРИИ (WHERE)</span>
                   </div>
-                  <p className="text-muted-foreground leading-relaxed">
-                    {selectedAdrItem.adrWhere}
-                  </p>
+                  <p className="text-muted-foreground leading-relaxed">{selectedAdrItem.adrWhere}</p>
                 </div>
 
                 <div className="rounded-lg border border-border bg-muted/30 p-3.5">

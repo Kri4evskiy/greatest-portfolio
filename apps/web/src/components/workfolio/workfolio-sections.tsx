@@ -1,16 +1,6 @@
 'use client'
 
-import {
-  Badge,
-  Button,
-  Callout,
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from '@repo/ui'
+import { Badge, Button, Callout, Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@repo/ui'
 import {
   ArrowUpRight,
   Briefcase,
@@ -138,19 +128,14 @@ export function WorkfolioHeroSection() {
 
         <p className="max-w-3xl text-base leading-relaxed text-muted-foreground sm:text-lg">
           Добро пожаловать в интерактивное <strong>Workfolio CV</strong> и защищенную{' '}
-          <strong>Инженерную Базу Знаний</strong>. Вместо статичного PDF-резюме этот монорепозиторий
-          сам является живым доказательством архитектуры: от сквозных Zod-контрактов и{' '}
-          <code>HttpOnly JWT</code> до <code>IndexedDB Offline-First</code> кэша, <code>D3.js</code>{' '}
-          графов и реактивного стрима <code>Server-Sent Events</code>.
+          <strong>Инженерную Базу Знаний</strong>. Вместо статичного PDF-резюме этот монорепозиторий сам является живым
+          доказательством архитектуры: от сквозных Zod-контрактов и <code>HttpOnly JWT</code> до{' '}
+          <code>IndexedDB Offline-First</code> кэша, <code>D3.js</code> графов и реактивного стрима{' '}
+          <code>Server-Sent Events</code>.
         </p>
 
         <div className="flex flex-wrap items-center gap-3 pt-1">
-          <Button
-            type="button"
-            size="lg"
-            onClick={() => handleOpenKnowledgeBase('/knowledge-base')}
-            className="gap-2"
-          >
+          <Button type="button" size="lg" onClick={() => handleOpenKnowledgeBase('/knowledge-base')} className="gap-2">
             {isUnlocked ? (
               <>
                 <LockOpen className="h-4 w-4 text-emerald-400" />
@@ -184,18 +169,15 @@ export function WorkfolioHeroSection() {
           <div className="rounded border border-border/70 bg-background/80 p-2.5">
             <div className="font-mono font-semibold text-foreground">1. 1-Click RBAC Demo</div>
             <p className="mt-0.5 text-muted-foreground">
-              Клик по кнопке <code>Base of Knowledge</code> в шапке открывает микро-форму на{' '}
-              <code>RHF + Zod</code>, выписывает <code>HttpOnly JWT</code> куку и пушит событие в{' '}
-              <code>SSE</code>.
+              Клик по кнопке <code>Base of Knowledge</code> в шапке открывает микро-форму на <code>RHF + Zod</code>,
+              выписывает <code>HttpOnly JWT</code> куку и пушит событие в <code>SSE</code>.
             </p>
           </div>
           <div className="rounded border border-border/70 bg-background/80 p-2.5">
-            <div className="font-mono font-semibold text-foreground">
-              2. Offline-First IndexedDB
-            </div>
+            <div className="font-mono font-semibold text-foreground">2. Offline-First IndexedDB</div>
             <p className="mt-0.5 text-muted-foreground">
-              Все запросы <code>TanStack Query v5</code> синхронизируются с браузерной БД{' '}
-              <code>IndexedDB</code> (TTL 24ч) — статьи и метрики открываются за 0 мс.
+              Все запросы <code>TanStack Query v5</code> синхронизируются с браузерной БД <code>IndexedDB</code> (TTL
+              24ч) — статьи и метрики открываются за 0 мс.
             </p>
           </div>
           <div className="rounded border border-border/70 bg-background/80 p-2.5">
@@ -234,23 +216,18 @@ export function WorkfolioProjectsSection() {
         <div>
           <div className="flex items-center gap-2">
             <GitBranch className="h-5 w-5 text-primary" />
-            <h2 className="text-xl font-bold tracking-tight">
-              Featured Engineering Case Studies (Workfolio Gallery)
-            </h2>
+            <h2 className="text-xl font-bold tracking-tight">Featured Engineering Case Studies (Workfolio Gallery)</h2>
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
-            Ключевые архитектурные модули этого монорепозитория с переходом к подробным MDX-статьям
-            и интерактивным графам D3.js.
+            Ключевые архитектурные модули этого монорепозитория с переходом к подробным MDX-статьям и интерактивным
+            графам D3.js.
           </p>
         </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
         {CASE_STUDIES.map((item) => (
-          <Card
-            key={item.id}
-            className="flex flex-col justify-between transition-shadow hover:shadow-md"
-          >
+          <Card key={item.id} className="flex flex-col justify-between transition-shadow hover:shadow-md">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between gap-2">
                 <Badge variant="secondary" className="font-mono text-[11px]">
@@ -308,10 +285,7 @@ export function WorkfolioExperienceSection() {
 
       <div className="space-y-4">
         {EXPERIENCE_TIMELINE.map((roleItem) => (
-          <div
-            key={roleItem.period}
-            className="rounded-lg border border-border bg-card p-5 shadow-sm"
-          >
+          <div key={roleItem.period} className="rounded-lg border border-border bg-card p-5 shadow-sm">
             <div className="flex flex-col justify-between gap-1 sm:flex-row sm:items-center">
               <div>
                 <h3 className="font-semibold text-base text-foreground">{roleItem.role}</h3>

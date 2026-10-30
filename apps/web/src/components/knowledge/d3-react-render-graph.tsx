@@ -105,10 +105,7 @@ export function ReactRenderGraphD3() {
       .attr(
         'd',
         d3
-          .linkHorizontal<
-            d3.HierarchyPointLink<RenderTreeNode>,
-            d3.HierarchyPointNode<RenderTreeNode>
-          >()
+          .linkHorizontal<d3.HierarchyPointLink<RenderTreeNode>, d3.HierarchyPointNode<RenderTreeNode>>()
           .x((d) => d.y)
           .y((d) => d.x),
       )
@@ -226,8 +223,7 @@ export function ReactRenderGraphD3() {
                 Total Commit: ~30.3ms
               </Badge>
               <span className="text-muted-foreground">
-                Красные узлы ререндерятся каскадно при каждом изменении фильтра без ручного{' '}
-                <code>useCallback</code>.
+                Красные узлы ререндерятся каскадно при каждом изменении фильтра без ручного <code>useCallback</code>.
               </span>
             </>
           ) : (
@@ -236,8 +232,8 @@ export function ReactRenderGraphD3() {
                 Total Commit: ~5.5ms (-81%)
               </Badge>
               <span className="text-muted-foreground">
-                React 19 Compiler автоматически мемоизирует поддеревья, а <code>use(promise)</code>{' '}
-                стримит данные в Suspense.
+                React 19 Compiler автоматически мемоизирует поддеревья, а <code>use(promise)</code> стримит данные в
+                Suspense.
               </span>
             </>
           )}

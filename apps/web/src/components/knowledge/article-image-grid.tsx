@@ -1,13 +1,6 @@
 'use client'
 
-import {
-  Badge,
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@repo/ui'
+import { Badge, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@repo/ui'
 import { Image as ImageIcon, Maximize2 } from 'lucide-react'
 import { useState } from 'react'
 
@@ -81,9 +74,7 @@ export function ArticleImageGrid({
               <div className="my-3 flex h-28 items-center justify-center rounded-md border border-border/60 bg-muted/40 p-3 font-mono text-xs text-muted-foreground">
                 <div className="text-center space-y-1">
                   <div className="font-semibold text-foreground">{item.title}</div>
-                  <div className="text-[11px] text-emerald-600">
-                    [WebP Vector/Raster Asset Preview]
-                  </div>
+                  <div className="text-[11px] text-emerald-600">[WebP Vector/Raster Asset Preview]</div>
                 </div>
               </div>
             </div>
@@ -118,8 +109,8 @@ export function ArticleImageGrid({
                 <DialogDescription>{zoomedItem.caption}</DialogDescription>
               </DialogHeader>
               <div className="rounded-lg border border-border bg-muted/40 p-6 text-center font-mono text-xs">
-                Оптимизированный ассет <code>&lt;ArticleImageGrid /&gt;</code> • Формат{' '}
-                <code>WebP</code> • Поддержка многоколоночных сеток внутри <code>.mdx</code> статей.
+                Оптимизированный ассет <code>&lt;ArticleImageGrid /&gt;</code> • Формат <code>WebP</code> • Поддержка
+                многоколоночных сеток внутри <code>.mdx</code> статей.
               </div>
             </>
           ) : null}

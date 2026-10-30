@@ -18,15 +18,9 @@ export function KnowledgeSidebar({ articles }: { articles: readonly MdxArticleFr
   return (
     <aside className="w-full shrink-0 md:w-72">
       <div className="mb-3 flex items-center justify-between md:hidden">
-        <span className="font-mono text-xs font-semibold uppercase text-muted-foreground">
-          Навигация Базы Знаний
-        </span>
+        <span className="font-mono text-xs font-semibold uppercase text-muted-foreground">Навигация Базы Знаний</span>
         <Button type="button" variant="outline" size="sm" onClick={toggleSidebar} className="h-7">
-          {isSidebarOpen ? (
-            <PanelLeftClose className="h-3.5 w-3.5" />
-          ) : (
-            <PanelLeftOpen className="h-3.5 w-3.5" />
-          )}
+          {isSidebarOpen ? <PanelLeftClose className="h-3.5 w-3.5" /> : <PanelLeftOpen className="h-3.5 w-3.5" />}
         </Button>
       </div>
 
@@ -36,9 +30,7 @@ export function KnowledgeSidebar({ articles }: { articles: readonly MdxArticleFr
             <Link
               href="/knowledge-base"
               className={`flex items-center justify-between rounded-md px-2.5 py-2 text-xs font-semibold transition-colors ${
-                pathname === '/knowledge-base'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'text-foreground hover:bg-muted'
+                pathname === '/knowledge-base' ? 'bg-primary text-primary-foreground' : 'text-foreground hover:bg-muted'
               }`}
             >
               <span className="flex items-center gap-2">

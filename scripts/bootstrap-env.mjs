@@ -37,10 +37,7 @@ function runStep(label, command) {
 function main() {
   syncEnvFile()
   syncVersionConstant()
-  runStep(
-    'Building @repo/shared-schemas (Zod contracts)',
-    'pnpm --filter @repo/shared-schemas build',
-  )
+  runStep('Building @repo/shared-schemas (Zod contracts)', 'pnpm --filter @repo/shared-schemas build')
   runStep('Generating Prisma Client (@repo/api)', 'pnpm --filter @repo/api prisma:generate')
   console.log('[setup] Monorepo workspace is ready! Run "pnpm run dev" to start all services.')
 }

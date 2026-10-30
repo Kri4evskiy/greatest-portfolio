@@ -49,13 +49,7 @@ const ONE_CLICK_PRESETS: ReadonlyArray<{
   },
 ]
 
-const VISITOR_ROLES: readonly VisitorRoleType[] = [
-  'TEAM_LEAD',
-  'RECRUITER',
-  'DEVELOPER',
-  'FOUNDER',
-  'OTHER',
-]
+const VISITOR_ROLES: readonly VisitorRoleType[] = ['TEAM_LEAD', 'RECRUITER', 'DEVELOPER', 'FOUNDER', 'OTHER']
 
 export function GuestPassModal() {
   const router = useRouter()
@@ -108,10 +102,7 @@ export function GuestPassModal() {
     router.refresh()
   }
 
-  const applyPresetAndUnlock = async (preset: {
-    displayName: string
-    visitorType: VisitorRoleType
-  }) => {
+  const applyPresetAndUnlock = async (preset: { displayName: string; visitorType: VisitorRoleType }) => {
     setValue('displayName', preset.displayName, { shouldValidate: true })
     setValue('visitorType', preset.visitorType, { shouldValidate: true })
     await onSubmit({
@@ -139,10 +130,8 @@ export function GuestPassModal() {
           </DialogTitle>
           <DialogDescription>
             Раздел инженерных разборов и D3.js-симуляций защищен на уровне{' '}
-            <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">
-              Next.js Edge Middleware
-            </code>{' '}
-            и <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">JwtRolesGuard</code>.
+            <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">Next.js Edge Middleware</code> и{' '}
+            <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">JwtRolesGuard</code>.
           </DialogDescription>
         </DialogHeader>
 
@@ -153,8 +142,8 @@ export function GuestPassModal() {
           className="my-1 text-xs"
         >
           Выбери пресет в <strong>1 клик</strong> или укажи свое имя — это демонстрация связки{' '}
-          <code>React Hook Form</code> + <code>Zod</code> + <code>NestJS JWT HttpOnly Cookie</code>{' '}
-          + <code>RBAC</code> + <code>SSE Telemetry</code>.
+          <code>React Hook Form</code> + <code>Zod</code> + <code>NestJS JWT HttpOnly Cookie</code> + <code>RBAC</code>{' '}
+          + <code>SSE Telemetry</code>.
         </Callout>
 
         <div className="space-y-2">
@@ -183,14 +172,8 @@ export function GuestPassModal() {
             <label htmlFor="guest-display-name" className="text-xs font-medium">
               Имя или никнейм гостя
             </label>
-            <Input
-              id="guest-display-name"
-              placeholder="Например: Alex (Team Lead)"
-              {...register('displayName')}
-            />
-            {errors.displayName ? (
-              <p className="text-xs text-red-600">{errors.displayName.message}</p>
-            ) : null}
+            <Input id="guest-display-name" placeholder="Например: Alex (Team Lead)" {...register('displayName')} />
+            {errors.displayName ? <p className="text-xs text-red-600">{errors.displayName.message}</p> : null}
           </div>
 
           <div className="space-y-1.5">
@@ -223,9 +206,7 @@ export function GuestPassModal() {
               className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
             >
               <KeyRound className="h-3.5 w-3.5" />
-              {showAdminInput
-                ? 'Скрыть поле Admin Passcode'
-                : 'Я владелец портфолио (Admin Passcode → роль ADMIN)'}
+              {showAdminInput ? 'Скрыть поле Admin Passcode' : 'Я владелец портфолио (Admin Passcode → роль ADMIN)'}
             </button>
 
             {showAdminInput ? (
@@ -244,9 +225,7 @@ export function GuestPassModal() {
 
           {issuePassMutation.isError ? (
             <p className="rounded-md bg-red-500/10 p-2 text-xs text-red-600">
-              {issuePassMutation.error instanceof Error
-                ? issuePassMutation.error.message
-                : 'Ошибка соединения с API'}
+              {issuePassMutation.error instanceof Error ? issuePassMutation.error.message : 'Ошибка соединения с API'}
             </p>
           ) : null}
 
@@ -255,15 +234,9 @@ export function GuestPassModal() {
               <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
               <span>Set-Cookie: HttpOnly; SameSite=Lax</span>
             </div>
-            <Button
-              type="submit"
-              disabled={isSubmitting || issuePassMutation.isPending}
-              className="gap-1.5"
-            >
+            <Button type="submit" disabled={isSubmitting || issuePassMutation.isPending} className="gap-1.5">
               <Sparkles className="h-4 w-4" />
-              {issuePassMutation.isPending
-                ? 'Выпускаем JWT пропуск...'
-                : 'Разблокировать Базу Знаний'}
+              {issuePassMutation.isPending ? 'Выпускаем JWT пропуск...' : 'Разблокировать Базу Знаний'}
             </Button>
           </DialogFooter>
         </form>

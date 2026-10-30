@@ -1,10 +1,4 @@
-import {
-  CanActivate,
-  ExecutionContext,
-  ForbiddenException,
-  Inject,
-  Injectable,
-} from '@nestjs/common'
+import { CanActivate, ExecutionContext, ForbiddenException, Inject, Injectable } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
 import type { Role } from '@repo/shared-schemas'
 import type { Request } from 'express'

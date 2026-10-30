@@ -1,10 +1,6 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import {
-  KNOWLEDGE_CATEGORY_LABELS,
-  type KnowledgeCategory,
-  KnowledgeCategoryEnum,
-} from '@repo/shared-schemas'
+import { KNOWLEDGE_CATEGORY_LABELS, type KnowledgeCategory, KnowledgeCategoryEnum } from '@repo/shared-schemas'
 import { cache } from 'react'
 
 export interface MdxArticleFrontmatter {
@@ -37,11 +33,7 @@ function resolveContentRoot(): string {
   return join(process.cwd(), 'content')
 }
 
-function parseRawMdx(
-  raw: string,
-  fallbackCategory: KnowledgeCategory,
-  slug: string,
-): MdxArticleDocument {
+function parseRawMdx(raw: string, fallbackCategory: KnowledgeCategory, slug: string): MdxArticleDocument {
   let body = raw.trim()
   const meta: Record<string, string> = {}
 
@@ -169,9 +161,7 @@ export const getAllKnowledgeArticles = cache((): MdxArticleDocument[] => {
   return articles
 })
 
-export const getArticleByCategoryAndSlug = cache(
-  (category: string, slug: string): MdxArticleDocument | null => {
-    const all = getAllKnowledgeArticles()
-    return all.find((a) => a.category === category && a.slug === slug) ?? null
-  },
-)
+export const getArticleByCategoryAndSlug = cache((category: string, slug: string): MdxArticleDocument | null => {
+  const all = getAllKnowledgeArticles()
+  return all.find((a) => a.category === category && a.slug === slug) ?? null
+})

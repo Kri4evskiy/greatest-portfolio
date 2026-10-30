@@ -32,13 +32,7 @@ export function useIncrementViewMutation() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async ({
-      slug,
-      category,
-    }: {
-      slug: string
-      category: KnowledgeCategory
-    }): Promise<ArticleMeta> => {
+    mutationFn: async ({ slug, category }: { slug: string; category: KnowledgeCategory }): Promise<ArticleMeta> => {
       const res = await fetch(`/api/knowledge/${encodeURIComponent(slug)}/view`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -66,13 +60,7 @@ export function useIncrementHelpfulMutation() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async ({
-      slug,
-      category,
-    }: {
-      slug: string
-      category: KnowledgeCategory
-    }): Promise<ArticleMeta> => {
+    mutationFn: async ({ slug, category }: { slug: string; category: KnowledgeCategory }): Promise<ArticleMeta> => {
       const res = await fetch(`/api/knowledge/${encodeURIComponent(slug)}/helpful`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

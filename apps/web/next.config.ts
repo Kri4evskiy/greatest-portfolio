@@ -35,8 +35,7 @@ const nextConfig: NextConfig = {
     optimizePackageImports: ['lucide-react', 'd3', '@repo/ui'],
   },
   env: {
-    NEXT_PUBLIC_REDACT_RUNTIME:
-      process.env.ENABLE_REDACT === 'true' ? 'enabled' : 'standard-react-19',
+    NEXT_PUBLIC_REDACT_RUNTIME: process.env.ENABLE_REDACT === 'true' ? 'enabled' : 'standard-react-19',
   },
   async rewrites() {
     return [

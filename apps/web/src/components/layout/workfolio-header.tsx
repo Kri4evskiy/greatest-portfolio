@@ -39,9 +39,7 @@ export function WorkfolioHeader() {
             <span className="flex h-6 w-6 items-center justify-center rounded border border-border bg-muted font-mono text-xs font-bold">
               W
             </span>
-            <span className="font-mono text-xs text-muted-foreground hidden sm:inline">
-              workspace /
-            </span>
+            <span className="font-mono text-xs text-muted-foreground hidden sm:inline">workspace /</span>
             <span className="font-semibold tracking-tight">workfolio-cv</span>
           </Link>
 

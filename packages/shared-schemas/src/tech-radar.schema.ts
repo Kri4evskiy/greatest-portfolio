@@ -1,12 +1,6 @@
 import { z } from 'zod'
 
-export const TechCategoryEnum = z.enum([
-  'Frontend',
-  'Backend',
-  'Database & Storage',
-  'DevOps & DX',
-  'Architecture',
-])
+export const TechCategoryEnum = z.enum(['Frontend', 'Backend', 'Database & Storage', 'DevOps & DX', 'Architecture'])
 export type TechCategory = z.infer<typeof TechCategoryEnum>
 
 export const TechLevelEnum = z.enum(['Core', 'Production', 'Experimental'])
@@ -95,8 +89,7 @@ export const TECH_RADAR_ITEMS: readonly TechRadarItem[] = [
     adrWhy:
       'LocalStorage синхронный (блокирует главный поток) и вмещает всего ~5 МБ. Для Offline-First кэша нужна асинхронная транзакционная БД IndexedDB.',
     adrWhere: 'Ядро провайдеров и модуль Базы Знаний в apps/web.',
-    adrHow:
-      'Подключен @tanstack/query-persist-client-core + адаптер idb-keyval с политикой gcTime / maxAge 24 часа.',
+    adrHow: 'Подключен @tanstack/query-persist-client-core + адаптер idb-keyval с политикой gcTime / maxAge 24 часа.',
   },
   {
     id: 'rhf-zod',
@@ -119,8 +112,7 @@ export const TECH_RADAR_ITEMS: readonly TechRadarItem[] = [
     category: 'Frontend',
     experienceYears: 4,
     level: 'Core',
-    summary:
-      'Дизайн-система в эстетике Notion Workfolio на базе Radix UI с документацией в Storybook.',
+    summary: 'Дизайн-система в эстетике Notion Workfolio на базе Radix UI с документацией в Storybook.',
     adrWhy:
       'В отличие от тяжелых рантайм-библиотек (MUI/AntD), shadcn/ui дает полный контроль кода и доступность WAI-ARIA из коробки, а Storybook позволяет тестировать UI изолированно.',
     adrWhere: 'Пакет packages/ui (@repo/ui), используемый в apps/web.',
@@ -134,8 +126,7 @@ export const TECH_RADAR_ITEMS: readonly TechRadarItem[] = [
     category: 'Frontend',
     experienceYears: 3,
     level: 'Experimental',
-    summary:
-      'Headless-движок таблиц для Tech Radar и эксперимент по уменьшению React-бандла на ~20%.',
+    summary: 'Headless-движок таблиц для Tech Radar и эксперимент по уменьшению React-бандла на ~20%.',
     adrWhy:
       'TanStack Table берет на себя математику сортировки и мульти-фильтрации при 100% контроле верстки, а TanStack Redact уменьшает клиентский рантайм на ~35 KB.',
     adrWhere: 'Матрица навыков Tech Radar на странице CV и конфигурация next.config.ts.',
@@ -149,8 +140,7 @@ export const TECH_RADAR_ITEMS: readonly TechRadarItem[] = [
     category: 'Frontend',
     experienceYears: 3,
     level: 'Production',
-    summary:
-      'Интерактивные инженерные статьи с живыми графами D3.js и оптимизированной графикой WebP.',
+    summary: 'Интерактивные инженерные статьи с живыми графами D3.js и оптимизированной графикой WebP.',
     adrWhy:
       'MDX позволяет рендерить внутри текста статей живые React-компоненты и интерактивные SVG-симуляции D3.js, а WebP сжимает изображения на 30–50% лучше PNG/JPEG.',
     adrWhere: 'Раздел /knowledge-base/[category]/[slug] в apps/web.',
@@ -168,8 +158,7 @@ export const TECH_RADAR_ITEMS: readonly TechRadarItem[] = [
     adrWhy:
       'Next.js API Routes в крупном проекте превращаются в спагетти-код. NestJS дает строгую структуру (DI, Modules, Controllers, Services, Guards), понятную любому бэкенд-тимлиду.',
     adrWhere: 'Приложение apps/api.',
-    adrHow:
-      'Изолированные доменные модули: AuthModule, KnowledgeModule, TelemetryModule, PrismaModule.',
+    adrHow: 'Изолированные доменные модули: AuthModule, KnowledgeModule, TelemetryModule, PrismaModule.',
   },
   {
     id: 'jwt-httponly-rbac',
@@ -192,13 +181,11 @@ export const TECH_RADAR_ITEMS: readonly TechRadarItem[] = [
     category: 'Database & Storage',
     experienceYears: 4,
     level: 'Core',
-    summary:
-      'Serverless PostgreSQL со строгой типобезопасностью запросов и декларативными миграциями.',
+    summary: 'Serverless PostgreSQL со строгой типобезопасностью запросов и декларативными миграциями.',
     adrWhy:
       'PostgreSQL — индустриальный стандарт, Neon.tech дает бесплатный Serverless Postgres с масштабированием, а Prisma ORM гарантирует 100% типобезопасность запросов.',
     adrWhere: 'Слой персистентности в apps/api/prisma.',
-    adrHow:
-      'Модели VisitorSession, ArticleMetrics и SystemEventLog с атомарными upsert-операциями.',
+    adrHow: 'Модели VisitorSession, ArticleMetrics и SystemEventLog с атомарными upsert-операциями.',
   },
   {
     id: 'microservices-sse',
@@ -221,8 +208,7 @@ export const TECH_RADAR_ITEMS: readonly TechRadarItem[] = [
     category: 'DevOps & DX',
     experienceYears: 3,
     level: 'Production',
-    summary:
-      '3-ступенчатые образы на Alpine под non-root пользователем и запуск стека одной командой.',
+    summary: '3-ступенчатые образы на Alpine под non-root пользователем и запуск стека одной командой.',
     adrWhy:
       'Гарантирует идентичность окружений и минимальный размер образов за счет вырезания только нужных подграфов монорепозитория через turbo prune.',
     adrWhere: 'Папка docker/ и корневой docker-compose.yml.',

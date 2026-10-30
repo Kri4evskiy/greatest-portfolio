@@ -72,9 +72,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
 
   async onModuleInit(): Promise<void> {
     if (!process.env.DATABASE_URL) {
-      this.logger.warn(
-        'DATABASE_URL not set — using resilient in-memory store with Prisma schema contract',
-      )
+      this.logger.warn('DATABASE_URL not set — using resilient in-memory store with Prisma schema contract')
       return
     }
 
@@ -84,9 +82,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
       this.logger.log('Connected to PostgreSQL via Prisma ORM')
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error'
-      this.logger.warn(
-        `PostgreSQL connection unavailable (${message}) — falling back to resilient in-memory store`,
-      )
+      this.logger.warn(`PostgreSQL connection unavailable (${message}) — falling back to resilient in-memory store`)
       this.dbConnected = false
     }
   }

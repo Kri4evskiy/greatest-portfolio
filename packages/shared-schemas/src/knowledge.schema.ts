@@ -1,11 +1,6 @@
 import { z } from 'zod'
 
-export const KnowledgeCategoryEnum = z.enum([
-  'typescript',
-  'react',
-  'nestjs-prisma',
-  'architecture-devops',
-])
+export const KnowledgeCategoryEnum = z.enum(['typescript', 'react', 'nestjs-prisma', 'architecture-devops'])
 export type KnowledgeCategory = z.infer<typeof KnowledgeCategoryEnum>
 
 export const KNOWLEDGE_CATEGORY_LABELS: Record<KnowledgeCategory, string> = {

@@ -23,9 +23,8 @@ export default function KnowledgeBaseIndexPage() {
         </h1>
         <p className="text-sm text-muted-foreground leading-relaxed">
           Все статьи ниже скомпилированы статически на этапе сборки (<code>SSG</code> из{' '}
-          <code>apps/web/content/*.mdx</code>), содержат интерактивные симуляции на{' '}
-          <code>D3.js</code> и кэшируют пользовательские метрики в браузерной БД{' '}
-          <code>IndexedDB</code> через <code>TanStack Query v5</code>.
+          <code>apps/web/content/*.mdx</code>), содержат интерактивные симуляции на <code>D3.js</code> и кэшируют
+          пользовательские метрики в браузерной БД <code>IndexedDB</code> через <code>TanStack Query v5</code>.
         </p>
       </div>
 
@@ -60,9 +59,7 @@ export default function KnowledgeBaseIndexPage() {
                 <CardTitle className="mt-2 text-base leading-snug group-hover:text-primary transition-colors">
                   {article.title}
                 </CardTitle>
-                <CardDescription className="text-xs leading-relaxed">
-                  {article.summary}
-                </CardDescription>
+                <CardDescription className="text-xs leading-relaxed">{article.summary}</CardDescription>
               </CardHeader>
               <CardContent className="pt-0">
                 <div className="flex items-center justify-between border-t border-border/60 pt-3 font-mono text-xs text-primary">
@@ -85,11 +82,8 @@ export default function KnowledgeBaseIndexPage() {
         </div>
         <p className="mt-1">
           Достаточно создать файл <code>.mdx</code> в любой из папок{' '}
-          <code>
-            apps/web/content/&#123;typescript,react,nestjs-prisma,architecture-devops&#125;/
-          </code>
-          . Функция <code>generateStaticParams()</code> автоматически включит его в SSG-сборку и
-          древовидный сайдбар.
+          <code>apps/web/content/&#123;typescript,react,nestjs-prisma,architecture-devops&#125;/</code>. Функция{' '}
+          <code>generateStaticParams()</code> автоматически включит его в SSG-сборку и древовидный сайдбар.
         </p>
       </div>
     </div>

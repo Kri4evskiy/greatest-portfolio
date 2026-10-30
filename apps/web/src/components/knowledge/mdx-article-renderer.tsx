@@ -5,21 +5,15 @@ import dynamic from 'next/dynamic'
 import type { MdxBlock } from '@/lib/mdx-content'
 import { ArticleImageGrid } from './article-image-grid'
 
-const ReactRenderGraphD3 = dynamic(
-  () => import('./d3-react-render-graph').then((m) => m.ReactRenderGraphD3),
-  {
-    ssr: false,
-    loading: () => <Skeleton className="my-6 h-72 w-full rounded-xl" />,
-  },
-)
+const ReactRenderGraphD3 = dynamic(() => import('./d3-react-render-graph').then((m) => m.ReactRenderGraphD3), {
+  ssr: false,
+  loading: () => <Skeleton className="my-6 h-72 w-full rounded-xl" />,
+})
 
-const ArchitectureFlowD3 = dynamic(
-  () => import('./d3-architecture-flow').then((m) => m.ArchitectureFlowD3),
-  {
-    ssr: false,
-    loading: () => <Skeleton className="my-6 h-64 w-full rounded-xl" />,
-  },
-)
+const ArchitectureFlowD3 = dynamic(() => import('./d3-architecture-flow').then((m) => m.ArchitectureFlowD3), {
+  ssr: false,
+  loading: () => <Skeleton className="my-6 h-64 w-full rounded-xl" />,
+})
 
 export function MdxArticleRenderer({ blocks }: { blocks: readonly MdxBlock[] }) {
   return (
@@ -29,10 +23,7 @@ export function MdxArticleRenderer({ blocks }: { blocks: readonly MdxBlock[] }) 
 
         if (block.type === 'h2') {
           return (
-            <h2
-              key={key}
-              className="mt-8 border-b border-border/60 pb-2 text-xl font-bold tracking-tight"
-            >
+            <h2 key={key} className="mt-8 border-b border-border/60 pb-2 text-xl font-bold tracking-tight">
               {block.text}
             </h2>
           )

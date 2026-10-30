@@ -1,10 +1,6 @@
 'use client'
 
-import {
-  type GuestPassFormInput,
-  type SessionProfile,
-  SessionProfileSchema,
-} from '@repo/shared-schemas'
+import { type GuestPassFormInput, type SessionProfile, SessionProfileSchema } from '@repo/shared-schemas'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 export const VISITOR_PROFILE_QUERY_KEY = ['auth', 'me'] as const

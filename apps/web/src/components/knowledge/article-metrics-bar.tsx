@@ -11,13 +11,7 @@ import {
 } from '@/hooks/use-knowledge-metrics'
 import { trackEvent } from '@/lib/analytics'
 
-export function ArticleMetricsBar({
-  slug,
-  category,
-}: {
-  slug: string
-  category: KnowledgeCategory
-}) {
+export function ArticleMetricsBar({ slug, category }: { slug: string; category: KnowledgeCategory }) {
   const { data: metricsList } = useKnowledgeMetrics(true)
   const incrementView = useIncrementViewMutation()
   const incrementHelpful = useIncrementHelpfulMutation()

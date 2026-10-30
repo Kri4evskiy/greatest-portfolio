@@ -2,11 +2,7 @@ import { z } from 'zod'
 import { RoleEnum, VisitorRoleTypeEnum } from './roles.schema.js'
 
 export const GuestPassFormSchema = z.object({
-  displayName: z
-    .string()
-    .trim()
-    .min(2, 'Введите имя или никнейм (минимум 2 символа)')
-    .max(50, 'Максимум 50 символов'),
+  displayName: z.string().trim().min(2, 'Введите имя или никнейм (минимум 2 символа)').max(50, 'Максимум 50 символов'),
   visitorType: VisitorRoleTypeEnum,
   adminPasscode: z.string().trim().max(100).optional(),
 })
