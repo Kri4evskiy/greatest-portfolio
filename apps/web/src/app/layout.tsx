@@ -14,8 +14,11 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="ru">
-      <body className="min-h-screen bg-background font-sans text-foreground antialiased selection:bg-primary selection:text-primary-foreground">
+    <html lang="ru" suppressHydrationWarning>
+      <body
+        suppressHydrationWarning
+        className="min-h-screen bg-background font-sans text-foreground antialiased selection:bg-primary selection:text-primary-foreground"
+      >
         <QueryProvider>
           <div className="flex min-h-screen flex-col">
             <WorkfolioHeader />

@@ -244,3 +244,15 @@
   2. Подключаем провайдер продуктовой аналитики `PostHog` в `apps/web` с трекингом ключевых действий тимлида (открытие модалки Guest Pass, получение доступа, клик по ADR в таблице технологий, чтение статьи).
   3. Создаем эталонный `.env.example` со всеми переменными окружения.
 - **Критерий готовности:** Весь монорепозиторий проходит `pnpm biome check .`, `pnpm turbo typecheck` и `pnpm turbo build` без единой ошибки.
+
+---
+
+## 🛠️ Tech Debt & Post-MVP Backlog (На будущее)
+
+1. **Production Lighthouse & Security Headers (`CSP` / `HSTS`):**
+   - Замеры Lighthouse проводить строго в режиме **Инкогнито** (без браузерных расширений вроде Grammarly) и на продакшен-сборке (`pnpm build && pnpm start`), так как в `pnpm dev` Next.js отдает неминифицированные чанки HMR и sourcemaps.
+   - При деплое на публичный домен добавить HTTP-заголовки `Content-Security-Policy (CSP)`, `Strict-Transport-Security (HSTS)` и `X-Content-Type-Options: nosniff` в `apps/web/next.config.ts`.
+2. **Оптимизация `bfcache` (Back/Forward Cache) со стримом `SSE`:**
+   - Открытое соединение `EventSource('/api/telemetry/stream')` в футере штатно блокирует сохранение страницы в `bfcache` при навигации «Назад/Вперед». При необходимости закрывать `EventSource` на событие `window.addEventListener('pagehide')` и переподключать на `pageshow`.
+3. **Подключение облачной БД Neon.tech и боевых ключей Sentry / PostHog:**
+   - Прописать боевой `DATABASE_URL` от Neon.tech, выполнить `pnpm --filter @repo/api prisma:push` и заполнить `SENTRY_DSN` / `NEXT_PUBLIC_POSTHOG_KEY` в продакшен-окружении.

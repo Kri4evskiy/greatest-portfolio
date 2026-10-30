@@ -46,8 +46,10 @@ description: Official Vercel Engineering React & Next.js Best Practices (vercel-
 - **`rerender-use-ref-transient-values`:** Часто меняющиеся значения (координаты курсора на графе `D3.js`, таймеры анимации) храни в `useRef`, а не в `useState`.
 - **`rerender-simple-expression-in-memo`:** Не оборачивай примитивные выражения (`const isAdmin = role === 'ADMIN'`) в `useMemo`.
 
-### Priority 6: Rendering Performance (`rendering-*`) — MEDIUM
+### Priority 6: Rendering Performance & Accessibility (`rendering-*`) — MEDIUM
 
+- **`rendering-hydration-extensions`:** Всегда добавляй `suppressHydrationWarning` на корневые теги `<html>` и `<body>` в `app/layout.tsx`, чтобы браузерные расширения (Grammarly, менеджеры паролей, переводчики, темы) не вызывали ошибку гидратации React при инжекте своих `data-*` атрибутов до загрузки бандла.
+- **`rendering-wcag-contrast`:** Проверяй, чтобы токены вторичного текста (`--muted-foreground`) на фоне `--background` и `--muted` обеспечивали контрастность не ниже `4.5:1` (WCAG AA) для `100/100` в Lighthouse Accessibility.
 - **`rendering-conditional-render`:** Используй явный тернарный оператор `count > 0 ? <Badge /> : null` вместо `count && <Badge />`, чтобы не отрендерить `0` в DOM.
 - **`rendering-content-visibility`:** Применяй `content-visibility: auto` для длинных секций и таблиц.
 
