@@ -1,63 +1,63 @@
-import { Body, Controller, Get, HttpCode, Post, Req, Res } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Inject,
+  Post,
+  Req,
+  Res,
+} from '@nestjs/common';
 import {
   type GuestPassFormInput,
   GuestPassFormSchema,
   type SessionProfile,
 } from '@repo/shared-schemas';
 import type { Request, Response } from 'express';
-import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
-import { AuthService } from './auth.service';
-import { KB_ACCESS_COOKIE } from './guards/jwt-roles.guard';
+import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe.js';
+import { AuthService, KB_ACCESS_COOKIE_NAME, KB_COOKIE_MAX_AGE_MS } from './auth.service.js';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(@Inject(AuthService) private readonly authService: AuthService) {}
 
   @Post('guest-pass')
-  @HttpCode(200)
+  @HttpCode(HttpStatus.OK)
   async issueGuestPass(
     @Body(new ZodValidationPipe(GuestPassFormSchema)) body: GuestPassFormInput,
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ): Promise<SessionProfile> {
-    const userAgent = req.headers['user-agent'] ?? null;
-    const { token, profile, maxAgeMs } = await this.authService.issueGuestPass(body, userAgent);
+    const userAgent = req.headers['user-agent'];
+    const { profile, accessToken } = await this.authService.issueGuestPass(body, userAgent);
 
-    res.cookie(KB_ACCESS_COOKIE, token, {
+    res.cookie(KB_ACCESS_COOKIE_NAME, accessToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       path: '/',
-      maxAge: maxAgeMs,
+      maxAge: KB_COOKIE_MAX_AGE_MS,
     });
 
     return profile;
   }
 
   @Get('me')
-  getMe(@Req() req: Request): SessionProfile {
-    const token = (req.cookies as Record<string, string | undefined> | undefined)?.[
-      KB_ACCESS_COOKIE
-    ];
-    return this.authService.resolveSessionFromCookie(token);
+  async getMe(@Req() req: Request): Promise<SessionProfile> {
+    const token = req.cookies?.[KB_ACCESS_COOKIE_NAME] as string | undefined;
+    return this.authService.resolveSessionFromToken(token);
   }
 
   @Post('logout')
-  @HttpCode(200)
+  @HttpCode(HttpStatus.OK)
   logout(@Res({ passthrough: true }) res: Response): SessionProfile {
-    res.clearCookie(KB_ACCESS_COOKIE, {
+    res.clearCookie(KB_ACCESS_COOKIE_NAME, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       path: '/',
     });
-
-    return {
-      id: null,
-      displayName: null,
-      visitorType: null,
-      role: 'GUEST',
-      expiresAt: null,
-    };
+    return this.authService.getGuestProfile();
   }
 }

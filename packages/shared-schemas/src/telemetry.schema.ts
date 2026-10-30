@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { VisitorRoleTypeEnum } from './roles.schema';
+import { VisitorRoleTypeEnum } from './roles.schema.js';
 
 export const TelemetryEventTypeEnum = z.enum([
   'GUEST_PASS_ISSUED',

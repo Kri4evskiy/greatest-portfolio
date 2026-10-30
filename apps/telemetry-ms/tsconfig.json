@@ -1,17 +1,20 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "module": "CommonJS",
-    "moduleResolution": "Node",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
     "target": "ES2022",
-    "outDir": "./dist",
-    "noEmit": false,
-    "declaration": false,
-    "sourceMap": true,
-    "experimentalDecorators": true,
+    "lib": ["ES2022"],
+    "declaration": true,
+    "removeComments": true,
     "emitDecoratorMetadata": true,
-    "exactOptionalPropertyTypes": false
+    "experimentalDecorators": true,
+    "allowSyntheticDefaultImports": true,
+    "sourceMap": true,
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "noEmit": true
   },
-  "include": ["src/**/*.ts"],
+  "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]
 }

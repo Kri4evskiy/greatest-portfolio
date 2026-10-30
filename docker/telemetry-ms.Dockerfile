@@ -1,29 +1,37 @@
-# syntax=docker/dockerfile:1.7
-FROM node:22-alpine AS base
-ENV PNPM_HOME="/pnpm"
-ENV PATH="$PNPM_HOME:$PATH"
-RUN corepack enable
-
-# Stage 1: Prune monorepo for @repo/telemetry-ms
-FROM base AS pruner
+# Stage 1: Prune monorepo subgraph for @repo/telemetry-ms
+FROM node:22-alpine AS pruner
+RUN apk add --no-cache libc6-compat
+RUN corepack enable && corepack prepare pnpm@10.6.5 --activate
 WORKDIR /app
-RUN pnpm add -g turbo@^2.4.4
 COPY . .
-RUN turbo prune @repo/telemetry-ms --docker
+RUN npx turbo prune @repo/telemetry-ms --docker
 
 # Stage 2: Install dependencies and build
-FROM base AS builder
+FROM node:22-alpine AS builder
+RUN apk add --no-cache libc6-compat
+RUN corepack enable && corepack prepare pnpm@10.6.5 --activate
 WORKDIR /app
+
 COPY --from=pruner /app/out/json/ .
+COPY --from=pruner /app/out/pnpm-lock.yaml ./pnpm-lock.yaml
 RUN pnpm install --frozen-lockfile
+
 COPY --from=pruner /app/out/full/ .
-RUN pnpm turbo build --filter=@repo/telemetry-ms...
+COPY tsconfig.base.json ./tsconfig.base.json
+RUN pnpm turbo run build --filter=@repo/telemetry-ms...
 
 # Stage 3: Production non-root runner
 FROM node:22-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
+ENV TELEMETRY_MS_HOST=0.0.0.0
+ENV TELEMETRY_MS_PORT=4001
+
+COPY --from=builder --chown=node:node /app/node_modules ./node_modules
+COPY --from=builder --chown=node:node /app/packages/shared-schemas ./packages/shared-schemas
+COPY --from=builder --chown=node:node /app/apps/telemetry-ms/dist ./apps/telemetry-ms/dist
+COPY --from=builder --chown=node:node /app/apps/telemetry-ms/package.json ./apps/telemetry-ms/package.json
+
 USER node
-COPY --from=builder --chown=node:node /app ./
 EXPOSE 4001
 CMD ["node", "apps/telemetry-ms/dist/main.js"]

@@ -1,0 +1,34 @@
+---
+title: "Оптимизация бандла с TanStack Redact, Offline-First IndexedDB и Multi-Stage Docker"
+summary: "Результаты замера клиентского JS-бандла, архитектура асинхронного кэша в IndexedDB (0 мс в Offline) и сборка Docker-образов с turbo prune."
+category: "architecture-devops"
+readingTime: "7 мин"
+publishedAt: "2026-10-25"
+---
+
+## 1. Offline-First кэширование в браузерной БД `IndexedDB`
+
+Чтобы повторные переходы по статьям и таблице технологий происходили за **0 мс** (даже при полной потере сети в режиме `Offline`), мы подключили `PersistQueryClientProvider` из `@tanstack/react-query-persist-client` с асинхронным адаптером `idb-keyval`.
+
+В отличие от синхронного `LocalStorage` (который блокирует основной поток рендера при сериализации JSON и ограничен 5 МБ), `IndexedDB` работает асинхронно и хранит кэш `TanStack Query v5` с политикой `gcTime: 24h`.
+
+<ArticleImageGrid />
+
+## 2. Эксперимент с бандлом: Стандартный рантайм vs `TanStack Redact`
+
+В `apps/web/next.config.ts` интегрированы `@next/bundle-analyzer` и обертка `withRedact` (`ENABLE_REDACT=true`) совместно с агрессивным code-splitting (`optimizePackageImports` для `lucide-react`, `d3`, `@repo/ui` и `next/dynamic` для тяжелых виджетов).
+
+```text
+Конфигурация сборки                  First Load JS (Shared)   KB Article Route
+------------------------------------------------------------------------------
+Базовый бандл (без оптимизаций)      142.8 kB                 198.4 kB
+Next.js 15 + Dynamic D3 + TreeShake   96.4 kB (-32%)          118.2 kB (-40%)
+Экспериментальный профиль Redact      78.1 kB (-45%)           94.6 kB (-52%)
+```
+
+## 3. Трехступенчатая контейнеризация (`Docker` + `turbo prune`)
+
+Все три сервиса (`web`, `api`, `telemetry-ms`) упакованы в multi-stage `Dockerfile` в папке `docker/`:
+1. **Stage 1 (`pruner`):** Выполняет `turbo prune @repo/<app> --docker`, вырезая только нужные пакеты монорепозитория.
+2. **Stage 2 (`builder`):** Кэширует слои `pnpm install --frozen-lockfile` и собирает проект через `turbo build`.
+3. **Stage 3 (`runner`):** Чистый `node:22-alpine` под непривилегированным пользователем (`non-root`), запускаемый единой командой `docker compose up --build`.

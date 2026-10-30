@@ -1,38 +1,79 @@
-import type { TechRadarItem } from '@repo/shared-schemas';
+import type { TechCategory, TechRadarItem } from '@repo/shared-schemas';
 import { create } from 'zustand';
+
+export type ReactRenderMode = 'react18' | 'react19';
 
 interface UIState {
   isGuestPassModalOpen: boolean;
-  redirectAfterUnlock: string | null;
+  pendingRedirectPath: string | null;
   selectedAdrItem: TechRadarItem | null;
-  isSidebarOpen: boolean;
-  d3ReactMode: 'react18' | 'react19';
-  openGuestPassModal: (redirectPath?: string) => void;
+  techRadarCategoryFilter: TechCategory | 'ALL';
+  techRadarSearch: string;
+  isKbSidebarOpen: boolean;
+  reactGraphMode: ReactRenderMode;
+  archFlowActiveNode: string | null;
+
+  openGuestPassModal: (redirectPath?: string | null) => void;
   closeGuestPassModal: () => void;
   openAdrInspector: (item: TechRadarItem) => void;
   closeAdrInspector: () => void;
-  toggleSidebar: () => void;
-  setD3ReactMode: (mode: 'react18' | 'react19') => void;
+  setTechRadarCategoryFilter: (category: TechCategory | 'ALL') => void;
+  setTechRadarSearch: (search: string) => void;
+  toggleKbSidebar: () => void;
+  setKbSidebarOpen: (open: boolean) => void;
+  setReactGraphMode: (mode: ReactRenderMode) => void;
+  setArchFlowActiveNode: (nodeId: string | null) => void;
 }
 
 export const useUIStore = create<UIState>((set) => ({
   isGuestPassModalOpen: false,
-  redirectAfterUnlock: null,
+  pendingRedirectPath: null,
   selectedAdrItem: null,
-  isSidebarOpen: true,
-  d3ReactMode: 'react19',
-  openGuestPassModal: (redirectPath) =>
+  techRadarCategoryFilter: 'ALL',
+  techRadarSearch: '',
+  isKbSidebarOpen: true,
+  reactGraphMode: 'react19',
+  archFlowActiveNode: 'nextjs-edge',
+
+  openGuestPassModal: (redirectPath = null) =>
     set({
       isGuestPassModalOpen: true,
-      redirectAfterUnlock: redirectPath ?? '/knowledge-base',
+      pendingRedirectPath: redirectPath ?? null,
     }),
   closeGuestPassModal: () =>
     set({
       isGuestPassModalOpen: false,
-      redirectAfterUnlock: null,
     }),
-  openAdrInspector: (item) => set({ selectedAdrItem: item }),
-  closeAdrInspector: () => set({ selectedAdrItem: null }),
-  toggleSidebar: () => set((state) => ({ isSidebarOpen: !state.isSidebarOpen })),
-  setD3ReactMode: (mode) => set({ d3ReactMode: mode }),
+  openAdrInspector: (item) =>
+    set({
+      selectedAdrItem: item,
+    }),
+  closeAdrInspector: () =>
+    set({
+      selectedAdrItem: null,
+    }),
+  setTechRadarCategoryFilter: (category) =>
+    set({
+      techRadarCategoryFilter: category,
+    }),
+  setTechRadarSearch: (search) =>
+    set({
+      techRadarSearch: search,
+    }),
+  toggleKbSidebar: () =>
+    set((state) => ({
+      isKbSidebarOpen: !state.isKbSidebarOpen,
+    })),
+  setKbSidebarOpen: (open) =>
+    set({
+      isKbSidebarOpen: open,
+    }),
+  setReactGraphMode: (mode) =>
+    set({
+      reactGraphMode: mode,
+    }),
+  setArchFlowActiveNode: (nodeId) =>
+    set({
+      archFlowActiveNode: nodeId,
+    }),
 }));

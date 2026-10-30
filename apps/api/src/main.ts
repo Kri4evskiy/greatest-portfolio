@@ -2,8 +2,8 @@ import 'reflect-metadata';
 import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import cookieParser from 'cookie-parser';
-import { AppModule } from './app.module';
-import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
+import { AppModule } from './app.module.js';
+import { SentryExceptionFilter } from './common/filters/sentry-exception.filter.js';
 
 async function bootstrap(): Promise<void> {
   const logger = new Logger('NestAPI');
@@ -11,20 +11,18 @@ async function bootstrap(): Promise<void> {
 
   app.setGlobalPrefix('api');
   app.use(cookieParser());
-  app.useGlobalFilters(new GlobalExceptionFilter());
+  app.useGlobalFilters(new SentryExceptionFilter());
 
-  const allowedOrigins = (process.env.CORS_ORIGIN ?? 'http://localhost:3000')
-    .split(',')
-    .map((origin) => origin.trim());
-
+  const webOrigin = process.env.WEB_ORIGIN ?? 'http://localhost:3000';
   app.enableCors({
-    origin: allowedOrigins,
+    origin: [webOrigin, 'http://127.0.0.1:3000'],
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   });
 
-  const port = Number.parseInt(process.env.API_PORT ?? '4000', 10);
+  const port = Number(process.env.PORT ?? 4000);
   await app.listen(port, '0.0.0.0');
-  logger.log(`NestJS API is running on http://localhost:${port}/api`);
+  logger.log(`NestJS API running on http://localhost:${port}/api`);
 }
 
-bootstrap();
+void bootstrap();

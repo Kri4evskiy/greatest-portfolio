@@ -1,55 +1,69 @@
-import { Body, Controller, Get, HttpCode, Param, Post, Req, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Inject,
+  Param,
+  Post,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import {
   type ArticleMeta,
-  type ArticleReactionInput,
-  ArticleReactionInputSchema,
+  type KnowledgeCategory,
+  KnowledgeCategoryEnum,
+  type SessionProfile,
 } from '@repo/shared-schemas';
-import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
-import { Roles } from '../auth/decorators/roles.decorator';
-import { type AuthenticatedRequest, JwtRolesGuard } from '../auth/guards/jwt-roles.guard';
-import { KnowledgeService } from './knowledge.service';
+import type { Request } from 'express';
+import { z } from 'zod';
+import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe.js';
+import { JwtRolesGuard } from '../auth/jwt-roles.guard.js';
+import { Roles } from '../auth/roles.decorator.js';
+import { KnowledgeService } from './knowledge.service.js';
+
+const CategoryBodySchema = z.object({
+  category: KnowledgeCategoryEnum.optional().default('typescript'),
+});
+
+type CategoryBody = z.infer<typeof CategoryBodySchema>;
 
 @Controller('knowledge')
 @UseGuards(JwtRolesGuard)
 export class KnowledgeController {
-  constructor(private readonly knowledgeService: KnowledgeService) {}
+  constructor(
+    @Inject(KnowledgeService)
+    private readonly knowledgeService: KnowledgeService,
+  ) {}
 
   @Get('metrics')
   @Roles('USER', 'ADMIN')
-  async getMetrics(): Promise<{ items: ArticleMeta[] }> {
-    const items = await this.knowledgeService.getAllMetrics();
-    return { items };
+  async getMetrics(): Promise<ArticleMeta[]> {
+    return this.knowledgeService.getAllMetrics();
   }
 
   @Post(':slug/view')
-  @HttpCode(200)
   @Roles('USER', 'ADMIN')
+  @HttpCode(HttpStatus.OK)
   async incrementView(
     @Param('slug') slug: string,
-    @Body(new ZodValidationPipe(ArticleReactionInputSchema)) body: ArticleReactionInput,
-    @Req() req: AuthenticatedRequest,
+    @Body(new ZodValidationPipe(CategoryBodySchema)) body: CategoryBody,
+    @Req() req: Request & { sessionProfile?: SessionProfile },
   ): Promise<ArticleMeta> {
-    return this.knowledgeService.recordView(
-      slug,
-      body.category,
-      req.user?.displayName,
-      req.user?.visitorType,
-    );
+    const category: KnowledgeCategory = body.category;
+    return this.knowledgeService.recordView(slug, category, req.sessionProfile);
   }
 
   @Post(':slug/helpful')
-  @HttpCode(200)
   @Roles('USER', 'ADMIN')
+  @HttpCode(HttpStatus.OK)
   async incrementHelpful(
     @Param('slug') slug: string,
-    @Body(new ZodValidationPipe(ArticleReactionInputSchema)) body: ArticleReactionInput,
-    @Req() req: AuthenticatedRequest,
+    @Body(new ZodValidationPipe(CategoryBodySchema)) body: CategoryBody,
+    @Req() req: Request & { sessionProfile?: SessionProfile },
   ): Promise<ArticleMeta> {
-    return this.knowledgeService.recordHelpful(
-      slug,
-      body.category,
-      req.user?.displayName,
-      req.user?.visitorType,
-    );
+    const category: KnowledgeCategory = body.category;
+    return this.knowledgeService.recordHelpful(slug, category, req.sessionProfile);
   }
 }

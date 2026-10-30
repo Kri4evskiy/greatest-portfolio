@@ -1,37 +1,38 @@
 'use client';
 
-import type { PersistedClient, Persister } from '@tanstack/query-persist-client-core';
+import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister';
 import { QueryClient } from '@tanstack/react-query';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import { del, get, set } from 'idb-keyval';
-import * as React from 'react';
+import { type ReactNode, useState } from 'react';
 
+const CACHE_KEY = 'greatest-portfolio-query-cache';
 const TWENTY_FOUR_HOURS_MS = 1000 * 60 * 60 * 24;
-const IDB_CACHE_KEY = 'greatest-portfolio-query-cache-v1';
 
-function createIDBPersister(idbValidKey: IDBValidKey = IDB_CACHE_KEY): Persister {
-  return {
-    persistClient: async (client: PersistedClient) => {
-      if (typeof window === 'undefined') return;
-      await set(idbValidKey, client);
+function createIndexedDbPersister() {
+  return createAsyncStoragePersister({
+    key: CACHE_KEY,
+    storage: {
+      getItem: async (key: string) => {
+        if (typeof window === 'undefined') return null;
+        const val = await get<string>(key);
+        return val ?? null;
+      },
+      setItem: async (key: string, value: string) => {
+        if (typeof window === 'undefined') return;
+        await set(key, value);
+      },
+      removeItem: async (key: string) => {
+        if (typeof window === 'undefined') return;
+        await del(key);
+      },
     },
-    restoreClient: async () => {
-      if (typeof window === 'undefined') return undefined;
-      return await get<PersistedClient>(idbValidKey);
-    },
-    removeClient: async () => {
-      if (typeof window === 'undefined') return;
-      await del(idbValidKey);
-    },
-  };
+    throttleTime: 1000,
+  });
 }
 
-export function QueryProvider({
-  children,
-}: {
-  children: React.ReactNode;
-}): React.JSX.Element {
-  const [queryClient] = React.useState(
+export function QueryProvider({ children }: { children: ReactNode }) {
+  const [queryClient] = useState(
     () =>
       new QueryClient({
         defaultOptions: {
@@ -45,7 +46,7 @@ export function QueryProvider({
       }),
   );
 
-  const [persister] = React.useState(() => createIDBPersister());
+  const [persister] = useState(() => createIndexedDbPersister());
 
   return (
     <PersistQueryClientProvider
@@ -53,6 +54,7 @@ export function QueryProvider({
       persistOptions={{
         persister,
         maxAge: TWENTY_FOUR_HOURS_MS,
+        buster: 'v1',
       }}
     >
       {children}

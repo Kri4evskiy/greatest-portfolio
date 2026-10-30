@@ -1,7 +1,8 @@
 'use client';
 
 import { Button } from '@repo/ui';
-import * as React from 'react';
+import { AlertTriangle, RotateCcw } from 'lucide-react';
+import { useEffect } from 'react';
 
 export default function GlobalError({
   error,
@@ -9,22 +10,27 @@ export default function GlobalError({
 }: {
   error: Error & { digest?: string };
   reset: () => void;
-}): React.JSX.Element {
-  React.useEffect(() => {
-    // Sentry client exception capture hook (ADR #15)
-    console.error('[Sentry ErrorBoundary]', error);
+}) {
+  useEffect(() => {
+    const sentryDsn = process.env.NEXT_PUBLIC_SENTRY_DSN;
+    console.error(
+      `[Sentry ErrorBoundary (${sentryDsn ? 'DSN active' : 'Graceful No-Op'})]:`,
+      error,
+    );
   }, [error]);
 
   return (
     <html lang="ru">
-      <body className="flex min-h-screen flex-col items-center justify-center bg-background p-6 text-foreground">
-        <div className="max-w-md space-y-4 rounded-xl border border-border bg-card p-6 text-center shadow-sm">
-          <h2 className="text-lg font-semibold">Произошла непредвиденная ошибка</h2>
+      <body className="flex min-h-screen items-center justify-center bg-background p-6 text-foreground">
+        <div className="max-w-md space-y-4 rounded-xl border border-border bg-card p-6 text-center shadow-md">
+          <AlertTriangle className="mx-auto h-10 w-10 text-amber-500" />
+          <h2 className="text-lg font-bold">Произошла непредвиденная ошибка рендера</h2>
           <p className="text-xs text-muted-foreground">
-            Событие зафиксировано системой мониторинга Sentry ErrorBoundary.
+            Исключение перехвачено глобальным баундари <code>Sentry GlobalError</code>.
           </p>
-          <Button type="button" onClick={() => reset()}>
-            Попробовать снова
+          <Button type="button" onClick={() => reset()} className="gap-2">
+            <RotateCcw className="h-4 w-4" />
+            <span>Попробовать снова</span>
           </Button>
         </div>
       </body>

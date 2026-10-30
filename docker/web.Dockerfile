@@ -1,33 +1,42 @@
-# syntax=docker/dockerfile:1.7
-FROM node:22-alpine AS base
-ENV PNPM_HOME="/pnpm"
-ENV PATH="$PNPM_HOME:$PATH"
-RUN corepack enable
-
-# Stage 1: Prune monorepo for @repo/web
-FROM base AS pruner
+# Stage 1: Prune monorepo subgraph for @repo/web
+FROM node:22-alpine AS pruner
+RUN apk add --no-cache libc6-compat
+RUN corepack enable && corepack prepare pnpm@10.6.5 --activate
 WORKDIR /app
-RUN pnpm add -g turbo@^2.4.4
 COPY . .
-RUN turbo prune @repo/web --docker
+RUN npx turbo prune @repo/web --docker
 
 # Stage 2: Install dependencies and build
-FROM base AS builder
+FROM node:22-alpine AS builder
+RUN apk add --no-cache libc6-compat
+RUN corepack enable && corepack prepare pnpm@10.6.5 --activate
 WORKDIR /app
+
 COPY --from=pruner /app/out/json/ .
+COPY --from=pruner /app/out/pnpm-lock.yaml ./pnpm-lock.yaml
 RUN pnpm install --frozen-lockfile
+
 COPY --from=pruner /app/out/full/ .
-RUN pnpm turbo build --filter=@repo/web...
+COPY tsconfig.base.json ./tsconfig.base.json
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV DOCKER_STANDALONE=true
+RUN pnpm turbo run build --filter=@repo/web...
 
 # Stage 3: Production non-root runner
 FROM node:22-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
-RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
+
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 nextjs
+
 COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/static ./apps/web/.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/apps/web/content ./apps/web/content
+
 USER nextjs
 EXPOSE 3000
-ENV PORT=3000
 CMD ["node", "apps/web/server.js"]

@@ -4,11 +4,13 @@ import { cn } from '../lib/utils';
 export interface CalloutProps extends React.HTMLAttributes<HTMLDivElement> {
   icon?: React.ReactNode | undefined;
   title?: string | undefined;
+  variant?: 'default' | 'info' | 'success' | 'warning' | undefined;
 }
 
 export function Callout({
   icon = '💡',
   title,
+  variant: _variant = 'default',
   children,
   className,
   ...props

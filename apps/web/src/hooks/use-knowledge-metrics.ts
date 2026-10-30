@@ -1,65 +1,127 @@
 'use client';
 
-import type { ArticleMeta, ArticleReactionInput } from '@repo/shared-schemas';
+import { type ArticleMeta, ArticleMetaSchema, type KnowledgeCategory } from '@repo/shared-schemas';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { z } from 'zod';
 
-export const KNOWLEDGE_METRICS_KEY = ['knowledge-metrics'] as const;
+export const KNOWLEDGE_METRICS_QUERY_KEY = ['knowledge', 'metrics'] as const;
+
+const ArticleMetaArraySchema = z.array(ArticleMetaSchema);
+
+async function fetchKnowledgeMetrics(): Promise<ArticleMeta[]> {
+  const res = await fetch('/api/knowledge/metrics', {
+    method: 'GET',
+    credentials: 'include',
+  });
+  if (!res.ok) {
+    throw new Error(`Protected endpoint (${res.status})`);
+  }
+  const data: unknown = await res.json();
+  return ArticleMetaArraySchema.parse(data);
+}
 
 export function useKnowledgeMetrics(enabled = true) {
   return useQuery({
-    queryKey: KNOWLEDGE_METRICS_KEY,
+    queryKey: KNOWLEDGE_METRICS_QUERY_KEY,
+    queryFn: fetchKnowledgeMetrics,
     enabled,
-    queryFn: async (): Promise<ArticleMeta[]> => {
-      const response = await fetch('/api/knowledge/metrics', {
+  });
+}
+
+export function useIncrementViewMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      slug,
+      category,
+    }: {
+      slug: string;
+      category: KnowledgeCategory;
+    }): Promise<ArticleMeta> => {
+      const res = await fetch(`/api/knowledge/${encodeURIComponent(slug)}/view`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
+        body: JSON.stringify({ category }),
       });
-      if (!response.ok) {
-        throw new Error('Failed to fetch knowledge metrics');
+      if (!res.ok) {
+        throw new Error('Failed to record article view');
       }
-      const data = (await response.json()) as { items: ArticleMeta[] };
-      return data.items;
+      const data: unknown = await res.json();
+      return ArticleMetaSchema.parse(data);
+    },
+    onSuccess: (updated) => {
+      queryClient.setQueryData<ArticleMeta[]>(KNOWLEDGE_METRICS_QUERY_KEY, (prev) => {
+        if (!prev) return [updated];
+        const exists = prev.some((item) => item.slug === updated.slug);
+        if (!exists) return [...prev, updated];
+        return prev.map((item) => (item.slug === updated.slug ? updated : item));
+      });
     },
   });
 }
 
-export function useIncrementArticleHelpful() {
+export function useIncrementHelpfulMutation() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (input: ArticleReactionInput): Promise<ArticleMeta> => {
-      const response = await fetch(`/api/knowledge/${input.slug}/helpful`, {
+    mutationFn: async ({
+      slug,
+      category,
+    }: {
+      slug: string;
+      category: KnowledgeCategory;
+    }): Promise<ArticleMeta> => {
+      const res = await fetch(`/api/knowledge/${encodeURIComponent(slug)}/helpful`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify(input),
+        body: JSON.stringify({ category }),
       });
-      if (!response.ok) {
-        throw new Error('Failed to mark article as helpful');
+      if (!res.ok) {
+        throw new Error('Failed to record helpful reaction');
       }
-      return (await response.json()) as ArticleMeta;
+      const data: unknown = await res.json();
+      return ArticleMetaSchema.parse(data);
     },
-    onMutate: async (input) => {
-      await queryClient.cancelQueries({ queryKey: KNOWLEDGE_METRICS_KEY });
-      const previous = queryClient.getQueryData<ArticleMeta[]>(KNOWLEDGE_METRICS_KEY);
+    onMutate: async ({ slug, category }) => {
+      await queryClient.cancelQueries({ queryKey: KNOWLEDGE_METRICS_QUERY_KEY });
+      const previous = queryClient.getQueryData<ArticleMeta[]>(KNOWLEDGE_METRICS_QUERY_KEY);
 
-      if (previous) {
-        queryClient.setQueryData<ArticleMeta[]>(
-          KNOWLEDGE_METRICS_KEY,
-          previous.map((item) =>
-            item.slug === input.slug ? { ...item, helpfulCount: item.helpfulCount + 1 } : item,
-          ),
+      queryClient.setQueryData<ArticleMeta[]>(KNOWLEDGE_METRICS_QUERY_KEY, (old) => {
+        const now = new Date().toISOString();
+        if (!old) {
+          return [
+            {
+              slug,
+              category,
+              viewsCount: 1,
+              helpfulCount: 1,
+              updatedAt: now,
+            },
+          ];
+        }
+        return old.map((item) =>
+          item.slug === slug
+            ? {
+                ...item,
+                helpfulCount: item.helpfulCount + 1,
+                updatedAt: now,
+              }
+            : item,
         );
-      }
+      });
 
       return { previous };
     },
-    onError: (_err, _input, context) => {
+    onError: (_err, _vars, context) => {
       if (context?.previous) {
-        queryClient.setQueryData(KNOWLEDGE_METRICS_KEY, context.previous);
+        queryClient.setQueryData(KNOWLEDGE_METRICS_QUERY_KEY, context.previous);
       }
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: KNOWLEDGE_METRICS_KEY });
+      void queryClient.invalidateQueries({ queryKey: KNOWLEDGE_METRICS_QUERY_KEY });
     },
   });
 }

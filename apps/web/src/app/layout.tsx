@@ -1,38 +1,30 @@
-import { LiveSseFooter } from '@/components/layout/live-sse-footer';
+import '@repo/ui/globals.css';
+import { WorkfolioFooter } from '@/components/layout/workfolio-footer';
 import { WorkfolioHeader } from '@/components/layout/workfolio-header';
 import { GuestPassModal } from '@/features/auth/guest-pass-modal';
-import { ObservabilityProvider } from '@/providers/observability-provider';
 import { QueryProvider } from '@/providers/query-provider';
 import type { Metadata } from 'next';
-import * as React from 'react';
-import './globals.css';
+import { type ReactNode, Suspense } from 'react';
 
 export const metadata: Metadata = {
-  title:
-    'Stanislav Krychevskyi | Senior Frontend & Fullstack Engineer — Workfolio & Knowledge Base',
+  title: 'Senior Full-Stack Portfolio (Workfolio UI) & Engineering Knowledge Base',
   description:
-    'Stanislav Krychevskyi — Frontend / Fullstack Engineer (5+ years, React, Next.js, NestJS, TypeScript, D3.js, AI DX). Production Workfolio & Protected Engineering Knowledge Base.',
+    'Interactive Senior Full-Stack TypeScript Portfolio built with Next.js 16, NestJS 12 (Native ESM), Prisma ORM, TanStack Query IndexedDB, D3.js, and Microservices SSE.',
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}): React.JSX.Element {
+export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="ru" suppressHydrationWarning>
-      <body className="flex min-h-screen flex-col bg-background text-foreground">
+    <html lang="ru">
+      <body className="min-h-screen bg-background font-sans text-foreground antialiased selection:bg-primary selection:text-primary-foreground">
         <QueryProvider>
-          <ObservabilityProvider>
-            <React.Suspense
-              fallback={<div className="h-14 border-b border-border/80 bg-background" />}
-            >
-              <WorkfolioHeader />
-            </React.Suspense>
+          <div className="flex min-h-screen flex-col">
+            <WorkfolioHeader />
+            <Suspense fallback={null}>
+              <GuestPassModal />
+            </Suspense>
             <main className="flex-1">{children}</main>
-            <GuestPassModal />
-            <LiveSseFooter />
-          </ObservabilityProvider>
+            <WorkfolioFooter />
+          </div>
         </QueryProvider>
       </body>
     </html>

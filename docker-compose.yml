@@ -1,29 +1,30 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: greatest-portfolio-postgres
+    container_name: workfolio-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: portfolio
-      POSTGRES_PASSWORD: portfolio_secret_password
-      POSTGRES_DB: greatest_portfolio
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-workfolio_db}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U portfolio -d greatest_portfolio"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d workfolio_db"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
 
   telemetry-ms:
     build:
       context: .
       dockerfile: docker/telemetry-ms.Dockerfile
-    container_name: greatest-portfolio-telemetry-ms
+    container_name: workfolio-telemetry-ms
     restart: unless-stopped
     environment:
+      NODE_ENV: production
       TELEMETRY_MS_HOST: 0.0.0.0
       TELEMETRY_MS_PORT: 4001
     ports:
@@ -33,7 +34,7 @@ services:
     build:
       context: .
       dockerfile: docker/api.Dockerfile
-    container_name: greatest-portfolio-api
+    container_name: workfolio-api
     restart: unless-stopped
     depends_on:
       postgres:
@@ -41,13 +42,15 @@ services:
       telemetry-ms:
         condition: service_started
     environment:
-      API_PORT: 4000
-      DATABASE_URL: postgresql://portfolio:portfolio_secret_password@postgres:5432/greatest_portfolio?schema=public
-      JWT_SECRET: production-super-secret-jwt-key-2026
-      ADMIN_SECRET_PASSCODE: workfolio-admin-2026
+      NODE_ENV: production
+      PORT: 4000
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/workfolio_db?schema=public
+      DIRECT_URL: postgresql://postgres:postgres@postgres:5432/workfolio_db?schema=public
+      JWT_SECRET: ${JWT_SECRET:-workfolio-super-secret-jwt-key-2026}
+      ADMIN_SECRET_PASSCODE: ${ADMIN_SECRET_PASSCODE:-workfolio-admin-2026}
       TELEMETRY_MS_HOST: telemetry-ms
       TELEMETRY_MS_PORT: 4001
-      CORS_ORIGIN: http://localhost:3000
+      WEB_ORIGIN: http://localhost:3000
     ports:
       - "4000:4000"
 
@@ -55,13 +58,15 @@ services:
     build:
       context: .
       dockerfile: docker/web.Dockerfile
-    container_name: greatest-portfolio-web
+    container_name: workfolio-web
     restart: unless-stopped
     depends_on:
       - api
     environment:
-      NEXT_PUBLIC_API_ORIGIN: http://api:4000
-      ENABLE_REDACT: "false"
+      NODE_ENV: production
+      PORT: 3000
+      API_INTERNAL_URL: http://api:4000
+      ENABLE_REDACT: ${ENABLE_REDACT:-false}
     ports:
       - "3000:3000"
 

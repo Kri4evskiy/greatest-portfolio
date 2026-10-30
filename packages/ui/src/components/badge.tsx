@@ -11,6 +11,7 @@ export const badgeVariants = cva(
         secondary: 'border-border bg-muted text-foreground',
         outline: 'border-border bg-transparent text-muted-foreground',
         core: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-800 dark:text-emerald-300',
+        success: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-800 dark:text-emerald-300',
         production: 'border-blue-500/30 bg-blue-500/10 text-blue-800 dark:text-blue-300',
         experimental: 'border-purple-500/30 bg-purple-500/10 text-purple-800 dark:text-purple-300',
         warning: 'border-amber-500/30 bg-amber-500/10 text-amber-800 dark:text-amber-300',

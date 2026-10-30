@@ -1,62 +1,45 @@
-import { ArticleClientWidgets } from '@/components/knowledge/article-client-widgets';
-import { getAllMdxArticles, getMdxArticleBySlug } from '@/lib/mdx-articles';
-import { KNOWLEDGE_CATEGORY_LABELS, type KnowledgeCategory } from '@repo/shared-schemas';
-import { Badge, Button } from '@repo/ui';
-import { ArrowLeft, Clock, FileCode2 } from 'lucide-react';
+import { ArticleMetricsBar } from '@/components/knowledge/article-metrics-bar';
+import { MdxArticleRenderer } from '@/components/knowledge/mdx-article-renderer';
+import { getAllKnowledgeArticles, getArticleByCategoryAndSlug } from '@/lib/mdx-content';
+import { KNOWLEDGE_CATEGORY_LABELS } from '@repo/shared-schemas';
+import { Badge } from '@repo/ui';
+import { ArrowLeft, Calendar, Clock } from 'lucide-react';
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import type * as React from 'react';
 
-export function generateStaticParams(): Array<{ category: string; slug: string }> {
-  const articles = getAllMdxArticles();
+interface ArticlePageProps {
+  params: Promise<{
+    category: string;
+    slug: string;
+  }>;
+}
+
+export function generateStaticParams() {
+  const articles = getAllKnowledgeArticles();
   return articles.map((article) => ({
     category: article.category,
     slug: article.slug,
   }));
 }
 
-function renderMarkdownBlocks(markdown: string): React.JSX.Element[] {
-  const blocks = markdown.split(/\n\n+/);
-  return blocks.map((block, index) => {
-    const trimmed = block.trim();
-    const key = `md-block-${index}`;
-
-    if (trimmed.startsWith('## ')) {
-      return (
-        <h2 key={key} className="mt-8 mb-3 text-xl font-bold tracking-tight text-foreground">
-          {trimmed.slice(3)}
-        </h2>
-      );
-    }
-
-    if (trimmed.startsWith('1. ')) {
-      const items = trimmed.split('\n').map((line) => line.replace(/^\d+\.\s+/, '').trim());
-      return (
-        <ol key={key} className="my-4 list-decimal space-y-2 pl-5 text-sm text-muted-foreground">
-          {items.map((item) => (
-            <li key={item} className="leading-relaxed">
-              {item}
-            </li>
-          ))}
-        </ol>
-      );
-    }
-
-    return (
-      <p key={key} className="my-3 text-sm text-muted-foreground leading-relaxed">
-        {trimmed}
-      </p>
-    );
-  });
+export async function generateMetadata({ params }: ArticlePageProps): Promise<Metadata> {
+  const { category, slug } = await params;
+  const article = getArticleByCategoryAndSlug(category, slug);
+  if (!article) {
+    return {
+      title: 'Статья не найдена | Knowledge Base',
+    };
+  }
+  return {
+    title: `${article.title} | Engineering Knowledge Base`,
+    description: article.summary,
+  };
 }
 
-export default async function KnowledgeArticlePage({
-  params,
-}: {
-  params: Promise<{ category: string; slug: string }>;
-}): Promise<React.JSX.Element> {
+export default async function KnowledgeArticlePage({ params }: ArticlePageProps) {
   const { category, slug } = await params;
-  const article = getMdxArticleBySlug(category, slug);
+  const article = getArticleByCategoryAndSlug(category, slug);
 
   if (!article) {
     notFound();
@@ -64,46 +47,38 @@ export default async function KnowledgeArticlePage({
 
   return (
     <article className="rounded-xl border border-border bg-card p-6 shadow-sm sm:p-8">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-4">
-        <Button asChild variant="ghost" size="sm" className="-ml-2">
-          <Link href="/knowledge-base">
-            <ArrowLeft className="h-4 w-4" />К списку статей
-          </Link>
-        </Button>
-
-        <div className="flex items-center gap-2">
-          <Badge variant="secondary">
-            {KNOWLEDGE_CATEGORY_LABELS[article.category as KnowledgeCategory] ?? article.category}
-          </Badge>
-          <Badge variant="outline" className="font-mono">
-            <Clock className="h-3 w-3" />
-            {article.readTime}
-          </Badge>
-          <Badge variant="core" className="font-mono">
-            <FileCode2 className="h-3 w-3" />
-            SSG MDX
-          </Badge>
-        </div>
+      <div className="mb-4">
+        <Link
+          href="/knowledge-base"
+          className="inline-flex items-center gap-1.5 font-mono text-xs text-muted-foreground hover:text-foreground"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" />
+          <span>Назад ко всем статьям Базы Знаний</span>
+        </Link>
       </div>
 
-      <header className="mt-5 space-y-2">
-        <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-          {article.title}
-        </h1>
+      <header className="space-y-3 border-b border-border/70 pb-5">
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge variant="secondary" className="font-mono text-xs">
+            {KNOWLEDGE_CATEGORY_LABELS[article.category]}
+          </Badge>
+          <span className="flex items-center gap-1 font-mono text-xs text-muted-foreground">
+            <Clock className="h-3.5 w-3.5" />
+            {article.readingTime}
+          </span>
+          <span className="flex items-center gap-1 font-mono text-xs text-muted-foreground">
+            <Calendar className="h-3.5 w-3.5" />
+            {article.publishedAt}
+          </span>
+        </div>
+
+        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{article.title}</h1>
         <p className="text-sm text-muted-foreground leading-relaxed">{article.summary}</p>
       </header>
 
-      <div className="mt-6">
-        <ArticleClientWidgets
-          slug={article.slug}
-          category={article.category}
-          embedGraph={article.embedGraph}
-        />
-      </div>
+      <ArticleMetricsBar slug={article.slug} category={article.category} />
 
-      <div className="mt-6 border-t border-border/70 pt-4">
-        {renderMarkdownBlocks(article.body)}
-      </div>
+      <MdxArticleRenderer blocks={article.blocks} />
     </article>
   );
 }

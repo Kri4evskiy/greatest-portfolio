@@ -1,11 +1,20 @@
+import bundleAnalyzer from '@next/bundle-analyzer';
 import type { NextConfig } from 'next';
 
-const enableRedact = process.env.ENABLE_REDACT === 'true';
+const withBundleAnalyzer = bundleAnalyzer({
+  enabled: process.env.ANALYZE === 'true',
+});
 
-function withRedactExperimental(config: NextConfig): NextConfig {
-  if (!enableRedact) {
+/**
+ * Experimental TanStack Redact wrapper (ADR-08 & Step 6.3).
+ * Activates alternative lightweight runtime optimizations when ENABLE_REDACT=true,
+ * with safe fallback to standard Next.js React 19 compiler pipeline.
+ */
+function withRedact(config: NextConfig): NextConfig {
+  if (process.env.ENABLE_REDACT !== 'true') {
     return config;
   }
+
   return {
     ...config,
     env: {
@@ -15,15 +24,28 @@ function withRedactExperimental(config: NextConfig): NextConfig {
   };
 }
 
-const baseConfig: NextConfig = {
-  output: 'standalone',
+const apiInternalUrl = process.env.API_INTERNAL_URL ?? 'http://localhost:4000';
+
+const nextConfig: NextConfig = {
+  ...(process.env.DOCKER_STANDALONE === 'true' ? { output: 'standalone' } : {}),
+  ...(process.env.NEXT_DIST_DIR ? { distDir: process.env.NEXT_DIST_DIR } : {}),
+  reactStrictMode: true,
   transpilePackages: ['@repo/ui', '@repo/shared-schemas'],
-  images: {
-    formats: ['image/webp'],
-  },
   experimental: {
-    optimizePackageImports: ['lucide-react', '@repo/ui', 'd3'],
+    optimizePackageImports: ['lucide-react', 'd3', '@repo/ui'],
+  },
+  env: {
+    NEXT_PUBLIC_REDACT_RUNTIME:
+      process.env.ENABLE_REDACT === 'true' ? 'enabled' : 'standard-react-19',
+  },
+  async rewrites() {
+    return [
+      {
+        source: '/api/:path*',
+        destination: `${apiInternalUrl}/api/:path*`,
+      },
+    ];
   },
 };
 
-export default withRedactExperimental(baseConfig);
+export default withBundleAnalyzer(withRedact(nextConfig));

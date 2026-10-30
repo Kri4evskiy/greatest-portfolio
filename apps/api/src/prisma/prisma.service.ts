@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto';
-import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 import type { ArticleMeta, KnowledgeCategory, Role, VisitorRoleType } from '@repo/shared-schemas';
 
-export interface VisitorSessionRecord {
+export interface StoredVisitorSession {
   id: string;
   displayName: string;
   visitorType: VisitorRoleType;
@@ -13,112 +13,110 @@ export interface VisitorSessionRecord {
   expiresAt: Date;
 }
 
-const INITIAL_ARTICLE_METRICS: readonly ArticleMeta[] = [
+const INITIAL_ARTICLES: Array<{
+  slug: string;
+  category: KnowledgeCategory;
+  viewsCount: number;
+  helpfulCount: number;
+}> = [
   {
     slug: 'adr-full-stack-catalog',
-    category: 'architecture-devops',
-    viewsCount: 142,
-    helpfulCount: 48,
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    slug: 'react-18-vs-19-compiler-and-fiber',
-    category: 'react',
-    viewsCount: 98,
-    helpfulCount: 37,
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    slug: 'strict-typescript-zod-contracts',
     category: 'typescript',
-    viewsCount: 84,
-    helpfulCount: 29,
-    updatedAt: new Date().toISOString(),
+    viewsCount: 142,
+    helpfulCount: 38,
   },
   {
-    slug: 'nestjs-jwt-httponly-rbac-prisma',
+    slug: 'react-18-vs-19-compiler-d3',
+    category: 'react',
+    viewsCount: 198,
+    helpfulCount: 64,
+  },
+  {
+    slug: 'nestjs-jwt-httponly-prisma-sse',
     category: 'nestjs-prisma',
-    viewsCount: 116,
-    helpfulCount: 41,
-    updatedAt: new Date().toISOString(),
+    viewsCount: 167,
+    helpfulCount: 51,
   },
   {
-    slug: 'tanstack-redact-bundle-experiment',
+    slug: 'tanstack-redact-bundle-docker',
     category: 'architecture-devops',
-    viewsCount: 73,
-    helpfulCount: 26,
-    updatedAt: new Date().toISOString(),
+    viewsCount: 129,
+    helpfulCount: 44,
   },
 ];
 
 @Injectable()
-export class PrismaService implements OnModuleInit, OnModuleDestroy {
+export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(PrismaService.name);
-  private client: PrismaClient | null = null;
-  private isDatabaseConnected = false;
+  private dbConnected = false;
 
-  // Fallback in-memory stores when DATABASE_URL (Neon/Docker Postgres) is not yet configured
-  private readonly memorySessions = new Map<string, VisitorSessionRecord>();
+  private readonly memorySessions = new Map<string, StoredVisitorSession>();
   private readonly memoryMetrics = new Map<string, ArticleMeta>();
-  private readonly memoryEventLogs: Array<{
-    id: string;
-    eventType: string;
-    payload: Record<string, unknown>;
-    createdAt: Date;
-  }> = [];
 
   constructor() {
-    for (const item of INITIAL_ARTICLE_METRICS) {
-      this.memoryMetrics.set(item.slug, { ...item });
+    super({
+      log: ['error', 'warn'],
+    });
+
+    const now = new Date().toISOString();
+    for (const item of INITIAL_ARTICLES) {
+      this.memoryMetrics.set(item.slug, {
+        slug: item.slug,
+        category: item.category,
+        viewsCount: item.viewsCount,
+        helpfulCount: item.helpfulCount,
+        updatedAt: now,
+      });
     }
   }
 
   async onModuleInit(): Promise<void> {
-    const dbUrl = process.env.DATABASE_URL;
-    if (!dbUrl) {
+    if (!process.env.DATABASE_URL) {
       this.logger.warn(
-        'DATABASE_URL is not set — running with pre-seeded In-Memory store (set Neon.tech or Docker DATABASE_URL for PostgreSQL persistence).',
+        'DATABASE_URL not set — using resilient in-memory store with Prisma schema contract',
       );
       return;
     }
 
     try {
-      this.client = new PrismaClient();
-      await this.client.$connect();
-      this.isDatabaseConnected = true;
-      this.logger.log('Connected to PostgreSQL via Prisma ORM.');
+      await this.$connect();
+      this.dbConnected = true;
+      this.logger.log('Connected to PostgreSQL via Prisma ORM');
     } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error);
+      const message = error instanceof Error ? error.message : 'Unknown error';
       this.logger.warn(
-        `Could not connect to PostgreSQL (${msg}). Falling back to In-Memory store so dev server stays up.`,
+        `PostgreSQL connection unavailable (${message}) — falling back to resilient in-memory store`,
       );
-      this.client = null;
-      this.isDatabaseConnected = false;
+      this.dbConnected = false;
     }
   }
 
   async onModuleDestroy(): Promise<void> {
-    if (this.client && this.isDatabaseConnected) {
-      await this.client.$disconnect();
+    if (this.dbConnected) {
+      await this.$disconnect();
     }
   }
 
-  async createVisitorSession(input: {
+  isDatabaseConnected(): boolean {
+    return this.dbConnected;
+  }
+
+  async createVisitorSession(data: {
     displayName: string;
     visitorType: VisitorRoleType;
     role: Role;
-    userAgent: string | null;
+    userAgent?: string | undefined;
     expiresAt: Date;
-  }): Promise<VisitorSessionRecord> {
-    if (this.client && this.isDatabaseConnected) {
+  }): Promise<StoredVisitorSession> {
+    if (this.dbConnected) {
       try {
-        const created = await this.client.visitorSession.create({
+        const created = await this.visitorSession.create({
           data: {
-            displayName: input.displayName,
-            visitorType: input.visitorType,
-            role: input.role,
-            userAgent: input.userAgent,
-            expiresAt: input.expiresAt,
+            displayName: data.displayName,
+            visitorType: data.visitorType,
+            role: data.role,
+            userAgent: data.userAgent ?? null,
+            expiresAt: data.expiresAt,
           },
         });
         return {
@@ -130,53 +128,61 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
           createdAt: created.createdAt,
           expiresAt: created.expiresAt,
         };
-      } catch {
-        // Fallback to memory on transient DB schema/network errors
+      } catch (err) {
+        this.logger.warn(`Prisma createVisitorSession fallback: ${String(err)}`);
       }
     }
 
-    const record: VisitorSessionRecord = {
+    const session: StoredVisitorSession = {
       id: randomUUID(),
-      displayName: input.displayName,
-      visitorType: input.visitorType,
-      role: input.role,
-      userAgent: input.userAgent,
+      displayName: data.displayName,
+      visitorType: data.visitorType,
+      role: data.role,
+      userAgent: data.userAgent ?? null,
       createdAt: new Date(),
-      expiresAt: input.expiresAt,
+      expiresAt: data.expiresAt,
     };
-    this.memorySessions.set(record.id, record);
-    return record;
+    this.memorySessions.set(session.id, session);
+    return session;
   }
 
   async getAllArticleMetrics(): Promise<ArticleMeta[]> {
-    if (this.client && this.isDatabaseConnected) {
+    if (this.dbConnected) {
       try {
-        const rows = await this.client.articleMetrics.findMany({
-          orderBy: { viewsCount: 'desc' },
+        const rows = await this.articleMetrics.findMany({
+          orderBy: { slug: 'asc' },
         });
         if (rows.length > 0) {
-          return rows.map((row) => ({
-            slug: row.slug,
-            category: row.category as KnowledgeCategory,
-            viewsCount: row.viewsCount,
-            helpfulCount: row.helpfulCount,
-            updatedAt: row.updatedAt.toISOString(),
+          return rows.map((r) => ({
+            slug: r.slug,
+            category: r.category as KnowledgeCategory,
+            viewsCount: r.viewsCount,
+            helpfulCount: r.helpfulCount,
+            updatedAt: r.updatedAt.toISOString(),
           }));
         }
-      } catch {
-        // Fallback to memory
+      } catch (err) {
+        this.logger.warn(`Prisma getAllArticleMetrics fallback: ${String(err)}`);
       }
     }
+
     return Array.from(this.memoryMetrics.values());
   }
 
   async incrementArticleView(slug: string, category: KnowledgeCategory): Promise<ArticleMeta> {
-    if (this.client && this.isDatabaseConnected) {
+    if (this.dbConnected) {
       try {
-        const updated = await this.client.articleMetrics.upsert({
+        const updated = await this.articleMetrics.upsert({
           where: { slug },
-          update: { viewsCount: { increment: 1 } },
-          create: { slug, category, viewsCount: 1, helpfulCount: 0 },
+          update: {
+            viewsCount: { increment: 1 },
+          },
+          create: {
+            slug,
+            category,
+            viewsCount: 1,
+            helpfulCount: 0,
+          },
         });
         return {
           slug: updated.slug,
@@ -185,36 +191,37 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
           helpfulCount: updated.helpfulCount,
           updatedAt: updated.updatedAt.toISOString(),
         };
-      } catch {
-        // Fallback to memory
+      } catch (err) {
+        this.logger.warn(`Prisma incrementArticleView fallback: ${String(err)}`);
       }
     }
 
     const existing = this.memoryMetrics.get(slug);
-    const next: ArticleMeta = existing
-      ? {
-          ...existing,
-          viewsCount: existing.viewsCount + 1,
-          updatedAt: new Date().toISOString(),
-        }
-      : {
-          slug,
-          category,
-          viewsCount: 1,
-          helpfulCount: 0,
-          updatedAt: new Date().toISOString(),
-        };
+    const next: ArticleMeta = {
+      slug,
+      category: existing?.category ?? category,
+      viewsCount: (existing?.viewsCount ?? 100) + 1,
+      helpfulCount: existing?.helpfulCount ?? 25,
+      updatedAt: new Date().toISOString(),
+    };
     this.memoryMetrics.set(slug, next);
     return next;
   }
 
   async incrementArticleHelpful(slug: string, category: KnowledgeCategory): Promise<ArticleMeta> {
-    if (this.client && this.isDatabaseConnected) {
+    if (this.dbConnected) {
       try {
-        const updated = await this.client.articleMetrics.upsert({
+        const updated = await this.articleMetrics.upsert({
           where: { slug },
-          update: { helpfulCount: { increment: 1 } },
-          create: { slug, category, viewsCount: 1, helpfulCount: 1 },
+          update: {
+            helpfulCount: { increment: 1 },
+          },
+          create: {
+            slug,
+            category,
+            viewsCount: 1,
+            helpfulCount: 1,
+          },
         });
         return {
           slug: updated.slug,
@@ -223,48 +230,36 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
           helpfulCount: updated.helpfulCount,
           updatedAt: updated.updatedAt.toISOString(),
         };
-      } catch {
-        // Fallback to memory
+      } catch (err) {
+        this.logger.warn(`Prisma incrementArticleHelpful fallback: ${String(err)}`);
       }
     }
 
     const existing = this.memoryMetrics.get(slug);
-    const next: ArticleMeta = existing
-      ? {
-          ...existing,
-          helpfulCount: existing.helpfulCount + 1,
-          updatedAt: new Date().toISOString(),
-        }
-      : {
-          slug,
-          category,
-          viewsCount: 1,
-          helpfulCount: 1,
-          updatedAt: new Date().toISOString(),
-        };
+    const next: ArticleMeta = {
+      slug,
+      category: existing?.category ?? category,
+      viewsCount: existing?.viewsCount ?? 100,
+      helpfulCount: (existing?.helpfulCount ?? 25) + 1,
+      updatedAt: new Date().toISOString(),
+    };
     this.memoryMetrics.set(slug, next);
     return next;
   }
 
   async logSystemEvent(eventType: string, payload: Record<string, unknown>): Promise<void> {
-    if (this.client && this.isDatabaseConnected) {
-      try {
-        await this.client.systemEventLog.create({
-          data: {
-            eventType,
-            payload: JSON.parse(JSON.stringify(payload)),
-          },
-        });
-        return;
-      } catch {
-        // Fallback to memory
-      }
+    if (!this.dbConnected) {
+      return;
     }
-    this.memoryEventLogs.push({
-      id: randomUUID(),
-      eventType,
-      payload,
-      createdAt: new Date(),
-    });
+    try {
+      await this.systemEventLog.create({
+        data: {
+          eventType,
+          payload: JSON.parse(JSON.stringify(payload)),
+        },
+      });
+    } catch (err) {
+      this.logger.warn(`Prisma logSystemEvent fallback: ${String(err)}`);
+    }
   }
 }

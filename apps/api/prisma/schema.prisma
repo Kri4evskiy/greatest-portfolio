@@ -1,10 +1,11 @@
-datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-}
-
 generator client {
   provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model VisitorSession {
@@ -17,7 +18,7 @@ model VisitorSession {
   expiresAt   DateTime
 
   @@index([role])
-  @@map("visitor_sessions")
+  @@index([createdAt])
 }
 
 model ArticleMetrics {
@@ -27,7 +28,7 @@ model ArticleMetrics {
   helpfulCount Int      @default(0)
   updatedAt    DateTime @updatedAt
 
-  @@map("article_metrics")
+  @@index([category])
 }
 
 model SystemEventLog {
@@ -37,5 +38,4 @@ model SystemEventLog {
   createdAt DateTime @default(now())
 
   @@index([eventType, createdAt])
-  @@map("system_event_logs")
 }

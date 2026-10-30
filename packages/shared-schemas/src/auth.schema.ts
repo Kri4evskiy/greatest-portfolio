@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { RoleEnum, VisitorRoleTypeEnum } from './roles.schema';
+import { RoleEnum, VisitorRoleTypeEnum } from './roles.schema.js';
 
 export const GuestPassFormSchema = z.object({
   displayName: z

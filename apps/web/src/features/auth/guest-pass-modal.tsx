@@ -1,6 +1,7 @@
 'use client';
 
-import { useIssueGuestPass } from '@/hooks/use-session';
+import { useIssueGuestPassMutation } from '@/hooks/use-visitor-profile';
+import { trackEvent } from '@/lib/analytics';
 import { useUIStore } from '@/store/use-ui-store';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
@@ -16,30 +17,35 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   Input,
 } from '@repo/ui';
-import { KeyRound, LockOpen, ShieldCheck, Sparkles } from 'lucide-react';
-import { useRouter } from 'next/navigation';
-import * as React from 'react';
+import { KeyRound, LockOpen, ShieldCheck, Sparkles, Terminal } from 'lucide-react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 
-const QUICK_PRESETS: ReadonlyArray<{
+const ONE_CLICK_PRESETS: ReadonlyArray<{
   label: string;
   displayName: string;
   visitorType: VisitorRoleType;
 }> = [
-  { label: '⚡ Team Lead (1-click)', displayName: 'Alex (Team Lead)', visitorType: 'TEAM_LEAD' },
   {
-    label: '🎯 Tech Recruiter',
-    displayName: 'Maria (Tech Recruiter)',
+    label: '⚡ Alex (Team Lead)',
+    displayName: 'Alex • Team Lead',
+    visitorType: 'TEAM_LEAD',
+  },
+  {
+    label: '🎯 Maria (Tech Recruiter)',
+    displayName: 'Maria • Tech Recruiter',
     visitorType: 'RECRUITER',
   },
   {
-    label: '🛠️ Senior Engineer',
-    displayName: 'Dmitry (Staff Engineer)',
-    visitorType: 'DEVELOPER',
+    label: '🚀 David (CTO / Founder)',
+    displayName: 'David • CTO',
+    visitorType: 'FOUNDER',
   },
 ];
 
@@ -51,14 +57,16 @@ const VISITOR_ROLES: readonly VisitorRoleType[] = [
   'OTHER',
 ];
 
-export function GuestPassModal(): React.JSX.Element {
+export function GuestPassModal() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const isOpen = useUIStore((s) => s.isGuestPassModalOpen);
-  const redirectAfterUnlock = useUIStore((s) => s.redirectAfterUnlock);
+  const pendingRedirectPath = useUIStore((s) => s.pendingRedirectPath);
+  const openModal = useUIStore((s) => s.openGuestPassModal);
   const closeModal = useUIStore((s) => s.closeGuestPassModal);
 
-  const [showAdminInput, setShowAdminInput] = React.useState(false);
-  const issueGuestPass = useIssueGuestPass();
+  const [showAdminInput, setShowAdminInput] = useState(false);
+  const issuePassMutation = useIssueGuestPassMutation();
 
   const {
     register,
@@ -69,7 +77,7 @@ export function GuestPassModal(): React.JSX.Element {
   } = useForm<GuestPassFormInput>({
     resolver: zodResolver(GuestPassFormSchema),
     defaultValues: {
-      displayName: 'Alex (Team Lead)',
+      displayName: 'Alex • Team Lead',
       visitorType: 'TEAM_LEAD',
       adminPasscode: '',
     },
@@ -80,70 +88,100 @@ export function GuestPassModal(): React.JSX.Element {
     name: 'visitorType',
   });
 
-  const onSubmit = async (values: GuestPassFormInput): Promise<void> => {
-    await issueGuestPass.mutateAsync(values);
-    const targetPath = redirectAfterUnlock ?? '/knowledge-base';
+  useEffect(() => {
+    const unlockParam = searchParams.get('unlock');
+    const redirectParam = searchParams.get('redirect');
+    if (unlockParam === 'knowledge-base') {
+      openModal(redirectParam ?? '/knowledge-base');
+      trackEvent('guest_pass_modal_opened', { source: 'middleware_redirect' });
+    }
+  }, [searchParams, openModal]);
+
+  const onSubmit = async (values: GuestPassFormInput) => {
+    const profile = await issuePassMutation.mutateAsync(values);
+    trackEvent('guest_pass_unlocked', {
+      visitorType: profile.visitorType,
+      role: profile.role,
+    });
     closeModal();
-    router.push(targetPath);
+    router.push(pendingRedirectPath ?? '/knowledge-base');
+    router.refresh();
+  };
+
+  const applyPresetAndUnlock = async (preset: {
+    displayName: string;
+    visitorType: VisitorRoleType;
+  }) => {
+    setValue('displayName', preset.displayName, { shouldValidate: true });
+    setValue('visitorType', preset.visitorType, { shouldValidate: true });
+    await onSubmit({
+      displayName: preset.displayName,
+      visitorType: preset.visitorType,
+      adminPasscode: '',
+    });
   };
 
   return (
-    <Dialog
-      open={isOpen}
-      onOpenChange={(open) => {
-        if (!open) closeModal();
-      }}
-    >
+    <Dialog open={isOpen} onOpenChange={(open) => (open ? openModal() : closeModal())}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <div className="flex items-center gap-2">
-            <Badge variant="core">RBAC + HttpOnly JWT Demo</Badge>
-            <Badge variant="outline">Zero Passwords</Badge>
+            <Badge variant="outline" className="font-mono text-[11px]">
+              RBAC • JWT HttpOnly Cookie
+            </Badge>
+            <Badge variant="secondary" className="font-mono text-[11px]">
+              packages/shared-schemas
+            </Badge>
           </div>
           <DialogTitle className="mt-2 flex items-center gap-2 text-xl">
-            <LockOpen className="h-5 w-5 text-emerald-600" />
-            Unlock Engineering Base of Knowledge
+            <LockOpen className="h-5 w-5 text-primary" />
+            Гостевой пропуск в Базу Знаний (1-Click Guest Pass)
           </DialogTitle>
           <DialogDescription>
-            Закрытый раздел защищен на уровне Next.js Edge Middleware и NestJS JwtRolesGuard.
+            Раздел инженерных разборов и D3.js-симуляций защищен на уровне{' '}
+            <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">
+              Next.js Edge Middleware
+            </code>{' '}
+            и <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">JwtRolesGuard</code>.
           </DialogDescription>
         </DialogHeader>
 
-        <Callout icon="🧪" title="Для Team Lead и Рекрутера (в 1 клик)">
-          Введи любое имя или нажми пресет ниже — это живое демо работы{' '}
-          <code className="rounded bg-background px-1 py-0.5 text-xs font-mono">
-            React Hook Form + Zod + NestJS JWT HttpOnly Cookies + RBAC + SSE
-          </code>
-          . После сабмита замок в шапке сменится на 🔓 и откроется доступ к интерактивным статьям и
-          D3.js графикам.
+        <Callout
+          variant="info"
+          title="Живое архитектурное демо без паролей и спама"
+          icon={<Terminal className="h-4 w-4" />}
+          className="my-1 text-xs"
+        >
+          Выбери пресет в <strong>1 клик</strong> или укажи свое имя — это демонстрация связки{' '}
+          <code>React Hook Form</code> + <code>Zod</code> + <code>NestJS JWT HttpOnly Cookie</code>{' '}
+          + <code>RBAC</code> + <code>SSE Telemetry</code>.
         </Callout>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <div className="space-y-1.5">
-            <span className="text-xs font-medium text-muted-foreground">
-              Быстрое заполнение в 1 клик:
-            </span>
-            <div className="flex flex-wrap gap-1.5">
-              {QUICK_PRESETS.map((preset) => (
-                <button
-                  key={preset.label}
-                  type="button"
-                  onClick={() => {
-                    setValue('displayName', preset.displayName, { shouldValidate: true });
-                    setValue('visitorType', preset.visitorType, { shouldValidate: true });
-                  }}
-                  className="inline-flex items-center gap-1 rounded-md border border-border bg-muted/60 px-2.5 py-1 text-xs font-medium text-foreground transition-colors hover:bg-accent"
-                >
-                  <Sparkles className="h-3 w-3 text-amber-500" />
-                  {preset.label}
-                </button>
-              ))}
-            </div>
+        <div className="space-y-2">
+          <p className="text-xs font-medium text-muted-foreground">
+            Быстрый вход в 1 клик (мгновенная выдача куки и редирект):
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {ONE_CLICK_PRESETS.map((preset) => (
+              <Button
+                key={preset.label}
+                type="button"
+                variant="secondary"
+                size="sm"
+                disabled={isSubmitting || issuePassMutation.isPending}
+                onClick={() => void applyPresetAndUnlock(preset)}
+                className="h-7 text-xs font-medium"
+              >
+                {preset.label}
+              </Button>
+            ))}
           </div>
+        </div>
 
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 pt-1">
           <div className="space-y-1.5">
-            <label htmlFor="guest-display-name" className="text-xs font-medium text-foreground">
-              Ваше имя или никнейм
+            <label htmlFor="guest-display-name" className="text-xs font-medium">
+              Имя или никнейм гостя
             </label>
             <Input
               id="guest-display-name"
@@ -156,8 +194,8 @@ export function GuestPassModal(): React.JSX.Element {
           </div>
 
           <div className="space-y-1.5">
-            <span className="text-xs font-medium text-foreground">Ваша роль в компании</span>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            <span className="text-xs font-medium">Ваша роль в команде</span>
+            <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
               {VISITOR_ROLES.map((roleKey) => {
                 const isSelected = selectedVisitorType === roleKey;
                 return (
@@ -165,10 +203,10 @@ export function GuestPassModal(): React.JSX.Element {
                     key={roleKey}
                     type="button"
                     onClick={() => setValue('visitorType', roleKey, { shouldValidate: true })}
-                    className={`rounded-md border px-2.5 py-1.5 text-left text-xs font-medium transition-all ${
+                    className={`rounded-md border px-2.5 py-1.5 text-left text-xs transition-colors ${
                       isSelected
-                        ? 'border-primary bg-primary text-primary-foreground shadow-sm'
-                        : 'border-border bg-background text-muted-foreground hover:bg-accent hover:text-foreground'
+                        ? 'border-primary bg-primary text-primary-foreground font-medium'
+                        : 'border-border bg-background hover:bg-accent text-foreground'
                     }`}
                   >
                     {VISITOR_ROLE_LABELS[roleKey]}
@@ -182,49 +220,52 @@ export function GuestPassModal(): React.JSX.Element {
             <button
               type="button"
               onClick={() => setShowAdminInput((prev) => !prev)}
-              className="inline-flex items-center gap-1.5 text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
             >
               <KeyRound className="h-3.5 w-3.5" />
               {showAdminInput
-                ? 'Скрыть ключ владельца (Admin RBAC)'
-                : 'У меня есть ключ владельца (Admin RBAC)'}
+                ? 'Скрыть поле Admin Passcode'
+                : 'Я владелец портфолио (Admin Passcode → роль ADMIN)'}
             </button>
+
             {showAdminInput ? (
               <div className="mt-2 space-y-1">
                 <Input
                   type="password"
-                  placeholder="Secret Admin Passcode (demo: workfolio-admin-2026)"
+                  placeholder="Введите секретный ключ администратора (опционально)"
                   {...register('adminPasscode')}
                 />
                 <p className="text-[11px] text-muted-foreground">
-                  Для демо проверки роли ADMIN используй код:{' '}
-                  <code className="font-mono">workfolio-admin-2026</code>
+                  Демо-ключ для проверяющего тимлида: <code>workfolio-admin-2026</code>
                 </p>
               </div>
             ) : null}
           </div>
 
-          {issueGuestPass.isError ? (
+          {issuePassMutation.isError ? (
             <p className="rounded-md bg-red-500/10 p-2 text-xs text-red-600">
-              Не удалось выпустить пропуск. Проверьте, что запущен бэкенд apps/api.
+              {issuePassMutation.error instanceof Error
+                ? issuePassMutation.error.message
+                : 'Ошибка соединения с API'}
             </p>
           ) : null}
 
-          <div className="flex items-center justify-end gap-2 pt-2">
-            <Button type="button" variant="ghost" onClick={closeModal}>
-              Отмена
-            </Button>
+          <DialogFooter className="gap-2 sm:justify-between">
+            <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+              <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
+              <span>Set-Cookie: HttpOnly; SameSite=Lax</span>
+            </div>
             <Button
               type="submit"
-              disabled={isSubmitting || issueGuestPass.isPending}
-              className="gap-2"
+              disabled={isSubmitting || issuePassMutation.isPending}
+              className="gap-1.5"
             >
-              <ShieldCheck className="h-4 w-4" />
-              {issueGuestPass.isPending
-                ? 'Подписываем JWT куку...'
-                : 'Получить Guest Pass и открыть 🔓'}
+              <Sparkles className="h-4 w-4" />
+              {issuePassMutation.isPending
+                ? 'Выпускаем JWT пропуск...'
+                : 'Разблокировать Базу Знаний'}
             </Button>
-          </div>
+          </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>

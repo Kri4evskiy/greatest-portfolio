@@ -1,38 +1,53 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import {
   type GuestPassFormInput,
   type Role,
   type SessionProfile,
   VISITOR_ROLE_LABELS,
+  type VisitorRoleType,
 } from '@repo/shared-schemas';
-import { PrismaService } from '../../prisma/prisma.service';
-import { TelemetryService } from '../telemetry/telemetry.service';
-import type { JwtTokenPayload } from './guards/jwt-roles.guard';
+import { PrismaService } from '../../prisma/prisma.service.js';
+import { TelemetryService } from '../telemetry/telemetry.service.js';
 
-const SEVEN_DAYS_MS = 1000 * 60 * 60 * 24 * 7;
+export const KB_ACCESS_COOKIE_NAME = 'kb_access_token';
+export const KB_COOKIE_MAX_AGE_MS = 1000 * 60 * 60 * 24 * 7; // 7 days
+
+export interface JwtSessionPayload {
+  sub: string;
+  displayName: string;
+  visitorType: VisitorRoleType;
+  role: Role;
+  expiresAt: string;
+}
 
 @Injectable()
 export class AuthService {
   constructor(
-    private readonly prisma: PrismaService,
-    private readonly jwtService: JwtService,
-    private readonly telemetry: TelemetryService,
+    @Inject(JwtService) private readonly jwtService: JwtService,
+    @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Inject(TelemetryService) private readonly telemetry: TelemetryService,
   ) {}
+
+  getGuestProfile(): SessionProfile {
+    return {
+      id: null,
+      displayName: null,
+      visitorType: null,
+      role: 'GUEST',
+      expiresAt: null,
+    };
+  }
 
   async issueGuestPass(
     input: GuestPassFormInput,
-    userAgent: string | null,
-  ): Promise<{ token: string; profile: SessionProfile; maxAgeMs: number }> {
-    const expectedAdminSecret = process.env.ADMIN_SECRET_PASSCODE ?? 'workfolio-admin-2026';
-    const isAdmin =
-      typeof input.adminPasscode === 'string' &&
-      input.adminPasscode.length > 0 &&
-      input.adminPasscode === expectedAdminSecret;
-
+    userAgent?: string | undefined,
+  ): Promise<{ profile: SessionProfile; accessToken: string }> {
+    const expectedAdminPasscode = process.env.ADMIN_SECRET_PASSCODE ?? 'workfolio-admin-2026';
+    const isAdmin = Boolean(input.adminPasscode) && input.adminPasscode === expectedAdminPasscode;
     const assignedRole: Role = isAdmin ? 'ADMIN' : 'USER';
-    const expiresAt = new Date(Date.now() + SEVEN_DAYS_MS);
 
+    const expiresAt = new Date(Date.now() + KB_COOKIE_MAX_AGE_MS);
     const session = await this.prisma.createVisitorSession({
       displayName: input.displayName,
       visitorType: input.visitorType,
@@ -41,25 +56,24 @@ export class AuthService {
       expiresAt,
     });
 
-    const payload: JwtTokenPayload = {
+    const payload: JwtSessionPayload = {
       sub: session.id,
       displayName: session.displayName,
       visitorType: session.visitorType,
       role: session.role,
+      expiresAt: session.expiresAt.toISOString(),
     };
 
-    const token = await this.jwtService.signAsync(payload);
+    const accessToken = await this.jwtService.signAsync(payload);
 
-    await this.telemetry.emitEvent({
+    await this.telemetry.publishEvent({
       type: 'GUEST_PASS_ISSUED',
-      message: `${session.displayName} (${VISITOR_ROLE_LABELS[session.visitorType]}) unlocked Base of Knowledge as ${session.role}`,
+      message: `${session.displayName} (${VISITOR_ROLE_LABELS[session.visitorType]}) unlocked Knowledge Base as ${session.role}`,
       actorName: session.displayName,
       actorRole: session.visitorType,
     });
 
     return {
-      token,
-      maxAgeMs: SEVEN_DAYS_MS,
       profile: {
         id: session.id,
         displayName: session.displayName,
@@ -67,37 +81,26 @@ export class AuthService {
         role: session.role,
         expiresAt: session.expiresAt.toISOString(),
       },
+      accessToken,
     };
   }
 
-  resolveSessionFromCookie(token: string | undefined): SessionProfile {
+  async resolveSessionFromToken(token?: string | undefined): Promise<SessionProfile> {
     if (!token) {
-      return {
-        id: null,
-        displayName: null,
-        visitorType: null,
-        role: 'GUEST',
-        expiresAt: null,
-      };
+      return this.getGuestProfile();
     }
 
     try {
-      const payload = this.jwtService.verify<JwtTokenPayload>(token);
+      const verified = await this.jwtService.verifyAsync<JwtSessionPayload>(token);
       return {
-        id: payload.sub,
-        displayName: payload.displayName,
-        visitorType: payload.visitorType,
-        role: payload.role,
-        expiresAt: payload.exp ? new Date(payload.exp * 1000).toISOString() : null,
+        id: verified.sub,
+        displayName: verified.displayName,
+        visitorType: verified.visitorType,
+        role: verified.role,
+        expiresAt: verified.expiresAt,
       };
     } catch {
-      return {
-        id: null,
-        displayName: null,
-        visitorType: null,
-        role: 'GUEST',
-        expiresAt: null,
-      };
+      return this.getGuestProfile();
     }
   }
 }
