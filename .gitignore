@@ -7,10 +7,12 @@ node_modules/
 
 # Build outputs
 .next/
+.next-build/
 out/
 dist/
 build/
 storybook-static/
+AppData/
 
 # Prisma generated & SQLite/local DBs
 *.db
