@@ -1,8 +1,5 @@
-'use client';
+'use client'
 
-import { useVisitorProfile } from '@/hooks/use-visitor-profile';
-import { trackEvent } from '@/lib/analytics';
-import { useUIStore } from '@/store/use-ui-store';
 import {
   Badge,
   Button,
@@ -13,7 +10,7 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from '@repo/ui';
+} from '@repo/ui'
 import {
   ArrowUpRight,
   Briefcase,
@@ -25,17 +22,20 @@ import {
   ShieldCheck,
   Terminal,
   Zap,
-} from 'lucide-react';
-import { useRouter } from 'next/navigation';
+} from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { useVisitorProfile } from '@/hooks/use-visitor-profile'
+import { trackEvent } from '@/lib/analytics'
+import { useUIStore } from '@/store/use-ui-store'
 
 interface CaseStudy {
-  id: string;
-  title: string;
-  subtitle: string;
-  metrics: string;
-  tags: string[];
-  articleSlug: string;
-  articleCategory: string;
+  id: string
+  title: string
+  subtitle: string
+  metrics: string
+  tags: string[]
+  articleSlug: string
+  articleCategory: string
 }
 
 const CASE_STUDIES: readonly CaseStudy[] = [
@@ -79,7 +79,7 @@ const CASE_STUDIES: readonly CaseStudy[] = [
     articleSlug: 'tanstack-redact-bundle-docker',
     articleCategory: 'architecture-devops',
   },
-];
+]
 
 const EXPERIENCE_TIMELINE = [
   {
@@ -102,23 +102,23 @@ const EXPERIENCE_TIMELINE = [
       'Оптимизировал запросы Prisma ORM в PostgreSQL (Neon) и настроил CI/CD пайплайны с Biome.js и Multi-stage Docker образами.',
     ],
   },
-] as const;
+] as const
 
 export function WorkfolioHeroSection() {
-  const router = useRouter();
-  const { data: profile } = useVisitorProfile();
-  const openGuestPassModal = useUIStore((s) => s.openGuestPassModal);
+  const router = useRouter()
+  const { data: profile } = useVisitorProfile()
+  const openGuestPassModal = useUIStore((s) => s.openGuestPassModal)
 
-  const isUnlocked = profile?.role === 'USER' || profile?.role === 'ADMIN';
+  const isUnlocked = profile?.role === 'USER' || profile?.role === 'ADMIN'
 
   const handleOpenKnowledgeBase = (targetPath = '/knowledge-base') => {
     if (isUnlocked) {
-      router.push(targetPath);
-      return;
+      router.push(targetPath)
+      return
     }
-    trackEvent('guest_pass_modal_opened', { source: 'hero_cta' });
-    openGuestPassModal(targetPath);
-  };
+    trackEvent('guest_pass_modal_opened', { source: 'hero_cta' })
+    openGuestPassModal(targetPath)
+  }
 
   return (
     <section id="about" className="scroll-mt-20 space-y-6 pt-6">
@@ -208,25 +208,25 @@ export function WorkfolioHeroSection() {
         </div>
       </Callout>
     </section>
-  );
+  )
 }
 
 export function WorkfolioProjectsSection() {
-  const router = useRouter();
-  const { data: profile } = useVisitorProfile();
-  const openGuestPassModal = useUIStore((s) => s.openGuestPassModal);
+  const router = useRouter()
+  const { data: profile } = useVisitorProfile()
+  const openGuestPassModal = useUIStore((s) => s.openGuestPassModal)
 
-  const isUnlocked = profile?.role === 'USER' || profile?.role === 'ADMIN';
+  const isUnlocked = profile?.role === 'USER' || profile?.role === 'ADMIN'
 
   const handleReadCaseStudy = (category: string, slug: string) => {
-    const targetUrl = `/knowledge-base/${category}/${slug}`;
+    const targetUrl = `/knowledge-base/${category}/${slug}`
     if (isUnlocked) {
-      router.push(targetUrl);
-      return;
+      router.push(targetUrl)
+      return
     }
-    trackEvent('guest_pass_modal_opened', { source: `case_study_${slug}` });
-    openGuestPassModal(targetUrl);
-  };
+    trackEvent('guest_pass_modal_opened', { source: `case_study_${slug}` })
+    openGuestPassModal(targetUrl)
+  }
 
   return (
     <section id="projects" className="scroll-mt-20 space-y-4">
@@ -295,7 +295,7 @@ export function WorkfolioProjectsSection() {
         ))}
       </div>
     </section>
-  );
+  )
 }
 
 export function WorkfolioExperienceSection() {
@@ -333,5 +333,5 @@ export function WorkfolioExperienceSection() {
         ))}
       </div>
     </section>
-  );
+  )
 }

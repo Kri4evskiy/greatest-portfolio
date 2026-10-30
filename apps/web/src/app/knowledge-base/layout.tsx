@@ -1,6 +1,6 @@
-import { KnowledgeSidebar } from '@/components/knowledge/knowledge-sidebar';
-import { getAllKnowledgeArticles } from '@/lib/mdx-content';
-import type { ReactNode } from 'react';
+import type { ReactNode } from 'react'
+import { KnowledgeSidebar } from '@/components/knowledge/knowledge-sidebar'
+import { getAllKnowledgeArticles } from '@/lib/mdx-content'
 
 export default function KnowledgeBaseLayout({ children }: { children: ReactNode }) {
   const articles = getAllKnowledgeArticles().map((a) => ({
@@ -10,7 +10,7 @@ export default function KnowledgeBaseLayout({ children }: { children: ReactNode 
     summary: a.summary,
     readingTime: a.readingTime,
     publishedAt: a.publishedAt,
-  }));
+  }))
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
@@ -19,5 +19,5 @@ export default function KnowledgeBaseLayout({ children }: { children: ReactNode 
         <div className="min-w-0 flex-1">{children}</div>
       </div>
     </div>
-  );
+  )
 }

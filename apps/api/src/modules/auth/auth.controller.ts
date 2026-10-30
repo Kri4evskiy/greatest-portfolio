@@ -1,22 +1,12 @@
-import {
-  Body,
-  Controller,
-  Get,
-  HttpCode,
-  HttpStatus,
-  Inject,
-  Post,
-  Req,
-  Res,
-} from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Inject, Post, Req, Res } from '@nestjs/common'
 import {
   type GuestPassFormInput,
   GuestPassFormSchema,
   type SessionProfile,
-} from '@repo/shared-schemas';
-import type { Request, Response } from 'express';
-import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe.js';
-import { AuthService, KB_ACCESS_COOKIE_NAME, KB_COOKIE_MAX_AGE_MS } from './auth.service.js';
+} from '@repo/shared-schemas'
+import type { Request, Response } from 'express'
+import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe.js'
+import { AuthService, KB_ACCESS_COOKIE_NAME, KB_COOKIE_MAX_AGE_MS } from './auth.service.js'
 
 @Controller('auth')
 export class AuthController {
@@ -29,8 +19,8 @@ export class AuthController {
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ): Promise<SessionProfile> {
-    const userAgent = req.headers['user-agent'];
-    const { profile, accessToken } = await this.authService.issueGuestPass(body, userAgent);
+    const userAgent = req.headers['user-agent']
+    const { profile, accessToken } = await this.authService.issueGuestPass(body, userAgent)
 
     res.cookie(KB_ACCESS_COOKIE_NAME, accessToken, {
       httpOnly: true,
@@ -38,15 +28,15 @@ export class AuthController {
       sameSite: 'lax',
       path: '/',
       maxAge: KB_COOKIE_MAX_AGE_MS,
-    });
+    })
 
-    return profile;
+    return profile
   }
 
   @Get('me')
   async getMe(@Req() req: Request): Promise<SessionProfile> {
-    const token = req.cookies?.[KB_ACCESS_COOKIE_NAME] as string | undefined;
-    return this.authService.resolveSessionFromToken(token);
+    const token = req.cookies?.[KB_ACCESS_COOKIE_NAME] as string | undefined
+    return this.authService.resolveSessionFromToken(token)
   }
 
   @Post('logout')
@@ -57,7 +47,7 @@ export class AuthController {
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       path: '/',
-    });
-    return this.authService.getGuestProfile();
+    })
+    return this.authService.getGuestProfile()
   }
 }

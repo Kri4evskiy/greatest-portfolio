@@ -1,8 +1,6 @@
-'use client';
+'use client'
 
-import { trackEvent } from '@/lib/analytics';
-import { useUIStore } from '@/store/use-ui-store';
-import { TECH_RADAR_ITEMS, type TechCategory, type TechRadarItem } from '@repo/shared-schemas';
+import { TECH_RADAR_ITEMS, type TechCategory, type TechRadarItem } from '@repo/shared-schemas'
 import {
   Badge,
   Button,
@@ -12,17 +10,19 @@ import {
   DialogHeader,
   DialogTitle,
   Input,
-} from '@repo/ui';
+} from '@repo/ui'
 import {
   type ColumnDef,
-  type SortingState,
   flexRender,
   getCoreRowModel,
   getSortedRowModel,
+  type SortingState,
   useReactTable,
-} from '@tanstack/react-table';
-import { ArrowUpDown, BookOpenCheck, Compass, Layers, Search, Sparkles } from 'lucide-react';
-import { useMemo, useState } from 'react';
+} from '@tanstack/react-table'
+import { ArrowUpDown, BookOpenCheck, Compass, Layers, Search, Sparkles } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { trackEvent } from '@/lib/analytics'
+import { useUIStore } from '@/store/use-ui-store'
 
 const CATEGORIES: ReadonlyArray<TechCategory | 'ALL'> = [
   'ALL',
@@ -31,32 +31,32 @@ const CATEGORIES: ReadonlyArray<TechCategory | 'ALL'> = [
   'Database & Storage',
   'DevOps & DX',
   'Architecture',
-];
+]
 
 export function TechRadarTable() {
-  const categoryFilter = useUIStore((s) => s.techRadarCategoryFilter);
-  const searchQuery = useUIStore((s) => s.techRadarSearch);
-  const selectedAdrItem = useUIStore((s) => s.selectedAdrItem);
-  const setCategoryFilter = useUIStore((s) => s.setTechRadarCategoryFilter);
-  const setSearchQuery = useUIStore((s) => s.setTechRadarSearch);
-  const openAdrInspector = useUIStore((s) => s.openAdrInspector);
-  const closeAdrInspector = useUIStore((s) => s.closeAdrInspector);
+  const categoryFilter = useUIStore((s) => s.techRadarCategoryFilter)
+  const searchQuery = useUIStore((s) => s.techRadarSearch)
+  const selectedAdrItem = useUIStore((s) => s.selectedAdrItem)
+  const setCategoryFilter = useUIStore((s) => s.setTechRadarCategoryFilter)
+  const setSearchQuery = useUIStore((s) => s.setTechRadarSearch)
+  const openAdrInspector = useUIStore((s) => s.openAdrInspector)
+  const closeAdrInspector = useUIStore((s) => s.closeAdrInspector)
 
-  const [sorting, setSorting] = useState<SortingState>([{ id: 'adrNumber', desc: false }]);
+  const [sorting, setSorting] = useState<SortingState>([{ id: 'adrNumber', desc: false }])
 
   const filteredData = useMemo(() => {
-    const normalizedQuery = searchQuery.trim().toLowerCase();
+    const normalizedQuery = searchQuery.trim().toLowerCase()
     return TECH_RADAR_ITEMS.filter((item) => {
-      const matchesCategory = categoryFilter === 'ALL' || item.category === categoryFilter;
-      if (!matchesCategory) return false;
-      if (!normalizedQuery) return true;
+      const matchesCategory = categoryFilter === 'ALL' || item.category === categoryFilter
+      if (!matchesCategory) return false
+      if (!normalizedQuery) return true
       return (
         item.name.toLowerCase().includes(normalizedQuery) ||
         item.summary.toLowerCase().includes(normalizedQuery) ||
         item.category.toLowerCase().includes(normalizedQuery)
-      );
-    });
-  }, [categoryFilter, searchQuery]);
+      )
+    })
+  }, [categoryFilter, searchQuery])
 
   const columns = useMemo<ColumnDef<TechRadarItem>[]>(
     () => [
@@ -101,14 +101,14 @@ export function TechRadarTable() {
         accessorKey: 'level',
         header: 'Статус',
         cell: ({ row }) => {
-          const level = row.original.level;
+          const level = row.original.level
           const variant =
-            level === 'Core' ? 'success' : level === 'Production' ? 'default' : 'warning';
+            level === 'Core' ? 'success' : level === 'Production' ? 'default' : 'warning'
           return (
             <Badge variant={variant} className="font-mono text-[10px]">
               {level}
             </Badge>
-          );
+          )
         },
       },
       {
@@ -137,11 +137,11 @@ export function TechRadarTable() {
               variant="outline"
               size="sm"
               onClick={() => {
-                openAdrInspector(row.original);
+                openAdrInspector(row.original)
                 trackEvent('adr_popover_inspected', {
                   adrNumber: row.original.adrNumber,
                   name: row.original.name,
-                });
+                })
               }}
               className="h-7 gap-1 font-mono text-xs"
             >
@@ -153,7 +153,7 @@ export function TechRadarTable() {
       },
     ],
     [openAdrInspector],
-  );
+  )
 
   const table = useReactTable({
     data: filteredData,
@@ -164,7 +164,7 @@ export function TechRadarTable() {
     onSortingChange: setSorting,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
-  });
+  })
 
   return (
     <section id="tech-radar" className="scroll-mt-20 space-y-4">
@@ -190,7 +190,7 @@ export function TechRadarTable() {
       <div className="flex flex-col gap-3 rounded-lg border border-border bg-card p-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap gap-1.5">
           {CATEGORIES.map((category) => {
-            const active = categoryFilter === category;
+            const active = categoryFilter === category
             return (
               <button
                 key={category}
@@ -204,7 +204,7 @@ export function TechRadarTable() {
               >
                 {category === 'ALL' ? 'Все домены (15)' : category}
               </button>
-            );
+            )
           })}
         </div>
 
@@ -265,7 +265,7 @@ export function TechRadarTable() {
       <Dialog
         open={selectedAdrItem !== null}
         onOpenChange={(open) => {
-          if (!open) closeAdrInspector();
+          if (!open) closeAdrInspector()
         }}
       >
         <DialogContent className="sm:max-w-xl">
@@ -319,5 +319,5 @@ export function TechRadarTable() {
         </DialogContent>
       </Dialog>
     </section>
-  );
+  )
 }

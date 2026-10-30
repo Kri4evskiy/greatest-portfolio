@@ -3,6 +3,7 @@
 Этот документ описывает архитектуру фронтенд-приложения `apps/web`.
 
 ## 1. Главная страница (`/`) — Ориентир Notion Workfolio + Верхний Header
+
 Стартовая страница — это ссылка-визитка, которую получают рекрутеры, тимлиды и СТО. Она сочетает минималистичную структуру **Notion Workfolio** (`https://www.notion.com/templates/workfolio`) и живую демонстрацию нашей Full-Stack архитектуры:
 
 1. **Sticky Top Header (Шапка сайта):**
@@ -26,6 +27,7 @@
    - Живой индикатор `Server-Sent Events (SSE)` из микросервиса `telemetry-ms` (показывает пульс сервера и последние обезличенные события в реальном времени).
 
 ## 2. Закрытая База Знаний (`/knowledge-base/*`) — SSG + MDX + WebP + D3.js
+
 - **Layout с древовидным Sidebar:** Разделы `TypeScript`, `React 18 vs 19`, `NestJS & Prisma`, `Architecture & DevOps`. Состояние открытых секций сайдбара хранится в `Zustand` (`useUIStore`).
 - **SSG (`generateStaticParams`):** Все статьи `.mdx` из папки `apps/web/content/` компилируются на этапе сборки в быстрый статический HTML, а динамические метрики (просмотры, кнопка «Полезно») подгружаются и кэшируются через `TanStack Query` + `IndexedDB`.
 - **Кастомные MDX-компоненты:**
@@ -35,10 +37,12 @@
     2. Интерактивный граф архитектуры этого монорепозитория (`Client -> Next.js Edge -> NestJS API -> Prisma/Neon -> Telemetry Microservice -> SSE`).
 
 ## 3. Экспериментальный рантайм `TanStack Redact`
+
 - В `next.config.ts` подготовлена обертка `withRedact` и `@next/bundle-analyzer`, управляемая через флаг окружения `ENABLE_REDACT=true`.
 - Результаты сравнения бандла (стандартный React DOM против TanStack Redact) задокументированы в виде отдельной инженерной статьи внутри Базы Знаний.
 
 ## 4. Стандарты Next.js AI Agents & Vercel React Best Practices
+
 Обязательно соблюдать правила из `.agents/skills/react-next-best-practices/SKILL.md`:
 1. **Next.js Local Version-Matched Docs (`nextjs.org/docs/app/guides/ai-agents`):** При работе с API Next.js сверяться с локальной документацией пакета в `apps/web/node_modules/next/dist/docs/` и соблюдать асинхронные контракты (`await params`, `await searchParams`, `await cookies()`).
 2. **Eliminate Waterfalls (`async-*`):** Запускать независимые запросы параллельно через `Promise.all`, использовать `React.cache()` для чтения MDX на сервере.

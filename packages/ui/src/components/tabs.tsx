@@ -1,8 +1,8 @@
-import * as TabsPrimitive from '@radix-ui/react-tabs';
-import * as React from 'react';
-import { cn } from '../lib/utils';
+import * as TabsPrimitive from '@radix-ui/react-tabs'
+import * as React from 'react'
+import { cn } from '../lib/utils'
 
-export const Tabs = TabsPrimitive.Root;
+export const Tabs = TabsPrimitive.Root
 
 export const TabsList = React.forwardRef<
   React.ComponentRef<typeof TabsPrimitive.List>,
@@ -16,8 +16,8 @@ export const TabsList = React.forwardRef<
     )}
     {...props}
   />
-));
-TabsList.displayName = TabsPrimitive.List.displayName;
+))
+TabsList.displayName = TabsPrimitive.List.displayName
 
 export const TabsTrigger = React.forwardRef<
   React.ComponentRef<typeof TabsPrimitive.Trigger>,
@@ -31,8 +31,8 @@ export const TabsTrigger = React.forwardRef<
     )}
     {...props}
   />
-));
-TabsTrigger.displayName = TabsPrimitive.Trigger.displayName;
+))
+TabsTrigger.displayName = TabsPrimitive.Trigger.displayName
 
 export const TabsContent = React.forwardRef<
   React.ComponentRef<typeof TabsPrimitive.Content>,
@@ -43,5 +43,5 @@ export const TabsContent = React.forwardRef<
     className={cn('mt-3 focus-visible:outline-none', className)}
     {...props}
   />
-));
-TabsContent.displayName = TabsPrimitive.Content.displayName;
+))
+TabsContent.displayName = TabsPrimitive.Content.displayName

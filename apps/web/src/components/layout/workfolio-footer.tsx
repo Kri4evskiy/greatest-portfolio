@@ -1,49 +1,49 @@
-'use client';
+'use client'
 
-import { APP_VERSION, type TelemetryEvent, TelemetryEventSchema } from '@repo/shared-schemas';
-import { Badge } from '@repo/ui';
-import { Activity, Database, Radio, Server } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { APP_VERSION, type TelemetryEvent, TelemetryEventSchema } from '@repo/shared-schemas'
+import { Badge } from '@repo/ui'
+import { Activity, Database, Radio, Server } from 'lucide-react'
+import { useEffect, useState } from 'react'
 
 export function WorkfolioFooter() {
-  const [sseConnected, setSseConnected] = useState(false);
-  const [latestEvent, setLatestEvent] = useState<TelemetryEvent | null>(null);
+  const [sseConnected, setSseConnected] = useState(false)
+  const [latestEvent, setLatestEvent] = useState<TelemetryEvent | null>(null)
 
   useEffect(() => {
-    let source: EventSource | null = null;
+    let source: EventSource | null = null
     try {
       source = new EventSource('/api/telemetry/stream', {
         withCredentials: true,
-      });
+      })
 
       source.onopen = () => {
-        setSseConnected(true);
-      };
+        setSseConnected(true)
+      }
 
       source.onmessage = (event) => {
         try {
-          const parsedJson: unknown = JSON.parse(event.data as string);
-          const validated = TelemetryEventSchema.safeParse(parsedJson);
+          const parsedJson: unknown = JSON.parse(event.data as string)
+          const validated = TelemetryEventSchema.safeParse(parsedJson)
           if (validated.success) {
-            setLatestEvent(validated.data);
-            setSseConnected(true);
+            setLatestEvent(validated.data)
+            setSseConnected(true)
           }
         } catch {
           // Ignore malformed event
         }
-      };
+      }
 
       source.onerror = () => {
-        setSseConnected(false);
-      };
+        setSseConnected(false)
+      }
     } catch {
-      setSseConnected(false);
+      setSseConnected(false)
     }
 
     return () => {
-      source?.close();
-    };
-  }, []);
+      source?.close()
+    }
+  }, [])
 
   return (
     <footer className="mt-20 border-t border-border/70 bg-muted/30">
@@ -100,5 +100,5 @@ export function WorkfolioFooter() {
         </div>
       </div>
     </footer>
-  );
+  )
 }

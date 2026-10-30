@@ -1,5 +1,5 @@
-import { Module } from '@nestjs/common';
-import { TelemetryMicroserviceController } from './telemetry.controller.js';
+import { Module } from '@nestjs/common'
+import { TelemetryMicroserviceController } from './telemetry.controller.js'
 
 @Module({
   controllers: [TelemetryMicroserviceController],

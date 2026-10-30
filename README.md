@@ -10,10 +10,12 @@ Production-grade Full-Stack монорепозиторий персональн�
 **Вам НЕ нужно заходить во вложенные папки (`apps/*`, `packages/*`) и устанавливать зависимости вручную** — одна команда в корне подготовит сразу все 6 пакетов монорепозитория.
 
 ### Предварительные требования
+
 - **Node.js:** `>= 22.0.0`
 - **pnpm:** `>= 10.x` (можно активировать через встроенный в Node.js `corepack enable`)
 
 ### Вариант 1: Мгновенный локальный запуск (без настройки БД и Docker)
+
 Бэкенд оснащен отказоустойчивым слоем `PrismaService`: если локальный PostgreSQL не запущен, API автоматически переключается на in-memory стор с сохранением всех контрактов `Prisma`, `JWT HttpOnly Cookies` и `SSE`-стриминга.
 
 ```bash
@@ -39,6 +41,7 @@ pnpm run dev
 ---
 
 ### Вариант 2: Полный запуск в Docker (PostgreSQL 16 + Microservice + API + Web)
+
 Если вы хотите поднять весь стек включая контейнер `postgres:16-alpine` и протестировать multi-stage сборку (`turbo prune --docker`):
 
 ```bash
@@ -52,23 +55,23 @@ docker compose up --build
 1. На главной странице [http://localhost:3000](http://localhost:3000) нажмите в верхней шапке на кнопку **`🔒 Base of Knowledge (Protected • 1-Click)`**.
 2. Откроется модальное окно **1-Click Guest Pass** (`React Hook Form` + `Zod` из `@repo/shared-schemas`):
    - Нажмите на любой из быстрых пресетов (**`⚡ Alex (Team Lead)`**, **`🎯 Maria (Tech Recruiter)`** или **`🚀 David (CTO)`**) для входа в 1 клик с ролью `USER`.
-   - Либо откройте спойлер *«Я владелец портфолио (Admin Passcode)»* и введите демо-ключ: `workfolio-admin-2026`, чтобы получить роль `ADMIN`.
+   - Либо откройте спойлер _«Я владелец портфолио (Admin Passcode)»_ и введите демо-ключ: `workfolio-admin-2026`, чтобы получить роль `ADMIN`.
 3. Бэкенд `NestJS` подпишет JWT, установит защищенную куку `Set-Cookie: kb_access_token=...; HttpOnly; SameSite=Lax`, отправит событие в TCP-микросервис телеметрии (`:4001`), обновит статус в футере по `SSE` и откроет доступ к разделу `/knowledge-base` (защищенному на уровне `src/proxy.ts` в Next.js 16 и `JwtRolesGuard` в NestJS 12).
 
 ---
 
 ## 🛠️ Основные команды монорепозитория (из корневой папки)
 
-| Команда | Описание |
-| :--- | :--- |
-| `pnpm install` | Устанавливает зависимости всех `apps/*` и `packages/*` + запускает `setup` |
-| `pnpm run setup` | Принудительно синхронизирует `.env`, собирает `@repo/shared-schemas` и генерирует `Prisma Client` |
-| `pnpm run dev` | Параллельный запуск `apps/web` (`:3000`), `apps/api` (`:4000`) и `apps/telemetry-ms` (`:4001`) |
-| `pnpm run build` | Продакшен-сборка всех пакетов и приложений через `Turborepo` |
-| `pnpm run typecheck` | Строгая проверка типов TypeScript (`tsc --noEmit`) во всех 5 пакетах |
-| `pnpm run lint` | Молниеносная проверка кода и форматирования через `Biome.js` (Rust) |
-| `pnpm run lint:fix` | Авто-исправление линтинга и форматирования через `Biome.js` |
-| `pnpm --filter @repo/ui storybook` | Запуск интерактивной витрины UI-компонентов `Storybook` на порту `6006` |
+| Команда                            | Описание                                                                                          |
+| :--------------------------------- | :------------------------------------------------------------------------------------------------ |
+| `pnpm install`                     | Устанавливает зависимости всех `apps/*` и `packages/*` + запускает `setup`                        |
+| `pnpm run setup`                   | Принудительно синхронизирует `.env`, собирает `@repo/shared-schemas` и генерирует `Prisma Client` |
+| `pnpm run dev`                     | Параллельный запуск `apps/web` (`:3000`), `apps/api` (`:4000`) и `apps/telemetry-ms` (`:4001`)    |
+| `pnpm run build`                   | Продакшен-сборка всех пакетов и приложений через `Turborepo`                                      |
+| `pnpm run typecheck`               | Строгая проверка типов TypeScript (`tsc --noEmit`) во всех 5 пакетах                              |
+| `pnpm run lint`                    | Молниеносная проверка кода и форматирования через `Biome.js` (Rust)                               |
+| `pnpm run lint:fix`                | Авто-исправление линтинга и форматирования через `Biome.js`                                       |
+| `pnpm --filter @repo/ui storybook` | Запуск интерактивной витрины UI-компонентов `Storybook` на порту `6006`                           |
 
 ---
 

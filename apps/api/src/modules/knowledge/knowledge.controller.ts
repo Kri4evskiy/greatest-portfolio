@@ -9,25 +9,25 @@ import {
   Post,
   Req,
   UseGuards,
-} from '@nestjs/common';
+} from '@nestjs/common'
 import {
   type ArticleMeta,
   type KnowledgeCategory,
   KnowledgeCategoryEnum,
   type SessionProfile,
-} from '@repo/shared-schemas';
-import type { Request } from 'express';
-import { z } from 'zod';
-import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe.js';
-import { JwtRolesGuard } from '../auth/jwt-roles.guard.js';
-import { Roles } from '../auth/roles.decorator.js';
-import { KnowledgeService } from './knowledge.service.js';
+} from '@repo/shared-schemas'
+import type { Request } from 'express'
+import { z } from 'zod'
+import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe.js'
+import { JwtRolesGuard } from '../auth/jwt-roles.guard.js'
+import { Roles } from '../auth/roles.decorator.js'
+import { KnowledgeService } from './knowledge.service.js'
 
 const CategoryBodySchema = z.object({
   category: KnowledgeCategoryEnum.optional().default('typescript'),
-});
+})
 
-type CategoryBody = z.infer<typeof CategoryBodySchema>;
+type CategoryBody = z.infer<typeof CategoryBodySchema>
 
 @Controller('knowledge')
 @UseGuards(JwtRolesGuard)
@@ -40,7 +40,7 @@ export class KnowledgeController {
   @Get('metrics')
   @Roles('USER', 'ADMIN')
   async getMetrics(): Promise<ArticleMeta[]> {
-    return this.knowledgeService.getAllMetrics();
+    return this.knowledgeService.getAllMetrics()
   }
 
   @Post(':slug/view')
@@ -51,8 +51,8 @@ export class KnowledgeController {
     @Body(new ZodValidationPipe(CategoryBodySchema)) body: CategoryBody,
     @Req() req: Request & { sessionProfile?: SessionProfile },
   ): Promise<ArticleMeta> {
-    const category: KnowledgeCategory = body.category;
-    return this.knowledgeService.recordView(slug, category, req.sessionProfile);
+    const category: KnowledgeCategory = body.category
+    return this.knowledgeService.recordView(slug, category, req.sessionProfile)
   }
 
   @Post(':slug/helpful')
@@ -63,7 +63,7 @@ export class KnowledgeController {
     @Body(new ZodValidationPipe(CategoryBodySchema)) body: CategoryBody,
     @Req() req: Request & { sessionProfile?: SessionProfile },
   ): Promise<ArticleMeta> {
-    const category: KnowledgeCategory = body.category;
-    return this.knowledgeService.recordHelpful(slug, category, req.sessionProfile);
+    const category: KnowledgeCategory = body.category
+    return this.knowledgeService.recordHelpful(slug, category, req.sessionProfile)
   }
 }

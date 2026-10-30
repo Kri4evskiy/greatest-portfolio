@@ -1,32 +1,32 @@
-'use client';
+'use client'
 
-import { useLogoutMutation, useVisitorProfile } from '@/hooks/use-visitor-profile';
-import { trackEvent } from '@/lib/analytics';
-import { useUIStore } from '@/store/use-ui-store';
-import { Badge, Button } from '@repo/ui';
-import { BookOpen, FileText, Lock, LockOpen, LogOut, ShieldAlert } from 'lucide-react';
-import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { Badge, Button } from '@repo/ui'
+import { BookOpen, FileText, Lock, LockOpen, LogOut, ShieldAlert } from 'lucide-react'
+import Link from 'next/link'
+import { usePathname, useRouter } from 'next/navigation'
+import { useLogoutMutation, useVisitorProfile } from '@/hooks/use-visitor-profile'
+import { trackEvent } from '@/lib/analytics'
+import { useUIStore } from '@/store/use-ui-store'
 
 export function WorkfolioHeader() {
-  const pathname = usePathname();
-  const router = useRouter();
-  const { data: profile } = useVisitorProfile();
-  const logoutMutation = useLogoutMutation();
-  const openGuestPassModal = useUIStore((s) => s.openGuestPassModal);
+  const pathname = usePathname()
+  const router = useRouter()
+  const { data: profile } = useVisitorProfile()
+  const logoutMutation = useLogoutMutation()
+  const openGuestPassModal = useUIStore((s) => s.openGuestPassModal)
 
-  const currentRole = profile?.role ?? 'GUEST';
-  const isUnlocked = currentRole === 'USER' || currentRole === 'ADMIN';
-  const isInsideKnowledgeBase = pathname.startsWith('/knowledge-base');
+  const currentRole = profile?.role ?? 'GUEST'
+  const isUnlocked = currentRole === 'USER' || currentRole === 'ADMIN'
+  const isInsideKnowledgeBase = pathname.startsWith('/knowledge-base')
 
   const handleKnowledgeBaseClick = () => {
     if (isUnlocked) {
-      router.push('/knowledge-base');
-      return;
+      router.push('/knowledge-base')
+      return
     }
-    trackEvent('guest_pass_modal_opened', { source: 'sticky_header_button' });
-    openGuestPassModal('/knowledge-base');
-  };
+    trackEvent('guest_pass_modal_opened', { source: 'sticky_header_button' })
+    openGuestPassModal('/knowledge-base')
+  }
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-border/70 bg-background/90 backdrop-blur-md">
@@ -101,9 +101,9 @@ export function WorkfolioHeader() {
                 onClick={() => {
                   void logoutMutation.mutateAsync().then(() => {
                     if (isInsideKnowledgeBase) {
-                      router.push('/');
+                      router.push('/')
                     }
-                  });
+                  })
                 }}
                 className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
               >
@@ -154,5 +154,5 @@ export function WorkfolioHeader() {
         </div>
       ) : null}
     </header>
-  );
+  )
 }

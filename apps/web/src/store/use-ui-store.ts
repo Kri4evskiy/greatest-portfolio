@@ -1,28 +1,28 @@
-import type { TechCategory, TechRadarItem } from '@repo/shared-schemas';
-import { create } from 'zustand';
+import type { TechCategory, TechRadarItem } from '@repo/shared-schemas'
+import { create } from 'zustand'
 
-export type ReactRenderMode = 'react18' | 'react19';
+export type ReactRenderMode = 'react18' | 'react19'
 
 interface UIState {
-  isGuestPassModalOpen: boolean;
-  pendingRedirectPath: string | null;
-  selectedAdrItem: TechRadarItem | null;
-  techRadarCategoryFilter: TechCategory | 'ALL';
-  techRadarSearch: string;
-  isKbSidebarOpen: boolean;
-  reactGraphMode: ReactRenderMode;
-  archFlowActiveNode: string | null;
+  isGuestPassModalOpen: boolean
+  pendingRedirectPath: string | null
+  selectedAdrItem: TechRadarItem | null
+  techRadarCategoryFilter: TechCategory | 'ALL'
+  techRadarSearch: string
+  isKbSidebarOpen: boolean
+  reactGraphMode: ReactRenderMode
+  archFlowActiveNode: string | null
 
-  openGuestPassModal: (redirectPath?: string | null) => void;
-  closeGuestPassModal: () => void;
-  openAdrInspector: (item: TechRadarItem) => void;
-  closeAdrInspector: () => void;
-  setTechRadarCategoryFilter: (category: TechCategory | 'ALL') => void;
-  setTechRadarSearch: (search: string) => void;
-  toggleKbSidebar: () => void;
-  setKbSidebarOpen: (open: boolean) => void;
-  setReactGraphMode: (mode: ReactRenderMode) => void;
-  setArchFlowActiveNode: (nodeId: string | null) => void;
+  openGuestPassModal: (redirectPath?: string | null) => void
+  closeGuestPassModal: () => void
+  openAdrInspector: (item: TechRadarItem) => void
+  closeAdrInspector: () => void
+  setTechRadarCategoryFilter: (category: TechCategory | 'ALL') => void
+  setTechRadarSearch: (search: string) => void
+  toggleKbSidebar: () => void
+  setKbSidebarOpen: (open: boolean) => void
+  setReactGraphMode: (mode: ReactRenderMode) => void
+  setArchFlowActiveNode: (nodeId: string | null) => void
 }
 
 export const useUIStore = create<UIState>((set) => ({
@@ -76,4 +76,4 @@ export const useUIStore = create<UIState>((set) => ({
     set({
       archFlowActiveNode: nodeId,
     }),
-}));
+}))

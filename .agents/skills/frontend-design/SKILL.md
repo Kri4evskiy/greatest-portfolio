@@ -1,4 +1,5 @@
 ---
+
 name: frontend-design
 description: Create distinctive, production-grade UI with a clear visual direction and without generic AI aesthetics.
 ---

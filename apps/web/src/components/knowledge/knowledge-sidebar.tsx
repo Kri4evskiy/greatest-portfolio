@@ -1,23 +1,19 @@
-'use client';
+'use client'
 
-import type { MdxArticleFrontmatter } from '@/lib/mdx-content';
-import { useUIStore } from '@/store/use-ui-store';
-import { KNOWLEDGE_CATEGORY_LABELS, type KnowledgeCategory } from '@repo/shared-schemas';
-import { Badge, Button } from '@repo/ui';
-import { BookOpen, ChevronRight, FolderGit2, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { KNOWLEDGE_CATEGORY_LABELS, type KnowledgeCategory } from '@repo/shared-schemas'
+import { Badge, Button } from '@repo/ui'
+import { BookOpen, ChevronRight, FolderGit2, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
+import type { MdxArticleFrontmatter } from '@/lib/mdx-content'
+import { useUIStore } from '@/store/use-ui-store'
 
-export function KnowledgeSidebar({
-  articles,
-}: {
-  articles: readonly MdxArticleFrontmatter[];
-}) {
-  const pathname = usePathname();
-  const isSidebarOpen = useUIStore((s) => s.isKbSidebarOpen);
-  const toggleSidebar = useUIStore((s) => s.toggleKbSidebar);
+export function KnowledgeSidebar({ articles }: { articles: readonly MdxArticleFrontmatter[] }) {
+  const pathname = usePathname()
+  const isSidebarOpen = useUIStore((s) => s.isKbSidebarOpen)
+  const toggleSidebar = useUIStore((s) => s.toggleKbSidebar)
 
-  const categories = Object.keys(KNOWLEDGE_CATEGORY_LABELS) as KnowledgeCategory[];
+  const categories = Object.keys(KNOWLEDGE_CATEGORY_LABELS) as KnowledgeCategory[]
 
   return (
     <aside className="w-full shrink-0 md:w-72">
@@ -57,7 +53,7 @@ export function KnowledgeSidebar({
 
           <div className="space-y-4">
             {categories.map((category) => {
-              const categoryArticles = articles.filter((a) => a.category === category);
+              const categoryArticles = articles.filter((a) => a.category === category)
               return (
                 <div key={category} className="space-y-1.5">
                   <div className="flex items-center gap-1.5 px-2 font-mono text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
@@ -67,8 +63,8 @@ export function KnowledgeSidebar({
 
                   <div className="space-y-1">
                     {categoryArticles.map((article) => {
-                      const href = `/knowledge-base/${article.category}/${article.slug}`;
-                      const isActive = pathname === href;
+                      const href = `/knowledge-base/${article.category}/${article.slug}`
+                      const isActive = pathname === href
                       return (
                         <Link
                           key={article.slug}
@@ -82,15 +78,15 @@ export function KnowledgeSidebar({
                           <ChevronRight className="mt-0.5 h-3.5 w-3.5 shrink-0 opacity-60 group-hover:translate-x-0.5 transition-transform" />
                           <span className="line-clamp-2 leading-snug">{article.title}</span>
                         </Link>
-                      );
+                      )
                     })}
                   </div>
                 </div>
-              );
+              )
             })}
           </div>
         </div>
       ) : null}
     </aside>
-  );
+  )
 }

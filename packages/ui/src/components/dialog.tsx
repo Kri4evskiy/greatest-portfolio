@@ -1,12 +1,12 @@
-import * as DialogPrimitive from '@radix-ui/react-dialog';
-import { X } from 'lucide-react';
-import * as React from 'react';
-import { cn } from '../lib/utils';
+import * as DialogPrimitive from '@radix-ui/react-dialog'
+import { X } from 'lucide-react'
+import * as React from 'react'
+import { cn } from '../lib/utils'
 
-export const Dialog = DialogPrimitive.Root;
-export const DialogTrigger = DialogPrimitive.Trigger;
-export const DialogPortal = DialogPrimitive.Portal;
-export const DialogClose = DialogPrimitive.Close;
+export const Dialog = DialogPrimitive.Root
+export const DialogTrigger = DialogPrimitive.Trigger
+export const DialogPortal = DialogPrimitive.Portal
+export const DialogClose = DialogPrimitive.Close
 
 export const DialogOverlay = React.forwardRef<
   React.ComponentRef<typeof DialogPrimitive.Overlay>,
@@ -17,8 +17,8 @@ export const DialogOverlay = React.forwardRef<
     className={cn('fixed inset-0 z-50 bg-black/50 backdrop-blur-sm transition-opacity', className)}
     {...props}
   />
-));
-DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
+))
+DialogOverlay.displayName = DialogPrimitive.Overlay.displayName
 
 export const DialogContent = React.forwardRef<
   React.ComponentRef<typeof DialogPrimitive.Content>,
@@ -41,16 +41,16 @@ export const DialogContent = React.forwardRef<
       </DialogPrimitive.Close>
     </DialogPrimitive.Content>
   </DialogPortal>
-));
-DialogContent.displayName = DialogPrimitive.Content.displayName;
+))
+DialogContent.displayName = DialogPrimitive.Content.displayName
 
 export function DialogHeader({
   className,
   ...props
 }: React.HTMLAttributes<HTMLDivElement>): React.JSX.Element {
-  return <div className={cn('flex flex-col space-y-1.5 text-left', className)} {...props} />;
+  return <div className={cn('flex flex-col space-y-1.5 text-left', className)} {...props} />
 }
-DialogHeader.displayName = 'DialogHeader';
+DialogHeader.displayName = 'DialogHeader'
 
 export function DialogFooter({
   className,
@@ -61,9 +61,9 @@ export function DialogFooter({
       className={cn('flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2', className)}
       {...props}
     />
-  );
+  )
 }
-DialogFooter.displayName = 'DialogFooter';
+DialogFooter.displayName = 'DialogFooter'
 
 export const DialogTitle = React.forwardRef<
   React.ComponentRef<typeof DialogPrimitive.Title>,
@@ -74,8 +74,8 @@ export const DialogTitle = React.forwardRef<
     className={cn('text-lg font-semibold leading-none tracking-tight', className)}
     {...props}
   />
-));
-DialogTitle.displayName = DialogPrimitive.Title.displayName;
+))
+DialogTitle.displayName = DialogPrimitive.Title.displayName
 
 export const DialogDescription = React.forwardRef<
   React.ComponentRef<typeof DialogPrimitive.Description>,
@@ -86,5 +86,5 @@ export const DialogDescription = React.forwardRef<
     className={cn('text-sm text-muted-foreground leading-relaxed', className)}
     {...props}
   />
-));
-DialogDescription.displayName = DialogPrimitive.Description.displayName;
+))
+DialogDescription.displayName = DialogPrimitive.Description.displayName

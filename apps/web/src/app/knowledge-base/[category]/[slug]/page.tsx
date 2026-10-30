@@ -1,48 +1,48 @@
-import { ArticleMetricsBar } from '@/components/knowledge/article-metrics-bar';
-import { MdxArticleRenderer } from '@/components/knowledge/mdx-article-renderer';
-import { getAllKnowledgeArticles, getArticleByCategoryAndSlug } from '@/lib/mdx-content';
-import { KNOWLEDGE_CATEGORY_LABELS } from '@repo/shared-schemas';
-import { Badge } from '@repo/ui';
-import { ArrowLeft, Calendar, Clock } from 'lucide-react';
-import type { Metadata } from 'next';
-import Link from 'next/link';
-import { notFound } from 'next/navigation';
+import { KNOWLEDGE_CATEGORY_LABELS } from '@repo/shared-schemas'
+import { Badge } from '@repo/ui'
+import { ArrowLeft, Calendar, Clock } from 'lucide-react'
+import type { Metadata } from 'next'
+import Link from 'next/link'
+import { notFound } from 'next/navigation'
+import { ArticleMetricsBar } from '@/components/knowledge/article-metrics-bar'
+import { MdxArticleRenderer } from '@/components/knowledge/mdx-article-renderer'
+import { getAllKnowledgeArticles, getArticleByCategoryAndSlug } from '@/lib/mdx-content'
 
 interface ArticlePageProps {
   params: Promise<{
-    category: string;
-    slug: string;
-  }>;
+    category: string
+    slug: string
+  }>
 }
 
 export function generateStaticParams() {
-  const articles = getAllKnowledgeArticles();
+  const articles = getAllKnowledgeArticles()
   return articles.map((article) => ({
     category: article.category,
     slug: article.slug,
-  }));
+  }))
 }
 
 export async function generateMetadata({ params }: ArticlePageProps): Promise<Metadata> {
-  const { category, slug } = await params;
-  const article = getArticleByCategoryAndSlug(category, slug);
+  const { category, slug } = await params
+  const article = getArticleByCategoryAndSlug(category, slug)
   if (!article) {
     return {
       title: 'Статья не найдена | Knowledge Base',
-    };
+    }
   }
   return {
     title: `${article.title} | Engineering Knowledge Base`,
     description: article.summary,
-  };
+  }
 }
 
 export default async function KnowledgeArticlePage({ params }: ArticlePageProps) {
-  const { category, slug } = await params;
-  const article = getArticleByCategoryAndSlug(category, slug);
+  const { category, slug } = await params
+  const article = getArticleByCategoryAndSlug(category, slug)
 
   if (!article) {
-    notFound();
+    notFound()
   }
 
   return (
@@ -80,5 +80,5 @@ export default async function KnowledgeArticlePage({ params }: ArticlePageProps)
 
       <MdxArticleRenderer blocks={article.blocks} />
     </article>
-  );
+  )
 }

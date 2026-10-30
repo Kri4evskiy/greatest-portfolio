@@ -1,5 +1,5 @@
-import { z } from 'zod';
-import { RoleEnum, VisitorRoleTypeEnum } from './roles.schema.js';
+import { z } from 'zod'
+import { RoleEnum, VisitorRoleTypeEnum } from './roles.schema.js'
 
 export const GuestPassFormSchema = z.object({
   displayName: z
@@ -9,9 +9,9 @@ export const GuestPassFormSchema = z.object({
     .max(50, 'Максимум 50 символов'),
   visitorType: VisitorRoleTypeEnum,
   adminPasscode: z.string().trim().max(100).optional(),
-});
+})
 
-export type GuestPassFormInput = z.infer<typeof GuestPassFormSchema>;
+export type GuestPassFormInput = z.infer<typeof GuestPassFormSchema>
 
 export const SessionProfileSchema = z.object({
   id: z.string().uuid().nullable(),
@@ -19,6 +19,6 @@ export const SessionProfileSchema = z.object({
   visitorType: VisitorRoleTypeEnum.nullable(),
   role: RoleEnum,
   expiresAt: z.string().datetime().nullable(),
-});
+})
 
-export type SessionProfile = z.infer<typeof SessionProfileSchema>;
+export type SessionProfile = z.infer<typeof SessionProfileSchema>

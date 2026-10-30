@@ -3,6 +3,7 @@
 Этот документ описывает защиту клиентских и серверных маршрутов в `apps/web` и UX получения гостевого доступа.
 
 ## 1. Защита роутов на уровне Next.js Edge Middleware (`src/middleware.ts`)
+
 - Middleware перехватывает все запросы к `/knowledge-base` и `/knowledge-base/:path*`.
 - Проверяет наличие и структуру куки `kb_access_token` (`HttpOnly` JWT, выписанный бэкендом `apps/api`).
 - Если куки нет или токен истек:
@@ -10,9 +11,10 @@
   - На главной странице параметр `?unlock=knowledge-base` автоматически открывает приветственную микро-модалку получения доступа.
 
 ## 2. UX Микро-формы «Guest Pass в 1 клик» для Рекрутера / Team Lead
+
 Мы не заставляем занятого тимлида придумывать пароли или подтверждать email. Микро-форма в хедере решает две задачи: защищает роут и демонстрирует инженерную связку в действии:
 - В модалке выводится прозрачный инженерный дисклеймер:
-  > *«Введи любое имя и выбери свою роль в 1 клик — это живое демо работы `React Hook Form` + `Zod` (`packages/shared-schemas`) + `NestJS JWT HttpOnly Cookies` + `Next.js Edge Middleware` + `RBAC` + `SSE Telemetry`.»*
+  > _«Введи любое имя и выбери свою роль в 1 клик — это живое демо работы `React Hook Form` + `Zod` (`packages/shared-schemas`) + `NestJS JWT HttpOnly Cookies` + `Next.js Edge Middleware` + `RBAC` + `SSE Telemetry`.»_
 - Поля формы:
   1. `Имя / Никнейм` (плюс кнопки быстрого заполнения в 1 клик: `Alex (Team Lead)`, `Maria (Tech Recruiter)`, `CTO Guest`).
   2. `Роль посетителя` (`TEAM_LEAD`, `RECRUITER`, `DEVELOPER`, `FOUNDER`).

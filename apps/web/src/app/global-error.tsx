@@ -1,23 +1,20 @@
-'use client';
+'use client'
 
-import { Button } from '@repo/ui';
-import { AlertTriangle, RotateCcw } from 'lucide-react';
-import { useEffect } from 'react';
+import { Button } from '@repo/ui'
+import { AlertTriangle, RotateCcw } from 'lucide-react'
+import { useEffect } from 'react'
 
 export default function GlobalError({
   error,
   reset,
 }: {
-  error: Error & { digest?: string };
-  reset: () => void;
+  error: Error & { digest?: string }
+  reset: () => void
 }) {
   useEffect(() => {
-    const sentryDsn = process.env.NEXT_PUBLIC_SENTRY_DSN;
-    console.error(
-      `[Sentry ErrorBoundary (${sentryDsn ? 'DSN active' : 'Graceful No-Op'})]:`,
-      error,
-    );
-  }, [error]);
+    const sentryDsn = process.env.NEXT_PUBLIC_SENTRY_DSN
+    console.error(`[Sentry ErrorBoundary (${sentryDsn ? 'DSN active' : 'Graceful No-Op'})]:`, error)
+  }, [error])
 
   return (
     <html lang="ru">
@@ -35,5 +32,5 @@ export default function GlobalError({
         </div>
       </body>
     </html>
-  );
+  )
 }

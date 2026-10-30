@@ -1,15 +1,12 @@
-'use client';
+'use client'
 
-import { useIssueGuestPassMutation } from '@/hooks/use-visitor-profile';
-import { trackEvent } from '@/lib/analytics';
-import { useUIStore } from '@/store/use-ui-store';
-import { zodResolver } from '@hookform/resolvers/zod';
+import { zodResolver } from '@hookform/resolvers/zod'
 import {
   type GuestPassFormInput,
   GuestPassFormSchema,
   VISITOR_ROLE_LABELS,
   type VisitorRoleType,
-} from '@repo/shared-schemas';
+} from '@repo/shared-schemas'
 import {
   Badge,
   Button,
@@ -21,16 +18,19 @@ import {
   DialogHeader,
   DialogTitle,
   Input,
-} from '@repo/ui';
-import { KeyRound, LockOpen, ShieldCheck, Sparkles, Terminal } from 'lucide-react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
-import { useForm, useWatch } from 'react-hook-form';
+} from '@repo/ui'
+import { KeyRound, LockOpen, ShieldCheck, Sparkles, Terminal } from 'lucide-react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { useEffect, useState } from 'react'
+import { useForm, useWatch } from 'react-hook-form'
+import { useIssueGuestPassMutation } from '@/hooks/use-visitor-profile'
+import { trackEvent } from '@/lib/analytics'
+import { useUIStore } from '@/store/use-ui-store'
 
 const ONE_CLICK_PRESETS: ReadonlyArray<{
-  label: string;
-  displayName: string;
-  visitorType: VisitorRoleType;
+  label: string
+  displayName: string
+  visitorType: VisitorRoleType
 }> = [
   {
     label: '⚡ Alex (Team Lead)',
@@ -47,7 +47,7 @@ const ONE_CLICK_PRESETS: ReadonlyArray<{
     displayName: 'David • CTO',
     visitorType: 'FOUNDER',
   },
-];
+]
 
 const VISITOR_ROLES: readonly VisitorRoleType[] = [
   'TEAM_LEAD',
@@ -55,18 +55,18 @@ const VISITOR_ROLES: readonly VisitorRoleType[] = [
   'DEVELOPER',
   'FOUNDER',
   'OTHER',
-];
+]
 
 export function GuestPassModal() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const isOpen = useUIStore((s) => s.isGuestPassModalOpen);
-  const pendingRedirectPath = useUIStore((s) => s.pendingRedirectPath);
-  const openModal = useUIStore((s) => s.openGuestPassModal);
-  const closeModal = useUIStore((s) => s.closeGuestPassModal);
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const isOpen = useUIStore((s) => s.isGuestPassModalOpen)
+  const pendingRedirectPath = useUIStore((s) => s.pendingRedirectPath)
+  const openModal = useUIStore((s) => s.openGuestPassModal)
+  const closeModal = useUIStore((s) => s.closeGuestPassModal)
 
-  const [showAdminInput, setShowAdminInput] = useState(false);
-  const issuePassMutation = useIssueGuestPassMutation();
+  const [showAdminInput, setShowAdminInput] = useState(false)
+  const issuePassMutation = useIssueGuestPassMutation()
 
   const {
     register,
@@ -81,45 +81,45 @@ export function GuestPassModal() {
       visitorType: 'TEAM_LEAD',
       adminPasscode: '',
     },
-  });
+  })
 
   const selectedVisitorType = useWatch({
     control,
     name: 'visitorType',
-  });
+  })
 
   useEffect(() => {
-    const unlockParam = searchParams.get('unlock');
-    const redirectParam = searchParams.get('redirect');
+    const unlockParam = searchParams.get('unlock')
+    const redirectParam = searchParams.get('redirect')
     if (unlockParam === 'knowledge-base') {
-      openModal(redirectParam ?? '/knowledge-base');
-      trackEvent('guest_pass_modal_opened', { source: 'middleware_redirect' });
+      openModal(redirectParam ?? '/knowledge-base')
+      trackEvent('guest_pass_modal_opened', { source: 'middleware_redirect' })
     }
-  }, [searchParams, openModal]);
+  }, [searchParams, openModal])
 
   const onSubmit = async (values: GuestPassFormInput) => {
-    const profile = await issuePassMutation.mutateAsync(values);
+    const profile = await issuePassMutation.mutateAsync(values)
     trackEvent('guest_pass_unlocked', {
       visitorType: profile.visitorType,
       role: profile.role,
-    });
-    closeModal();
-    router.push(pendingRedirectPath ?? '/knowledge-base');
-    router.refresh();
-  };
+    })
+    closeModal()
+    router.push(pendingRedirectPath ?? '/knowledge-base')
+    router.refresh()
+  }
 
   const applyPresetAndUnlock = async (preset: {
-    displayName: string;
-    visitorType: VisitorRoleType;
+    displayName: string
+    visitorType: VisitorRoleType
   }) => {
-    setValue('displayName', preset.displayName, { shouldValidate: true });
-    setValue('visitorType', preset.visitorType, { shouldValidate: true });
+    setValue('displayName', preset.displayName, { shouldValidate: true })
+    setValue('visitorType', preset.visitorType, { shouldValidate: true })
     await onSubmit({
       displayName: preset.displayName,
       visitorType: preset.visitorType,
       adminPasscode: '',
-    });
-  };
+    })
+  }
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => (open ? openModal() : closeModal())}>
@@ -197,7 +197,7 @@ export function GuestPassModal() {
             <span className="text-xs font-medium">Ваша роль в команде</span>
             <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
               {VISITOR_ROLES.map((roleKey) => {
-                const isSelected = selectedVisitorType === roleKey;
+                const isSelected = selectedVisitorType === roleKey
                 return (
                   <button
                     key={roleKey}
@@ -211,7 +211,7 @@ export function GuestPassModal() {
                   >
                     {VISITOR_ROLE_LABELS[roleKey]}
                   </button>
-                );
+                )
               })}
             </div>
           </div>
@@ -269,5 +269,5 @@ export function GuestPassModal() {
         </form>
       </DialogContent>
     </Dialog>
-  );
+  )
 }

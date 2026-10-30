@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from 'zod'
 
 export const TechCategoryEnum = z.enum([
   'Frontend',
@@ -6,11 +6,11 @@ export const TechCategoryEnum = z.enum([
   'Database & Storage',
   'DevOps & DX',
   'Architecture',
-]);
-export type TechCategory = z.infer<typeof TechCategoryEnum>;
+])
+export type TechCategory = z.infer<typeof TechCategoryEnum>
 
-export const TechLevelEnum = z.enum(['Core', 'Production', 'Experimental']);
-export type TechLevel = z.infer<typeof TechLevelEnum>;
+export const TechLevelEnum = z.enum(['Core', 'Production', 'Experimental'])
+export type TechLevel = z.infer<typeof TechLevelEnum>
 
 export const TechRadarItemSchema = z.object({
   id: z.string().min(1),
@@ -23,8 +23,8 @@ export const TechRadarItemSchema = z.object({
   adrWhy: z.string().min(1),
   adrWhere: z.string().min(1),
   adrHow: z.string().min(1),
-});
-export type TechRadarItem = z.infer<typeof TechRadarItemSchema>;
+})
+export type TechRadarItem = z.infer<typeof TechRadarItemSchema>
 
 export const TECH_RADAR_ITEMS: readonly TechRadarItem[] = [
   {
@@ -243,4 +243,4 @@ export const TECH_RADAR_ITEMS: readonly TechRadarItem[] = [
     adrHow:
       'Error Boundaries в Next.js + GlobalExceptionFilter в NestJS для Sentry и клиентский провайдер аналитики PostHog.',
   },
-] as const;
+] as const

@@ -1,9 +1,9 @@
-import { TechRadarTable } from '@/components/workfolio/tech-radar-table';
+import { TechRadarTable } from '@/components/workfolio/tech-radar-table'
 import {
   WorkfolioExperienceSection,
   WorkfolioHeroSection,
   WorkfolioProjectsSection,
-} from '@/components/workfolio/workfolio-sections';
+} from '@/components/workfolio/workfolio-sections'
 
 export default function WorkfolioHomePage() {
   return (
@@ -13,5 +13,5 @@ export default function WorkfolioHomePage() {
       <WorkfolioExperienceSection />
       <TechRadarTable />
     </div>
-  );
+  )
 }

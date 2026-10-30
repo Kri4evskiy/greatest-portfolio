@@ -1,18 +1,18 @@
-'use client';
+'use client'
 
-import { useUIStore } from '@/store/use-ui-store';
-import { Badge } from '@repo/ui';
-import * as d3 from 'd3';
-import { Network } from 'lucide-react';
-import { useEffect, useRef } from 'react';
+import { Badge } from '@repo/ui'
+import * as d3 from 'd3'
+import { Network } from 'lucide-react'
+import { useEffect, useRef } from 'react'
+import { useUIStore } from '@/store/use-ui-store'
 
 interface ArchNode {
-  id: string;
-  label: string;
-  sub: string;
-  x: number;
-  y: number;
-  description: string;
+  id: string
+  label: string
+  sub: string
+  x: number
+  y: number
+  description: string
 }
 
 const DEFAULT_ARCH_NODE: ArchNode = {
@@ -23,7 +23,7 @@ const DEFAULT_ARCH_NODE: ArchNode = {
   y: 120,
   description:
     'Edge Middleware проверяет наличие HttpOnly куки kb_access_token за <5 мс до отдачи SSG-страницы Базы Знаний.',
-};
+}
 
 const ARCH_NODES: readonly ArchNode[] = [
   {
@@ -63,7 +63,7 @@ const ARCH_NODES: readonly ArchNode[] = [
     description:
       'Изолированный микросервис @nestjs/microservices (Transport.TCP) обогащает события и стримит их обратно в браузер через RxJS @Sse("/api/telemetry/stream").',
   },
-];
+]
 
 const ARCH_LINKS: ReadonlyArray<{ source: string; target: string; label: string }> = [
   { source: 'client-idb', target: 'nextjs-edge', label: 'Cookie / RSC' },
@@ -71,35 +71,35 @@ const ARCH_LINKS: ReadonlyArray<{ source: string; target: string; label: string 
   { source: 'nestjs-api', target: 'prisma-neon', label: 'Prisma Upsert' },
   { source: 'nestjs-api', target: 'telemetry-ms', label: 'TCP Event' },
   { source: 'telemetry-ms', target: 'client-idb', label: 'SSE Push' },
-];
+]
 
 export function ArchitectureFlowD3() {
-  const svgRef = useRef<SVGSVGElement | null>(null);
-  const activeNodeId = useUIStore((s) => s.archFlowActiveNode);
-  const setActiveNodeId = useUIStore((s) => s.setArchFlowActiveNode);
+  const svgRef = useRef<SVGSVGElement | null>(null)
+  const activeNodeId = useUIStore((s) => s.archFlowActiveNode)
+  const setActiveNodeId = useUIStore((s) => s.setArchFlowActiveNode)
 
-  const selectedNode = ARCH_NODES.find((n) => n.id === activeNodeId) ?? DEFAULT_ARCH_NODE;
+  const selectedNode = ARCH_NODES.find((n) => n.id === activeNodeId) ?? DEFAULT_ARCH_NODE
 
   useEffect(() => {
-    const svgEl = svgRef.current;
-    if (!svgEl) return;
+    const svgEl = svgRef.current
+    if (!svgEl) return
 
-    const svg = d3.select(svgEl);
-    svg.selectAll('*').remove();
+    const svg = d3.select(svgEl)
+    svg.selectAll('*').remove()
 
-    const nodeMap = new Map(ARCH_NODES.map((n) => [n.id, n]));
+    const nodeMap = new Map(ARCH_NODES.map((n) => [n.id, n]))
 
     // Draw edges
-    const linkGroup = svg.append('g');
+    const linkGroup = svg.append('g')
     for (const link of ARCH_LINKS) {
-      const s = nodeMap.get(link.source);
-      const t = nodeMap.get(link.target);
-      if (!s || !t) continue;
+      const s = nodeMap.get(link.source)
+      const t = nodeMap.get(link.target)
+      if (!s || !t) continue
 
-      const isLoopback = link.source === 'telemetry-ms' && link.target === 'client-idb';
+      const isLoopback = link.source === 'telemetry-ms' && link.target === 'client-idb'
       const pathData = isLoopback
         ? `M ${s.x} ${s.y + 22} C ${s.x - 120} 245, ${t.x + 120} 245, ${t.x} ${t.y + 22}`
-        : `M ${s.x + 48} ${s.y} L ${t.x - 48} ${t.y}`;
+        : `M ${s.x + 48} ${s.y} L ${t.x - 48} ${t.y}`
 
       linkGroup
         .append('path')
@@ -107,7 +107,7 @@ export function ArchitectureFlowD3() {
         .attr('fill', 'none')
         .attr('stroke', isLoopback ? '#10b981' : '#64748b')
         .attr('stroke-width', 2)
-        .attr('stroke-dasharray', isLoopback ? '4,4' : 'none');
+        .attr('stroke-dasharray', isLoopback ? '4,4' : 'none')
     }
 
     // Draw nodes
@@ -120,8 +120,8 @@ export function ArchitectureFlowD3() {
       .attr('transform', (d) => `translate(${d.x}, ${d.y})`)
       .style('cursor', 'pointer')
       .on('click', (_event, d) => {
-        setActiveNodeId(d.id);
-      });
+        setActiveNodeId(d.id)
+      })
 
     nodeGroup
       .append('rect')
@@ -132,7 +132,7 @@ export function ArchitectureFlowD3() {
       .attr('rx', 8)
       .attr('fill', (d) => (d.id === selectedNode.id ? '#0f172a' : '#f8fafc'))
       .attr('stroke', (d) => (d.id === selectedNode.id ? '#10b981' : '#cbd5e1'))
-      .attr('stroke-width', (d) => (d.id === selectedNode.id ? 2.5 : 1.5));
+      .attr('stroke-width', (d) => (d.id === selectedNode.id ? 2.5 : 1.5))
 
     nodeGroup
       .append('text')
@@ -142,7 +142,7 @@ export function ArchitectureFlowD3() {
       .attr('font-size', '10px')
       .attr('font-weight', '700')
       .attr('fill', (d) => (d.id === selectedNode.id ? '#ffffff' : '#0f172a'))
-      .text((d) => d.label);
+      .text((d) => d.label)
 
     nodeGroup
       .append('text')
@@ -151,8 +151,8 @@ export function ArchitectureFlowD3() {
       .attr('font-family', 'monospace')
       .attr('font-size', '8.5px')
       .attr('fill', (d) => (d.id === selectedNode.id ? '#a7f3d0' : '#64748b'))
-      .text((d) => d.sub);
-  }, [selectedNode.id, setActiveNodeId]);
+      .text((d) => d.sub)
+  }, [selectedNode.id, setActiveNodeId])
 
   return (
     <div className="my-6 rounded-xl border border-border bg-card p-4 shadow-sm">
@@ -185,5 +185,5 @@ export function ArchitectureFlowD3() {
         <p className="mt-1 text-muted-foreground leading-relaxed">{selectedNode.description}</p>
       </div>
     </div>
-  );
+  )
 }

@@ -1,4 +1,4 @@
-'use client';
+'use client'
 
 import {
   Badge,
@@ -7,17 +7,17 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from '@repo/ui';
-import { Image as ImageIcon, Maximize2 } from 'lucide-react';
-import { useState } from 'react';
+} from '@repo/ui'
+import { Image as ImageIcon, Maximize2 } from 'lucide-react'
+import { useState } from 'react'
 
 export interface ArticleDiagramCard {
-  id: string;
-  title: string;
-  caption: string;
-  formatLabel: string;
-  metricsBadge: string;
-  svgPreviewType: 'webp-pipeline' | 'cookie-guard' | 'redact-bundle';
+  id: string
+  title: string
+  caption: string
+  formatLabel: string
+  metricsBadge: string
+  svgPreviewType: 'webp-pipeline' | 'cookie-guard' | 'redact-bundle'
 }
 
 const DEFAULT_CARDS: readonly ArticleDiagramCard[] = [
@@ -39,16 +39,16 @@ const DEFAULT_CARDS: readonly ArticleDiagramCard[] = [
     metricsBadge: '0 XSS Surface',
     svgPreviewType: 'cookie-guard',
   },
-];
+]
 
 export function ArticleImageGrid({
   items = DEFAULT_CARDS,
   columns = 2,
 }: {
-  items?: readonly ArticleDiagramCard[];
-  columns?: 1 | 2;
+  items?: readonly ArticleDiagramCard[]
+  columns?: 1 | 2
 }) {
-  const [zoomedItem, setZoomedItem] = useState<ArticleDiagramCard | null>(null);
+  const [zoomedItem, setZoomedItem] = useState<ArticleDiagramCard | null>(null)
 
   return (
     <div className="my-6 space-y-2">
@@ -99,7 +99,7 @@ export function ArticleImageGrid({
       <Dialog
         open={zoomedItem !== null}
         onOpenChange={(open) => {
-          if (!open) setZoomedItem(null);
+          if (!open) setZoomedItem(null)
         }}
       >
         <DialogContent className="sm:max-w-lg">
@@ -126,5 +126,5 @@ export function ArticleImageGrid({
         </DialogContent>
       </Dialog>
     </div>
-  );
+  )
 }

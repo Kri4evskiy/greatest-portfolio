@@ -1,15 +1,15 @@
-import type { Meta, StoryObj } from '@storybook/react';
-import { Badge } from './badge';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './card';
+import type { Meta, StoryObj } from '@storybook/react'
+import { Badge } from './badge'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './card'
 
 const meta: Meta<typeof Card> = {
   title: 'Workfolio UI/Card',
   component: Card,
   tags: ['autodocs'],
-};
+}
 
-export default meta;
-type Story = StoryObj<typeof Card>;
+export default meta
+type Story = StoryObj<typeof Card>
 
 export const ProjectCaseStudy: Story = {
   render: () => (
@@ -31,4 +31,4 @@ export const ProjectCaseStudy: Story = {
       </CardContent>
     </Card>
   ),
-};
+}

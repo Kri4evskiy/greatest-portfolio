@@ -3,25 +3,25 @@ export type AnalyticsEventName =
   | 'guest_pass_unlocked'
   | 'adr_popover_inspected'
   | 'article_read'
-  | 'article_helpful_clicked';
+  | 'article_helpful_clicked'
 
 export function trackEvent(
   event: AnalyticsEventName,
   properties?: Record<string, string | number | boolean | null | undefined>,
 ): void {
   if (typeof window === 'undefined') {
-    return;
+    return
   }
 
-  const posthogKey = process.env.NEXT_PUBLIC_POSTHOG_KEY;
-  const posthogHost = process.env.NEXT_PUBLIC_POSTHOG_HOST ?? 'https://app.posthog.com';
+  const posthogKey = process.env.NEXT_PUBLIC_POSTHOG_KEY
+  const posthogHost = process.env.NEXT_PUBLIC_POSTHOG_HOST ?? 'https://app.posthog.com'
 
   if (!posthogKey) {
     // Graceful no-op in local development when NEXT_PUBLIC_POSTHOG_KEY is unset
     if (process.env.NODE_ENV === 'development') {
-      console.debug(`[PostHog Telemetry No-Op] ${event}`, properties ?? {});
+      console.debug(`[PostHog Telemetry No-Op] ${event}`, properties ?? {})
     }
-    return;
+    return
   }
 
   void fetch(`${posthogHost}/capture/`, {
@@ -39,5 +39,5 @@ export function trackEvent(
     keepalive: true,
   }).catch(() => {
     // Non-blocking analytics
-  });
+  })
 }

@@ -1,4 +1,5 @@
 ---
+
 name: brainstorming
 description: Use before creative or architectural work. Clarify intent, constraints, options, and success criteria before implementation.
 ---

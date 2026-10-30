@@ -1,10 +1,10 @@
-import type * as React from 'react';
-import { cn } from '../lib/utils';
+import type * as React from 'react'
+import { cn } from '../lib/utils'
 
 export interface CalloutProps extends React.HTMLAttributes<HTMLDivElement> {
-  icon?: React.ReactNode | undefined;
-  title?: string | undefined;
-  variant?: 'default' | 'info' | 'success' | 'warning' | undefined;
+  icon?: React.ReactNode | undefined
+  title?: string | undefined
+  variant?: 'default' | 'info' | 'success' | 'warning' | undefined
 }
 
 export function Callout({
@@ -29,5 +29,5 @@ export function Callout({
         <div className="text-muted-foreground leading-relaxed">{children}</div>
       </div>
     </div>
-  );
+  )
 }

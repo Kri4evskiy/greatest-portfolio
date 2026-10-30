@@ -1,7 +1,7 @@
-import { Inject, Injectable } from '@nestjs/common';
-import type { ArticleMeta, KnowledgeCategory, SessionProfile } from '@repo/shared-schemas';
-import { PrismaService } from '../../prisma/prisma.service.js';
-import { TelemetryService } from '../telemetry/telemetry.service.js';
+import { Inject, Injectable } from '@nestjs/common'
+import type { ArticleMeta, KnowledgeCategory, SessionProfile } from '@repo/shared-schemas'
+import { PrismaService } from '../../prisma/prisma.service.js'
+import { TelemetryService } from '../telemetry/telemetry.service.js'
 
 @Injectable()
 export class KnowledgeService {
@@ -11,7 +11,7 @@ export class KnowledgeService {
   ) {}
 
   async getAllMetrics(): Promise<ArticleMeta[]> {
-    return this.prisma.getAllArticleMetrics();
+    return this.prisma.getAllArticleMetrics()
   }
 
   async recordView(
@@ -19,7 +19,7 @@ export class KnowledgeService {
     category: KnowledgeCategory,
     actor?: SessionProfile | undefined,
   ): Promise<ArticleMeta> {
-    const updated = await this.prisma.incrementArticleView(slug, category);
+    const updated = await this.prisma.incrementArticleView(slug, category)
 
     await this.telemetry.publishEvent({
       type: 'ARTICLE_VIEWED',
@@ -27,9 +27,9 @@ export class KnowledgeService {
       actorName: actor?.displayName ?? undefined,
       actorRole: actor?.visitorType ?? undefined,
       slug,
-    });
+    })
 
-    return updated;
+    return updated
   }
 
   async recordHelpful(
@@ -37,7 +37,7 @@ export class KnowledgeService {
     category: KnowledgeCategory,
     actor?: SessionProfile | undefined,
   ): Promise<ArticleMeta> {
-    const updated = await this.prisma.incrementArticleHelpful(slug, category);
+    const updated = await this.prisma.incrementArticleHelpful(slug, category)
 
     await this.telemetry.publishEvent({
       type: 'ARTICLE_HELPFUL',
@@ -45,8 +45,8 @@ export class KnowledgeService {
       actorName: actor?.displayName ?? undefined,
       actorRole: actor?.visitorType ?? undefined,
       slug,
-    });
+    })
 
-    return updated;
+    return updated
   }
 }

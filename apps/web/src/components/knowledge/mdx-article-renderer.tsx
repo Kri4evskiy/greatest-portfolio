@@ -1,9 +1,9 @@
-'use client';
+'use client'
 
-import type { MdxBlock } from '@/lib/mdx-content';
-import { Skeleton } from '@repo/ui';
-import dynamic from 'next/dynamic';
-import { ArticleImageGrid } from './article-image-grid';
+import { Skeleton } from '@repo/ui'
+import dynamic from 'next/dynamic'
+import type { MdxBlock } from '@/lib/mdx-content'
+import { ArticleImageGrid } from './article-image-grid'
 
 const ReactRenderGraphD3 = dynamic(
   () => import('./d3-react-render-graph').then((m) => m.ReactRenderGraphD3),
@@ -11,7 +11,7 @@ const ReactRenderGraphD3 = dynamic(
     ssr: false,
     loading: () => <Skeleton className="my-6 h-72 w-full rounded-xl" />,
   },
-);
+)
 
 const ArchitectureFlowD3 = dynamic(
   () => import('./d3-architecture-flow').then((m) => m.ArchitectureFlowD3),
@@ -19,13 +19,13 @@ const ArchitectureFlowD3 = dynamic(
     ssr: false,
     loading: () => <Skeleton className="my-6 h-64 w-full rounded-xl" />,
   },
-);
+)
 
 export function MdxArticleRenderer({ blocks }: { blocks: readonly MdxBlock[] }) {
   return (
     <div className="space-y-4 text-sm leading-relaxed text-foreground sm:text-base">
       {blocks.map((block, index) => {
-        const key = `${block.type}-${index}`;
+        const key = `${block.type}-${index}`
 
         if (block.type === 'h2') {
           return (
@@ -35,7 +35,7 @@ export function MdxArticleRenderer({ blocks }: { blocks: readonly MdxBlock[] }) 
             >
               {block.text}
             </h2>
-          );
+          )
         }
 
         if (block.type === 'paragraph') {
@@ -43,7 +43,7 @@ export function MdxArticleRenderer({ blocks }: { blocks: readonly MdxBlock[] }) 
             <p key={key} className="text-muted-foreground leading-relaxed">
               {block.text}
             </p>
-          );
+          )
         }
 
         if (block.type === 'list') {
@@ -53,7 +53,7 @@ export function MdxArticleRenderer({ blocks }: { blocks: readonly MdxBlock[] }) 
                 <li key={item}>{item}</li>
               ))}
             </ul>
-          );
+          )
         }
 
         if (block.type === 'code') {
@@ -70,21 +70,21 @@ export function MdxArticleRenderer({ blocks }: { blocks: readonly MdxBlock[] }) 
                 <code>{block.code}</code>
               </pre>
             </div>
-          );
+          )
         }
 
         if (block.type === 'component') {
           if (block.name === 'ReactRenderGraphD3') {
-            return <ReactRenderGraphD3 key={key} />;
+            return <ReactRenderGraphD3 key={key} />
           }
           if (block.name === 'ArchitectureFlowD3') {
-            return <ArchitectureFlowD3 key={key} />;
+            return <ArchitectureFlowD3 key={key} />
           }
-          return <ArticleImageGrid key={key} />;
+          return <ArticleImageGrid key={key} />
         }
 
-        return null;
+        return null
       })}
     </div>
-  );
+  )
 }

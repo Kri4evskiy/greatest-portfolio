@@ -1,4 +1,5 @@
 ---
+
 name: code-simplifier
 description: Simplify code for clarity and maintainability while preserving exact behavior.
 ---

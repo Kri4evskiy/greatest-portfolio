@@ -1,19 +1,19 @@
-'use client';
+'use client'
 
-import { useUIStore } from '@/store/use-ui-store';
-import { Badge, Button } from '@repo/ui';
-import * as d3 from 'd3';
-import { Cpu, RefreshCw, Sparkles } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { Badge, Button } from '@repo/ui'
+import * as d3 from 'd3'
+import { Cpu, RefreshCw, Sparkles } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { useUIStore } from '@/store/use-ui-store'
 
 interface RenderTreeNode {
-  id: string;
-  label: string;
-  react18Status: 'rerendered' | 'manual-memo' | 'root';
-  react19Status: 'auto-memoized' | 'streamed-use' | 'root';
-  renderCostMs18: number;
-  renderCostMs19: number;
-  children?: RenderTreeNode[];
+  id: string
+  label: string
+  react18Status: 'rerendered' | 'manual-memo' | 'root'
+  react19Status: 'auto-memoized' | 'streamed-use' | 'root'
+  renderCostMs18: number
+  renderCostMs19: number
+  children?: RenderTreeNode[]
 }
 
 const COMPONENT_TREE: RenderTreeNode = {
@@ -69,28 +69,28 @@ const COMPONENT_TREE: RenderTreeNode = {
       ],
     },
   ],
-};
+}
 
 export function ReactRenderGraphD3() {
-  const svgRef = useRef<SVGSVGElement | null>(null);
-  const pulseCounterRef = useRef(0);
-  const mode = useUIStore((s) => s.reactGraphMode);
-  const setMode = useUIStore((s) => s.setReactGraphMode);
-  const [triggerCount, setTriggerCount] = useState(1);
+  const svgRef = useRef<SVGSVGElement | null>(null)
+  const pulseCounterRef = useRef(0)
+  const mode = useUIStore((s) => s.reactGraphMode)
+  const setMode = useUIStore((s) => s.setReactGraphMode)
+  const [triggerCount, setTriggerCount] = useState(1)
 
   useEffect(() => {
-    const svgEl = svgRef.current;
-    if (!svgEl) return;
+    const svgEl = svgRef.current
+    if (!svgEl) return
 
-    const width = 680;
-    const height = 300;
-    const svg = d3.select(svgEl);
-    svg.selectAll('*').remove();
+    const width = 680
+    const height = 300
+    const svg = d3.select(svgEl)
+    svg.selectAll('*').remove()
 
-    const g = svg.append('g').attr('transform', 'translate(90, 30)');
-    const hierarchyRoot = d3.hierarchy<RenderTreeNode>(COMPONENT_TREE);
-    const treeLayout = d3.tree<RenderTreeNode>().size([height - 60, width - 220]);
-    const treeData = treeLayout(hierarchyRoot);
+    const g = svg.append('g').attr('transform', 'translate(90, 30)')
+    const hierarchyRoot = d3.hierarchy<RenderTreeNode>(COMPONENT_TREE)
+    const treeLayout = d3.tree<RenderTreeNode>().size([height - 60, width - 220])
+    const treeData = treeLayout(hierarchyRoot)
 
     // Links
     g.selectAll('.link')
@@ -111,7 +111,7 @@ export function ReactRenderGraphD3() {
           >()
           .x((d) => d.y)
           .y((d) => d.x),
-      );
+      )
 
     // Nodes
     const nodes = g
@@ -119,19 +119,19 @@ export function ReactRenderGraphD3() {
       .data(treeData.descendants())
       .enter()
       .append('g')
-      .attr('transform', (d) => `translate(${d.y},${d.x})`);
+      .attr('transform', (d) => `translate(${d.y},${d.x})`)
 
     nodes
       .append('circle')
       .attr('r', 14)
       .attr('fill', (d) => {
         if (mode === 'react18') {
-          return d.data.react18Status === 'rerendered' ? '#ef4444' : '#f59e0b';
+          return d.data.react18Status === 'rerendered' ? '#ef4444' : '#f59e0b'
         }
-        return d.data.react19Status === 'streamed-use' ? '#3b82f6' : '#10b981';
+        return d.data.react19Status === 'streamed-use' ? '#3b82f6' : '#10b981'
       })
       .attr('stroke', '#ffffff')
-      .attr('stroke-width', 2);
+      .attr('stroke-width', 2)
 
     nodes
       .append('text')
@@ -141,7 +141,7 @@ export function ReactRenderGraphD3() {
       .attr('font-size', '11px')
       .attr('font-weight', '600')
       .attr('fill', 'currentColor')
-      .text((d) => d.data.label);
+      .text((d) => d.data.label)
 
     nodes
       .append('text')
@@ -154,8 +154,8 @@ export function ReactRenderGraphD3() {
         mode === 'react19'
           ? `${d.data.renderCostMs19}ms (${d.data.react19Status} #${triggerCount})`
           : `${d.data.renderCostMs18}ms (${d.data.react18Status} #${triggerCount})`,
-      );
-  }, [mode, triggerCount]);
+      )
+  }, [mode, triggerCount])
 
   return (
     <div className="my-6 rounded-xl border border-border bg-card p-4 shadow-sm">
@@ -197,8 +197,8 @@ export function ReactRenderGraphD3() {
             size="sm"
             variant="ghost"
             onClick={() => {
-              pulseCounterRef.current += 1;
-              setTriggerCount((c) => c + 1);
+              pulseCounterRef.current += 1
+              setTriggerCount((c) => c + 1)
             }}
             className="h-7 px-2"
             title="Пересчитать цикл рендера"
@@ -244,5 +244,5 @@ export function ReactRenderGraphD3() {
         </div>
       </div>
     </div>
-  );
+  )
 }

@@ -1,9 +1,9 @@
-import bundleAnalyzer from '@next/bundle-analyzer';
-import type { NextConfig } from 'next';
+import bundleAnalyzer from '@next/bundle-analyzer'
+import type { NextConfig } from 'next'
 
 const withBundleAnalyzer = bundleAnalyzer({
   enabled: process.env.ANALYZE === 'true',
-});
+})
 
 /**
  * Experimental TanStack Redact wrapper (ADR-08 & Step 6.3).
@@ -12,7 +12,7 @@ const withBundleAnalyzer = bundleAnalyzer({
  */
 function withRedact(config: NextConfig): NextConfig {
   if (process.env.ENABLE_REDACT !== 'true') {
-    return config;
+    return config
   }
 
   return {
@@ -21,10 +21,10 @@ function withRedact(config: NextConfig): NextConfig {
       ...config.env,
       NEXT_PUBLIC_REDACT_RUNTIME: 'enabled',
     },
-  };
+  }
 }
 
-const apiInternalUrl = process.env.API_INTERNAL_URL ?? 'http://localhost:4000';
+const apiInternalUrl = process.env.API_INTERNAL_URL ?? 'http://localhost:4000'
 
 const nextConfig: NextConfig = {
   ...(process.env.DOCKER_STANDALONE === 'true' ? { output: 'standalone' } : {}),
@@ -44,8 +44,8 @@ const nextConfig: NextConfig = {
         source: '/api/:path*',
         destination: `${apiInternalUrl}/api/:path*`,
       },
-    ];
+    ]
   },
-};
+}
 
-export default withBundleAnalyzer(withRedact(nextConfig));
+export default withBundleAnalyzer(withRedact(nextConfig))

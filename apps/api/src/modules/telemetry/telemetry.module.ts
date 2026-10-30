@@ -1,7 +1,7 @@
-import { Global, Module } from '@nestjs/common';
-import { ClientsModule, Transport } from '@nestjs/microservices';
-import { TelemetryController } from './telemetry.controller.js';
-import { TELEMETRY_MS_CLIENT, TelemetryService } from './telemetry.service.js';
+import { Global, Module } from '@nestjs/common'
+import { ClientsModule, Transport } from '@nestjs/microservices'
+import { TelemetryController } from './telemetry.controller.js'
+import { TELEMETRY_MS_CLIENT, TelemetryService } from './telemetry.service.js'
 
 @Global()
 @Module({

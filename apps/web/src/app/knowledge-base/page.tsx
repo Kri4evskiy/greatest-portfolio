@@ -1,19 +1,11 @@
-import { getAllKnowledgeArticles } from '@/lib/mdx-content';
-import { KNOWLEDGE_CATEGORY_LABELS } from '@repo/shared-schemas';
-import {
-  Badge,
-  Callout,
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@repo/ui';
-import { ArrowRight, Clock, Database, ShieldCheck, Sparkles } from 'lucide-react';
-import Link from 'next/link';
+import { KNOWLEDGE_CATEGORY_LABELS } from '@repo/shared-schemas'
+import { Badge, Callout, Card, CardContent, CardDescription, CardHeader, CardTitle } from '@repo/ui'
+import { ArrowRight, Clock, Database, ShieldCheck, Sparkles } from 'lucide-react'
+import Link from 'next/link'
+import { getAllKnowledgeArticles } from '@/lib/mdx-content'
 
 export default function KnowledgeBaseIndexPage() {
-  const articles = getAllKnowledgeArticles();
+  const articles = getAllKnowledgeArticles()
 
   return (
     <div className="space-y-8">
@@ -101,5 +93,5 @@ export default function KnowledgeBaseIndexPage() {
         </p>
       </div>
     </div>
-  );
+  )
 }

@@ -4,12 +4,12 @@ import {
   ForbiddenException,
   Inject,
   Injectable,
-} from '@nestjs/common';
-import { Reflector } from '@nestjs/core';
-import type { Role } from '@repo/shared-schemas';
-import type { Request } from 'express';
-import { AuthService, KB_ACCESS_COOKIE_NAME } from './auth.service.js';
-import { ROLES_KEY } from './roles.decorator.js';
+} from '@nestjs/common'
+import { Reflector } from '@nestjs/core'
+import type { Role } from '@repo/shared-schemas'
+import type { Request } from 'express'
+import { AuthService, KB_ACCESS_COOKIE_NAME } from './auth.service.js'
+import { ROLES_KEY } from './roles.decorator.js'
 
 @Injectable()
 export class JwtRolesGuard implements CanActivate {
@@ -22,25 +22,25 @@ export class JwtRolesGuard implements CanActivate {
     const requiredRoles = this.reflector.getAllAndOverride<Role[] | undefined>(ROLES_KEY, [
       context.getHandler(),
       context.getClass(),
-    ]);
+    ])
 
     if (!requiredRoles || requiredRoles.length === 0) {
-      return true;
+      return true
     }
 
-    const request = context.switchToHttp().getRequest<Request>();
-    const token = request.cookies?.[KB_ACCESS_COOKIE_NAME] as string | undefined;
-    const profile = await this.authService.resolveSessionFromToken(token);
+    const request = context.switchToHttp().getRequest<Request>()
+    const token = request.cookies?.[KB_ACCESS_COOKIE_NAME] as string | undefined
+    const profile = await this.authService.resolveSessionFromToken(token)
 
     if (!requiredRoles.includes(profile.role)) {
       throw new ForbiddenException({
         message: 'Protected Knowledge Base resource. Issue a 1-click Guest Pass first.',
         currentRole: profile.role,
         requiredRoles,
-      });
+      })
     }
 
-    (request as Request & { sessionProfile?: unknown }).sessionProfile = profile;
-    return true;
+    ;(request as Request & { sessionProfile?: unknown }).sessionProfile = profile
+    return true
   }
 }

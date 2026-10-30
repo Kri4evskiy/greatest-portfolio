@@ -1,22 +1,22 @@
-import { randomUUID } from 'node:crypto';
-import { Inject, Injectable, Logger, MessageEvent } from '@nestjs/common';
-import { ClientProxy } from '@nestjs/microservices';
+import { randomUUID } from 'node:crypto'
+import { Inject, Injectable, Logger, MessageEvent } from '@nestjs/common'
+import { ClientProxy } from '@nestjs/microservices'
 import {
   TelemetryEvent,
   TelemetryEventSchema,
   TelemetryEventType,
   VisitorRoleType,
-} from '@repo/shared-schemas';
-import { Observable, Subject, firstValueFrom, interval, map, merge, of, timeout } from 'rxjs';
-import { PrismaService } from '../../prisma/prisma.service.js';
+} from '@repo/shared-schemas'
+import { firstValueFrom, interval, map, merge, Observable, of, Subject, timeout } from 'rxjs'
+import { PrismaService } from '../../prisma/prisma.service.js'
 
-export const TELEMETRY_MS_CLIENT = 'TELEMETRY_MS_CLIENT';
+export const TELEMETRY_MS_CLIENT = 'TELEMETRY_MS_CLIENT'
 
 @Injectable()
 export class TelemetryService {
-  private readonly logger = new Logger(TelemetryService.name);
-  private readonly events$ = new Subject<TelemetryEvent>();
-  private readonly recentEvents: TelemetryEvent[] = [];
+  private readonly logger = new Logger(TelemetryService.name)
+  private readonly events$ = new Subject<TelemetryEvent>()
+  private readonly recentEvents: TelemetryEvent[] = []
 
   constructor(
     @Inject(TELEMETRY_MS_CLIENT) private readonly telemetryClient: ClientProxy,
@@ -24,11 +24,11 @@ export class TelemetryService {
   ) {}
 
   async publishEvent(input: {
-    type: TelemetryEventType;
-    message: string;
-    actorName?: string | undefined;
-    actorRole?: VisitorRoleType | undefined;
-    slug?: string | undefined;
+    type: TelemetryEventType
+    message: string
+    actorName?: string | undefined
+    actorRole?: VisitorRoleType | undefined
+    slug?: string | undefined
   }): Promise<TelemetryEvent> {
     const rawEvent: TelemetryEvent = TelemetryEventSchema.parse({
       id: randomUUID(),
@@ -38,49 +38,49 @@ export class TelemetryService {
       ...(input.actorRole ? { actorRole: input.actorRole } : {}),
       ...(input.slug ? { slug: input.slug } : {}),
       timestamp: new Date().toISOString(),
-    });
+    })
 
-    this.recentEvents.unshift(rawEvent);
+    this.recentEvents.unshift(rawEvent)
     if (this.recentEvents.length > 25) {
-      this.recentEvents.pop();
+      this.recentEvents.pop()
     }
 
-    this.events$.next(rawEvent);
-    await this.prisma.logSystemEvent(rawEvent.type, rawEvent);
+    this.events$.next(rawEvent)
+    await this.prisma.logSystemEvent(rawEvent.type, rawEvent)
 
     try {
-      this.telemetryClient.emit('telemetry.event', rawEvent);
+      this.telemetryClient.emit('telemetry.event', rawEvent)
     } catch (err) {
-      this.logger.debug(`Telemetry MS emit skipped (local mode): ${String(err)}`);
+      this.logger.debug(`Telemetry MS emit skipped (local mode): ${String(err)}`)
     }
 
-    return rawEvent;
+    return rawEvent
   }
 
   async getMicroserviceStats(): Promise<{
-    totalEventsProcessed: number;
-    recentEvents: TelemetryEvent[];
-    microserviceConnected: boolean;
+    totalEventsProcessed: number
+    recentEvents: TelemetryEvent[]
+    microserviceConnected: boolean
   }> {
     try {
       const response = await firstValueFrom(
         this.telemetryClient
           .send<{
-            totalEventsProcessed: number;
-            recentEvents: TelemetryEvent[];
+            totalEventsProcessed: number
+            recentEvents: TelemetryEvent[]
           }>('telemetry.stats', {})
           .pipe(timeout(800)),
-      );
+      )
       return {
         ...response,
         microserviceConnected: true,
-      };
+      }
     } catch {
       return {
         totalEventsProcessed: this.recentEvents.length,
         recentEvents: this.recentEvents.slice(0, 5),
         microserviceConnected: false,
-      };
+      }
     }
   }
 
@@ -90,7 +90,7 @@ export class TelemetryService {
       type: 'SYSTEM_HEARTBEAT',
       message: 'SSE Telemetry Stream connected (NestJS + Microservice TCP:4001)',
       timestamp: new Date().toISOString(),
-    };
+    }
 
     const heartbeat$ = interval(15000).pipe(
       map(
@@ -101,7 +101,7 @@ export class TelemetryService {
           timestamp: new Date().toISOString(),
         }),
       ),
-    );
+    )
 
     return merge(of(welcomeEvent), this.events$.asObservable(), heartbeat$).pipe(
       map((event) => ({
@@ -109,6 +109,6 @@ export class TelemetryService {
         type: 'message',
         data: event,
       })),
-    );
+    )
   }
 }
