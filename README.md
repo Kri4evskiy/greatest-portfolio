@@ -100,7 +100,7 @@ docker compose up --build
 ```text
 greatest-portfolio/
 ├── .agents/                    # Каскадная система контекста и ADR для ИИ-агентов
-│   ├── implementation-plan.md  # Пошаговый план реализации (Эпики 1–7)
+│   ├── tech-debt-backlog.md    # Бэклог, Tech Debt и Post-MVP план развития
 │   ├── architecture/           # ADR-каталог, общие контракты, Docker & Observability
 │   ├── frontend/               # Правила Next.js, Workfolio UI, Storybook, State, Auth
 │   └── backend/                # Правила NestJS, JWT Security, Prisma, Microservices & SSE
@@ -125,5 +125,5 @@ greatest-portfolio/
 ## 🧭 Навигация по архитектурной документации
 
 - [Корневой роутер контекста ИИ (`AGENTS.md`)](./AGENTS.md)
-- [Пошаговый план реализации и Implementation Notes (`.agents/implementation-plan.md`)](./.agents/implementation-plan.md)
+- [Бэклог, Tech Debt и Post-MVP план развития (`.agents/tech-debt-backlog.md`)](./.agents/tech-debt-backlog.md)
 - [Полный каталог 15 ADR: Почему, Где и Как (`.agents/architecture/adr-stack.md`)](./.agents/architecture/adr-stack.md)

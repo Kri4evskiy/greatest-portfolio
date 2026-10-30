@@ -13,7 +13,7 @@
 
 | Домен задачи                                                    | Какой файл читать ПЕРВЫМ                                                                | Какие папки кода трогать                                     |
 | :-------------------------------------------------------------- | :-------------------------------------------------------------------------------------- | :----------------------------------------------------------- |
-| **План реализации / Очередность шагов (Implementation Notes)**  | `.agents/implementation-plan.md`                                                        | Зависит от текущего шага                                     |
+| **Бэклог, Tech Debt и план развития (Post-MVP Roadmap)**        | `.agents/tech-debt-backlog.md`                                                          | Зависит от выбранной задачи из бэклога                       |
 | **Архитектура / Почему выбрана технология (15 ADR)**            | `.agents/architecture/adr-stack.md`                                                     | `turbo.json`, `biome.json`, `tsconfig.base.json`             |
 | **Общие Zod-схемы и контракты API**                             | `.agents/architecture/shared-contracts.md`                                              | `packages/shared-schemas/*`                                  |
 | **UI-компоненты, Tailwind, shadcn/ui, Storybook, Workfolio UI** | `.agents/frontend/ui-storybook.md`                                                      | `packages/ui/*`, `apps/web/src/components/*`                 |
