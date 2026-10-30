@@ -22,3 +22,11 @@
 
 - Каждый компонент в `packages/ui/src/components/*` обязан иметь рядом файл `*.stories.tsx`.
 - В Storybook настраиваются варианты состояний (`Default`, `Hover`, `Disabled`, `Loading`, `Dark/Light Mode`), чтобы любой рекрутер или тимлид мог открыть витрину UI-кита (`pnpm --filter @repo/ui storybook`) и убедиться в культуре компонентной разработки.
+
+## 4. Система тем (Light / Dark / System Mode — Zero-FOUC)
+
+- **Провайдер и хранение выбора (`next-themes`):**
+  - В `apps/web/src/providers/theme-provider.tsx` настроен `NextThemesProvider` с `attribute="class"`, `defaultTheme="system"`, `enableSystem` и `storageKey="workfolio-theme"`.
+  - При первом визите применяется системная тема ОС (`prefers-color-scheme`), а при ручном переключении через кнопку `ThemeToggle` (`Sun` / `Moon` в `WorkfolioHeader`) выбор сохраняется в `localStorage['workfolio-theme']` и применяется синхронным микро-скриптом в `<head>` до первого рендера без белой вспышки (`Zero-FOUC`).
+- **Семантические HSL-токены (`packages/ui/src/styles/globals.css`):**
+  - Никогда не используй захардкоженные светлые/темные HEX-цвета (`#ffffff`, `#f8fafc`, `#0f172a`) для карточек, текста или фонов (включая `D3.js` SVG-графы) — всегда используй семантические переменные `hsl(var(--background))`, `hsl(var(--card))`, `hsl(var(--foreground))`, `hsl(var(--muted-foreground))`, `hsl(var(--border))`.

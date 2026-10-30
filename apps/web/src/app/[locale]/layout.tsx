@@ -9,6 +9,7 @@ import { WorkfolioFooter } from '@/components/layout/workfolio-footer'
 import { WorkfolioHeader } from '@/components/layout/workfolio-header'
 import { GuestPassModal } from '@/features/auth/guest-pass-modal'
 import { QueryProvider } from '@/providers/query-provider'
+import { ThemeProvider } from '@/providers/theme-provider'
 
 export function generateStaticParams() {
   return SUPPORTED_LOCALES.map((locale) => ({ locale }))
@@ -49,16 +50,18 @@ export default async function LocaleRootLayout({
         className="min-h-screen bg-background font-sans text-foreground antialiased selection:bg-primary selection:text-primary-foreground"
       >
         <NextIntlClientProvider locale={parsed.data} messages={messages}>
-          <QueryProvider>
-            <div className="flex min-h-screen flex-col">
-              <WorkfolioHeader />
-              <Suspense fallback={null}>
-                <GuestPassModal />
-              </Suspense>
-              <main className="flex-1">{children}</main>
-              <WorkfolioFooter />
-            </div>
-          </QueryProvider>
+          <ThemeProvider>
+            <QueryProvider>
+              <div className="flex min-h-screen flex-col">
+                <WorkfolioHeader />
+                <Suspense fallback={null}>
+                  <GuestPassModal />
+                </Suspense>
+                <main className="flex-1">{children}</main>
+                <WorkfolioFooter />
+              </div>
+            </QueryProvider>
+          </ThemeProvider>
         </NextIntlClientProvider>
       </body>
     </html>

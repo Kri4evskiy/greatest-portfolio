@@ -15,7 +15,8 @@
     "protectedBadge": "Захищено • 1-Клік",
     "logoutTitle": "Вийти з сесії ({name})",
     "guestBanner": "Гостьовий режим. Випустіть 1-Click Guest Pass для повного доступу.",
-    "languageLabel": "Мова"
+    "languageLabel": "Мова",
+    "themeToggle": "Перемкнути світлу / темну тему"
   },
   "Hero": {
     "openBadge": "● Відкритий до пропозицій Senior Full-Stack / Tech Lead",

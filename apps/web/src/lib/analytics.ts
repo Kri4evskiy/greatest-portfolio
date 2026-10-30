@@ -5,6 +5,7 @@ export type AnalyticsEventName =
   | 'article_read'
   | 'article_helpful_clicked'
   | 'language_switched'
+  | 'theme_toggled'
 
 export function trackEvent(
   event: AnalyticsEventName,

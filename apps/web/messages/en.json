@@ -15,7 +15,8 @@
     "protectedBadge": "Protected • 1-Click",
     "logoutTitle": "Sign out of session ({name})",
     "guestBanner": "Guest mode. Issue a 1-Click Guest Pass for full access.",
-    "languageLabel": "Language"
+    "languageLabel": "Language",
+    "themeToggle": "Switch between Light and Dark theme"
   },
   "Hero": {
     "openBadge": "● Open to Senior Full-Stack / Tech Lead Proposals",

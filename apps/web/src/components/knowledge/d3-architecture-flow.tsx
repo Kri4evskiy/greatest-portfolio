@@ -130,8 +130,8 @@ export function ArchitectureFlowD3() {
       .attr('width', 110)
       .attr('height', 52)
       .attr('rx', 8)
-      .attr('fill', (d) => (d.id === selectedNode.id ? '#0f172a' : '#f8fafc'))
-      .attr('stroke', (d) => (d.id === selectedNode.id ? '#10b981' : '#cbd5e1'))
+      .attr('fill', (d) => (d.id === selectedNode.id ? 'hsl(var(--primary))' : 'hsl(var(--muted))'))
+      .attr('stroke', (d) => (d.id === selectedNode.id ? '#10b981' : 'hsl(var(--border))'))
       .attr('stroke-width', (d) => (d.id === selectedNode.id ? 2.5 : 1.5))
 
     nodeGroup
@@ -141,7 +141,7 @@ export function ArchitectureFlowD3() {
       .attr('font-family', 'monospace')
       .attr('font-size', '10px')
       .attr('font-weight', '700')
-      .attr('fill', (d) => (d.id === selectedNode.id ? '#ffffff' : '#0f172a'))
+      .attr('fill', (d) => (d.id === selectedNode.id ? 'hsl(var(--primary-foreground))' : 'hsl(var(--foreground))'))
       .text((d) => d.label)
 
     nodeGroup
@@ -150,7 +150,9 @@ export function ArchitectureFlowD3() {
       .attr('text-anchor', 'middle')
       .attr('font-family', 'monospace')
       .attr('font-size', '8.5px')
-      .attr('fill', (d) => (d.id === selectedNode.id ? '#a7f3d0' : '#64748b'))
+      .attr('fill', (d) =>
+        d.id === selectedNode.id ? 'hsl(var(--primary-foreground))' : 'hsl(var(--muted-foreground))',
+      )
       .text((d) => d.sub)
   }, [selectedNode.id, setActiveNodeId])
 

@@ -127,7 +127,7 @@ export function ReactRenderGraphD3() {
         }
         return d.data.react19Status === 'streamed-use' ? '#3b82f6' : '#10b981'
       })
-      .attr('stroke', '#ffffff')
+      .attr('stroke', 'hsl(var(--card))')
       .attr('stroke-width', 2)
 
     nodes

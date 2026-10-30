@@ -8,6 +8,7 @@ import { Link, usePathname, useRouter } from '@/i18n/navigation'
 import { trackEvent } from '@/lib/analytics'
 import { useUIStore } from '@/store/use-ui-store'
 import { LanguageSwitcher } from './language-switcher'
+import { ThemeToggle } from './theme-toggle'
 
 export function WorkfolioHeader() {
   const t = useTranslations('Header')
@@ -75,6 +76,7 @@ export function WorkfolioHeader() {
         </nav>
 
         <div className="flex items-center gap-2">
+          <ThemeToggle />
           <LanguageSwitcher />
 
           {isUnlocked ? (
@@ -150,7 +152,7 @@ export function WorkfolioHeader() {
       </div>
 
       {!isUnlocked && isInsideKnowledgeBase ? (
-        <div className="border-t border-amber-500/30 bg-amber-500/10 px-4 py-1 text-center text-xs text-amber-800">
+        <div className="border-t border-amber-500/30 bg-amber-500/10 px-4 py-1 text-center text-xs text-amber-800 dark:text-amber-300">
           <ShieldAlert className="mr-1 inline h-3.5 w-3.5" />
           {t('guestBanner')}
         </div>

@@ -16,20 +16,22 @@
     --accent: 40 15% 93%;
     --accent-foreground: 24 10% 10%;
     --radius: 0.5rem;
+    color-scheme: light;
   }
 
   .dark {
-    --background: 24 8% 9%;
-    --foreground: 40 15% 94%;
-    --muted: 24 7% 14%;
-    --muted-foreground: 30 6% 62%;
-    --card: 24 8% 11%;
-    --card-foreground: 40 15% 94%;
-    --border: 24 6% 20%;
-    --primary: 40 15% 94%;
-    --primary-foreground: 24 8% 9%;
-    --accent: 24 7% 16%;
-    --accent-foreground: 40 15% 94%;
+    --background: 24 10% 8%;
+    --foreground: 40 15% 95%;
+    --muted: 24 8% 14%;
+    --muted-foreground: 30 8% 68%;
+    --card: 24 9% 11%;
+    --card-foreground: 40 15% 95%;
+    --border: 24 7% 20%;
+    --primary: 40 15% 95%;
+    --primary-foreground: 24 10% 8%;
+    --accent: 24 8% 17%;
+    --accent-foreground: 40 15% 95%;
+    color-scheme: dark;
   }
 
   * {
