@@ -11,7 +11,7 @@
 
 - **Почему выбрали (Why):** В Full-Stack проекте на TypeScript главная боль — рассинхронизация типов между фронтендом (`Next.js`) и бэкендом (`NestJS`). `pnpm` экономит до 70% места на диске за счет жестких ссылок (hard links) и строгой изоляции `node_modules` (защита от фантомных зависимостей), а `Turborepo` дает умное кэширование сборки и параллельный запуск задач.
 - **Где применяется (Where):** В корне проекта. Объединяет приложения `apps/web`, `apps/api`, `apps/telemetry-ms` и общие пакеты `packages/shared-schemas`, `packages/ui`.
-- **Как реализовано (How):** Единый `pnpm-workspace.yaml` и `turbo.json` с пайплайнами `build`, `lint`, `typecheck`, `dev`. Схемы валидации пишутся один раз в `packages/shared-schemas` и импортируются и в `Next.js`, и в `NestJS`.
+- **Как реализовано (How):** Единый `pnpm-workspace.yaml` и `turbo.json` с пайплайнами `build`, `lint`, `typecheck`, `dev`. Схемы валидации пишутся один раз в `packages/shared-schemas` и импортируются и в `Next.js`, и в `NestJS`. Для обеспечения 100% Onboarding-отказоустойчивости на любых машинах (включая Windows с жесткими политиками Smart App Control) команда `pnpm run dev` обернута в адаптивный раннер `scripts/dev-runner.mjs` с автоматическим graceful fallback на `pnpm workspaces`.
 
 ---
 

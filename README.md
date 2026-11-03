@@ -30,6 +30,8 @@ pnpm install
 
 # 3. Запустить все сервисы параллельно (Next.js 16 + NestJS 12 API + Telemetry Microservice)
 pnpm run dev
+# (Адаптивный раннер scripts/dev-runner.mjs запускает Turborepo, а в случае блокировки
+# нативных бинарников, например Windows Smart App Control, бесшовно переключается на pnpm workspaces)
 ```
 
 После запуска откройте в браузере:
@@ -66,12 +68,25 @@ docker compose up --build
 | :--------------------------------- | :------------------------------------------------------------------------------------------------ |
 | `pnpm install`                     | Устанавливает зависимости всех `apps/*` и `packages/*` + запускает `setup`                        |
 | `pnpm run setup`                   | Принудительно синхронизирует `.env`, собирает `@repo/shared-schemas` и генерирует `Prisma Client` |
-| `pnpm run dev`                     | Параллельный запуск `apps/web` (`:3000`), `apps/api` (`:4000`) и `apps/telemetry-ms` (`:4001`)    |
+| `pnpm run dev`                     | **Адаптивный запуск:** Turborepo с автоматическим graceful fallback на `pnpm workspaces`          |
+| `pnpm run dev:pnpm`                | Принудительный прямой запуск всех сервисов через `pnpm --parallel` (без вызова `turbo.exe`)       |
+| `pnpm run dev:turbo`               | Принудительный запуск через `Turborepo` (`turbo run dev`)                                         |
 | `pnpm run build`                   | Продакшен-сборка всех пакетов и приложений через `Turborepo`                                      |
-| `pnpm run typecheck`               | Строгая проверка типов TypeScript (`tsc --noEmit`) во всех 5 пакетах                              |
+| `pnpm run build:pnpm`              | Сборка монорепозитория напрямую через `pnpm -r build` (топологический порядок)                    |
+| `pnpm run typecheck`               | Строгая проверка типов TypeScript (`tsc --noEmit`) во всех пакетах через `Turborepo`              |
+| `pnpm run typecheck:pnpm`          | Проверка типов TypeScript напрямую через `pnpm -r typecheck`                                      |
 | `pnpm run lint`                    | Молниеносная проверка кода и форматирования через `Biome.js` (Rust)                               |
 | `pnpm run lint:fix`                | Авто-исправление линтинга и форматирования через `Biome.js`                                       |
 | `pnpm --filter @repo/ui storybook` | Запуск интерактивной витрины UI-компонентов `Storybook` на порту `6006`                           |
+
+### 🛡️ Отказоустойчивость DX и Windows Smart App Control (SAC)
+
+В современных версиях Windows 11 включена политика ядра **Smart App Control (SAC)**, которая может блокировать неподписанные бинарные файлы экосистемы (например, `turbo.exe` из `@turbo/windows-64`, генерируя ошибку `spawn UNKNOWN / 0x800711C7`).
+
+Архитектура проекта спроектирована по стандарту **Zero-Friction Onboarding**:
+- Скрипт `scripts/dev-runner.mjs` выполняет префлайт-проверку доступности Turborepo.
+- Если система блокирует бинарник, раннер выводит понятное предупреждение и **прозрачно подхватывает запуск через нативный `pnpm workspaces`**, гарантируя, что любой тимлид или ревьюер сможет поднять проект в 1 команду на любой машине.
+- В CI/CD и Docker (Linux) всегда на 100% задействуются нативный `Turborepo`, `turbo prune` и удаленное кэширование Vercel.
 
 ---
 
