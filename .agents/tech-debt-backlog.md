@@ -112,12 +112,12 @@
 
 ### 1. Архитектурный анализ компонентов монорепозитория
 
-| Компонент | Стек | Специфика рантайма | Совместимость с Vercel Hobby | Где хостить бесплатно |
-| :--- | :--- | :--- | :--- | :--- |
-| **`apps/web`** | `Next.js 16 (App Router)` | SSG, SSR, RSC, Serverless Functions, Edge Proxy (`src/proxy.ts`) | **100% совместимо** (нативная среда Vercel, автоматический Turborepo Remote Caching) | **Vercel** (Hobby Plan, $0) |
-| **`apps/api`** | `NestJS 12` | Долгоживущий Node.js демон (`long-running process`), HTTP REST, Prisma ORM, SSE (`@Sse('stream')`) | **Несовместимо** (лимит Serverless-функции 10–15 сек, разрыв долгоживущих соединений) | **Render.com** / **Koyeb** / **Fly.io** (Docker Web Service, $0) |
-| **`apps/telemetry-ms`**| `NestJS Microservice` | **Постоянный TCP-сокет** на порту `4001` (транспорт `@nestjs/microservices`) | **Несовместимо** (Vercel не маршрутизирует произвольные TCP-порты) | Разворачивается в едином Docker Compose или как фоновый воркер рядом с API ($0) |
-| **База данных** | `PostgreSQL 16` | Транзакционная реляционная СУБД для `Prisma ORM` | Нет встроенной СУБД на Vercel Hobby | **Neon.tech** (Serverless PostgreSQL, бесплатный tier 0.5 GB) |
+| Компонент               | Стек                      | Специфика рантайма                                                                                 | Совместимость с Vercel Hobby                                                          | Где хостить бесплатно                                                           |
+| :---------------------- | :------------------------ | :------------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------ | :------------------------------------------------------------------------------ |
+| **`apps/web`**          | `Next.js 16 (App Router)` | SSG, SSR, RSC, Serverless Functions, Edge Proxy (`src/proxy.ts`)                                   | **100% совместимо** (нативная среда Vercel, автоматический Turborepo Remote Caching)  | **Vercel** (Hobby Plan, $0)                                                     |
+| **`apps/api`**          | `NestJS 12`               | Долгоживущий Node.js демон (`long-running process`), HTTP REST, Prisma ORM, SSE (`@Sse('stream')`) | **Несовместимо** (лимит Serverless-функции 10–15 сек, разрыв долгоживущих соединений) | **Render.com** / **Koyeb** / **Fly.io** (Docker Web Service, $0)                |
+| **`apps/telemetry-ms`** | `NestJS Microservice`     | **Постоянный TCP-сокет** на порту `4001` (транспорт `@nestjs/microservices`)                       | **Несовместимо** (Vercel не маршрутизирует произвольные TCP-порты)                    | Разворачивается в едином Docker Compose или как фоновый воркер рядом с API ($0) |
+| **База данных**         | `PostgreSQL 16`           | Транзакционная реляционная СУБД для `Prisma ORM`                                                   | Нет встроенной СУБД на Vercel Hobby                                                   | **Neon.tech** (Serverless PostgreSQL, бесплатный tier 0.5 GB)                   |
 
 ### 2. Схема взаимодействия в продакшене
 
@@ -165,6 +165,6 @@
      - `APP_ENV`: `production`.
 
 ### 4. Почему Vercel идеален для фронтенда и Turborepo
+
 - Vercel бесплатно предоставляет **Turborepo Remote Cache**: каждый билд в Vercel использует хэши из облака, сборка повторных изменений занимает секунды.
 - Бесплатный SSL, глобальный CDN (Edge Network) и поддержка Server Components (RSC) из коробки.
-
