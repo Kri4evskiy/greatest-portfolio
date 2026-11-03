@@ -7,10 +7,16 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: ${POSTGRES_DB:-workfolio_db}
+    # Security & Port Mapping:
+    # - Local: 127.0.0.1:5432 exposes DB exclusively to host machine (DBeaver/DataGrip), blocked from external LAN.
+    # - Production: Remove 'ports' completely. The database must live exclusively inside 'backend-network'
+    #   or be hosted on a managed cloud service (e.g. Neon.tech) with encrypted TLS connections.
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - backend-network
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U postgres -d workfolio_db" ]
       interval: 5s
@@ -27,8 +33,9 @@ services:
       NODE_ENV: production
       TELEMETRY_MS_HOST: 0.0.0.0
       TELEMETRY_MS_PORT: 4001
-    ports:
-      - "4001:4001"
+    # Fully isolated microservice: internal TCP port, no host port exposure needed
+    networks:
+      - backend-network
 
   api:
     build:
@@ -52,7 +59,16 @@ services:
       TELEMETRY_MS_PORT: 4001
       WEB_ORIGIN: http://localhost:3000
     ports:
-      - "4000:4000"
+      - "127.0.0.1:4000:4000"
+    healthcheck:
+      test: [ "CMD-SHELL", "wget -qO- http://127.0.0.1:4000/api/health || exit 1" ]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    networks:
+      - backend-network
+      - frontend-network
 
   web:
     build:
@@ -61,7 +77,8 @@ services:
     container_name: workfolio-web
     restart: unless-stopped
     depends_on:
-      - api
+      api:
+        condition: service_healthy
     environment:
       NODE_ENV: production
       PORT: 3000
@@ -69,6 +86,16 @@ services:
       ENABLE_REDACT: ${ENABLE_REDACT:-false}
     ports:
       - "3000:3000"
+    networks:
+      - frontend-network
+
+networks:
+  # Isolated private network for database and microservices (zero external access)
+  backend-network:
+    driver: bridge
+  # Demilitarized zone network connecting frontend to API gateway
+  frontend-network:
+    driver: bridge
 
 volumes:
   postgres_data:

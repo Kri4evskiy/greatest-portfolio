@@ -1,10 +1,10 @@
 # Stage 1: Prune monorepo subgraph for @repo/telemetry-ms
 FROM node:22-alpine AS pruner
 RUN apk add --no-cache libc6-compat
-RUN corepack enable && corepack prepare pnpm@10.6.5 --activate
+RUN npm install -g turbo@^2
 WORKDIR /app
 COPY . .
-RUN npx turbo prune @repo/telemetry-ms --docker
+RUN turbo prune @repo/telemetry-ms --docker
 
 # Stage 2: Install dependencies and build
 FROM node:22-alpine AS builder
@@ -14,7 +14,7 @@ WORKDIR /app
 
 COPY --from=pruner /app/out/json/ .
 COPY --from=pruner /app/out/pnpm-lock.yaml ./pnpm-lock.yaml
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --frozen-lockfile --ignore-scripts
 
 COPY --from=pruner /app/out/full/ .
 COPY tsconfig.base.json ./tsconfig.base.json
@@ -31,6 +31,7 @@ COPY --from=builder --chown=node:node /app/node_modules ./node_modules
 COPY --from=builder --chown=node:node /app/packages/shared-schemas ./packages/shared-schemas
 COPY --from=builder --chown=node:node /app/apps/telemetry-ms/dist ./apps/telemetry-ms/dist
 COPY --from=builder --chown=node:node /app/apps/telemetry-ms/package.json ./apps/telemetry-ms/package.json
+COPY --from=builder --chown=node:node /app/apps/telemetry-ms/node_modules ./apps/telemetry-ms/node_modules
 
 USER node
 EXPOSE 4001

@@ -1,6 +1,17 @@
 import { spawn, spawnSync } from 'node:child_process'
+import { copyFileSync, existsSync } from 'node:fs'
+import { resolve } from 'node:path'
 
 const isWindows = process.platform === 'win32'
+
+function ensureEnvFile() {
+  const envPath = resolve(process.cwd(), '.env')
+  const envExamplePath = resolve(process.cwd(), '.env.example')
+  if (!existsSync(envPath) && existsSync(envExamplePath)) {
+    copyFileSync(envExamplePath, envPath)
+    console.log('[dev-runner] 📄 Created .env from .env.example')
+  }
+}
 
 function canRunTurbo() {
   if (process.env.FORCE_PNPM === 'true' || process.env.FORCE_PNPM === '1') {
@@ -56,6 +67,7 @@ function runCommand(command, args) {
 }
 
 function main() {
+  ensureEnvFile()
   const turboAvailable = canRunTurbo()
 
   if (turboAvailable) {

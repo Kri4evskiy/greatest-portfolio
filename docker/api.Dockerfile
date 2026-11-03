@@ -1,10 +1,10 @@
 # Stage 1: Prune monorepo subgraph for @repo/api
 FROM node:22-alpine AS pruner
 RUN apk add --no-cache libc6-compat openssl
-RUN corepack enable && corepack prepare pnpm@10.6.5 --activate
+RUN npm install -g turbo@^2
 WORKDIR /app
 COPY . .
-RUN npx turbo prune @repo/api --docker
+RUN turbo prune @repo/api --docker
 
 # Stage 2: Install dependencies, generate Prisma Client, and build
 FROM node:22-alpine AS builder
@@ -14,7 +14,7 @@ WORKDIR /app
 
 COPY --from=pruner /app/out/json/ .
 COPY --from=pruner /app/out/pnpm-lock.yaml ./pnpm-lock.yaml
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --frozen-lockfile --ignore-scripts
 
 COPY --from=pruner /app/out/full/ .
 COPY tsconfig.base.json ./tsconfig.base.json
@@ -32,6 +32,7 @@ COPY --from=builder --chown=node:node /app/packages/shared-schemas ./packages/sh
 COPY --from=builder --chown=node:node /app/apps/api/dist ./apps/api/dist
 COPY --from=builder --chown=node:node /app/apps/api/prisma ./apps/api/prisma
 COPY --from=builder --chown=node:node /app/apps/api/package.json ./apps/api/package.json
+COPY --from=builder --chown=node:node /app/apps/api/node_modules ./apps/api/node_modules
 
 USER node
 EXPOSE 4000
