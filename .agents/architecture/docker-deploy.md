@@ -9,13 +9,15 @@
 2. **Stage 2 (`installer & builder`):** Ставит зависимости через `pnpm install --frozen-lockfile` (используя кэш слоев Docker) и запускает `pnpm turbo build --filter=@repo/<app-name>...`.
 3. **Stage 3 (`runner`):** Чистый `node:22-alpine` образ, работающий от непривилегированного пользователя (`USER node` / `nextjs`), содержащий только скомпилированный артефакт (`standalone` для Next.js, `dist` для NestJS).
 
-## 2. Единый `docker-compose.yml`
+## 2. Единый `docker-compose.yml` и сетевая изоляция (Zero-Trust Network Segmentation)
 
-Поднимает одной командой `docker compose up --build` весь стек для проверки тимлидом локально:
-- `postgres`: `postgres:16-alpine` с healthcheck и volume (чтобы стек работал даже полностью автономно без внешнего интернета/Neon).
-- `telemetry-ms`: Микросервис телеметрии (порт TCP `4001`).
-- `api`: Основной бэкенд NestJS (порт HTTP `4000`, накатывает миграции Prisma и подключается к `telemetry-ms`).
-- `web`: Фронтенд Next.js (порт HTTP `3000`).
+Стек поднимается одной командой `docker compose up --build -d` с разделением на две изолированные bridge-сети:
+- **`backend-network` (полностью закрытый контур):**
+  - `postgres`: `postgres:16-alpine` с healthcheck (`pg_isready`) и volume. Порт `127.0.0.1:5432:5432` привязан строго к loopback-интерфейсу хоста (для DBeaver/DataGrip), защищая базу от внешнего доступа из локальной сети.
+  - `telemetry-ms`: микросервис телеметрии (TCP `:4001`). Порт **не экспонируется наружу** на хост и доступен только для `api` внутри docker-сети.
+- **`frontend-network` (демилитаризованный контур):**
+  - `api`: основной бэкенд NestJS 12. Подключен к **обеим сетям**, выступает защищенным шлюзом. Оснащен встроенным healthcheck (`wget http://127.0.0.1:4000/api/health`).
+  - `web`: фронтенд Next.js 16 (порт `3000:3000`). Подключен только к `frontend-network`, не имеет прямого доступа к базе данных и TCP-микросервису. Запускается строго после успешного healthcheck API (`condition: service_healthy`).
 
 ## 3. Наблюдаемость (`Sentry` + `PostHog`)
 

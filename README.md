@@ -24,9 +24,10 @@ git clone <URL_РЕПОЗИТОРИЯ>
 cd greatest-portfolio
 
 # 2. Установить зависимости всех пакетов монорепозитория одной командой
-# (postinstall-скрипт автоматически создаст .env из .env.example,
-#  соберет пакет @repo/shared-schemas и сгенерирует типы Prisma Client)
 pnpm install
+
+# (Опционально) Принудительно запустить setup-скрипт (создаст .env, соберет @repo/shared-schemas и Prisma Client):
+# pnpm run setup
 
 # 3. Запустить все сервисы параллельно (Next.js 16 + NestJS 12 API + Telemetry Microservice)
 pnpm run dev
@@ -47,7 +48,7 @@ pnpm run dev
 Если вы хотите поднять весь стек включая контейнер `postgres:16-alpine` и протестировать multi-stage сборку (`turbo prune --docker`):
 
 ```bash
-docker compose up --build
+docker compose up --build -d
 ```
 
 ---
