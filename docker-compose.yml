@@ -58,6 +58,8 @@ services:
       TELEMETRY_MS_HOST: telemetry-ms
       TELEMETRY_MS_PORT: 4001
       WEB_ORIGIN: http://localhost:3000
+    # Production Note: In a production VPS setup behind Nginx/Caddy or Cloud Ingress (e.g. AWS ALB),
+    # ports: - "127.0.0.1:4000:4000" only serves reverse proxy traffic. On PaaS (Render/Fly.io) this is automatic.
     ports:
       - "127.0.0.1:4000:4000"
     healthcheck:
