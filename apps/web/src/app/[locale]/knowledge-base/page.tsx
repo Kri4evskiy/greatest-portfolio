@@ -1,7 +1,7 @@
 import { DEFAULT_LOCALE, KNOWLEDGE_CATEGORY_LABELS, SupportedLocaleEnum } from '@repo/shared-schemas'
 import { Badge, Callout, Card, CardContent, CardDescription, CardHeader, CardTitle } from '@repo/ui'
 import { ArrowRight, Clock, Database, ShieldCheck, Sparkles } from 'lucide-react'
-import { getTranslations, setRequestLocale } from 'next-intl/server'
+import { getTranslations } from 'next-intl/server'
 import { Link } from '@/i18n/navigation'
 import { getAllKnowledgeArticles } from '@/lib/mdx-content'
 
@@ -9,7 +9,6 @@ export default async function KnowledgeBaseIndexPage({ params }: { params: Promi
   const { locale } = await params
   const parsed = SupportedLocaleEnum.safeParse(locale)
   const resolvedLocale = parsed.success ? parsed.data : DEFAULT_LOCALE
-  setRequestLocale(resolvedLocale)
 
   const t = await getTranslations({ locale: resolvedLocale, namespace: 'KnowledgeBase' })
   const articles = getAllKnowledgeArticles(resolvedLocale)

@@ -1,5 +1,4 @@
 import { DEFAULT_LOCALE, SupportedLocaleEnum } from '@repo/shared-schemas'
-import { setRequestLocale } from 'next-intl/server'
 import type { ReactNode } from 'react'
 import { KnowledgeSidebar } from '@/components/knowledge/knowledge-sidebar'
 import { getAllKnowledgeArticles } from '@/lib/mdx-content'
@@ -14,7 +13,6 @@ export default async function KnowledgeBaseLayout({
   const { locale } = await params
   const parsed = SupportedLocaleEnum.safeParse(locale)
   const resolvedLocale = parsed.success ? parsed.data : DEFAULT_LOCALE
-  setRequestLocale(resolvedLocale)
 
   const articles = getAllKnowledgeArticles(resolvedLocale).map((a) => ({
     slug: a.slug,

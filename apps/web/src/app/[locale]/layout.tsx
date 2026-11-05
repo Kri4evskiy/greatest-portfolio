@@ -3,7 +3,7 @@ import { DEFAULT_LOCALE, SUPPORTED_LOCALES, SupportedLocaleEnum } from '@repo/sh
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { NextIntlClientProvider } from 'next-intl'
-import { getMessages, getTranslations, setRequestLocale } from 'next-intl/server'
+import { getMessages, getTranslations } from 'next-intl/server'
 import { type ReactNode, Suspense } from 'react'
 import { WorkfolioFooter } from '@/components/layout/workfolio-footer'
 import { WorkfolioHeader } from '@/components/layout/workfolio-header'
@@ -40,7 +40,6 @@ export default async function LocaleRootLayout({
     notFound()
   }
 
-  setRequestLocale(parsed.data)
   const messages = await getMessages()
 
   return (

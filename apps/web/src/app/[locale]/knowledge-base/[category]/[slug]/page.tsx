@@ -3,7 +3,7 @@ import { Badge, Callout } from '@repo/ui'
 import { ArrowLeft, Calendar, Clock, Globe } from 'lucide-react'
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
-import { getTranslations, setRequestLocale } from 'next-intl/server'
+import { getTranslations } from 'next-intl/server'
 import { ArticleMetricsBar } from '@/components/knowledge/article-metrics-bar'
 import { MdxArticleRenderer } from '@/components/knowledge/mdx-article-renderer'
 import { Link } from '@/i18n/navigation'
@@ -49,7 +49,6 @@ export default async function KnowledgeArticlePage({ params }: ArticlePageProps)
   const { locale, category, slug } = await params
   const parsed = SupportedLocaleEnum.safeParse(locale)
   const resolvedLocale = parsed.success ? parsed.data : DEFAULT_LOCALE
-  setRequestLocale(resolvedLocale)
 
   const t = await getTranslations({ locale: resolvedLocale, namespace: 'KnowledgeBase' })
   const article = getArticleByCategoryAndSlug(category, slug, resolvedLocale)
