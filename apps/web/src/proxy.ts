@@ -5,7 +5,7 @@ import { routing } from './i18n/routing'
 const KB_ACCESS_COOKIE_NAME = 'kb_access_token'
 const handleI18nRouting = createMiddleware(routing)
 
-const PROTECTED_KB_REGEX = /^(?:\/(en|uk|ru))?\/knowledge-base(?:\/.*)?$/
+const PROTECTED_KB_REGEX = /^(?:\/(en|ua|ru))?\/knowledge-base(?:\/.*)?$/
 
 export function proxy(request: NextRequest): NextResponse {
   const { pathname } = request.nextUrl
