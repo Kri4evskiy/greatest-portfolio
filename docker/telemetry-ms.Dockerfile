@@ -9,7 +9,7 @@ RUN turbo prune @repo/telemetry-ms --docker
 # Stage 2: Install dependencies and build
 FROM node:22-alpine AS builder
 RUN apk add --no-cache libc6-compat
-RUN corepack enable && corepack prepare pnpm@10.6.5 --activate
+RUN corepack enable && corepack prepare pnpm@12.16.1 --activate
 WORKDIR /app
 
 COPY --from=pruner /app/out/json/ .
