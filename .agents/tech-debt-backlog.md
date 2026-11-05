@@ -3,7 +3,7 @@
 ## 📌 Текущий статус проекта (Baseline State)
 
 Базовая архитектура монорепозитория (**Epics 1–7, MVP**) **полностью реализована и работает**:
-- **Monorepo Core:** `pnpm` Workspaces + `Turborepo` + `Biome 2.6.4` + `Lefthook 2.2.2` + `scripts/bootstrap-env.mjs`.
+- **Monorepo Core:** `pnpm 12.16.1` Workspaces (`allowBuilds`) + `Turborepo` + `Biome 2.6.4` + `Lefthook 2.2.2` + `scripts/bootstrap-env.mjs`.
 - **Shared Packages:** `@repo/shared-schemas` (Zod-контракты API/SSE/RBAC) и `@repo/ui` (Tailwind CSS, shadcn/ui, Storybook 8).
 - **Backend (`apps/api` + `apps/telemetry-ms`):** `NestJS 12` (Native ESM), `Prisma ORM` (с In-Memory fallback без БД), `HttpOnly` JWT Cookie Auth (`ADMIN` / `GUEST`), `@Sse('stream')` проксирование TCP-телеметрии.
 - **Frontend (`apps/web`):** `Next.js 16` App Router, `src/proxy.ts` Edge-защита роутов, `TanStack Query v5` + `IndexedDB` Offline-First кэш, `Zustand`, `TanStack Table` (15 ADR), SSG `.mdx` инженерная база знаний с `D3.js` симуляциями.
