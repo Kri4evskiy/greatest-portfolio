@@ -16,7 +16,8 @@
       "!**/dist",
       "!**/storybook-static",
       "!**/pnpm-lock.yaml",
-      "!**/*.min.js"
+      "!**/*.min.js",
+      "!**/next-env.d.ts"
     ]
   },
   "formatter": {
