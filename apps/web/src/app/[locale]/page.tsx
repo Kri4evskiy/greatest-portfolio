@@ -1,4 +1,5 @@
 import { PageSectionNavigator } from '@/components/layout/page-section-navigator'
+import { EngineeringRoadmapBoard } from '@/components/workfolio/engineering-roadmap-board'
 import { TechRadarTable } from '@/components/workfolio/tech-radar-table'
 import {
   WorkfolioExperienceSection,
@@ -14,6 +15,7 @@ export default function WorkfolioHomePage() {
         <WorkfolioProjectsSection />
         <WorkfolioExperienceSection />
         <TechRadarTable />
+        <EngineeringRoadmapBoard />
       </div>
       <PageSectionNavigator />
     </>

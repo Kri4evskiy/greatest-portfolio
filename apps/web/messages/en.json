@@ -1,15 +1,16 @@
 {
   "Metadata": {
-    "title": "Senior Full-Stack Portfolio (Workfolio UI) & Engineering Knowledge Base",
-    "description": "Interactive Senior Full-Stack TypeScript Portfolio built with Next.js 16, NestJS 12 (Native ESM), Prisma ORM, TanStack Query IndexedDB, D3.js, and Microservices SSE."
+    "title": "Stanislav Krychevskyi — Senior Frontend / Fullstack Engineer & Knowledge Base",
+    "description": "Interactive Workfolio CV and Engineering Knowledge Base by Stanislav Krychevskyi (5+ yrs React, Next.js 16, NestJS, TypeScript, XYFlow, D3.js, Prisma, AI Workflows)."
   },
   "Header": {
-    "availableBadge": "● Available for Senior / Lead Roles",
+    "availableBadge": "● Open to Senior Frontend / Fullstack Roles",
     "nav": {
-      "about": "About",
-      "projects": "Case Studies",
-      "experience": "Experience",
-      "techRadar": "Tech Radar (16 ADR)"
+      "about": "About & Contacts",
+      "projects": "Architecture Cases",
+      "experience": "Commercial Experience",
+      "techRadar": "Tech Radar (16 ADR)",
+      "roadmap": "Tech Debt & Ideas"
     },
     "knowledgeBase": "Base of Knowledge",
     "knowledgeBaseShort": "KB",
@@ -24,27 +25,32 @@
     "searchAria": "Open global search (Ctrl+K)"
   },
   "Hero": {
-    "openBadge": "● Open to Senior Full-Stack / Tech Lead Proposals",
-    "stackBadge": "TypeScript Strict • Next.js 16 • NestJS 12 (ESM) • Prisma • Microservices",
-    "title": "Senior Full-Stack Engineer & Systems Architect",
-    "description": "Welcome to the interactive Workfolio CV and protected Engineering Knowledge Base. Instead of a static PDF resume, this monorepo itself is a live architectural proof: from end-to-end Zod contracts and HttpOnly JWT cookies to an IndexedDB Offline-First cache, D3.js graphs, and a reactive Server-Sent Events stream.",
+    "openBadge": "● Open to Senior Frontend / Fullstack Proposals",
+    "yearsExpBadge": "Years Commercial Experience",
+    "description": "Frontend Engineer with 5+ years of commercial experience specializing in the React & Next.js ecosystem with Fullstack capabilities (Node.js, NestJS, Python, PostgreSQL). Focused on performance optimization (-15–40% LCP/TTI), interactive data & workflow visualization (XYFlow, D3.js), strict typesafe architectures, and AI-assisted engineering (Cursor, Claude, LLM workflows).",
     "ctaUnlocked": "Open Engineering Knowledge Base",
     "ctaLocked": "Unlock Knowledge Base (1-Click Guest Pass)",
     "ctaTechRadar": "16-Technology Matrix (ADR)",
-    "calloutTitle": "How this project is built (Notion Workfolio + Production Full-Stack)",
-    "pillar1Title": "1. 1-Click RBAC Demo",
-    "pillar1Desc": "Clicking Base of Knowledge in the header opens a RHF + Zod micro-form, issues an HttpOnly JWT cookie, and broadcasts a live event over SSE.",
-    "pillar2Title": "2. Offline-First IndexedDB",
-    "pillar2Desc": "All TanStack Query v5 requests sync with the browser's IndexedDB database (24h TTL) — articles and metrics load in 0ms even offline.",
-    "pillar3Title": "3. 16 Interactive ADRs",
-    "pillar3Desc": "In the TanStack Table below, every technology includes a structured Why / Where / How breakdown of its role in this monorepo."
+    "ctaRoadmap": "Tech Debt & Ideas Log",
+    "calloutTitle": "How this live monorepo complements my CV",
+    "pillar1Title": "1. 1-Click Zero-Trust RBAC",
+    "pillar1Desc": "Clicking Base of Knowledge opens a RHF + Zod micro-form, issues an HttpOnly JWT cookie, and streams a live event over SSE.",
+    "pillar2Title": "2. 3-Tier MDX 2.0 + Cmd+K",
+    "pillar2Desc": "Multi-slug Knowledge Base (Topic -> Subtopic -> Notes) with 0 KB JS Shiki highlighting, #tags, and instant Cmd+K search.",
+    "pillar3Title": "3. Transparent Trade-offs",
+    "pillar3Desc": "Includes 16 interactive ADRs plus an open Engineering Backlog & Trade-offs board explaining what was built vs deferred."
   },
   "Projects": {
-    "title": "Featured Engineering Case Studies (Workfolio Gallery)",
-    "subtitle": "Core architectural modules of this monorepo linked directly to in-depth MDX articles and interactive D3.js simulations.",
+    "title": "Live Monorepo Architecture Case Studies",
+    "subtitle": "Interactive modules built directly inside this repository, linked to in-depth MDX notes and D3.js simulations.",
     "readUnlocked": "Read engineering deep-dive in Knowledge Base",
     "readLocked": "🔒 Unlock & open article (1-Click)",
     "items": {
+      "this-project-engine": {
+        "title": "This Platform: 3-Tier Multi-Slug MDX 2.0 Engine, Server Shiki & Cmd+K Search",
+        "subtitle": "How this dual-purpose CV & Second Brain was architected from scratch: folded multi-slug sidebar, subtopic tabs, 0 KB client JS syntax highlighting, RSC search index, and Mobile-First section navigator.",
+        "metrics": "Flagship Architecture • 0 KB Highlight JS • <5ms Cmd+K"
+      },
       "monorepo-adr": {
         "title": "Enterprise Monorepo & End-to-End Zod Contracts",
         "subtitle": "Unified pnpm + Turborepo build graph for Next.js 16, NestJS 12 (Native ESM), and the telemetry microservice with end-to-end type safety and zero OpenAPI codegen.",
@@ -68,25 +74,14 @@
     }
   },
   "Experience": {
-    "title": "Experience & Engineering Timeline",
-    "items": {
-      "senior": {
-        "period": "2023 — Present",
-        "role": "Senior Full-Stack TypeScript Engineer / System Architect",
-        "company": "High-Load B2B SaaS & FinTech Platform",
-        "h1": "Architected and migrated frontend and backend applications into a unified pnpm + Turborepo monorepo (Next.js App Router + NestJS + shared Zod contracts and UI kit).",
-        "h2": "Engineered an Offline-First client caching layer with TanStack Query v5 + IndexedDB, reducing redundant metadata API reads by 55%.",
-        "h3": "Implemented distributed telemetry using @nestjs/microservices (TCP/Redis) and Server-Sent Events (SSE) for real-time session monitoring."
-      },
-      "fullstack": {
-        "period": "2021 — 2023",
-        "role": "Full-Stack Developer (React / Node.js / PostgreSQL)",
-        "company": "Enterprise Product Team",
-        "h1": "Built the company design system on Tailwind CSS + Radix UI (shadcn/ui) with full visual documentation in Storybook.",
-        "h2": "Migrated authentication from vulnerable LocalStorage tokens to HttpOnly, Secure, SameSite=Lax cookies with GUEST / USER / ADMIN RBAC.",
-        "h3": "Optimized Prisma ORM queries on PostgreSQL (Neon) and standardized CI/CD pipelines with Biome.js and multi-stage Docker images."
-      }
-    }
+    "title": "Commercial Experience (5+ Years)",
+    "subtitle": "Production track record across high-load e-commerce (50k+ DAU), visual workflow SaaS, and RWA tokenization.",
+    "projectsLabel": "Projects",
+    "showEarlierRoles": "Show earlier commercial roles (2020 – 2022 • {count} companies)",
+    "hideEarlierRoles": "Collapse earlier commercial roles (2020 – 2022)",
+    "educationHeading": "Education",
+    "languagesHeading": "Languages & Workflow",
+    "aiWorkflowsNote": "AI-Assisted Engineering: Cursor, Claude, Copilot & structured LLM workflows"
   },
   "TechRadar": {
     "title": "Tech Radar Database (16 Architecture Decision Records)",
@@ -171,13 +166,36 @@
     "cmdHeadingsMatch": "Section:",
     "cmdActionCvHome": "Workfolio CV — Overview & Experience",
     "cmdActionTechRadar": "Tech Radar — 16 Architecture Decisions (ADR)",
+    "cmdActionRoadmap": "Engineering Backlog — Tech Debt, Ideas & Trade-offs",
     "cmdActionKbOverview": "Knowledge Base — All Topics & Subtopics",
     "cmdHintNavigate": "↑↓ navigate",
     "cmdHintOpen": "↵ open",
     "cmdHintClose": "esc close",
     "cmdLockedBadge": "1-Click Unlock"
   },
+  "Roadmap": {
+    "title": "Engineering Backlog, Tech Debt & Trade-offs",
+    "subtitle": "Living registry of upcoming upgrades (including Notion Workfolio UI v2), known tech debt, product ideas, and explicit engineering arguments on why certain features are prioritized or deferred.",
+    "filterAll": "All Items",
+    "statusPlanned": "Planned Next",
+    "statusEvaluating": "Evaluating Idea",
+    "statusDeferred": "Deferred (Trade-off)",
+    "statusShipped": "Shipped Foundation",
+    "kindUiUx": "UI / Notion Design",
+    "kindTechDebt": "Tech Debt",
+    "kindArchitecture": "Architecture",
+    "kindIdea": "Product Idea",
+    "kindDevops": "DevOps & QA",
+    "effortLabel": "Effort",
+    "showArgumentsBtn": "Inspect Arguments & Trade-offs",
+    "hideArgumentsBtn": "Hide Arguments & Trade-offs",
+    "rationaleHeading": "Engineering Rationale (Why Now / Why Deferred)",
+    "prosHeading": "Value & Arguments For",
+    "constraintsHeading": "Constraints, Cost & Trade-offs",
+    "sourceNote": "Add new ideas, tech debt, and arguments directly in:"
+  },
   "Footer": {
+    "contactPrompt": "Available for Senior Frontend / Fullstack conversations",
     "waitingPulse": "/api/telemetry/stream • Waiting for pulse..."
   }
 }

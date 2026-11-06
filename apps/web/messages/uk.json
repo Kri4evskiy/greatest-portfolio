@@ -1,15 +1,16 @@
 {
   "Metadata": {
-    "title": "Senior Full-Stack Портфоліо (Workfolio UI) та Інженерна База Знань",
-    "description": "Інтерактивне Senior Full-Stack TypeScript портфоліо на базі Next.js 16, NestJS 12 (Native ESM), Prisma ORM, TanStack Query IndexedDB, D3.js та мікросервісів із SSE."
+    "title": "Станіслав Кричевський — Senior Frontend / Fullstack Engineer та База Знань",
+    "description": "Інтерактивне Workfolio CV та Інженерна База Знань Станіслава Кричевського (5+ років: React, Next.js 16, NestJS, TypeScript, XYFlow, D3.js, Prisma, AI Workflows)."
   },
   "Header": {
-    "availableBadge": "● Відкритий до пропозицій Senior / Lead",
+    "availableBadge": "● Відкритий до пропозицій Senior Frontend / Fullstack",
     "nav": {
-      "about": "Про мене",
-      "projects": "Кейси",
-      "experience": "Досвід",
-      "techRadar": "Tech Radar (16 ADR)"
+      "about": "Про мене і контакти",
+      "projects": "Архітектурні кейси",
+      "experience": "Комерційний досвід",
+      "techRadar": "Tech Radar (16 ADR)",
+      "roadmap": "Tech Debt та Ідеї"
     },
     "knowledgeBase": "Base of Knowledge",
     "knowledgeBaseShort": "База",
@@ -24,27 +25,32 @@
     "searchAria": "Відкрити глобальний пошук (Ctrl+K)"
   },
   "Hero": {
-    "openBadge": "● Відкритий до пропозицій Senior Full-Stack / Tech Lead",
-    "stackBadge": "TypeScript Strict • Next.js 16 • NestJS 12 (ESM) • Prisma • Microservices",
-    "title": "Senior Full-Stack Engineer & Systems Architect",
-    "description": "Ласкаво просимо до інтерактивного Workfolio CV та захищеної Інженерної Бази Знань. Замість статичного PDF-резюме цей монорепозиторій сам є живим доказом архітектури: від наскрізних Zod-контрактів і HttpOnly JWT до IndexedDB Offline-First кешу, D3.js графів та реактивного стріму Server-Sent Events.",
+    "openBadge": "● Відкритий до пропозицій Senior Frontend / Fullstack",
+    "yearsExpBadge": "років комерційного досвіду",
+    "description": "Frontend Engineer із 5+ роками комерційного досвіду в екосистемі React та Next.js і компетенціями Fullstack (Node.js, NestJS, Python, PostgreSQL). Спеціалізуюся на оптимізації продуктивності (-15–40% LCP/TTI), візуальних графах і воркфлоу (XYFlow, D3.js), суворій типізації та AI-інжинірингу (Cursor, Claude, LLM workflows).",
     "ctaUnlocked": "Відкрити Інженерну Базу Знань",
     "ctaLocked": "Розблокувати Базу Знань (1-Click Guest Pass)",
     "ctaTechRadar": "Матриця 16 технологій (ADR)",
-    "calloutTitle": "Як влаштований цей проєкт (Notion Workfolio + Production Full-Stack)",
-    "pillar1Title": "1. 1-Click RBAC Demo",
-    "pillar1Desc": "Клік по кнопці Base of Knowledge у шапці відкриває мікро-форму на RHF + Zod, виписує HttpOnly JWT куку та пушить подію в SSE.",
-    "pillar2Title": "2. Offline-First IndexedDB",
-    "pillar2Desc": "Усі запити TanStack Query v5 синхронізуються з браузерною БД IndexedDB (TTL 24 год) — статті та метрики відкриваються за 0 мс.",
-    "pillar3Title": "3. 16 інтерактивних ADR",
-    "pillar3Desc": "Нижче в таблиці TanStack Table у кожного інструменту є розбір Чому / Де / Як він застосований у цьому репозиторії."
+    "ctaRoadmap": "Tech Debt, Ідеї та Компроміси",
+    "calloutTitle": "Як цей живий монорепозиторій доповнює моє CV",
+    "pillar1Title": "1. 1-Click Zero-Trust RBAC",
+    "pillar1Desc": "Клік по Base of Knowledge відкриває мікро-форму на RHF + Zod, виписує HttpOnly JWT куку та пушить подію в SSE.",
+    "pillar2Title": "2. 3-рівневий MDX 2.0 + Cmd+K",
+    "pillar2Desc": "Мультислаг База Знань (Тема -> Підтеми -> Статті) з 0 КБ JS підсвічуванням Shiki, #тегами та пошуком Cmd+K.",
+    "pillar3Title": "3. Прозорі компроміси",
+    "pillar3Desc": "Містить 16 інтерактивних ADR та відкриту дошку Tech Debt і відкладених ідей із аргументацією За та Проти."
   },
   "Projects": {
-    "title": "Featured Engineering Case Studies (Workfolio Gallery)",
-    "subtitle": "Ключові архітектурні модулі цього монорепозиторію з переходом до детальних MDX-статей та інтерактивних графів D3.js.",
+    "title": "Живі архітектурні кейси цього монорепозиторію",
+    "subtitle": "Інтерактивні модулі, реалізовані прямо в цьому проєкті з переходом до детальних MDX-конспектів і D3.js симуляцій.",
     "readUnlocked": "Читати інженерний розбір у Базі Знань",
     "readLocked": "🔒 Розблокувати та відкрити статтю (1 клік)",
     "items": {
+      "this-project-engine": {
+        "title": "Ця платформа: 3-рівневий рушій MDX 2.0, серверний Shiki та пошук Cmd+K",
+        "subtitle": "Як із нуля спроєктовано цей портал CV + Друга пам’ять: згорнутий мультислаг-сайдбар, вкладки підтем, 0 КБ клієнтського JS на підсвічування коду, RSC-індекс пошуку та Mobile-First навігатор.",
+        "metrics": "Флагманський розбір • 0 KB Highlight JS • <5ms Cmd+K"
+      },
       "monorepo-adr": {
         "title": "Enterprise Monorepo & End-to-End Zod Contracts",
         "subtitle": "Єдиний граф збірки pnpm + Turborepo для Next.js 16, NestJS 12 (Native ESM) і мікросервісу телеметрії з наскрізною типізацією без кодогенерації OpenAPI.",
@@ -68,25 +74,14 @@
     }
   },
   "Experience": {
-    "title": "Experience & Engineering Timeline",
-    "items": {
-      "senior": {
-        "period": "2023 — Теперішній час",
-        "role": "Senior Full-Stack TypeScript Engineer / System Architect",
-        "company": "High-Load B2B SaaS & FinTech Platform",
-        "h1": "Спроєктував та мігрував фронтенд і бекенд у монорепозиторій pnpm + Turborepo (Next.js App Router + NestJS + пакети спільних Zod-контрактів та UI-кіта).",
-        "h2": "Впровадив Offline-First архітектуру клієнтського кешу через TanStack Query v5 + IndexedDB, знизивши навантаження на читання метаданих API на 55%.",
-        "h3": "Реалізував розподілену телеметрію на базі @nestjs/microservices (TCP/Redis) та Server-Sent Events (SSE) для живого моніторингу сесій."
-      },
-      "fullstack": {
-        "period": "2021 — 2023",
-        "role": "Full-Stack Developer (React / Node.js / PostgreSQL)",
-        "company": "Enterprise Product Team",
-        "h1": "Розробив дизайн-систему компанії на базі Tailwind CSS + Radix UI (shadcn/ui) з повним покриттям документацією в Storybook.",
-        "h2": "Перевів авторизацію з вразливого LocalStorage на захищені HttpOnly, Secure, SameSite=Lax куки з рольовою моделлю RBAC (GUEST / USER / ADMIN).",
-        "h3": "Оптимізував запити Prisma ORM у PostgreSQL (Neon) та налаштував CI/CD пайплайни з Biome.js і Multi-stage Docker образами."
-      }
-    }
+    "title": "Комерційний досвід (5+ років)",
+    "subtitle": "Продакшен-досвід у високонавантаженому e-commerce (50k+ DAU), візуальних SaaS-конструкторах та токенізації активів (RWA).",
+    "projectsLabel": "Проєкти",
+    "showEarlierRoles": "Показати попередній комерційний досвід (2020 – 2022 • {count} компанії)",
+    "hideEarlierRoles": "Згорнути попередній комерційний досвід (2020 – 2022)",
+    "educationHeading": "Освіта",
+    "languagesHeading": "Мови та Інженерний процес",
+    "aiWorkflowsNote": "AI-Assisted Engineering: Cursor, Claude, Copilot та структуровані LLM-воркфлоу"
   },
   "TechRadar": {
     "title": "Tech Radar Database (16 Architecture Decision Records)",
@@ -171,13 +166,36 @@
     "cmdHeadingsMatch": "Розділ:",
     "cmdActionCvHome": "Workfolio CV — Головна та Досвід",
     "cmdActionTechRadar": "Tech Radar — Матриця 16 технологій (ADR)",
+    "cmdActionRoadmap": "Інженерний Беклог — Tech Debt, Ідеї та Компроміси",
     "cmdActionKbOverview": "База Знань — Усі теми та підтеми",
     "cmdHintNavigate": "↑↓ вибір",
     "cmdHintOpen": "↵ відкрити",
     "cmdHintClose": "esc закрити",
     "cmdLockedBadge": "1-Клік доступ"
   },
+  "Roadmap": {
+    "title": "Інженерний беклог, Tech Debt та архітектурні компроміси",
+    "subtitle": "Живий реєстр наступних оновлень (зокрема візуальний редизайн Notion Workfolio UI v2), технічного боргу, продуктових ідей та аргументів — чому певні фічі в пріоритеті або свідомо відкладені.",
+    "filterAll": "Усі пункти",
+    "statusPlanned": "У черзі (Next)",
+    "statusEvaluating": "Оцінка ідеї",
+    "statusDeferred": "Відкладено (Trade-off)",
+    "statusShipped": "Вже реалізовано",
+    "kindUiUx": "UI / Notion Дизайн",
+    "kindTechDebt": "Tech Debt",
+    "kindArchitecture": "Архітектура",
+    "kindIdea": "Ідея фічі",
+    "kindDevops": "DevOps та QA",
+    "effortLabel": "Обсяг",
+    "showArgumentsBtn": "Показати аргументи За та Проти",
+    "hideArgumentsBtn": "Сховати аргументи",
+    "rationaleHeading": "Інженерна аргументація (Чому зараз / Чому відкладено)",
+    "prosHeading": "Цінність та аргументи «За»",
+    "constraintsHeading": "Обмеження, вартість та компроміси",
+    "sourceNote": "Додавати нові ідеї, техборг та аргументи можна напряму у файлі:"
+  },
   "Footer": {
+    "contactPrompt": "Відкритий до пропозицій на позиції Senior Frontend / Fullstack",
     "waitingPulse": "/api/telemetry/stream • Очікування пульсу..."
   }
 }

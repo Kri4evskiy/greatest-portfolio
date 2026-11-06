@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { usePathname, useRouter } from '@/i18n/navigation'
 
-export const WORKFOLIO_SECTION_IDS = ['about', 'projects', 'experience', 'tech-radar'] as const
+export const WORKFOLIO_SECTION_IDS = ['about', 'projects', 'experience', 'tech-radar', 'roadmap'] as const
 
 export type WorkfolioSectionId = (typeof WORKFOLIO_SECTION_IDS)[number]
 
@@ -65,7 +65,7 @@ export function useActiveWorkfolioSection(): WorkfolioSectionId {
       }
 
       if (scrollY + viewportHeight >= docHeight - 48) {
-        setActiveSection('tech-radar')
+        setActiveSection('roadmap')
         return
       }
 

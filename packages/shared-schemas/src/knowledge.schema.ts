@@ -56,6 +56,7 @@ const LOCALIZED_SUBTOPIC_LABELS: Record<SupportedLocale, Record<string, string>>
   en: {
     'monorepo-docker': 'Monorepo & Docker',
     'mobile-first-ui': 'Mobile-First & Navigation',
+    'knowledge-engine': 'MDX 2.0 & Search Engine',
     compiler: 'React Compiler',
     'react-19': 'React 19',
     'react-18-vs-19': 'React 18 vs 19',
@@ -70,6 +71,7 @@ const LOCALIZED_SUBTOPIC_LABELS: Record<SupportedLocale, Record<string, string>>
   uk: {
     'monorepo-docker': 'Монорепо та Docker',
     'mobile-first-ui': 'Mobile-First та Навігація',
+    'knowledge-engine': 'MDX 2.0 та Пошуковий Рушій',
     compiler: 'React Compiler',
     'react-19': 'React 19',
     'react-18-vs-19': 'React 18 vs 19',
@@ -84,6 +86,7 @@ const LOCALIZED_SUBTOPIC_LABELS: Record<SupportedLocale, Record<string, string>>
   ru: {
     'monorepo-docker': 'Монорепо и Docker',
     'mobile-first-ui': 'Mobile-First и Навигация',
+    'knowledge-engine': 'Движок MDX 2.0 и Поиск',
     compiler: 'React Compiler',
     'react-19': 'React 19',
     'react-18-vs-19': 'React 18 vs 19',

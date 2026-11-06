@@ -10,11 +10,15 @@ import {
   type WorkfolioSectionId,
 } from '@/hooks/use-section-navigation'
 
-const SECTION_TRANSLATION_KEYS: Record<WorkfolioSectionId, 'about' | 'projects' | 'experience' | 'techRadar'> = {
+const SECTION_TRANSLATION_KEYS: Record<
+  WorkfolioSectionId,
+  'about' | 'projects' | 'experience' | 'techRadar' | 'roadmap'
+> = {
   about: 'about',
   projects: 'projects',
   experience: 'experience',
   'tech-radar': 'techRadar',
+  roadmap: 'roadmap',
 }
 
 const SECTION_INDICES: Record<WorkfolioSectionId, string> = {
@@ -22,6 +26,7 @@ const SECTION_INDICES: Record<WorkfolioSectionId, string> = {
   projects: '02',
   experience: '03',
   'tech-radar': '04',
+  roadmap: '05',
 }
 
 export function PageSectionNavigator() {

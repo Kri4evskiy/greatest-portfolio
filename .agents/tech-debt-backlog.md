@@ -45,10 +45,15 @@
 - [x] **Command Palette (`Cmd+K` / `Ctrl+K` — `CommandPaletteModal`):** мгновенный клиентский поиск с любого экрана (плюс кнопка в `WorkfolioHeader` и `KnowledgeSidebar`) по названиям статей, путям тем/подтем, подзаголовкам `h2/h3` (с переходом к `#id` секции), `#тегам` и быстрым командам навигации с учётом RBAC (`GuestPassModal`).
 - [x] **Фильтрация по `#тегам` и формату материала (`Cheat Sheet` / `Deep Dive` / `ADR` — `KnowledgeDirectoryExplorer`)** + блок перелинковки `Предыдущая / Следующая статья` и `Похожие конспекты по #тегам` (`ArticleFooterNav`).
 
-### ⏳ Этап 5 (Phase 5): Персонализация CV для Тимлида, наполнение раздела «Этот проект» и выделение AI Skill
+### ✅ Этап 5 (Phase 5): Персонализация CV для Тимлида, живая доска Tech Debt / Идей и выделение AI Skill
 
-- [ ] **Персональный профиль в `Hero` и `Footer`:** имя, роль, локация, прямые ссылки (`GitHub`, `LinkedIn`, `Telegram`, `Download PDF CV`) и разделение реальных коммерческих проектов с инженерными разборами.
-- [ ] **Подробные технические статьи в разделе `Этот проект`:** детальная документация того, как реализован каждый слой (включая Mobile-First систему, боковой навигатор, `pnpm 12` + BuildKit Docker, Zero-Trust Auth) + оформление паттернов адаптивного UI в `.agents/skills/mobile-first-workfolio/SKILL.md`.
+- [x] **Персональный профиль Станислава Кричевского (`author-profile.ts`) в `Hero`, `Header`, `Experience` и `Footer`:** реальные контакты (`Telegram @Kri4evskiy`, `LinkedIn`, `GitHub`, `kri4evskiy@gmail.com`), матрица Hard Skills, все 6 реальных коммерческих мест работы (`Superscript Systems`, `Risesoft`, `Brander`, `DevsX`, `AIHelps`, `Velas Network AG`), образование и языки на `EN / UK / RU`.
+- [x] **Живая интерактивная секция `Engineering Backlog, Tech Debt & Trade-offs` (`#roadmap` — `engineering-roadmap.ts` + `EngineeringRoadmapBoard`):** открытая доска идей, техдолга и осознанно отложенных решений с аргументами «За» и «Ограничения / Компромиссы» прямо на главной странице (интегрирована в `PageSectionNavigator` `05` и глобальный поиск `Cmd+K`).
+- [x] **Флагманская статья в разделе `Этот проект` (`this-project/knowledge-engine/three-tier-mdx-cmdk-architecture.{en,uk,ru}.mdx`)** + выделение переиспользуемого агентского скилла `.agents/skills/mobile-first-workfolio/SKILL.md`.
+
+### ⏳ Этап 6 (Next Epoch — UI v2): Визуальный редизайн в аутентичной эстетике Notion Workfolio
+
+- [ ] **Notion Workfolio Authentic Visual Redesign (`UI v2`):** перевести визуальный язык с классических SaaS-карточек ближе к оригинальному Notion Workfolio (обложка и аватар страницы в стиле Notion, мягкая палитра «тёплой бумаги и чернил» для Light/Dark, облегчённые списки/таблицы без тяжёлых рамок, спокойная типографика) поверх уже готового архитектурного ядра Этапов 1–5.
 
 ---
 

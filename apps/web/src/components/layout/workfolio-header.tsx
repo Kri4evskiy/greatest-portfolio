@@ -3,6 +3,7 @@
 import { Badge, Button } from '@repo/ui'
 import { BookOpen, FileText, Lock, LockOpen, LogOut, Search, ShieldAlert } from 'lucide-react'
 import { useTranslations } from 'next-intl'
+import { AUTHOR_PROFILE } from '@/data/author-profile'
 import { useSectionNavigation } from '@/hooks/use-section-navigation'
 import { useLogoutMutation, useVisitorProfile } from '@/hooks/use-visitor-profile'
 import { Link, usePathname, useRouter } from '@/i18n/navigation'
@@ -48,11 +49,11 @@ export function WorkfolioHeader() {
             }}
             className="flex min-w-0 items-center gap-1.5 font-medium text-foreground transition-opacity hover:opacity-80 sm:gap-2"
           >
-            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded border border-border bg-muted font-mono text-xs font-bold">
-              W
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded border border-border bg-muted font-mono text-[11px] font-bold">
+              {AUTHOR_PROFILE.initials}
             </span>
-            <span className="hidden font-mono text-xs text-muted-foreground md:inline">workspace /</span>
-            <span className="truncate font-semibold tracking-tight text-xs sm:text-sm">workfolio-cv</span>
+            <span className="hidden font-mono text-xs text-muted-foreground md:inline">workfolio /</span>
+            <span className="truncate font-semibold tracking-tight text-xs sm:text-sm">Stanislav Krychevskyi</span>
           </Link>
 
           {isInsideKnowledgeBase ? (

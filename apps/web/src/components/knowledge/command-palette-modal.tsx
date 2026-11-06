@@ -2,7 +2,7 @@
 
 import { getKnowledgeFormatLabel, type SupportedLocale } from '@repo/shared-schemas'
 import { Badge } from '@repo/ui'
-import { ArrowRight, BookOpen, Cpu, FileText, Hash, Home, Lock, Search, Sparkles, X } from 'lucide-react'
+import { ArrowRight, BookOpen, Compass, Cpu, FileText, Hash, Home, Lock, Search, Sparkles, X } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSectionNavigation } from '@/hooks/use-section-navigation'
@@ -23,7 +23,7 @@ type PaletteEntry =
       kind: 'quick-action'
       id: string
       label: string
-      actionType: 'cv-home' | 'tech-radar' | 'kb-overview'
+      actionType: 'cv-home' | 'tech-radar' | 'roadmap' | 'kb-overview'
     }
   | {
       kind: 'article'
@@ -95,6 +95,7 @@ export function CommandPaletteModal({ items, topTags, locale }: CommandPaletteMo
     () => [
       { kind: 'quick-action', id: 'qa-kb', label: t('cmdActionKbOverview'), actionType: 'kb-overview' },
       { kind: 'quick-action', id: 'qa-radar', label: t('cmdActionTechRadar'), actionType: 'tech-radar' },
+      { kind: 'quick-action', id: 'qa-roadmap', label: t('cmdActionRoadmap'), actionType: 'roadmap' },
       { kind: 'quick-action', id: 'qa-cv', label: t('cmdActionCvHome'), actionType: 'cv-home' },
     ],
     [t],
@@ -179,6 +180,10 @@ export function CommandPaletteModal({ items, topTags, locale }: CommandPaletteMo
         }
         if (entry.actionType === 'tech-radar') {
           scrollToSection('tech-radar')
+          return
+        }
+        if (entry.actionType === 'roadmap') {
+          scrollToSection('roadmap')
           return
         }
         if (entry.actionType === 'kb-overview') {
@@ -334,6 +339,8 @@ export function CommandPaletteModal({ items, topTags, locale }: CommandPaletteMo
                             <Home className="h-4 w-4 shrink-0 text-primary" />
                           ) : entry.actionType === 'tech-radar' ? (
                             <Cpu className="h-4 w-4 shrink-0 text-primary" />
+                          ) : entry.actionType === 'roadmap' ? (
+                            <Compass className="h-4 w-4 shrink-0 text-primary" />
                           ) : (
                             <BookOpen className="h-4 w-4 shrink-0 text-primary" />
                           )}
