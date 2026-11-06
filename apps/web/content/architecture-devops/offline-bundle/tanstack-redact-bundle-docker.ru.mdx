@@ -1,9 +1,16 @@
 ---
-title: "Оптимизация бандла с TanStack Redact, Offline-First IndexedDB и Multi-Stage Docker"
+title: "Оптимизация бандла с TanStack Redact и Offline-First IndexedDB"
+sidebarLabel: "Offline IndexedDB и Redact"
+metricSlug: "tanstack-redact-bundle-docker"
 summary: "Результаты замера клиентского JS-бандла, архитектура асинхронного кэша в IndexedDB (0 мс в Offline) и сборка Docker-образов с turbo prune."
 category: "architecture-devops"
 readingTime: "7 мин"
 publishedAt: "2026-10-25"
+order: 1
+tldr:
+  - "`TanStack Query v5` персистит кэш в асинхронную **IndexedDB** (`idb-keyval`, `gcTime: 24h`), обеспечивая чтение за **0 мс** в офлайне."
+  - "`optimizePackageImports` + `next/dynamic` уменьшают стартовый бандл на **32%**, а профиль `TanStack Redact` — на **45%**."
+  - "Трёхступенчатая сборка `turbo prune --docker` формирует легковесные `node:22-alpine` образы под `non-root`."
 ---
 
 ## 1. Offline-First кэширование в браузерной БД `IndexedDB`
@@ -18,13 +25,11 @@ publishedAt: "2026-10-25"
 
 В `apps/web/next.config.ts` интегрированы `@next/bundle-analyzer` и обертка `withRedact` (`ENABLE_REDACT=true`) совместно с агрессивным code-splitting (`optimizePackageImports` для `lucide-react`, `d3`, `@repo/ui` и `next/dynamic` для тяжелых виджетов).
 
-```text
-Конфигурация сборки                  First Load JS (Shared)   KB Article Route
-------------------------------------------------------------------------------
-Базовый бандл (без оптимизаций)      142.8 kB                 198.4 kB
-Next.js 15 + Dynamic D3 + TreeShake   96.4 kB (-32%)          118.2 kB (-40%)
-Экспериментальный профиль Redact      78.1 kB (-45%)           94.6 kB (-52%)
-```
+| Конфигурация сборки | First Load JS (Shared) | Маршрут статьи БЗ |
+| :--- | :---: | :---: |
+| Базовый бандл (без оптимизаций) | 142.8 kB | 198.4 kB |
+| Next.js 16 + Dynamic D3 + TreeShake | **96.4 kB (-32%)** | **118.2 kB (-40%)** |
+| Экспериментальный профиль Redact | **78.1 kB (-45%)** | **94.6 kB (-52%)** |
 
 ## 3. Трехступенчатая контейнеризация (`Docker` + `turbo prune`)
 

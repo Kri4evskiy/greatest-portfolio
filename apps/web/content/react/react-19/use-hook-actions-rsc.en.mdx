@@ -1,0 +1,41 @@
+---
+title: "React 19 Primitives: use(), Actions, useOptimistic & ref as Prop"
+sidebarLabel: "use(), Actions & ref Prop"
+summary: "Cheat sheet on core React 19 APIs: conditional promise/context reading with use(), form mutations via useActionState, and dropping forwardRef."
+category: "react"
+readingTime: "5 min"
+publishedAt: "2026-11-06"
+order: 2
+tldr:
+  - "`use(resource)` unwraps Promises (suspending until resolved) and Contexts — unlike hooks, it **can** be called inside `if` blocks and loops."
+  - "`useActionState` + `useOptimistic` standardize async form pending states and instant optimistic UI rollbacks."
+  - "`forwardRef` is obsolete: function components accept `ref` directly as a regular prop."
+---
+
+## 1. The `use()` API: Promises & Conditional Context
+
+Unlike `useContext` or `useState`, `use()` is not restricted to the top level of a component — you can call it conditionally after early returns or inside `if` branches.
+
+### Streaming a Server Promise to a Client Component
+
+```tsx title="Server -> Client Streaming with use()"
+'use client'
+import { use } from 'react'
+
+export function MetricsSummary({ metricsPromise }: { metricsPromise: Promise<MetricsDto> }) {
+  const data = use(metricsPromise)
+  return <span className="font-mono">{data.viewsCount} views</span>
+}
+```
+
+> [!TIP]
+> Initiate the promise in a **Server Component** without `await`, wrap the Client Component in `<Suspense>`, and unwrap it on the client via `use(promise)` to eliminate server-blocking waterfalls.
+
+## 2. Ergonomic Improvements in React 19
+
+| Feature | React 18 Boilerplate | React 19 Idiom |
+| :--- | :--- | :--- |
+| Passing DOM refs | `forwardRef<HTMLInputElement, Props>((props, ref) => ...)` | `function Input({ ref, ...props }: Props)` |
+| Context Provider | `<ThemeContext.Provider value={theme}>` | `<ThemeContext value={theme}>` |
+| Form Pending State | Manual `isLoading` + `error` `useState` pairs | `const [state, action, isPending] = useActionState(...)` |
+| Document Metadata | Third-party `react-helmet` or custom effects | Native `<title>`, `<meta>`, `<link>` hoisting |

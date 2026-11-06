@@ -1,9 +1,16 @@
 ---
 title: "Zero-Trust Security: JWT у HttpOnly Cookies, Prisma ORM та SSE Телеметрія"
+sidebarLabel: "HttpOnly JWT, Prisma та SSE"
+metricSlug: "nestjs-jwt-httponly-prisma-sse"
 summary: "Чому зберігання токенів у LocalStorage вразливе до XSS, як працює зв’язка Next.js Edge Proxy + NestJS Guards та реактивний стрім @Sse."
 category: "nestjs-prisma"
 readingTime: "9 хв"
 publishedAt: "2026-10-21"
+order: 1
+tldr:
+  - "JWT-токени зберігаються виключно у `HttpOnly, Secure, SameSite=Lax` куках — JavaScript не має доступу до `kb_access_token`."
+  - "Подвійний контур захисту: **Next.js Edge Proxy** (`src/proxy.ts`) + **NestJS `JwtRolesGuard`** (`USER` / `ADMIN`)."
+  - "Атомарний `prisma.articleMetrics.upsert` транслює події через TCP (`:4001`) у `telemetry-ms` та `@Sse('stream')`."
 ---
 
 ## 1. Чому ми заборонили `LocalStorage` для JWT-токенів
@@ -13,9 +20,7 @@ publishedAt: "2026-10-21"
 У нашому монорепозиторії реалізована схема **HttpOnly Cookie + Dual-Layer RBAC**:
 
 1. При сабміті мікро-форми `POST /api/auth/guest-pass` бекенд **NestJS** створює запис `VisitorSession` у PostgreSQL через **Prisma ORM**.
-2. Сервер підписує JWT та виставляє заголовок `Set-Cookie`:
-   - `HttpOnly` — JavaScript у браузері фізично не бачить куку `kb_access_token` у `document.cookie`.
-   - `SameSite=Lax` та `Secure` — захист від CSRF та перехоплення трафіку.
+2. Сервер підписує JWT та виставляє `Set-Cookie` з прапорцями `HttpOnly`, `SameSite=Lax` та `Secure`.
 3. **Рівень 1 (Next.js Edge Proxy):** До рендеру будь-якої сторінки `/knowledge-base/*` перевіряє наявність і структуру куки на Edge.
 4. **Рівень 2 (NestJS `JwtRolesGuard`):** Перевіряє криптографічний підпис JWT та роль (`USER` / `ADMIN`) при запитах до `/api/knowledge/*`.
 
@@ -25,12 +30,12 @@ publishedAt: "2026-10-21"
 
 Коли тімлід відкриває статтю або натискає кнопку `Helpful`, бекенд виконує атомарний `upsert` у PostgreSQL (`Neon.tech`), що виключає стан гонитви (`race condition`):
 
-```typescript
+```typescript title="apps/api/src/modules/knowledge/knowledge.service.ts"
 await this.prisma.articleMetrics.upsert({
   where: { slug },
   update: { helpfulCount: { increment: 1 } },
   create: { slug, category, viewsCount: 1, helpfulCount: 1 },
-});
+})
 ```
 
 Одразу після запису `apps/api` відправляє подію по TCP (`порт 4001`) у виділений мікросервіс `apps/telemetry-ms`, а підписники ендпоінту `GET /api/telemetry/stream` (`@Sse`) миттєво бачать оновлення в живому індикаторі футера.

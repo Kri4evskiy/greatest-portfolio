@@ -1,9 +1,16 @@
 ---
-title: "Повний каталог 15 ADR: Монорепозиторій, Суворий TypeScript та End-to-End Zod"
+title: "Повний каталог 16 ADR: Монорепозиторій, Biome.js та End-to-End Архітектура"
+sidebarLabel: "16 ADR монорепо (D3 граф)"
+metricSlug: "adr-full-stack-catalog"
 summary: "Чому ми обрали pnpm + Turborepo, Biome.js на Rust, Lefthook та єдиний пакет Zod-контрактів замість дублювання інтерфейсів."
 category: "typescript"
 readingTime: "8 хв"
 publishedAt: "2026-10-15"
+order: 2
+tldr:
+  - "Єдиний воркспейс **pnpm 12** + **Turborepo** повністю прибирає розсинхронізацію контрактів між клієнтом і API."
+  - "Єдиний Rust-бінарник **Biome.js** замінює 120+ пакетів `ESLint + Prettier` (~50 мс на перевірку всього проєкту)."
+  - "Хук **Lefthook** перед кожним комітом перевіряє форматування, суворі типи та оновлює версію збірки."
 ---
 
 ## 1. Проблема класичних Full-Stack репозиторіїв
@@ -18,13 +25,13 @@ publishedAt: "2026-10-15"
 
 Замість того щоб писати `class-validator` декоратори на бекенді та окремі схеми для `React Hook Form` на фронтенді, ми експортуємо одну схему `Zod`:
 
-```typescript
+```typescript title="packages/shared-schemas/src/auth.schema.ts"
 export const GuestPassFormSchema = z.object({
   displayName: z.string().trim().min(2).max(50),
   visitorType: VisitorRoleTypeEnum,
   adminPasscode: z.string().trim().max(100).optional(),
-});
-export type GuestPassFormInput = z.infer<typeof GuestPassFormSchema>;
+})
+export type GuestPassFormInput = z.infer<typeof GuestPassFormSchema>
 ```
 
 - **На фронтенді (`apps/web`):** Схема передається напряму в `zodResolver(GuestPassFormSchema)`.
@@ -36,7 +43,6 @@ export type GuestPassFormInput = z.infer<typeof GuestPassFormSchema>;
 
 Ми повністю відмовилися від повільної зв’язки `ESLint + Prettier` (120+ пакетів у `node_modules`) на користь єдиного бінарника **Biome.js** на Rust, який перевіряє та форматує весь монорепозиторій за **~50 мс**.
 
-На кожен `git commit` хук **Lefthook** автоматично:
 1. Запускає `biome check --write` на індексованих файлах.
 2. Перевіряє суворі типи `pnpm turbo typecheck` (`noUncheckedIndexedAccess: true`, `exactOptionalPropertyTypes: true`).
 3. Інкрементує патч-версію в кореневому `package.json` та синхронізує константу `APP_VERSION` для відображення у футері сайту.

@@ -1,12 +1,19 @@
 ---
-title: "Full Catalog of 15 ADRs: Monorepo, Strict TypeScript, and End-to-End Zod"
+title: "Full Catalog of 16 ADRs: Monorepo, Biome.js & End-to-End Architecture"
+sidebarLabel: "16 Monorepo ADRs (D3)"
+metricSlug: "adr-full-stack-catalog"
 summary: "Why we chose pnpm + Turborepo, Rust-powered Biome.js, Lefthook, and a shared Zod contract package over duplicated DTO interfaces."
 category: "typescript"
 readingTime: "8 min"
 publishedAt: "2026-10-15"
+order: 2
+tldr:
+  - "Monorepo orchestration via **pnpm 12 Workspaces** + **Turborepo** with zero cross-repo DTO drift."
+  - "Single Rust binary **Biome.js** replaces 120+ `ESLint + Prettier` packages (~50ms full check)."
+  - "**Lefthook** pre-commit pipeline enforces formatting, strict typechecking, and automatic patch versioning."
 ---
 
-## 1. The Problem with Traditional Full-Stack Repositories
+## 1. The Problem with Split Full-Stack Repositories
 
 In most product teams, the frontend (`Next.js`) and backend (`NestJS`) live in separate repositories or communicate through manually copied TypeScript interfaces. Whenever a field changes on the backend, the frontend build still succeeds and the bug only surfaces at runtime in production.
 
@@ -18,13 +25,13 @@ We solved this at the monorepo architecture level (`pnpm workspaces` + `Turborep
 
 Instead of writing `class-validator` decorators on the backend and separate `React Hook Form` schemas on the frontend, we export a single `Zod` schema:
 
-```typescript
+```typescript title="packages/shared-schemas/src/auth.schema.ts"
 export const GuestPassFormSchema = z.object({
   displayName: z.string().trim().min(2).max(50),
   visitorType: VisitorRoleTypeEnum,
   adminPasscode: z.string().trim().max(100).optional(),
-});
-export type GuestPassFormInput = z.infer<typeof GuestPassFormSchema>;
+})
+export type GuestPassFormInput = z.infer<typeof GuestPassFormSchema>
 ```
 
 - **On the frontend (`apps/web`):** The schema is passed directly into `zodResolver(GuestPassFormSchema)`.
@@ -36,7 +43,6 @@ export type GuestPassFormInput = z.infer<typeof GuestPassFormSchema>;
 
 We replaced the slow `ESLint + Prettier` toolchain (120+ packages in `node_modules`) with a single Rust binary — **Biome.js**, which lints and formats the entire monorepo in **~50ms**.
 
-On every `git commit`, **Lefthook** automatically:
 1. Runs `biome check --write` on staged files.
 2. Verifies strict types via `pnpm turbo typecheck` (`noUncheckedIndexedAccess: true`, `exactOptionalPropertyTypes: true`).
 3. Increments the patch version in root `package.json` and syncs the `APP_VERSION` constant displayed in the site footer.

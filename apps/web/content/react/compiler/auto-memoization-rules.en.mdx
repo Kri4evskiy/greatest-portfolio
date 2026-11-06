@@ -1,0 +1,60 @@
+---
+title: "React Compiler: Fine-Grained Auto-Memoization & Rules of React"
+sidebarLabel: "Auto-Memoization & Rules"
+summary: "How React Compiler transforms components into fine-grained memoized blocks at build time, eliminating manual useMemo, useCallback, and React.memo boilerplate."
+category: "react"
+readingTime: "6 min"
+publishedAt: "2026-11-06"
+order: 1
+tldr:
+  - "**React Compiler** analyzes control flow at build time and caches both derived values and JSX elements in a component-level memo array (`useMemoCache`)."
+  - "Manual `useMemo`, `useCallback`, and `React.memo` are no longer required for pure UI components."
+  - "Violating **Rules of React** (mutating props/state during render or reading refs in render) causes the compiler to safely skip that component."
+---
+
+## 1. What React Compiler Does Under the Hood
+
+Historically, React re-rendered an entire component subtree whenever parent state changed unless every object, callback, and child component was manually wrapped in `useMemo`, `useCallback`, and `React.memo`.
+
+**React Compiler** (`babel-plugin-react-compiler`) lowers standard TypeScript/JSX components into an SSA-like intermediate representation (HIR) and injects fine-grained memo slots automatically.
+
+### Source Code vs Compiled Output
+
+```tsx title="Before: Clean Component Written by Developer"
+export function ProjectFilterList({ items, query }: { items: Project[]; query: string }) {
+  const visible = items.filter((item) => item.name.toLowerCase().includes(query.toLowerCase()))
+  return (
+    <ul>
+      {visible.map((item) => (
+        <ProjectRow key={item.id} item={item} />
+      ))}
+    </ul>
+  )
+}
+```
+
+At build time, the compiler caches `visible` **and** the resulting `<ul>` JSX node independently — if unrelated parent props change, neither `.filter()` nor `<ProjectRow />` re-executes.
+
+## 2. When Do You Still Need Manual `useMemo` or `useCallback`?
+
+| Scenario | Manual Hook Needed? | Why |
+| :--- | :---: | :--- |
+| Passing callbacks/objects to child React components | **No** | Compiler stabilizes references automatically |
+| Expensive pure array sorting/filtering in render | **No** | Cached in memo slots until inputs change |
+| Referential identity inside `useEffect` dependency arrays | **Rarely** | Only if you explicitly want coarse effect control |
+| Sharing cache across *different* component instances | **Yes** | Use `TanStack Query` or module-level LRU cache |
+
+> [!IMPORTANT]
+> Never mutate values captured by closures during render (`array.push(...)` on state/props). Always create new references or mutate strictly local variables created inside the same render pass.
+
+## 3. Enabling React Compiler in Next.js App Router
+
+```typescript title="apps/web/next.config.ts"
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  reactCompiler: true,
+}
+
+export default nextConfig
+```

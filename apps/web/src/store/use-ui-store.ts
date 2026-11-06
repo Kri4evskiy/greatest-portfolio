@@ -24,19 +24,13 @@ interface UIState {
   setKbSidebarOpen: (open: boolean) => void
   toggleKbFolder: (pathKey: string) => void
   expandKbAncestors: (pathKeys: readonly string[]) => void
+  collapseAllKbFolders: () => void
+  expandAllKbFolders: (pathKeys: readonly string[]) => void
   setReactGraphMode: (mode: ReactRenderMode) => void
   setArchFlowActiveNode: (nodeId: string | null) => void
 }
 
-const DEFAULT_EXPANDED_FOLDERS: Record<string, boolean> = {
-  'this-project': true,
-  'this-project/monorepo-docker': true,
-  'this-project/mobile-first-ui': true,
-  typescript: true,
-  react: true,
-  'nestjs-prisma': true,
-  'architecture-devops': true,
-}
+const DEFAULT_EXPANDED_FOLDERS: Record<string, boolean> = {}
 
 export const useUIStore = create<UIState>((set) => ({
   isGuestPassModalOpen: false,
@@ -100,6 +94,18 @@ export const useUIStore = create<UIState>((set) => ({
         }
       }
       return changed ? { expandedKbFolders: next } : state
+    }),
+  collapseAllKbFolders: () =>
+    set({
+      expandedKbFolders: {},
+    }),
+  expandAllKbFolders: (pathKeys) =>
+    set(() => {
+      const next: Record<string, boolean> = {}
+      for (const key of pathKeys) {
+        next[key] = true
+      }
+      return { expandedKbFolders: next }
     }),
   setReactGraphMode: (mode) =>
     set({

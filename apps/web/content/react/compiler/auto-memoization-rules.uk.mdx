@@ -1,0 +1,60 @@
+---
+title: "React Compiler: Авто-мемоїзація графа рендеру та Rules of React"
+sidebarLabel: "Авто-мемоїзація та правила"
+summary: "Як React Compiler перетворює звичайний JSX на точкові блоки кешування під час збірки, прибираючи потребу в ручних useMemo, useCallback та React.memo."
+category: "react"
+readingTime: "6 хв"
+publishedAt: "2026-11-06"
+order: 1
+tldr:
+  - "**React Compiler** аналізує потік даних під час збірки й кешує як обчислення, так і сам JSX у внутрішньому слоті `useMemoCache`."
+  - "Ручні обгортки `useMemo`, `useCallback` та `React.memo` більше не потрібні для чистих компонентів."
+  - "При порушенні **Rules of React** (мутація пропсів під час рендеру) компілятор безпечно пропускає оптимізацію конкретного компонента."
+---
+
+## 1. Як працює React Compiler під капотом
+
+Раніше будь-яке оновлення стейту батьківського компонента викликало ререндер усього піддерева, якщо розробник забув огорнути хоча б один об’єкт чи функцію у `useMemo` / `useCallback`.
+
+**React Compiler** (`babel-plugin-react-compiler`) будує граф залежностей змінних на етапі компіляції та автоматично додає точкову мемоїзацію.
+
+### Чистий код розробника без шаблонних хуків
+
+```tsx title="Компонент без ручного useMemo"
+export function ProjectFilterList({ items, query }: { items: Project[]; query: string }) {
+  const visible = items.filter((item) => item.name.toLowerCase().includes(query.toLowerCase()))
+  return (
+    <ul>
+      {visible.map((item) => (
+        <ProjectRow key={item.id} item={item} />
+      ))}
+    </ul>
+  )
+}
+```
+
+Компілятор окремо кешує і масив `visible`, і фінальний вузол `<ul>`: якщо змінюються інші пропси батька, фільтрація та рендер `<ProjectRow />` не запускаються повторно.
+
+## 2. Коли ручні `useMemo` / `useCallback` ще можуть знадобитися?
+
+| Сценарій | Потрібен ручний хук? | Причина |
+| :--- | :---: | :--- |
+| Передача колбеків та об’єктів у дочірні компоненти | **Ні** | Компілятор стабілізує посилання автоматично |
+| Важка фільтрація або сортування масивів у рендері | **Ні** | Кешується у слоті до зміни вхідних даних |
+| Тонкий контроль залежностей зовнішнього `useEffect` | **Іноді** | Якщо потрібна явна гарантія стабільності ефекту |
+| Спільний кеш між різними екземплярами компонентів | **Так** | Використовуйте `TanStack Query` або зовнішній стор |
+
+> [!IMPORTANT]
+> Не мутуйте пропси чи зовнішні об’єкти прямо під час рендеру (`props.items.sort(...)`). Створюйте копію (`[...props.items].sort(...)`), щоб не ламати інваріанти компілятора.
+
+## 3. Підключення в Next.js App Router
+
+```typescript title="apps/web/next.config.ts"
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  reactCompiler: true,
+}
+
+export default nextConfig
+```

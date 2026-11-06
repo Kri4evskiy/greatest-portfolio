@@ -1,9 +1,16 @@
 ---
-title: "Bundle Optimization with TanStack Redact, Offline-First IndexedDB, and Multi-Stage Docker"
+title: "Bundle Optimization with TanStack Redact & Offline-First IndexedDB"
+sidebarLabel: "Offline IndexedDB & Redact"
+metricSlug: "tanstack-redact-bundle-docker"
 summary: "Client JS bundle benchmarks, asynchronous IndexedDB caching architecture (0ms offline reads), and Docker image pruning with turbo prune."
 category: "architecture-devops"
 readingTime: "7 min"
 publishedAt: "2026-10-25"
+order: 1
+tldr:
+  - "`TanStack Query v5` persists API state into asynchronous **IndexedDB** (`idb-keyval`, `gcTime: 24h`) for **0ms** offline reads."
+  - "`optimizePackageImports` + `next/dynamic` cut First Load JS by **32%**, and experimental `TanStack Redact` cuts it by **45%**."
+  - "3-stage `turbo prune --docker` containers run as non-root `node:22-alpine` processes."
 ---
 
 ## 1. Offline-First Caching in Browser `IndexedDB`
@@ -18,13 +25,11 @@ Unlike synchronous `LocalStorage` (which blocks the main thread during JSON seri
 
 In `apps/web/next.config.ts`, we integrated `@next/bundle-analyzer` and the `withRedact` wrapper (`ENABLE_REDACT=true`) alongside aggressive code-splitting (`optimizePackageImports` for `lucide-react`, `d3`, `@repo/ui` and `next/dynamic` for heavy visualizations).
 
-```text
-Build Configuration                  First Load JS (Shared)   KB Article Route
-------------------------------------------------------------------------------
-Baseline bundle (unoptimized)        142.8 kB                 198.4 kB
-Next.js 16 + Dynamic D3 + TreeShake   96.4 kB (-32%)          118.2 kB (-40%)
-Experimental Redact Profile           78.1 kB (-45%)           94.6 kB (-52%)
-```
+| Build Configuration | First Load JS (Shared) | KB Article Route |
+| :--- | :---: | :---: |
+| Baseline bundle (unoptimized) | 142.8 kB | 198.4 kB |
+| Next.js 16 + Dynamic D3 + TreeShake | **96.4 kB (-32%)** | **118.2 kB (-40%)** |
+| Experimental Redact Profile | **78.1 kB (-45%)** | **94.6 kB (-52%)** |
 
 ## 3. Three-Stage Containerization (`Docker` + `turbo prune`)
 

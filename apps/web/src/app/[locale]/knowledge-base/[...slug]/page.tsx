@@ -181,6 +181,24 @@ export default async function KnowledgeCatchAllPage({ params }: CatchAllKnowledg
   const subFolders = folder.children.filter((c): c is KnowledgeTreeFolderNode => c.type === 'folder')
   const directArticles = folder.children.filter((c): c is KnowledgeTreeArticleNode => c.type === 'article')
 
+  const displayedArticles: KnowledgeTreeArticleNode[] =
+    directArticles.length > 0
+      ? directArticles
+      : (() => {
+          const collected: KnowledgeTreeArticleNode[] = []
+          const walk = (node: KnowledgeTreeFolderNode) => {
+            for (const child of node.children) {
+              if (child.type === 'article') {
+                collected.push(child)
+              } else {
+                walk(child)
+              }
+            }
+          }
+          walk(folder)
+          return collected
+        })()
+
   return (
     <div className="space-y-6 rounded-xl border border-border bg-card p-5 shadow-sm sm:p-8">
       <BreadcrumbsNav rootLabel={t('breadcrumbsRoot')} items={breadcrumbs} />
@@ -225,13 +243,13 @@ export default async function KnowledgeCatchAllPage({ params }: CatchAllKnowledg
         </section>
       ) : null}
 
-      {directArticles.length > 0 ? (
+      {displayedArticles.length > 0 ? (
         <section className="space-y-3">
           <h2 className="font-mono text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             {t('articlesInSectionHeading')}
           </h2>
           <div className="grid gap-4 sm:grid-cols-2">
-            {directArticles.map(({ article: item }) => (
+            {displayedArticles.map(({ article: item }) => (
               <Link key={item.routePath} href={`/knowledge-base/${item.routePath}`} className="group block">
                 <Card className="h-full transition-all group-hover:border-primary/50 group-hover:shadow-md">
                   <CardHeader className="pb-3">

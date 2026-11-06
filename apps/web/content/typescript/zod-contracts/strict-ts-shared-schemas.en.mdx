@@ -1,0 +1,35 @@
+---
+title: "Unified API Contracts: Strict TypeScript & Shared Zod Schemas"
+sidebarLabel: "Shared Zod Contracts"
+metricSlug: "strict-typescript-zod-contracts"
+summary: "How @repo/shared-schemas eliminates DTO drift between React Hook Form on the client and NestJS ZodValidationPipe on the server."
+category: "typescript"
+readingTime: "5 min"
+publishedAt: "2026-10-16"
+order: 1
+tldr:
+  - "Schema first, TypeScript type second (`z.infer<typeof Schema>`) inside `@repo/shared-schemas`."
+  - "Enforces `strict: true`, `noUncheckedIndexedAccess: true`, and `exactOptionalPropertyTypes: true` across all 5 workspace packages."
+  - "Same Zod schema powers both `zodResolver` (`React Hook Form`) and `ZodValidationPipe` (`NestJS`)."
+---
+
+## 1. Eliminating Frontend–Backend DTO Drift
+
+When `Next.js` and `NestJS` maintain separate TypeScript interfaces by hand, renaming a backend DTO field leaves the frontend build green while breaking production payloads at runtime.
+
+## 2. Single Source of Truth in `@repo/shared-schemas`
+
+```typescript title="packages/shared-schemas/src/auth.schema.ts"
+export const GuestPassFormSchema = z.object({
+  displayName: z.string().trim().min(2).max(50),
+  visitorType: VisitorRoleTypeEnum,
+  adminPasscode: z.string().trim().max(100).optional(),
+})
+export type GuestPassFormInput = z.infer<typeof GuestPassFormSchema>
+```
+
+| Layer | Integration Point | Guarantee |
+| :--- | :--- | :--- |
+| **Compile Time (`tsc`)** | `noUncheckedIndexedAccess` + `z.infer` | Any renamed property fails `pnpm turbo typecheck` immediately |
+| **Client (`apps/web`)** | `zodResolver(GuestPassFormSchema)` | Synchronous form validation before network request |
+| **Server (`apps/api`)** | `ZodValidationPipe(GuestPassFormSchema)` | Zero-trust runtime payload sanitization in NestJS |

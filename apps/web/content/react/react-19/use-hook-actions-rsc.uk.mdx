@@ -1,0 +1,41 @@
+---
+title: "Примітиви React 19: API use(), Actions, useOptimistic та ref як проп"
+sidebarLabel: "Хук use(), Actions та ref"
+summary: "Шпаргалка по ключових API React 19: читання промісів і контексту через use() всередині умов, форми на useActionState та відмова від forwardRef."
+category: "react"
+readingTime: "5 хв"
+publishedAt: "2026-11-06"
+order: 2
+tldr:
+  - "`use(resource)` розпаковує `Promise` (інтегруючись із `<Suspense>`) та `Context` — на відміну від класичних хуків, його **можна** викликати всередині `if`."
+  - "`useActionState` та `useOptimistic` прибирають ручні прапорці `isLoading` при мутаціях та миттєво оновлюють UI з авто-відкатом при помилці."
+  - "`forwardRef` більше не потрібен: `ref` передається у функціональний компонент як звичайний проп."
+---
+
+## 1. API `use()`: потокові проміси та умовний контекст
+
+На відміну від `useContext`, виклик `use()` дозволений після ранніх `return` або всередині блоків `if`.
+
+### Передача неблокуючого проміса з RSC на клієнт
+
+```tsx title="Стрімінг проміса через use()"
+'use client'
+import { use } from 'react'
+
+export function MetricsSummary({ metricsPromise }: { metricsPromise: Promise<MetricsDto> }) {
+  const data = use(metricsPromise)
+  return <span className="font-mono">{data.viewsCount} переглядів</span>
+}
+```
+
+> [!TIP]
+> Створюйте проміс у **Server Component** без `await`, огортайте клієнтський блок у `<Suspense>` та читайте результат через `use(promise)`, щоб не блокувати віддачу першого HTML-екрана.
+
+## 2. Головні спрощення коду в React 19
+
+| Задача | Як було в React 18 | Як стало в React 19 |
+| :--- | :--- | :--- |
+| Прокидання `ref` у DOM | `forwardRef<HTMLInputElement, Props>((props, ref) => ...)` | `function Input({ ref, ...props }: Props)` |
+| Провайдер контексту | `<ThemeContext.Provider value={theme}>` | `<ThemeContext value={theme}>` |
+| Стан відправки форми | Ручні `useState` для `isLoading` та `error` | `const [state, action, isPending] = useActionState(...)` |
+| Мета-теги сторінки | Сторонні бібліотеки або ручні ефекти | Нативне підняття `<title>`, `<meta>`, `<link>` у `<head>` |

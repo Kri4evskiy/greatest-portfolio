@@ -1,0 +1,41 @@
+---
+title: "Примитивы React 19: API use(), Actions, useOptimistic и ref как проп"
+sidebarLabel: "Хук use(), Actions и ref"
+summary: "Шпаргалка по главным API React 19: чтение промисов и контекста через use() внутри условий, мутации через useActionState и отказ от forwardRef."
+category: "react"
+readingTime: "5 мин"
+publishedAt: "2026-11-06"
+order: 2
+tldr:
+  - "`use(resource)` распаковывает `Promise` (в связке с `<Suspense>`) и `Context` — в отличие от обычных хуков, его **можно** вызывать внутри `if` и циклов."
+  - "`useActionState` и `useOptimistic` заменяют ручные связки `isLoading / error` и дают мгновенный оптимистичный отклик UI с авто-откатом."
+  - "Обёртка `forwardRef` ушла в прошлое: `ref` принимается функциональным компонентом как обычный проп."
+---
+
+## 1. API `use()`: потоковые промисы и условный контекст
+
+В отличие от классического `useContext`, функцию `use()` разрешено вызывать после ранних `return` и внутри условных веток `if`.
+
+### Потоковая передача промиса из Server Component на клиент
+
+```tsx title="Стриминг промиса без блокировки SSR"
+'use client'
+import { use } from 'react'
+
+export function MetricsSummary({ metricsPromise }: { metricsPromise: Promise<MetricsDto> }) {
+  const data = use(metricsPromise)
+  return <span className="font-mono">{data.viewsCount} просмотров</span>
+}
+```
+
+> [!TIP]
+> Запускайте промис в **Server Component** без `await`, оборачивайте клиентский виджет в `<Suspense>` и раскрывайте данные через `use(promise)` — так HTML страницы улетает в браузер мгновенно без серверного водопада (`waterfall`).
+
+## 2. Главные эргономические улучшения в React 19
+
+| Задача | Бойлерплейт в React 18 | Стандарт в React 19 |
+| :--- | :--- | :--- |
+| Проброс `ref` в инпут/кнопку | `forwardRef<HTMLInputElement, Props>((props, ref) => ...)` | `function Input({ ref, ...props }: Props)` |
+| Объявление провайдера | `<ThemeContext.Provider value={theme}>` | `<ThemeContext value={theme}>` |
+| Сабмит и лоадер мутации | Ручные `useState` для `isLoading` и `error` | `const [state, action, isPending] = useActionState(...)` |
+| Метаданные документа | Сторонние обёртки или ручная работа с `head` | Нативный подъём `<title>`, `<meta>`, `<link>` в `<head>` |

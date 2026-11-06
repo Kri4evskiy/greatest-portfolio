@@ -1,0 +1,35 @@
+---
+title: "Єдині контракти API: Суворий TypeScript та спільні схеми Zod"
+sidebarLabel: "Спільні Zod-контракти"
+metricSlug: "strict-typescript-zod-contracts"
+summary: "Як пакет @repo/shared-schemas виключає розсинхронізацію DTO між React Hook Form на клієнті та NestJS ZodValidationPipe на бекенді."
+category: "typescript"
+readingTime: "5 хв"
+publishedAt: "2026-10-16"
+order: 1
+tldr:
+  - "Спочатку схема `Zod`, потім тип через `z.infer<typeof Schema>` у пакеті `@repo/shared-schemas`."
+  - "Увімкнено `strict: true`, `noUncheckedIndexedAccess: true` та `exactOptionalPropertyTypes: true` у `tsconfig.base.json`."
+  - "Одна й та сама схема валідує форму у `React Hook Form` та вхідний запит у `NestJS ZodValidationPipe`."
+---
+
+## 1. Усунення дрейфу контрактів між фронтендом і бекендом
+
+Коли `Next.js` та `NestJS` описують інтерфейси окремо вручну, перейменування поля у DTO не ловиться компілятором на клієнті й спливає помилкою в продакшені.
+
+## 2. Єдине джерело істини в `@repo/shared-schemas`
+
+```typescript title="packages/shared-schemas/src/auth.schema.ts"
+export const GuestPassFormSchema = z.object({
+  displayName: z.string().trim().min(2).max(50),
+  visitorType: VisitorRoleTypeEnum,
+  adminPasscode: z.string().trim().max(100).optional(),
+})
+export type GuestPassFormInput = z.infer<typeof GuestPassFormSchema>
+```
+
+| Контур перевірки | Точка інтеграції | Що гарантує |
+| :--- | :--- | :--- |
+| **Збірка (`tsc`)** | `noUncheckedIndexedAccess` + `z.infer` | Миттєве падіння `pnpm turbo typecheck` при зміні поля |
+| **Клієнт (`apps/web`)** | `zodResolver(GuestPassFormSchema)` | Миттєва валідація полів форми до відправки в мережу |
+| **Сервер (`apps/api`)** | `ZodValidationPipe(GuestPassFormSchema)` | Сувора рантайм-перевірка тіла HTTP-запиту в NestJS |

@@ -1,9 +1,16 @@
 ---
-title: "Оптимізація бандла з TanStack Redact, Offline-First IndexedDB та Multi-Stage Docker"
+title: "Оптимізація бандла з TanStack Redact та Offline-First IndexedDB"
+sidebarLabel: "Offline IndexedDB та Redact"
+metricSlug: "tanstack-redact-bundle-docker"
 summary: "Результати виміру клієнтського JS-бандла, архітектура асинхронного кешу в IndexedDB (0 мс в Offline) та збірка Docker-образів із turbo prune."
 category: "architecture-devops"
 readingTime: "7 хв"
 publishedAt: "2026-10-25"
+order: 1
+tldr:
+  - "`TanStack Query v5` зберігає кеш у асинхронній **IndexedDB** (`idb-keyval`, `gcTime: 24h`), даючи **0 мс** відгуку навіть без мережі."
+  - "`optimizePackageImports` та `next/dynamic` скорочують First Load JS на **32%**, а профіль `TanStack Redact` — на **45%**."
+  - "Триступенева збірка `turbo prune --docker` ізолює мінімальний продакшен-артефакт на `node:22-alpine`."
 ---
 
 ## 1. Offline-First кешування в браузерній БД `IndexedDB`
@@ -18,13 +25,11 @@ publishedAt: "2026-10-25"
 
 У `apps/web/next.config.ts` інтегровані `@next/bundle-analyzer` та обгортка `withRedact` (`ENABLE_REDACT=true`) спільно з агресивним code-splitting (`optimizePackageImports` для `lucide-react`, `d3`, `@repo/ui` та `next/dynamic` для важких віджетів).
 
-```text
-Конфігурація збірки                  First Load JS (Shared)   KB Article Route
-------------------------------------------------------------------------------
-Базовий бандл (без оптимізацій)      142.8 kB                 198.4 kB
-Next.js 16 + Dynamic D3 + TreeShake   96.4 kB (-32%)          118.2 kB (-40%)
-Експериментальний профіль Redact      78.1 kB (-45%)           94.6 kB (-52%)
-```
+| Конфігурація збірки | First Load JS (Shared) | Маршрут статті БЗ |
+| :--- | :---: | :---: |
+| Базовий бандл (без оптимізацій) | 142.8 kB | 198.4 kB |
+| Next.js 16 + Dynamic D3 + TreeShake | **96.4 kB (-32%)** | **118.2 kB (-40%)** |
+| Експериментальний профіль Redact | **78.1 kB (-45%)** | **94.6 kB (-52%)** |
 
 ## 3. Триступенева контейнеризація (`Docker` + `turbo prune`)
 

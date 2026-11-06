@@ -1,9 +1,16 @@
 ---
 title: "Zero-Trust Security: JWT in HttpOnly Cookies, Prisma ORM, and SSE Telemetry"
+sidebarLabel: "HttpOnly JWT, Prisma & SSE"
+metricSlug: "nestjs-jwt-httponly-prisma-sse"
 summary: "Why storing tokens in LocalStorage is vulnerable to XSS, how Next.js Edge Proxy + NestJS Guards work together, and reactive @Sse streaming."
 category: "nestjs-prisma"
 readingTime: "9 min"
 publishedAt: "2026-10-21"
+order: 1
+tldr:
+  - "JWT tokens live strictly inside `HttpOnly, Secure, SameSite=Lax` cookies — completely invisible to `document.cookie` XSS vectors."
+  - "Dual-layer verification: **Next.js Edge Proxy** (`src/proxy.ts`) + **NestJS `JwtRolesGuard`** (`USER` / `ADMIN`)."
+  - "Atomic `prisma.articleMetrics.upsert` emits live TCP events (`:4001`) into `telemetry-ms`, streamed back via `@Sse('stream')`."
 ---
 
 ## 1. Why We Banned `LocalStorage` for JWT Tokens
@@ -12,12 +19,10 @@ Storing `accessToken` in `window.localStorage` or `sessionStorage` exposes the a
 
 Our monorepo implements **HttpOnly Cookie + Dual-Layer RBAC**:
 
-1. When the `POST /api/auth/guest-pass` micro-form is submitted, the **NestJS** backend records a `VisitorSession` in PostgreSQL via **Prisma ORM**.
-2. The server signs a JWT and sets the `Set-Cookie` header:
-   - `HttpOnly` — client-side JavaScript cannot access `kb_access_token` via `document.cookie`.
-   - `SameSite=Lax` and `Secure` — mitigates CSRF and network interception.
-3. **Layer 1 (Next.js Edge Proxy):** Verifies cookie presence and structure at the Edge before rendering any `/knowledge-base/*` route.
-4. **Layer 2 (NestJS `JwtRolesGuard`):** Verifies the cryptographic JWT signature and role (`USER` / `ADMIN`) on `/api/knowledge/*` endpoints.
+1. When `POST /api/auth/guest-pass` is submitted, **NestJS** records a `VisitorSession` in PostgreSQL via **Prisma ORM**.
+2. The server signs a JWT and sets `Set-Cookie` with `HttpOnly`, `SameSite=Lax`, and `Secure`.
+3. **Layer 1 (Next.js Edge Proxy):** Verifies cookie structure at the Edge before rendering `/knowledge-base/*`.
+4. **Layer 2 (NestJS `JwtRolesGuard`):** Verifies the cryptographic signature and role (`USER` / `ADMIN`) on `/api/knowledge/*`.
 
 <ArchitectureFlowD3 />
 
@@ -25,12 +30,12 @@ Our monorepo implements **HttpOnly Cookie + Dual-Layer RBAC**:
 
 When a Tech Lead opens an article or clicks `Helpful`, the backend performs an atomic `upsert` in PostgreSQL (`Neon.tech`), preventing race conditions:
 
-```typescript
+```typescript title="apps/api/src/modules/knowledge/knowledge.service.ts"
 await this.prisma.articleMetrics.upsert({
   where: { slug },
   update: { helpfulCount: { increment: 1 } },
   create: { slug, category, viewsCount: 1, helpfulCount: 1 },
-});
+})
 ```
 
 Immediately after writing, `apps/api` emits an event over TCP (`port 4001`) to the dedicated `apps/telemetry-ms` microservice, and subscribers of `GET /api/telemetry/stream` (`@Sse`) see the live update in the footer indicator.

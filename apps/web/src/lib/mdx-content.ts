@@ -31,6 +31,8 @@ export interface MdxArticleFrontmatter {
   locale: SupportedLocale
   isFallback: boolean
   title: string
+  /** Concise single-line label displayed inside the left sidebar tree */
+  sidebarLabel: string
   summary: string
   readingTime: string
   publishedAt: string
@@ -73,6 +75,7 @@ export interface KnowledgeTreeFolderNode {
   label: string
   pathSegments: string[]
   articleCount: number
+  minOrder: number
   children: KnowledgeTreeNode[]
 }
 
@@ -253,7 +256,7 @@ function parseRawMdx(
   const category = parsedCategory.success ? parsedCategory.data : fallbackCategory
   const pathSegments = [category, ...relativeSubSegments, leafSlug]
   const routePath = pathSegments.join('/')
-  const metricSlug = relativeSubSegments.length === 0 ? leafSlug : pathSegments.join('--')
+  const metricSlug = meta.metricSlug || (relativeSubSegments.length === 0 ? leafSlug : pathSegments.join('--'))
   const parsedOrder = meta.order ? Number.parseInt(meta.order, 10) : Number.NaN
 
   const lines = markdownBody.split(/\r?\n/)
@@ -456,6 +459,7 @@ function parseRawMdx(
     })
   }
 
+  const resolvedTitle = meta.title ?? leafSlug
   return {
     slug: metricSlug,
     leafSlug,
@@ -464,9 +468,10 @@ function parseRawMdx(
     routePath,
     locale,
     isFallback,
-    title: meta.title ?? leafSlug,
+    title: resolvedTitle,
+    sidebarLabel: meta.sidebarLabel || resolvedTitle,
     summary: meta.summary ?? '',
-    readingTime: meta.readingTime ?? '5 min',
+    readingTime: meta.readingTime ?? meta.readTime ?? '5 min',
     publishedAt: meta.publishedAt ?? '2026-10-15',
     order: Number.isFinite(parsedOrder) ? parsedOrder : 999,
     tldr,
@@ -490,6 +495,7 @@ function toFrontmatter(doc: MdxArticleDocument): MdxArticleFrontmatter {
     locale: doc.locale,
     isFallback: doc.isFallback,
     title: doc.title,
+    sidebarLabel: doc.sidebarLabel,
     summary: doc.summary,
     readingTime: doc.readingTime,
     publishedAt: doc.publishedAt,
@@ -577,6 +583,7 @@ function insertArticleIntoFolder(
   locale: SupportedLocale,
 ): void {
   folder.articleCount += 1
+  folder.minOrder = Math.min(folder.minOrder, article.order)
 
   if (remainingSegments.length <= 1) {
     folder.children.push({
@@ -605,6 +612,7 @@ function insertArticleIntoFolder(
       label: formatKnowledgeSegmentLabel(nextSegment, locale),
       pathSegments: nextPathSegments,
       articleCount: 0,
+      minOrder: article.order,
       children: [],
     }
     folder.children.push(childFolder)
@@ -619,10 +627,10 @@ function sortTreeNodesRecursively(nodes: KnowledgeTreeNode[]): void {
       return a.type === 'folder' ? -1 : 1
     }
     if (a.type === 'folder' && b.type === 'folder') {
-      return a.label.localeCompare(b.label)
+      return a.minOrder - b.minOrder || a.label.localeCompare(b.label)
     }
     if (a.type === 'article' && b.type === 'article') {
-      return a.article.order - b.article.order || a.article.title.localeCompare(b.article.title)
+      return a.article.order - b.article.order || a.article.sidebarLabel.localeCompare(b.article.sidebarLabel)
     }
     return 0
   })
@@ -651,6 +659,7 @@ export const getKnowledgeTree = cache((localeInput?: string): KnowledgeTreeFolde
       label: formatKnowledgeSegmentLabel(category, locale),
       pathSegments: [category],
       articleCount: 0,
+      minOrder: 999,
       children: [],
     }
 

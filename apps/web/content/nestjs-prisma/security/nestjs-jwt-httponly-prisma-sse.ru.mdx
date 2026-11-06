@@ -1,9 +1,16 @@
 ---
 title: "Zero-Trust Security: JWT в HttpOnly Cookies, Prisma ORM и SSE Телеметрия"
-summary: "Почему хранение токенов в LocalStorage уязвимо к XSS, как работает связка Next.js Edge Middleware + NestJS Guards и реактивный стрим @Sse."
+sidebarLabel: "HttpOnly JWT, Prisma и SSE"
+metricSlug: "nestjs-jwt-httponly-prisma-sse"
+summary: "Почему хранение токенов в LocalStorage уязвимо к XSS, как работает связка Next.js Edge Proxy + NestJS Guards и реактивный стрим @Sse."
 category: "nestjs-prisma"
 readingTime: "9 мин"
 publishedAt: "2026-10-21"
+order: 1
+tldr:
+  - "JWT-токены хранятся строго в `HttpOnly, Secure, SameSite=Lax` куках — клиентский JS физически не может прочитать `kb_access_token`."
+  - "Двойной контур авторизации: **Next.js Edge Proxy** (`src/proxy.ts`) + **NestJS `JwtRolesGuard`** (`USER` / `ADMIN`)."
+  - "Атомарный `prisma.articleMetrics.upsert` отправляет TCP-импульс (`:4001`) в `telemetry-ms` с трансляцией через `@Sse('stream')`."
 ---
 
 ## 1. Почему мы запретили `LocalStorage` для JWT-токенов
@@ -13,10 +20,8 @@ publishedAt: "2026-10-21"
 В нашем монорепозитории реализована схема **HttpOnly Cookie + Dual-Layer RBAC**:
 
 1. При сабмите микро-формы `POST /api/auth/guest-pass` бэкенд **NestJS** создает запись `VisitorSession` в PostgreSQL через **Prisma ORM**.
-2. Сервер подписывает JWT и выставляет заголовок `Set-Cookie`:
-   - `HttpOnly` — JavaScript в браузере физически не видит куку `kb_access_token` в `document.cookie`.
-   - `SameSite=Lax` и `Secure` — защита от CSRF и перехвата трафика.
-3. **Уровень 1 (Next.js Edge Middleware):** До рендера любой страницы `/knowledge-base/*` проверяет наличие и структуру куки на Edge.
+2. Сервер подписывает JWT и выставляет `Set-Cookie` с флагами `HttpOnly`, `SameSite=Lax` и `Secure`.
+3. **Уровень 1 (Next.js Edge Proxy):** До рендера любой страницы `/knowledge-base/*` проверяет наличие и структуру куки на Edge.
 4. **Уровень 2 (NestJS `JwtRolesGuard`):** Проверяет криптографическую подпись JWT и роль (`USER` / `ADMIN`) при запросах к `/api/knowledge/*`.
 
 <ArchitectureFlowD3 />
@@ -25,12 +30,12 @@ publishedAt: "2026-10-21"
 
 Когда тимлид открывает статью или нажимает кнопку `Helpful`, бэкенд выполняет атомарный `upsert` в PostgreSQL (`Neon.tech`), исключающий состояние гонки (`race condition`):
 
-```typescript
+```typescript title="apps/api/src/modules/knowledge/knowledge.service.ts"
 await this.prisma.articleMetrics.upsert({
   where: { slug },
   update: { helpfulCount: { increment: 1 } },
   create: { slug, category, viewsCount: 1, helpfulCount: 1 },
-});
+})
 ```
 
-Сразу после записи `apps/api` отправляет событие по TCP (` порт 4001`) в выделенный микросервис `apps/telemetry-ms`, а подписчики эндпоинта `GET /api/telemetry/stream` (`@Sse`) мгновенно видят обновление в живом индикаторе футера.
+Сразу после записи `apps/api` отправляет событие по TCP (`порт 4001`) в выделенный микросервис `apps/telemetry-ms`, а подписчики эндпоинта `GET /api/telemetry/stream` (`@Sse`) мгновенно видят обновление в живом индикаторе футера.

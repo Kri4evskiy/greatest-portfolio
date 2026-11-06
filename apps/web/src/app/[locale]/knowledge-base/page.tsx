@@ -1,4 +1,9 @@
-import { DEFAULT_LOCALE, getKnowledgeCategoryLabel, SupportedLocaleEnum } from '@repo/shared-schemas'
+import {
+  DEFAULT_LOCALE,
+  formatKnowledgeSegmentLabel,
+  getKnowledgeCategoryLabel,
+  SupportedLocaleEnum,
+} from '@repo/shared-schemas'
 import { Badge, Callout, Card, CardContent, CardDescription, CardHeader, CardTitle } from '@repo/ui'
 import { ArrowRight, Clock, Database, FolderOpen, ShieldCheck, Sparkles } from 'lucide-react'
 import { getTranslations } from 'next-intl/server'
@@ -81,7 +86,10 @@ export default async function KnowledgeBaseIndexPage({ params }: { params: Promi
       {/* All Articles Grid */}
       <div className="grid gap-4 sm:grid-cols-2">
         {articles.map((article) => {
-          const subPath = article.pathSegments.slice(1, -1).join(' / ')
+          const subPath = article.pathSegments
+            .slice(1, -1)
+            .map((seg) => formatKnowledgeSegmentLabel(seg, resolvedLocale))
+            .join(' / ')
           return (
             <Link key={article.routePath} href={`/knowledge-base/${article.routePath}`} className="group block">
               <Card className="h-full transition-all group-hover:border-primary/50 group-hover:shadow-md">
