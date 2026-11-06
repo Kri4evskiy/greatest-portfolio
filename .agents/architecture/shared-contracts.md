@@ -30,7 +30,8 @@
 
 ### 3. Метаданные Базы Знаний (`knowledge.schema.ts`)
 
-- `KnowledgeCategoryEnum = z.enum(['typescript', 'react', 'nestjs-prisma', 'architecture-devops'])`
+- `KnowledgeCategoryEnum = z.enum(['this-project', 'typescript', 'react', 'nestjs-prisma', 'architecture-devops', 'databases-sql', 'system-design'])`
+- `getKnowledgeCategoryLabel(category, locale)` и `formatKnowledgeSegmentLabel(segment, locale)` — локализованные названия корневых разделов и вложенных подпапок любой глубины.
 - `ArticleMetaSchema`:
   - `slug`: `z.string().min(1)`
   - `category`: `KnowledgeCategoryEnum`

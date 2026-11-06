@@ -1,0 +1,28 @@
+---
+title: "Mobile-First UI, Боковий навігатор секцій та фікс ScrollSpy-якорів"
+summary: "Чому ми розвантажили шапку сайту, як усунули зависання повторного кліку по #hash у Next.js App Router і побудували плаваючий навігатор у стилі Notion."
+category: "this-project"
+readingTime: "5 хв"
+publishedAt: "2026-11-06"
+order: 2
+---
+
+## 1. Усунення завмирання повторного кліку по якорю в Next.js
+
+Стандартний компонент Link у Next.js пропускає прокрутку, якщо поточний #hash в URL вже збігається з цільовим після ручного скролу. Хук useSectionNavigation викликає нативний scrollIntoView напряму при кожному натисканні:
+
+```typescript
+const element = document.getElementById(sectionId)
+if (element) {
+  element.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  window.history.replaceState(null, '', `#${sectionId}`)
+}
+```
+
+## 2. Чистий Хедер та адаптивний PageSectionNavigator
+
+Винесення навігації по секціях із шапки звільнило простір для екранів 360px і розділило патерни керування під тип пристрою:
+
+- Десктоп (xl+): паряща бічна панель у стилі Notion праворуч від контенту з пасивним ScrollSpy на requestAnimationFrame.
+- Смартфони та планшети (< xl): ергономічна плаваюча кнопка-пігулка під великий палець у правому нижньому кутку.
+- Мобільні картки Tech Radar: на екранах < md широка таблиця перетворюється на компактні картки технологій з інспектором ADR.

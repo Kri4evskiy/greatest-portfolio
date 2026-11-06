@@ -10,6 +10,7 @@ interface UIState {
   techRadarCategoryFilter: TechCategory | 'ALL'
   techRadarSearch: string
   isKbSidebarOpen: boolean
+  expandedKbFolders: Record<string, boolean>
   reactGraphMode: ReactRenderMode
   archFlowActiveNode: string | null
 
@@ -21,8 +22,20 @@ interface UIState {
   setTechRadarSearch: (search: string) => void
   toggleKbSidebar: () => void
   setKbSidebarOpen: (open: boolean) => void
+  toggleKbFolder: (pathKey: string) => void
+  expandKbAncestors: (pathKeys: readonly string[]) => void
   setReactGraphMode: (mode: ReactRenderMode) => void
   setArchFlowActiveNode: (nodeId: string | null) => void
+}
+
+const DEFAULT_EXPANDED_FOLDERS: Record<string, boolean> = {
+  'this-project': true,
+  'this-project/monorepo-docker': true,
+  'this-project/mobile-first-ui': true,
+  typescript: true,
+  react: true,
+  'nestjs-prisma': true,
+  'architecture-devops': true,
 }
 
 export const useUIStore = create<UIState>((set) => ({
@@ -32,6 +45,7 @@ export const useUIStore = create<UIState>((set) => ({
   techRadarCategoryFilter: 'ALL',
   techRadarSearch: '',
   isKbSidebarOpen: true,
+  expandedKbFolders: DEFAULT_EXPANDED_FOLDERS,
   reactGraphMode: 'react19',
   archFlowActiveNode: 'nextjs-edge',
 
@@ -67,6 +81,25 @@ export const useUIStore = create<UIState>((set) => ({
   setKbSidebarOpen: (open) =>
     set({
       isKbSidebarOpen: open,
+    }),
+  toggleKbFolder: (pathKey) =>
+    set((state) => ({
+      expandedKbFolders: {
+        ...state.expandedKbFolders,
+        [pathKey]: !(state.expandedKbFolders[pathKey] ?? false),
+      },
+    })),
+  expandKbAncestors: (pathKeys) =>
+    set((state) => {
+      let changed = false
+      const next = { ...state.expandedKbFolders }
+      for (const key of pathKeys) {
+        if (!next[key]) {
+          next[key] = true
+          changed = true
+        }
+      }
+      return changed ? { expandedKbFolders: next } : state
     }),
   setReactGraphMode: (mode) =>
     set({

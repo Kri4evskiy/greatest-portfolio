@@ -1,0 +1,28 @@
+---
+title: "Mobile-First UI, Floating Section Navigator & Anchor ScrollSpy"
+summary: "Why we removed section links from the sticky header, solved Next.js repeated hash-click stalls, and built a Notion-style floating rail + mobile thumb pill."
+category: "this-project"
+readingTime: "5 min"
+publishedAt: "2026-11-06"
+order: 2
+---
+
+## 1. Solving Repeated Hash-Click Stalls in Next.js App Router
+
+Standard Next.js Link components skip scrolling if window.location.hash already matches the target href after manual user scrolling. Our custom useSectionNavigation hook invokes scrollIntoView directly whenever pathname is on the home page:
+
+```typescript
+const element = document.getElementById(sectionId)
+if (element) {
+  element.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  window.history.replaceState(null, '', `#${sectionId}`)
+}
+```
+
+## 2. Decluttered Header & Ergonomic Floating Navigator
+
+Moving the 4 CV section links out of WorkfolioHeader freed horizontal space for 360px mobile viewports and established two adaptive navigation surfaces:
+
+- Desktop (xl+): Notion-inspired floating outline rail on the right margin with rAF-throttled passive ScrollSpy indicators.
+- Mobile & Tablet (< xl): Thumb-friendly bottom-right floating pill showing the active section and opening a quick-jump popover.
+- Mobile Card View for Tech Radar: Replaces 6-column horizontal table scrolling on phones with structured ADR cards.

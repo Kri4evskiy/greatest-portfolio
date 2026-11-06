@@ -1,0 +1,47 @@
+---
+title: "pnpm 12, allowBuilds та BuildKit оптимізація Multi-Stage Docker"
+summary: "Як ми перевели монорепозиторій на pnpm 12.16.1, налаштували суворий allowBuilds і прискорили експорт Docker-шарів у 5 разів завдяки BuildKit cache mounts та pnpm prune --prod."
+category: "this-project"
+readingTime: "6 хв"
+publishedAt: "2026-11-06"
+order: 1
+---
+
+## 1. Міграція з pnpm 10 на pnpm 12 (Rust-ядро + SQLite-стор)
+
+Починаючи з pnpm 12, блок налаштувань у package.json (onlyBuiltDependencies) більше не читається — усі дозволи на postinstall-скрипти живуть виключно у словнику allowBuilds усередині pnpm-workspace.yaml.
+
+```yaml
+packages:
+  - "apps/*"
+  - "packages/*"
+
+allowBuilds:
+  "@biomejs/biome": true
+  "@parcel/watcher": true
+  "@prisma/client": true
+  "@prisma/engines": true
+  "@swc/core": true
+  esbuild: true
+  lefthook: true
+  prisma: true
+  sharp: true
+```
+
+## 2. Спільний BuildKit Cache Mount для 3 мікросервісів
+
+Замість повторного завантаження 100+ МБ однакових бінарників у кожному контейнері ми підключили персистентний кеш BuildKit для стора pnpm та прогріли бінарник pnpm у базовому шарі:
+
+```dockerfile
+RUN corepack enable && corepack prepare pnpm@12.16.1 --activate && pnpm --version
+RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
+    pnpm install --frozen-lockfile --ignore-scripts
+```
+
+## 3. Очищення devDependencies зі збереженням Prisma Client
+
+Виклик pnpm prune --prod --ignore-scripts після turbo run build прибирає Biome, Turbo, TypeScript і Prisma CLI (~180 МБ) з фінальних runner-образів, зберігаючи згенерований рантайм .prisma/client:
+
+- Стиснутий образ telemetry-ms: 64.3 MB
+- Стиснутий образ api: 78.2 MB (підключення до PostgreSQL за 15 мс)
+- Стиснутий образ web (standalone): 85.6 MB
