@@ -19,7 +19,9 @@
     "languageLabel": "Language",
     "themeToggle": "Switch between Light and Dark theme",
     "sectionNavTitle": "On this page",
-    "scrollToTop": "Back to top"
+    "scrollToTop": "Back to top",
+    "searchPlaceholder": "Search notes...",
+    "searchAria": "Open global search (Ctrl+K)"
   },
   "Hero": {
     "openBadge": "● Open to Senior Full-Stack / Tech Lead Proposals",
@@ -152,7 +154,28 @@
     "fallbackNotice": "This article is currently displayed in the fallback language ({fallbackLocale}).",
     "viewsLabel": "{count} views",
     "indexedDbBadge": "Cached in IndexedDB (0ms Offline Read)",
-    "helpfulBtn": "Helpful ({count})"
+    "helpfulBtn": "Helpful ({count})",
+    "sidebarSearchTrigger": "Search notes & #tags...",
+    "filterFormatAll": "All formats",
+    "filterTagsLabel": "Filter by #tag:",
+    "clearFilters": "Reset filters",
+    "filteredResultsHeading": "Filtered Notes ({count})",
+    "noFilteredResults": "No notes match the selected format or #tag.",
+    "prevArticleLabel": "Previous note",
+    "nextArticleLabel": "Next note",
+    "relatedNotesHeading": "Related notes by #tags",
+    "cmdPlaceholder": "Search articles, h2/h3 headings, subtopics, or #tags...",
+    "cmdEmpty": "No matching notes or headings found.",
+    "cmdQuickActionsHeading": "Quick Navigation",
+    "cmdArticlesHeading": "Knowledge Base Notes",
+    "cmdHeadingsMatch": "Section:",
+    "cmdActionCvHome": "Workfolio CV — Overview & Experience",
+    "cmdActionTechRadar": "Tech Radar — 16 Architecture Decisions (ADR)",
+    "cmdActionKbOverview": "Knowledge Base — All Topics & Subtopics",
+    "cmdHintNavigate": "↑↓ navigate",
+    "cmdHintOpen": "↵ open",
+    "cmdHintClose": "esc close",
+    "cmdLockedBadge": "1-Click Unlock"
   },
   "Footer": {
     "waitingPulse": "/api/telemetry/stream • Waiting for pulse..."

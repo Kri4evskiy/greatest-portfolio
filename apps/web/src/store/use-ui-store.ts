@@ -6,6 +6,8 @@ export type ReactRenderMode = 'react18' | 'react19'
 interface UIState {
   isGuestPassModalOpen: boolean
   pendingRedirectPath: string | null
+  isCommandPaletteOpen: boolean
+  commandPaletteInitialQuery: string
   selectedAdrItem: TechRadarItem | null
   techRadarCategoryFilter: TechCategory | 'ALL'
   techRadarSearch: string
@@ -16,6 +18,8 @@ interface UIState {
 
   openGuestPassModal: (redirectPath?: string | null) => void
   closeGuestPassModal: () => void
+  openCommandPalette: (initialQuery?: string) => void
+  closeCommandPalette: () => void
   openAdrInspector: (item: TechRadarItem) => void
   closeAdrInspector: () => void
   setTechRadarCategoryFilter: (category: TechCategory | 'ALL') => void
@@ -35,6 +39,8 @@ const DEFAULT_EXPANDED_FOLDERS: Record<string, boolean> = {}
 export const useUIStore = create<UIState>((set) => ({
   isGuestPassModalOpen: false,
   pendingRedirectPath: null,
+  isCommandPaletteOpen: false,
+  commandPaletteInitialQuery: '',
   selectedAdrItem: null,
   techRadarCategoryFilter: 'ALL',
   techRadarSearch: '',
@@ -51,6 +57,16 @@ export const useUIStore = create<UIState>((set) => ({
   closeGuestPassModal: () =>
     set({
       isGuestPassModalOpen: false,
+    }),
+  openCommandPalette: (initialQuery = '') =>
+    set({
+      isCommandPaletteOpen: true,
+      commandPaletteInitialQuery: initialQuery,
+    }),
+  closeCommandPalette: () =>
+    set({
+      isCommandPaletteOpen: false,
+      commandPaletteInitialQuery: '',
     }),
   openAdrInspector: (item) =>
     set({

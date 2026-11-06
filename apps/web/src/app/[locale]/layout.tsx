@@ -5,9 +5,11 @@ import { notFound } from 'next/navigation'
 import { NextIntlClientProvider } from 'next-intl'
 import { getMessages, getTranslations } from 'next-intl/server'
 import { type ReactNode, Suspense } from 'react'
+import { CommandPaletteModal } from '@/components/knowledge/command-palette-modal'
 import { WorkfolioFooter } from '@/components/layout/workfolio-footer'
 import { WorkfolioHeader } from '@/components/layout/workfolio-header'
 import { GuestPassModal } from '@/features/auth/guest-pass-modal'
+import { getAllKnowledgeTags, getKnowledgeSearchIndex } from '@/lib/mdx-content'
 import { QueryProvider } from '@/providers/query-provider'
 import { ThemeProvider } from '@/providers/theme-provider'
 
@@ -41,6 +43,8 @@ export default async function LocaleRootLayout({
   }
 
   const messages = await getMessages()
+  const searchIndex = getKnowledgeSearchIndex(parsed.data)
+  const topTags = getAllKnowledgeTags(parsed.data)
 
   return (
     <html lang={parsed.data} suppressHydrationWarning>
@@ -56,6 +60,7 @@ export default async function LocaleRootLayout({
                 <Suspense fallback={null}>
                   <GuestPassModal />
                 </Suspense>
+                <CommandPaletteModal items={searchIndex} topTags={topTags} locale={parsed.data} />
                 <main className="flex-1">{children}</main>
                 <WorkfolioFooter />
               </div>

@@ -11,6 +11,7 @@ import {
   FolderOpen,
   Layers,
   PanelLeft,
+  Search,
   Sparkles,
 } from 'lucide-react'
 import { useTranslations } from 'next-intl'
@@ -174,6 +175,7 @@ export function KnowledgeSidebar({
   const expandKbAncestors = useUIStore((s) => s.expandKbAncestors)
   const collapseAllKbFolders = useUIStore((s) => s.collapseAllKbFolders)
   const expandAllKbFolders = useUIStore((s) => s.expandAllKbFolders)
+  const openCommandPalette = useUIStore((s) => s.openCommandPalette)
   const [isMobileOpen, setIsMobileOpen] = useState(false)
 
   const allFolderKeys = useMemo(() => collectAllFolderKeys(tree), [tree])
@@ -204,6 +206,23 @@ export function KnowledgeSidebar({
 
   const renderTreeContent = (closeOnSelect: boolean) => (
     <div className="space-y-3 rounded-xl border border-border bg-card p-3 shadow-sm">
+      <button
+        type="button"
+        onClick={() => {
+          if (closeOnSelect) setIsMobileOpen(false)
+          openCommandPalette('')
+        }}
+        className="flex w-full items-center justify-between gap-2 rounded-lg border border-border/80 bg-muted/30 px-2.5 py-1.5 text-left text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:bg-muted hover:text-foreground"
+      >
+        <span className="flex min-w-0 items-center gap-2 truncate">
+          <Search className="h-3.5 w-3.5 shrink-0 text-primary" />
+          <span className="truncate">{t('sidebarSearchTrigger')}</span>
+        </span>
+        <kbd className="shrink-0 rounded border border-border bg-background px-1.5 py-0.5 font-mono text-[10px]">
+          ⌘K
+        </kbd>
+      </button>
+
       <div className="flex items-center gap-1 border-b border-border/60 pb-2.5">
         <Link
           href="/knowledge-base"

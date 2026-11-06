@@ -19,7 +19,9 @@
     "languageLabel": "Мова",
     "themeToggle": "Перемкнути світлу / темну тему",
     "sectionNavTitle": "Навігація по сторінці",
-    "scrollToTop": "Догори"
+    "scrollToTop": "Догори",
+    "searchPlaceholder": "Пошук...",
+    "searchAria": "Відкрити глобальний пошук (Ctrl+K)"
   },
   "Hero": {
     "openBadge": "● Відкритий до пропозицій Senior Full-Stack / Tech Lead",
@@ -152,7 +154,28 @@
     "fallbackNotice": "Ця стаття зараз відображається резервною мовою ({fallbackLocale}).",
     "viewsLabel": "{count} переглядів",
     "indexedDbBadge": "Cached in IndexedDB (0ms Offline Read)",
-    "helpfulBtn": "Корисно ({count})"
+    "helpfulBtn": "Корисно ({count})",
+    "sidebarSearchTrigger": "Пошук конспектів та #тегів...",
+    "filterFormatAll": "Усі формати",
+    "filterTagsLabel": "Фільтр за #тегом:",
+    "clearFilters": "Скинути фільтри",
+    "filteredResultsHeading": "Знайдені конспекти ({count})",
+    "noFilteredResults": "Немає конспектів за обраним форматом або #тегом.",
+    "prevArticleLabel": "Попередня стаття",
+    "nextArticleLabel": "Наступна стаття",
+    "relatedNotesHeading": "Схожі конспекти за #тегами",
+    "cmdPlaceholder": "Пошук статей, підзаголовків h2/h3, підтем або #тегів...",
+    "cmdEmpty": "Нічого не знайдено за вашим запитом.",
+    "cmdQuickActionsHeading": "Швидкі переходи",
+    "cmdArticlesHeading": "Конспекти Бази Знань",
+    "cmdHeadingsMatch": "Розділ:",
+    "cmdActionCvHome": "Workfolio CV — Головна та Досвід",
+    "cmdActionTechRadar": "Tech Radar — Матриця 16 технологій (ADR)",
+    "cmdActionKbOverview": "База Знань — Усі теми та підтеми",
+    "cmdHintNavigate": "↑↓ вибір",
+    "cmdHintOpen": "↵ відкрити",
+    "cmdHintClose": "esc закрити",
+    "cmdLockedBadge": "1-Клік доступ"
   },
   "Footer": {
     "waitingPulse": "/api/telemetry/stream • Очікування пульсу..."

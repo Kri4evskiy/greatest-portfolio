@@ -19,7 +19,9 @@
     "languageLabel": "Язык",
     "themeToggle": "Переключить светлую / тёмную тему",
     "sectionNavTitle": "Навигация по странице",
-    "scrollToTop": "Наверх"
+    "scrollToTop": "Наверх",
+    "searchPlaceholder": "Поиск...",
+    "searchAria": "Открыть глобальный поиск (Ctrl+K)"
   },
   "Hero": {
     "openBadge": "● Открыт к предложениям Senior Full-Stack / Tech Lead",
@@ -152,7 +154,28 @@
     "fallbackNotice": "Эта статья сейчас отображается на резервном языке ({fallbackLocale}).",
     "viewsLabel": "{count} просмотров",
     "indexedDbBadge": "Cached in IndexedDB (0ms Offline Read)",
-    "helpfulBtn": "Полезно ({count})"
+    "helpfulBtn": "Полезно ({count})",
+    "sidebarSearchTrigger": "Поиск статей и #тегов...",
+    "filterFormatAll": "Все форматы",
+    "filterTagsLabel": "Фильтр по #тегу:",
+    "clearFilters": "Сбросить фильтры",
+    "filteredResultsHeading": "Найденные конспекты ({count})",
+    "noFilteredResults": "Нет конспектов по выбранному формату или #тегу.",
+    "prevArticleLabel": "Предыдущая статья",
+    "nextArticleLabel": "Следующая статья",
+    "relatedNotesHeading": "Похожие конспекты по #тегам",
+    "cmdPlaceholder": "Поиск статей, подзаголовков h2/h3, подтем или #тегов...",
+    "cmdEmpty": "По этому запросу ничего не найдено.",
+    "cmdQuickActionsHeading": "Быстрые переходы",
+    "cmdArticlesHeading": "Конспекты Базы Знаний",
+    "cmdHeadingsMatch": "Раздел:",
+    "cmdActionCvHome": "Workfolio CV — Главная и Опыт",
+    "cmdActionTechRadar": "Tech Radar — Матрица 16 технологий (ADR)",
+    "cmdActionKbOverview": "База Знаний — Все темы и подтемы",
+    "cmdHintNavigate": "↑↓ выбор",
+    "cmdHintOpen": "↵ открыть",
+    "cmdHintClose": "esc закрыть",
+    "cmdLockedBadge": "Доступ в 1 клик"
   },
   "Footer": {
     "waitingPulse": "/api/telemetry/stream • Waiting for pulse..."

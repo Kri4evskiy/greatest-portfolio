@@ -1,7 +1,7 @@
 'use client'
 
 import { Badge, Button } from '@repo/ui'
-import { BookOpen, FileText, Lock, LockOpen, LogOut, ShieldAlert } from 'lucide-react'
+import { BookOpen, FileText, Lock, LockOpen, LogOut, Search, ShieldAlert } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useSectionNavigation } from '@/hooks/use-section-navigation'
 import { useLogoutMutation, useVisitorProfile } from '@/hooks/use-visitor-profile'
@@ -19,6 +19,7 @@ export function WorkfolioHeader() {
   const { data: profile } = useVisitorProfile()
   const logoutMutation = useLogoutMutation()
   const openGuestPassModal = useUIStore((s) => s.openGuestPassModal)
+  const openCommandPalette = useUIStore((s) => s.openCommandPalette)
 
   const currentRole = profile?.role ?? 'GUEST'
   const isUnlocked = currentRole === 'USER' || currentRole === 'ADMIN'
@@ -69,6 +70,20 @@ export function WorkfolioHeader() {
         </div>
 
         <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+          <button
+            type="button"
+            aria-label={t('searchAria')}
+            title={t('searchAria')}
+            onClick={() => openCommandPalette('')}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-muted/30 text-muted-foreground transition-colors hover:border-primary/40 hover:bg-accent hover:text-foreground md:w-auto md:gap-2 md:px-2.5"
+          >
+            <Search className="h-3.5 w-3.5 shrink-0" />
+            <span className="hidden text-xs md:inline">{t('searchPlaceholder')}</span>
+            <kbd className="hidden rounded border border-border bg-background px-1 py-0.5 font-mono text-[10px] lg:inline">
+              ⌘K
+            </kbd>
+          </button>
+
           <ThemeToggle />
           <LanguageSwitcher />
 

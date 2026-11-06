@@ -119,6 +119,31 @@ export function formatKnowledgeSegmentLabel(segment: string, locale: SupportedLo
     .join(' ')
 }
 
+export const KnowledgeNoteFormatEnum = z.enum(['cheat-sheet', 'deep-dive', 'adr'])
+export type KnowledgeNoteFormat = z.infer<typeof KnowledgeNoteFormatEnum>
+
+const LOCALIZED_FORMAT_LABELS: Record<SupportedLocale, Record<KnowledgeNoteFormat, string>> = {
+  en: {
+    'cheat-sheet': 'Cheat Sheet',
+    'deep-dive': 'Deep Dive',
+    adr: 'ADR',
+  },
+  uk: {
+    'cheat-sheet': 'Шпаргалка',
+    'deep-dive': 'Глибокий розбір',
+    adr: 'ADR',
+  },
+  ru: {
+    'cheat-sheet': 'Шпаргалка',
+    'deep-dive': 'Глубокий разбор',
+    adr: 'ADR',
+  },
+}
+
+export function getKnowledgeFormatLabel(format: KnowledgeNoteFormat, locale: SupportedLocale = 'en'): string {
+  return LOCALIZED_FORMAT_LABELS[locale]?.[format] ?? LOCALIZED_FORMAT_LABELS.en[format]
+}
+
 export const ArticleMetaSchema = z.object({
   slug: z.string().min(1),
   category: KnowledgeCategoryEnum,

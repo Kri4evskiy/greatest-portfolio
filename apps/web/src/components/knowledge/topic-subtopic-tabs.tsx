@@ -8,7 +8,6 @@ interface TopicSubtopicTabsProps {
   activeSubtopicSegment: string | null
   topicBadgeLabel: string
   allSubtopicsLabel: string
-  compact?: boolean
 }
 
 export function TopicSubtopicTabs({
@@ -16,7 +15,6 @@ export function TopicSubtopicTabs({
   activeSubtopicSegment,
   topicBadgeLabel,
   allSubtopicsLabel,
-  compact = false,
 }: TopicSubtopicTabsProps) {
   const subtopics = rootTopic.children.filter((child): child is KnowledgeTreeFolderNode => child.type === 'folder')
 
@@ -29,11 +27,7 @@ export function TopicSubtopicTabs({
   const isThisProject = rootTopic.segment === 'this-project'
 
   return (
-    <div
-      className={`rounded-xl border border-border bg-card shadow-sm ${
-        compact ? 'mb-4 p-3 sm:px-4 sm:py-3' : 'p-4 sm:p-5'
-      }`}
-    >
+    <div className="rounded-xl border border-border bg-card p-4 shadow-sm sm:p-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <Badge variant="secondary" className="font-mono text-[10px] uppercase tracking-wider">
@@ -48,7 +42,7 @@ export function TopicSubtopicTabs({
             ) : (
               <FolderTree className="h-4 w-4 text-primary" />
             )}
-            <span className={compact ? 'text-sm sm:text-base' : 'text-lg sm:text-xl'}>{rootTopic.label}</span>
+            <span className="text-lg sm:text-xl">{rootTopic.label}</span>
           </Link>
         </div>
 

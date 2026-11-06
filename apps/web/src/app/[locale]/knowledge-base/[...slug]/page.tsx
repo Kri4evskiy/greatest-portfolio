@@ -1,9 +1,17 @@
-import { DEFAULT_LOCALE, getKnowledgeCategoryLabel, SUPPORTED_LOCALES, SupportedLocaleEnum } from '@repo/shared-schemas'
+import {
+  DEFAULT_LOCALE,
+  getKnowledgeCategoryLabel,
+  getKnowledgeFormatLabel,
+  SUPPORTED_LOCALES,
+  type SupportedLocale,
+  SupportedLocaleEnum,
+} from '@repo/shared-schemas'
 import { Badge, Callout, Card, CardContent, CardDescription, CardHeader, CardTitle } from '@repo/ui'
-import { ArrowLeft, ArrowRight, Calendar, ChevronRight, Clock, FolderOpen, Globe, Sparkles, Zap } from 'lucide-react'
+import { ArrowRight, Calendar, ChevronRight, Clock, FolderOpen, Globe, Sparkles, Zap } from 'lucide-react'
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { getTranslations } from 'next-intl/server'
+import { ArticleFooterNav } from '@/components/knowledge/article-footer-nav'
 import { ArticleMetricsBar } from '@/components/knowledge/article-metrics-bar'
 import { DesktopArticleToc, MobileArticleToc } from '@/components/knowledge/article-toc'
 import { MdxArticleRenderer, renderInlineMarkdown } from '@/components/knowledge/mdx-article-renderer'
@@ -11,6 +19,7 @@ import { TopicSubtopicTabs } from '@/components/knowledge/topic-subtopic-tabs'
 import { Link } from '@/i18n/navigation'
 import {
   buildKnowledgeBreadcrumbs,
+  getAdjacentAndRelatedArticles,
   getAllStaticKnowledgeSlugArrays,
   getArticleByPathSegments,
   getFolderByPathSegments,
@@ -103,17 +112,27 @@ function collectFolderArticles(node: KnowledgeTreeFolderNode): MdxArticleFrontma
   return out
 }
 
-function ArticlePreviewCard({ item, openLabel }: { item: MdxArticleFrontmatter; openLabel: string }) {
+function ArticlePreviewCard({
+  item,
+  locale,
+  openLabel,
+}: {
+  item: MdxArticleFrontmatter
+  locale: SupportedLocale
+  openLabel: string
+}) {
   return (
     <Link href={`/knowledge-base/${item.routePath}`} className="group block h-full">
       <Card className="flex h-full flex-col justify-between transition-all group-hover:border-primary/50 group-hover:shadow-md">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between gap-2">
+            <Badge variant="outline" className="font-mono text-[10px] text-primary">
+              {getKnowledgeFormatLabel(item.format, locale)}
+            </Badge>
             <span className="flex items-center gap-1 font-mono text-[11px] text-muted-foreground">
               <Clock className="h-3 w-3" />
               {item.readingTime}
             </span>
-            <span className="font-mono text-[11px] text-muted-foreground">{item.publishedAt}</span>
           </div>
           <CardTitle className="mt-1.5 text-base leading-snug transition-colors group-hover:text-primary">
             {item.title}
@@ -121,6 +140,19 @@ function ArticlePreviewCard({ item, openLabel }: { item: MdxArticleFrontmatter; 
           <CardDescription className="text-xs leading-relaxed">{item.summary}</CardDescription>
         </CardHeader>
         <CardContent className="pt-0">
+          {item.tags.length > 0 ? (
+            <div className="mb-3 flex flex-wrap gap-1">
+              {item.tags.slice(0, 4).map((tag) => (
+                <span
+                  key={`${item.routePath}-${tag}`}
+                  className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground"
+                >
+                  #{tag}
+                </span>
+              ))}
+            </div>
+          ) : null}
+
           <div className="flex items-center justify-between border-t border-border/60 pt-3 font-mono text-xs text-primary">
             <span className="flex items-center gap-1">
               <Sparkles className="h-3.5 w-3.5" />
@@ -140,94 +172,98 @@ export default async function KnowledgeCatchAllPage({ params }: CatchAllKnowledg
   const resolvedLocale = parsed.success ? parsed.data : DEFAULT_LOCALE
   const t = await getTranslations({ locale: resolvedLocale, namespace: 'KnowledgeBase' })
 
-  const rootSegment = slug[0]
-  const rootTopic = rootSegment ? getFolderByPathSegments([rootSegment], resolvedLocale) : null
-
-  // 1. Level 3+: Leaf Article View (with persistent Topic + Subtopic Tabs above the article)
+  // 1. Level 3+: Clean, Distraction-Free Leaf Article View (Breadcrumbs + Format + #Tags + Prev/Next)
   const article = getArticleByPathSegments(slug, resolvedLocale)
   if (article) {
     const breadcrumbs = buildKnowledgeBreadcrumbs(slug, resolvedLocale, article.sidebarLabel)
     const parentSegments = slug.slice(0, -1)
     const parentHref = parentSegments.length > 0 ? `/knowledge-base/${parentSegments.join('/')}` : '/knowledge-base'
-    const activeSubtopicSegment = slug.length >= 3 ? (slug[1] ?? null) : null
+    const { prev, next, related } = getAdjacentAndRelatedArticles(article.routePath, resolvedLocale)
 
     return (
-      <div className="space-y-4">
-        {rootTopic ? (
-          <TopicSubtopicTabs
-            compact
-            rootTopic={rootTopic}
-            activeSubtopicSegment={activeSubtopicSegment}
-            topicBadgeLabel={t('topicBadge')}
-            allSubtopicsLabel={t('allSubtopicsTab')}
-          />
-        ) : null}
+      <div className="flex flex-col gap-6 xl:flex-row xl:items-start">
+        <article className="min-w-0 flex-1 rounded-xl border border-border bg-card p-5 shadow-sm sm:p-8">
+          <BreadcrumbsNav rootLabel={t('breadcrumbsRoot')} items={breadcrumbs} />
 
-        <div className="flex flex-col gap-6 xl:flex-row xl:items-start">
-          <article className="min-w-0 flex-1 rounded-xl border border-border bg-card p-5 shadow-sm sm:p-8">
-            <BreadcrumbsNav rootLabel={t('breadcrumbsRoot')} items={breadcrumbs} />
+          {article.isFallback ? (
+            <Callout variant="info" icon={<Globe className="h-4 w-4" />} className="mb-4 text-xs">
+              {t('fallbackNotice', { fallbackLocale: article.locale.toUpperCase() })}
+            </Callout>
+          ) : null}
 
-            {article.isFallback ? (
-              <Callout variant="info" icon={<Globe className="h-4 w-4" />} className="mb-4 text-xs">
-                {t('fallbackNotice', { fallbackLocale: article.locale.toUpperCase() })}
-              </Callout>
-            ) : null}
-
-            <header className="space-y-3 border-b border-border/70 pb-5">
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge variant="secondary" className="font-mono text-xs">
-                  {getKnowledgeCategoryLabel(article.category, resolvedLocale)}
-                </Badge>
-                <span className="flex items-center gap-1 font-mono text-xs text-muted-foreground">
-                  <Clock className="h-3.5 w-3.5" />
-                  {article.readingTime}
-                </span>
-                <span className="flex items-center gap-1 font-mono text-xs text-muted-foreground">
-                  <Calendar className="h-3.5 w-3.5" />
-                  {article.publishedAt}
-                </span>
-              </div>
-
-              <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{article.title}</h1>
-              <p className="text-sm leading-relaxed text-muted-foreground">{article.summary}</p>
-            </header>
-
-            {/* Quick Recall (TL;DR) Cheat-Sheet Box */}
-            {article.tldr.length > 0 ? (
-              <div className="my-5 rounded-xl border border-primary/30 bg-primary/5 p-4">
-                <div className="mb-2 flex items-center gap-2 font-mono text-xs font-semibold uppercase tracking-wider text-primary">
-                  <Zap className="h-4 w-4 text-amber-500" />
-                  <span>{t('tldrTitle')}</span>
-                </div>
-                <ul className="list-disc space-y-1.5 pl-5 text-xs leading-relaxed text-foreground/90 sm:text-sm">
-                  {article.tldr.map((point) => (
-                    <li key={point}>{renderInlineMarkdown(point, point.slice(0, 24))}</li>
-                  ))}
-                </ul>
-              </div>
-            ) : null}
-
-            {/* Mobile & Tablet Inline Collapsible Table of Contents (< xl) */}
-            <MobileArticleToc items={article.toc} />
-
-            <ArticleMetricsBar slug={article.slug} category={article.category} />
-
-            <MdxArticleRenderer blocks={article.blocks} />
-
-            <div className="mt-8 border-t border-border/70 pt-5">
-              <Link
-                href={parentHref}
-                className="inline-flex items-center gap-1.5 font-mono text-xs text-muted-foreground hover:text-foreground"
-              >
-                <ArrowLeft className="h-3.5 w-3.5" />
-                <span>{t('backToAll')}</span>
-              </Link>
+          <header className="space-y-3 border-b border-border/70 pb-5">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="secondary" className="font-mono text-xs">
+                {getKnowledgeCategoryLabel(article.category, resolvedLocale)}
+              </Badge>
+              <Badge variant="outline" className="font-mono text-xs text-primary">
+                {getKnowledgeFormatLabel(article.format, resolvedLocale)}
+              </Badge>
+              <span className="flex items-center gap-1 font-mono text-xs text-muted-foreground">
+                <Clock className="h-3.5 w-3.5" />
+                {article.readingTime}
+              </span>
+              <span className="flex items-center gap-1 font-mono text-xs text-muted-foreground">
+                <Calendar className="h-3.5 w-3.5" />
+                {article.publishedAt}
+              </span>
             </div>
-          </article>
 
-          {/* Desktop Sticky Right-Rail Table of Contents (xl+) */}
-          <DesktopArticleToc items={article.toc} />
-        </div>
+            <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{article.title}</h1>
+            <p className="text-sm leading-relaxed text-muted-foreground">{article.summary}</p>
+
+            {article.tags.length > 0 ? (
+              <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                {article.tags.map((tag) => (
+                  <Link
+                    key={tag}
+                    href={`/knowledge-base?tag=${encodeURIComponent(tag)}`}
+                    className="rounded-md border border-border/80 bg-muted/40 px-2 py-0.5 font-mono text-[11px] text-muted-foreground transition-colors hover:border-primary/50 hover:bg-primary/10 hover:text-primary"
+                  >
+                    #{tag}
+                  </Link>
+                ))}
+              </div>
+            ) : null}
+          </header>
+
+          {/* Quick Recall (TL;DR) Cheat-Sheet Box */}
+          {article.tldr.length > 0 ? (
+            <div className="my-5 rounded-xl border border-primary/30 bg-primary/5 p-4">
+              <div className="mb-2 flex items-center gap-2 font-mono text-xs font-semibold uppercase tracking-wider text-primary">
+                <Zap className="h-4 w-4 text-amber-500" />
+                <span>{t('tldrTitle')}</span>
+              </div>
+              <ul className="list-disc space-y-1.5 pl-5 text-xs leading-relaxed text-foreground/90 sm:text-sm">
+                {article.tldr.map((point) => (
+                  <li key={point}>{renderInlineMarkdown(point, point.slice(0, 24))}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
+          {/* Mobile & Tablet Inline Collapsible Table of Contents (< xl) */}
+          <MobileArticleToc items={article.toc} />
+
+          <ArticleMetricsBar slug={article.slug} category={article.category} />
+
+          <MdxArticleRenderer blocks={article.blocks} />
+
+          <ArticleFooterNav
+            prev={prev}
+            next={next}
+            related={related}
+            locale={resolvedLocale}
+            prevLabel={t('prevArticleLabel')}
+            nextLabel={t('nextArticleLabel')}
+            relatedHeading={t('relatedNotesHeading')}
+            backHref={parentHref}
+            backLabel={t('backToAll')}
+          />
+        </article>
+
+        {/* Desktop Sticky Right-Rail Table of Contents (xl+) */}
+        <DesktopArticleToc items={article.toc} />
       </div>
     )
   }
@@ -238,6 +274,8 @@ export default async function KnowledgeCatchAllPage({ params }: CatchAllKnowledg
     notFound()
   }
 
+  const rootSegment = slug[0]
+  const rootTopic = rootSegment ? getFolderByPathSegments([rootSegment], resolvedLocale) : null
   const isRootTopic = slug.length === 1
   const activeSubtopicSegment = slug.length >= 2 ? (slug[1] ?? null) : null
   const breadcrumbs = buildKnowledgeBreadcrumbs(slug, resolvedLocale, folder.label)
@@ -246,7 +284,7 @@ export default async function KnowledgeCatchAllPage({ params }: CatchAllKnowledg
 
   return (
     <div className="space-y-5">
-      {/* Persistent Topic + Subtopic Tabs Header */}
+      {/* Topic + Subtopic Tabs Header on Hub Pages */}
       {rootTopic ? (
         <TopicSubtopicTabs
           rootTopic={rootTopic}
@@ -277,7 +315,7 @@ export default async function KnowledgeCatchAllPage({ params }: CatchAllKnowledg
           </header>
         ) : null}
 
-        {/* Level 1 Topic View: Group articles cleanly under each Subtopic so hierarchy Topic -> Subtopic -> Articles is crystal clear */}
+        {/* Level 1 Topic View: Group articles cleanly under each Subtopic */}
         {isRootTopic && subFolders.length > 0 ? (
           <div className="space-y-7">
             {subFolders.map((sub) => {
@@ -300,7 +338,12 @@ export default async function KnowledgeCatchAllPage({ params }: CatchAllKnowledg
 
                   <div className="grid gap-4 sm:grid-cols-2">
                     {subArticles.map((item) => (
-                      <ArticlePreviewCard key={item.routePath} item={item} openLabel={t('openArticleCta')} />
+                      <ArticlePreviewCard
+                        key={item.routePath}
+                        item={item}
+                        locale={resolvedLocale}
+                        openLabel={t('openArticleCta')}
+                      />
                     ))}
                   </div>
                 </section>
@@ -309,7 +352,7 @@ export default async function KnowledgeCatchAllPage({ params }: CatchAllKnowledg
           </div>
         ) : null}
 
-        {/* Nested Subfolders inside a deeper level (if Level 2 itself has Level 3 subfolders) */}
+        {/* Nested Subfolders inside a deeper level */}
         {!isRootTopic && subFolders.length > 0 ? (
           <section className="space-y-3">
             <h2 className="font-mono text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -346,7 +389,12 @@ export default async function KnowledgeCatchAllPage({ params }: CatchAllKnowledg
             </h2>
             <div className="grid gap-4 sm:grid-cols-2">
               {directArticles.map(({ article: item }) => (
-                <ArticlePreviewCard key={item.routePath} item={item} openLabel={t('openArticleCta')} />
+                <ArticlePreviewCard
+                  key={item.routePath}
+                  item={item}
+                  locale={resolvedLocale}
+                  openLabel={t('openArticleCta')}
+                />
               ))}
             </div>
           </section>

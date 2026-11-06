@@ -6,6 +6,8 @@ import {
   KNOWLEDGE_CATEGORY_LABELS,
   type KnowledgeCategory,
   KnowledgeCategoryEnum,
+  type KnowledgeNoteFormat,
+  KnowledgeNoteFormatEnum,
   type SupportedLocale,
   SupportedLocaleEnum,
 } from '@repo/shared-schemas'
@@ -37,6 +39,8 @@ export interface MdxArticleFrontmatter {
   readingTime: string
   publishedAt: string
   order: number
+  format: KnowledgeNoteFormat
+  tags: string[]
   tldr: string[]
 }
 
@@ -164,22 +168,32 @@ function parseCodeFenceHeader(fenceRest: string): { language: string; title?: st
   }
 }
 
+function normalizeTag(rawTag: string): string {
+  return rawTag
+    .trim()
+    .replace(/^["'#]+|["']+$/g, '')
+    .toLowerCase()
+    .replace(/\s+/g, '-')
+}
+
 function parseFrontmatterBlock(rawBody: string): {
   meta: Record<string, string>
   tldr: string[]
+  tags: string[]
   markdownBody: string
 } {
   const meta: Record<string, string> = {}
   const tldr: string[] = []
+  const tags: string[] = []
   let markdownBody = rawBody.trim()
 
   if (!markdownBody.startsWith('---')) {
-    return { meta, tldr, markdownBody }
+    return { meta, tldr, tags, markdownBody }
   }
 
   const endIdx = markdownBody.indexOf('---', 3)
   if (endIdx === -1) {
-    return { meta, tldr, markdownBody }
+    return { meta, tldr, tags, markdownBody }
   }
 
   const frontmatterLines = markdownBody.slice(3, endIdx).trim().split(/\r?\n/)
@@ -198,7 +212,7 @@ function parseFrontmatterBlock(rawBody: string): {
       const key = trimmedLine.slice(0, colonIdx).trim()
       const rawVal = trimmedLine.slice(colonIdx + 1).trim()
 
-      if (key === 'tldr' && !rawVal) {
+      if ((key === 'tldr' || key === 'tags') && !rawVal) {
         idx += 1
         while (idx < frontmatterLines.length) {
           const itemLine = (frontmatterLines[idx] ?? '').trim()
@@ -207,9 +221,26 @@ function parseFrontmatterBlock(rawBody: string): {
             .slice(2)
             .trim()
             .replace(/^["']|["']$/g, '')
-          if (cleanedItem) tldr.push(cleanedItem)
+          if (cleanedItem) {
+            if (key === 'tldr') {
+              tldr.push(cleanedItem)
+            } else {
+              const tag = normalizeTag(cleanedItem)
+              if (tag && !tags.includes(tag)) tags.push(tag)
+            }
+          }
           idx += 1
         }
+        continue
+      }
+
+      if (key === 'tags' && rawVal) {
+        const stripped = rawVal.replace(/^\[/, '').replace(/\]$/, '')
+        for (const piece of stripped.split(',')) {
+          const tag = normalizeTag(piece)
+          if (tag && !tags.includes(tag)) tags.push(tag)
+        }
+        idx += 1
         continue
       }
 
@@ -220,7 +251,7 @@ function parseFrontmatterBlock(rawBody: string): {
   }
 
   markdownBody = markdownBody.slice(endIdx + 3).trim()
-  return { meta, tldr, markdownBody }
+  return { meta, tldr, tags, markdownBody }
 }
 
 function isSpecialBlockStart(rawLine: string, nextLine?: string): boolean {
@@ -250,10 +281,12 @@ function parseRawMdx(
   locale: SupportedLocale,
   isFallback: boolean,
 ): MdxArticleDocument {
-  const { meta, tldr, markdownBody } = parseFrontmatterBlock(raw)
+  const { meta, tldr, tags, markdownBody } = parseFrontmatterBlock(raw)
 
   const parsedCategory = KnowledgeCategoryEnum.safeParse(meta.category)
   const category = parsedCategory.success ? parsedCategory.data : fallbackCategory
+  const parsedFormat = KnowledgeNoteFormatEnum.safeParse(meta.format)
+  const format: KnowledgeNoteFormat = parsedFormat.success ? parsedFormat.data : 'deep-dive'
   const pathSegments = [category, ...relativeSubSegments, leafSlug]
   const routePath = pathSegments.join('/')
   const metricSlug = meta.metricSlug || (relativeSubSegments.length === 0 ? leafSlug : pathSegments.join('--'))
@@ -474,6 +507,8 @@ function parseRawMdx(
     readingTime: meta.readingTime ?? meta.readTime ?? '5 min',
     publishedAt: meta.publishedAt ?? '2026-10-15',
     order: Number.isFinite(parsedOrder) ? parsedOrder : 999,
+    format,
+    tags,
     tldr,
     toc,
     blocks,
@@ -500,6 +535,8 @@ function toFrontmatter(doc: MdxArticleDocument): MdxArticleFrontmatter {
     readingTime: doc.readingTime,
     publishedAt: doc.publishedAt,
     order: doc.order,
+    format: doc.format,
+    tags: doc.tags,
     tldr: doc.tldr,
   }
 }
@@ -742,3 +779,112 @@ export function getAllStaticKnowledgeSlugArrays(): string[][] {
 
   return paths
 }
+
+export interface KnowledgeSearchItem {
+  routePath: string
+  title: string
+  sidebarLabel: string
+  summary: string
+  category: KnowledgeCategory
+  topicLabel: string
+  subtopicLabel: string
+  format: KnowledgeNoteFormat
+  tags: string[]
+  readingTime: string
+  headings: Array<{ id: string; text: string }>
+}
+
+export const getKnowledgeSearchIndex = cache((localeInput?: string): KnowledgeSearchItem[] => {
+  const locale = normalizeLocale(localeInput)
+  const docs = getAllKnowledgeArticles(locale)
+
+  return docs.map((doc) => {
+    const topicLabel = formatKnowledgeSegmentLabel(doc.category, locale)
+    const subtopicLabel = doc.pathSegments
+      .slice(1, -1)
+      .map((seg) => formatKnowledgeSegmentLabel(seg, locale))
+      .join(' / ')
+
+    return {
+      routePath: doc.routePath,
+      title: doc.title,
+      sidebarLabel: doc.sidebarLabel,
+      summary: doc.summary,
+      category: doc.category,
+      topicLabel,
+      subtopicLabel,
+      format: doc.format,
+      tags: doc.tags,
+      readingTime: doc.readingTime,
+      headings: doc.toc.map((h) => ({ id: h.id, text: h.text })),
+    }
+  })
+})
+
+export const getAllKnowledgeTags = cache((localeInput?: string): Array<{ tag: string; count: number }> => {
+  const docs = getAllKnowledgeArticles(localeInput)
+  const counts = new Map<string, number>()
+
+  for (const doc of docs) {
+    for (const tag of doc.tags) {
+      counts.set(tag, (counts.get(tag) ?? 0) + 1)
+    }
+  }
+
+  return Array.from(counts.entries())
+    .map(([tag, count]) => ({ tag, count }))
+    .sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag))
+})
+
+function flattenTreeArticles(nodes: readonly KnowledgeTreeNode[]): MdxArticleFrontmatter[] {
+  const out: MdxArticleFrontmatter[] = []
+  for (const node of nodes) {
+    if (node.type === 'article') {
+      out.push(node.article)
+    } else {
+      out.push(...flattenTreeArticles(node.children))
+    }
+  }
+  return out
+}
+
+export interface AdjacentAndRelatedArticles {
+  prev: MdxArticleFrontmatter | null
+  next: MdxArticleFrontmatter | null
+  related: MdxArticleFrontmatter[]
+}
+
+export const getAdjacentAndRelatedArticles = cache(
+  (routePath: string, localeInput?: string): AdjacentAndRelatedArticles => {
+    const locale = normalizeLocale(localeInput)
+    const tree = getKnowledgeTree(locale)
+    const ordered = flattenTreeArticles(tree)
+    const currentIndex = ordered.findIndex((item) => item.routePath === routePath)
+
+    const prev = currentIndex > 0 ? (ordered[currentIndex - 1] ?? null) : null
+    const next = currentIndex >= 0 && currentIndex < ordered.length - 1 ? (ordered[currentIndex + 1] ?? null) : null
+    const current = currentIndex >= 0 ? ordered[currentIndex] : undefined
+
+    if (!current) {
+      return { prev, next, related: [] }
+    }
+
+    const currentTags = new Set(current.tags)
+    const scored = ordered
+      .filter((candidate) => candidate.routePath !== routePath)
+      .map((candidate) => {
+        let sharedTagScore = 0
+        for (const tag of candidate.tags) {
+          if (currentTags.has(tag)) sharedTagScore += 2
+        }
+        const sameCategoryBonus = candidate.category === current.category ? 1 : 0
+        return { candidate, score: sharedTagScore + sameCategoryBonus, sharedTagScore }
+      })
+      .filter((entry) => entry.sharedTagScore > 0)
+      .sort((a, b) => b.score - a.score || a.candidate.order - b.candidate.order)
+      .slice(0, 2)
+      .map((entry) => entry.candidate)
+
+    return { prev, next, related: scored }
+  },
+)
