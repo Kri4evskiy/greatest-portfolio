@@ -1,14 +1,9 @@
-import {
-  DEFAULT_LOCALE,
-  formatKnowledgeSegmentLabel,
-  getKnowledgeCategoryLabel,
-  SupportedLocaleEnum,
-} from '@repo/shared-schemas'
-import { Badge, Callout, Card, CardContent, CardDescription, CardHeader, CardTitle } from '@repo/ui'
-import { ArrowRight, Clock, Database, FolderOpen, ShieldCheck, Sparkles } from 'lucide-react'
+import { DEFAULT_LOCALE, SupportedLocaleEnum } from '@repo/shared-schemas'
+import { Badge, Callout } from '@repo/ui'
+import { ArrowRight, Database, FolderOpen, Layers, ShieldCheck, Sparkles } from 'lucide-react'
 import { getTranslations } from 'next-intl/server'
 import { Link } from '@/i18n/navigation'
-import { getAllKnowledgeArticles, getKnowledgeTree, type KnowledgeTreeFolderNode } from '@/lib/mdx-content'
+import { getKnowledgeTree, type KnowledgeTreeFolderNode } from '@/lib/mdx-content'
 
 export default async function KnowledgeBaseIndexPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params
@@ -17,7 +12,6 @@ export default async function KnowledgeBaseIndexPage({ params }: { params: Promi
 
   const t = await getTranslations({ locale: resolvedLocale, namespace: 'KnowledgeBase' })
   const tree = getKnowledgeTree(resolvedLocale)
-  const articles = getAllKnowledgeArticles(resolvedLocale)
 
   return (
     <div className="space-y-8">
@@ -27,105 +21,85 @@ export default async function KnowledgeBaseIndexPage({ params }: { params: Promi
             {t('protectedBadge')}
           </Badge>
           <Badge variant="outline" className="font-mono text-xs">
-            SSG Tree • MDX • D3.js • IndexedDB
+            Topic → Subtopic → Articles • SSG MDX 2.0
           </Badge>
         </div>
         <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{t('title')}</h1>
-        <p className="text-sm text-muted-foreground leading-relaxed">{t('description')}</p>
+        <p className="text-sm leading-relaxed text-muted-foreground">{t('description')}</p>
       </div>
 
       <Callout variant="success" title={t('calloutTitle')} icon={<ShieldCheck className="h-4 w-4" />}>
         {t('calloutBody')}
       </Callout>
 
-      {/* Root Sections & Subtopics Directory */}
-      <div className="grid gap-3 sm:grid-cols-2">
-        {tree.map((section) => {
-          const subFolders = section.children.filter(
-            (child): child is KnowledgeTreeFolderNode => child.type === 'folder',
-          )
-          const isThisProject = section.segment === 'this-project'
-          return (
-            <Link key={section.pathKey} href={`/knowledge-base/${section.pathKey}`} className="group block">
-              <div
-                className={`flex h-full flex-col justify-between rounded-xl border p-4 transition-all group-hover:border-primary/60 group-hover:shadow-sm ${
-                  isThisProject ? 'border-primary/40 bg-primary/5' : 'border-border bg-card'
-                }`}
-              >
-                <div>
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="flex items-center gap-2 font-semibold text-sm text-foreground group-hover:text-primary">
-                      {isThisProject ? (
-                        <Sparkles className="h-4 w-4 text-primary" />
-                      ) : (
-                        <FolderOpen className="h-4 w-4 text-primary" />
-                      )}
-                      <span>{section.label}</span>
-                    </span>
-                    <Badge variant="secondary" className="font-mono text-[10px]">
-                      {t('itemsCountBadge', { count: section.articleCount })}
-                    </Badge>
-                  </div>
+      {/* Structured 3-Tier Directory: Topics -> Subtopics -> Articles */}
+      <div className="space-y-4">
+        {tree.map((topic) => {
+          const subtopics = topic.children.filter((child): child is KnowledgeTreeFolderNode => child.type === 'folder')
+          const isThisProject = topic.segment === 'this-project'
 
-                  {subFolders.length > 0 ? (
-                    <div className="mt-3 flex flex-wrap gap-1.5">
-                      {subFolders.map((sub) => (
-                        <Badge key={sub.pathKey} variant="outline" className="font-mono text-[10px]">
-                          ↳ {sub.label} ({sub.articleCount})
-                        </Badge>
-                      ))}
-                    </div>
-                  ) : null}
+          return (
+            <section
+              key={topic.pathKey}
+              className={`rounded-xl border p-5 shadow-sm transition-colors ${
+                isThisProject ? 'border-primary/40 bg-primary/5' : 'border-border bg-card'
+              }`}
+            >
+              {/* Level 1: Topic Header */}
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 pb-3.5">
+                <Link
+                  href={`/knowledge-base/${topic.pathKey}`}
+                  className="group inline-flex items-center gap-2.5 text-lg font-bold tracking-tight text-foreground transition-colors hover:text-primary"
+                >
+                  {isThisProject ? (
+                    <Sparkles className="h-5 w-5 text-primary" />
+                  ) : (
+                    <Layers className="h-5 w-5 text-primary" />
+                  )}
+                  <span>{topic.label}</span>
+                  <ArrowRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-1 group-hover:text-primary" />
+                </Link>
+
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary" className="font-mono text-[11px]">
+                    {t('subtopicsCountBadge', { subtopics: subtopics.length, articles: topic.articleCount })}
+                  </Badge>
                 </div>
               </div>
-            </Link>
-          )
-        })}
-      </div>
 
-      {/* All Articles Grid */}
-      <div className="grid gap-4 sm:grid-cols-2">
-        {articles.map((article) => {
-          const subPath = article.pathSegments
-            .slice(1, -1)
-            .map((seg) => formatKnowledgeSegmentLabel(seg, resolvedLocale))
-            .join(' / ')
-          return (
-            <Link key={article.routePath} href={`/knowledge-base/${article.routePath}`} className="group block">
-              <Card className="h-full transition-all group-hover:border-primary/50 group-hover:shadow-md">
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex min-w-0 flex-wrap items-center gap-1">
-                      <Badge variant="secondary" className="font-mono text-[10px]">
-                        {getKnowledgeCategoryLabel(article.category, resolvedLocale)}
-                      </Badge>
-                      {subPath ? (
-                        <Badge variant="outline" className="font-mono text-[10px]">
-                          {subPath}
-                        </Badge>
-                      ) : null}
-                    </div>
-                    <span className="flex shrink-0 items-center gap-1 font-mono text-[11px] text-muted-foreground">
-                      <Clock className="h-3 w-3" />
-                      {article.readingTime}
-                    </span>
-                  </div>
-                  <CardTitle className="mt-2 text-base leading-snug transition-colors group-hover:text-primary">
-                    {article.title}
-                  </CardTitle>
-                  <CardDescription className="text-xs leading-relaxed">{article.summary}</CardDescription>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <div className="flex items-center justify-between border-t border-border/60 pt-3 font-mono text-xs text-primary">
-                    <span className="flex items-center gap-1">
-                      <Sparkles className="h-3.5 w-3.5" />
-                      {t('openArticleCta')}
-                    </span>
-                    <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-1" />
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
+              {/* Level 2: Clickable Subtopic Tabs/Cards inside the Topic */}
+              {subtopics.length > 0 ? (
+                <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {subtopics.map((sub) => (
+                    <Link key={sub.pathKey} href={`/knowledge-base/${sub.pathKey}`} className="group block">
+                      <div className="flex h-full flex-col justify-between rounded-lg border border-border/80 bg-background/80 p-3.5 transition-all group-hover:border-primary/50 group-hover:bg-accent/40 group-hover:shadow-sm">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="flex min-w-0 items-center gap-2 text-sm font-semibold text-foreground group-hover:text-primary">
+                            <FolderOpen className="h-4 w-4 shrink-0 text-primary/80" />
+                            <span className="truncate">{sub.label}</span>
+                          </span>
+                          <Badge variant="outline" className="shrink-0 font-mono text-[10px]">
+                            {sub.articleCount}
+                          </Badge>
+                        </div>
+
+                        {/* Level 3 Preview: Titles of articles inside this subtopic */}
+                        <ul className="mt-2.5 space-y-1 border-t border-border/50 pt-2 text-xs text-muted-foreground">
+                          {sub.children.slice(0, 3).map((leaf) =>
+                            leaf.type === 'article' ? (
+                              <li key={leaf.pathKey} className="flex items-center gap-1.5 truncate">
+                                <span className="h-1 w-1 shrink-0 rounded-full bg-primary/60" />
+                                <span className="truncate">{leaf.article.sidebarLabel}</span>
+                              </li>
+                            ) : null,
+                          )}
+                        </ul>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              ) : null}
+            </section>
           )
         })}
       </div>

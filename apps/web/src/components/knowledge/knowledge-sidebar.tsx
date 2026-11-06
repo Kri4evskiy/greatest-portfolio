@@ -2,12 +2,14 @@
 
 import { Badge } from '@repo/ui'
 import {
-  ArrowUpRight,
   BookOpen,
   ChevronDown,
   ChevronRight,
   ChevronsDownUp,
   ChevronsUpDown,
+  Folder,
+  FolderOpen,
+  Layers,
   PanelLeft,
   Sparkles,
 } from 'lucide-react'
@@ -36,21 +38,14 @@ interface KnowledgeTreeItemProps {
   depth: number
   pathname: string
   closeOnSelect: boolean
-  openSectionOverviewLabel: string
   onSelectLeaf: () => void
 }
 
-function KnowledgeTreeItem({
-  node,
-  depth,
-  pathname,
-  closeOnSelect,
-  openSectionOverviewLabel,
-  onSelectLeaf,
-}: KnowledgeTreeItemProps) {
+function KnowledgeTreeItem({ node, depth, pathname, closeOnSelect, onSelectLeaf }: KnowledgeTreeItemProps) {
   const expandedFolders = useUIStore((s) => s.expandedKbFolders)
   const toggleFolder = useUIStore((s) => s.toggleKbFolder)
 
+  // Level 3 (or deepest leaf): Article inside a Subtopic
   if (node.type === 'article') {
     const href = `/knowledge-base/${node.article.routePath}`
     const isActive = pathname === href
@@ -77,36 +72,63 @@ function KnowledgeTreeItem({
     )
   }
 
+  // Level 1 (Root Topic, e.g. React) or Level 2+ (Subtopic, e.g. React Compiler)
   const folderHref = `/knowledge-base/${node.pathKey}`
   const isExactFolderActive = pathname === folderHref
   const isInsideBranch = isExactFolderActive || pathname.startsWith(`${folderHref}/`)
   const isExpanded = expandedFolders[node.pathKey] ?? false
   const isThisProjectRoot = depth === 0 && node.segment === 'this-project'
 
+  const renderLevelIcon = () => {
+    if (isThisProjectRoot) {
+      return <Sparkles className="h-3.5 w-3.5 shrink-0 text-primary" />
+    }
+    if (depth === 0) {
+      return <Layers className={`h-3.5 w-3.5 shrink-0 ${isInsideBranch ? 'text-primary' : 'text-muted-foreground'}`} />
+    }
+    return isExpanded ? (
+      <FolderOpen className="h-3.5 w-3.5 shrink-0 text-primary/80" />
+    ) : (
+      <Folder className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+    )
+  }
+
   return (
     <div className="space-y-0.5">
       <div
-        className={`group flex items-center justify-between gap-1 rounded-md px-1.5 py-1 transition-colors ${
+        className={`group flex items-center justify-between gap-1 rounded-md pr-1.5 py-0.5 transition-colors ${
           isExactFolderActive
-            ? 'bg-accent font-semibold text-foreground'
+            ? 'bg-primary/10 font-semibold text-primary'
             : isInsideBranch
-              ? 'text-foreground hover:bg-muted/50'
+              ? 'bg-muted/40 text-foreground'
               : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
         }`}
       >
-        {/* Whole-row accordion toggle button so clicking the topic or arrow smoothly unfolds/folds */}
+        {/* Arrow button: expands/collapses the tree branch in-place */}
         <button
           type="button"
           aria-expanded={isExpanded}
+          aria-label={`Toggle ${node.label}`}
           onClick={() => toggleFolder(node.pathKey)}
-          className="flex min-w-0 flex-1 items-center gap-1.5 py-0.5 text-left"
+          className="flex h-6 w-6 shrink-0 items-center justify-center rounded hover:bg-muted"
         >
           <ChevronRight
-            className={`h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform duration-150 ${
-              isExpanded ? 'rotate-90 text-foreground' : ''
-            }`}
+            className={`h-3.5 w-3.5 shrink-0 transition-transform duration-150 ${isExpanded ? 'rotate-90' : ''}`}
           />
-          {isThisProjectRoot ? <Sparkles className="h-3.5 w-3.5 shrink-0 text-primary" /> : null}
+        </button>
+
+        {/* Clicking the Topic or Subtopic name BOTH expands the branch AND opens its Topic/Subtopic hub with tabs */}
+        <Link
+          href={folderHref}
+          onClick={() => {
+            if (!isExpanded || isExactFolderActive) {
+              toggleFolder(node.pathKey)
+            }
+            if (closeOnSelect) onSelectLeaf()
+          }}
+          className="flex min-w-0 flex-1 items-center gap-1.5 py-1 text-left"
+        >
+          {renderLevelIcon()}
           <span
             className={`truncate ${
               depth === 0 ? 'text-[13px] font-semibold tracking-tight text-foreground' : 'text-xs font-medium'
@@ -114,32 +136,15 @@ function KnowledgeTreeItem({
           >
             {node.label}
           </span>
-        </button>
+        </Link>
 
-        {/* Right side: subtle overview jump link + compact count pill */}
-        <div className="flex shrink-0 items-center gap-1">
-          <Link
-            href={folderHref}
-            title={openSectionOverviewLabel}
-            aria-label={`${openSectionOverviewLabel}: ${node.label}`}
-            onClick={() => {
-              if (!isExpanded) {
-                toggleFolder(node.pathKey)
-              }
-              if (closeOnSelect) onSelectLeaf()
-            }}
-            className="flex h-5 w-5 items-center justify-center rounded text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100"
-          >
-            <ArrowUpRight className="h-3 w-3" />
-          </Link>
-          <span className="rounded bg-muted/70 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
-            {node.articleCount}
-          </span>
-        </div>
+        <span className="shrink-0 rounded bg-muted/80 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+          {node.articleCount}
+        </span>
       </div>
 
       {isExpanded ? (
-        <div className="ml-[13px] space-y-0.5 border-l border-border/70 pl-2.5 pt-0.5">
+        <div className="ml-[11px] space-y-0.5 border-l border-border/70 pl-2.5 pt-0.5">
           {node.children.map((child) => (
             <KnowledgeTreeItem
               key={child.pathKey}
@@ -147,7 +152,6 @@ function KnowledgeTreeItem({
               depth={depth + 1}
               pathname={pathname}
               closeOnSelect={closeOnSelect}
-              openSectionOverviewLabel={openSectionOverviewLabel}
               onSelectLeaf={onSelectLeaf}
             />
           ))}
@@ -178,7 +182,7 @@ export function KnowledgeSidebar({
     [allFolderKeys, expandedFolders],
   )
 
-  // Automatically expand only the active ancestor chain when opening a nested folder or article
+  // Automatically expand only the active ancestor chain when opening a Topic, Subtopic, or Article
   useEffect(() => {
     if (!pathname.startsWith('/knowledge-base/')) return
     const rel = pathname.slice('/knowledge-base/'.length)
@@ -250,7 +254,6 @@ export function KnowledgeSidebar({
             depth={0}
             pathname={pathname}
             closeOnSelect={closeOnSelect}
-            openSectionOverviewLabel={t('openSectionOverview')}
             onSelectLeaf={() => setIsMobileOpen(false)}
           />
         ))}
@@ -260,7 +263,7 @@ export function KnowledgeSidebar({
 
   return (
     <aside className="w-full shrink-0 md:sticky md:top-20 md:w-64 lg:w-72">
-      {/* Mobile collapsible navigation trigger — closed by default so article content starts immediately */}
+      {/* Mobile collapsible navigation trigger — closed by default so content starts immediately */}
       <div className="md:hidden">
         <button
           type="button"

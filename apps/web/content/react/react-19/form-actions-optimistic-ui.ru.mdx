@@ -1,0 +1,43 @@
+---
+title: "Формы и мутации в React 19: useActionState, useFormStatus и useOptimistic"
+sidebarLabel: "Form Actions и Optimistic UI"
+summary: "Шпаргалка по мгновенному оптимистичному отклику UI и автоматическим статусам отправки формы без ручных флагов загрузки."
+category: "react"
+readingTime: "5 мин"
+publishedAt: "2026-11-06"
+order: 3
+tldr:
+  - "`useOptimistic(state, reducer)` обновляет цифру или список на экране за **0 мс** до ответа API и автоматически откатывает при сетевой ошибке."
+  - "`useFormStatus()` позволяет кнопке сабмита узнать `{ pending }` родительской `<form>` без проброса пропсов."
+  - "Для сложных клиентских форм со схемами **Zod** и кэшем `IndexedDB` оптимальна связка `React Hook Form` + `TanStack Query`."
+---
+
+## 1. Мгновенный отклик интерфейса через `useOptimistic`
+
+```tsx title="Оптимистичное обновление счётчика без задержки"
+'use client'
+import { useOptimistic } from 'react'
+
+export function HelpfulButton({ count, onVote }: { count: number; onVote: () => Promise<void> }) {
+  const [optimisticCount, addOptimistic] = useOptimistic(count, (curr, delta: number) => curr + delta)
+
+  return (
+    <form
+      action={async () => {
+        addOptimistic(1)
+        await onVote()
+      }}
+    >
+      <button type="submit">Полезно ({optimisticCount})</button>
+    </form>
+  )
+}
+```
+
+## 2. Выбор между нативными Form Actions и `React Hook Form`
+
+| Сценарий | Нативный React 19 `<form action>` | `React Hook Form` + `Zod` + `TanStack Query` |
+| :--- | :--- | :--- |
+| Быстрая мутация из 1–2 кнопок/полей | **Идеально** (`0 KB` стороннего кода) | Избыточно |
+| Живая клиентская валидация по `Zod` | Ручной маппинг ошибок по полям | **Идеально** (`zodResolver` + изоляция подписок) |
+| Offline-First синхронизация с `IndexedDB` | Нет встроенного кэш-слоя | **Идеально** (единый стор `TanStack Query`) |

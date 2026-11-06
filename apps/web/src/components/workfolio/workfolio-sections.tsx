@@ -31,25 +31,25 @@ const CASE_STUDY_CONFIGS: readonly CaseStudyConfig[] = [
   {
     id: 'monorepo-adr',
     tags: ['pnpm', 'Turborepo', 'Zod', 'Biome.js', 'Lefthook'],
-    articleSlug: 'adr-full-stack-catalog',
+    articleSlug: 'adr-catalog/adr-full-stack-catalog',
     articleCategory: 'typescript',
   },
   {
     id: 'react19-compiler-d3',
     tags: ['React 19', 'Next.js 16', 'D3.js', 'Zustand', 'SSG'],
-    articleSlug: 'react-18-vs-19-compiler-d3',
+    articleSlug: 'react-18-vs-19/rendering-diff-d3',
     articleCategory: 'react',
   },
   {
     id: 'zero-trust-jwt-sse',
     tags: ['NestJS', 'JWT HttpOnly', 'Prisma ORM', 'Microservices', 'RxJS SSE'],
-    articleSlug: 'nestjs-jwt-httponly-prisma-sse',
+    articleSlug: 'security/nestjs-jwt-httponly-prisma-sse',
     articleCategory: 'nestjs-prisma',
   },
   {
     id: 'offline-first-redact-docker',
     tags: ['IndexedDB', 'TanStack Query v5', 'TanStack Redact', 'Docker', 'Sentry'],
-    articleSlug: 'tanstack-redact-bundle-docker',
+    articleSlug: 'offline-bundle/tanstack-redact-bundle-docker',
     articleCategory: 'architecture-devops',
   },
 ]

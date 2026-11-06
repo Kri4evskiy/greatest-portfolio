@@ -1,0 +1,33 @@
+---
+title: "Debugging React Compiler: Opt-Out Directives & React DevTools Memo Badge"
+sidebarLabel: "Directives & DevTools Debug"
+summary: "How to inspect compiled components in React DevTools, temporarily opt out legacy code with use no memo, and adopt the compiler incrementally."
+category: "react"
+readingTime: "4 min"
+publishedAt: "2026-11-06"
+order: 2
+tldr:
+  - "Components optimized by **React Compiler** automatically display a `Memo ✨` badge in **React DevTools**."
+  - "Use the `'use no memo'` directive at the top of a function body as an emergency escape hatch if a legacy third-party library mutates refs or props."
+  - "Incremental rollout (`compilationMode: 'annotation'`) lets large teams opt in selectively with `'use memo'`."
+---
+
+## 1. Verifying Optimization in React DevTools
+
+Open **React DevTools → Components**: every component compiled successfully shows a **`Memo ✨`** pill next to its name. If the pill is missing, the compiler detected a side effect during render and safely skipped that component without breaking your app.
+
+## 2. Escape Hatch Directives (`'use no memo'` & `'use memo'`)
+
+```tsx title="Temporary Opt-Out for Mutable Legacy Libraries"
+export function LegacyChartWrapper({ mutableInstance }: { mutableInstance: ExternalChart }) {
+  'use no memo'
+  // Compiler skips memoizing this component so external imperative mutations always reflect
+  return <div data-chart-version={mutableInstance.version} />
+}
+```
+
+| Directive / Mode | Effect | When to Use |
+| :--- | :--- | :--- |
+| Default (`infer` / `all`) | Compiles every valid component & hook | Greenfield Next.js 16 projects (our setup) |
+| `'use no memo'` | Skips compiling a specific function | Debugging a suspect third-party mutation bug |
+| `'use memo'` (`annotation` mode) | Opt-in compilation per component | Gradual migration of legacy 500k+ LOC codebases |

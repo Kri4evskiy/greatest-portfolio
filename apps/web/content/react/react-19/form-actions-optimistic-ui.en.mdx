@@ -1,0 +1,43 @@
+---
+title: "React 19 Form Actions: useActionState, useFormStatus & useOptimistic"
+sidebarLabel: "Form Actions & Optimistic UI"
+summary: "Pattern cheat sheet for instant optimistic mutations and automatic pending states without manual useState loading flags."
+category: "react"
+readingTime: "5 min"
+publishedAt: "2026-11-06"
+order: 3
+tldr:
+  - "`useOptimistic(state, reducer)` updates the UI in **0ms** before the server responds and automatically reverts if the action throws."
+  - "`useFormStatus()` lets deep submit button components read `{ pending }` from the parent `<form>` without prop drilling."
+  - "For complex client-side validation with **Zod**, pair `React Hook Form` with `TanStack Query` mutations."
+---
+
+## 1. Instant Feedback with `useOptimistic`
+
+```tsx title="Zero-Latency Helpful Counter"
+'use client'
+import { useOptimistic } from 'react'
+
+export function HelpfulButton({ count, onVote }: { count: number; onVote: () => Promise<void> }) {
+  const [optimisticCount, addOptimistic] = useOptimistic(count, (curr, delta: number) => curr + delta)
+
+  return (
+    <form
+      action={async () => {
+        addOptimistic(1)
+        await onVote()
+      }}
+    >
+      <button type="submit">Helpful ({optimisticCount})</button>
+    </form>
+  )
+}
+```
+
+## 2. Choosing Between Native Form Actions and `React Hook Form`
+
+| Requirement | Native React 19 `<form action>` | `React Hook Form` + `Zod` + `TanStack Query` |
+| :--- | :--- | :--- |
+| Simple 1–2 field server mutation | **Ideal** (zero extra bundle) | Overkill |
+| Complex multi-field live Zod validation | Verbose manual field error mapping | **Ideal** (`zodResolver` + field-level subscriptions) |
+| Offline-First IndexedDB cache sync | Not built in | **Ideal** (`onMutate` + persisted query cache) |
