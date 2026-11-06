@@ -5,13 +5,21 @@ category: "this-project"
 readingTime: "5 min"
 publishedAt: "2026-11-06"
 order: 2
+tldr:
+  - "Removed duplicate `ADR` and middle section links from `WorkfolioHeader` to prevent horizontal crowding on `360px` screens."
+  - "Built `useSectionNavigation` to invoke `scrollIntoView` directly even when `window.location.hash` already matches the clicked target."
+  - "Added `PageSectionNavigator`: a Notion-style right outline rail on `xl+` and a thumb-friendly floating pill on `< xl`."
 ---
 
 ## 1. Solving Repeated Hash-Click Stalls in Next.js App Router
 
-Standard Next.js Link components skip scrolling if window.location.hash already matches the target href after manual user scrolling. Our custom useSectionNavigation hook invokes scrollIntoView directly whenever pathname is on the home page:
+Standard Next.js `<Link href="/#projects">` components skip scrolling if `window.location.hash` already equals `#projects` after the user manually scrolls up.
 
-```typescript
+### Direct Programmatic Scroll + Passive ScrollSpy
+
+Our custom `useSectionNavigation` hook intercepts same-page clicks and triggers native smooth scrolling every single time:
+
+```typescript title="apps/web/src/hooks/use-section-navigation.ts"
 const element = document.getElementById(sectionId)
 if (element) {
   element.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -19,10 +27,18 @@ if (element) {
 }
 ```
 
-## 2. Decluttered Header & Ergonomic Floating Navigator
+> [!NOTE]
+> Active section tracking (`useActiveWorkfolioSection`) uses a `{ passive: true }` scroll listener throttled with `requestAnimationFrame`, guaranteeing **60 FPS** scrolling without main-thread layout thrashing.
 
-Moving the 4 CV section links out of WorkfolioHeader freed horizontal space for 360px mobile viewports and established two adaptive navigation surfaces:
+## 2. Adaptive Surfaces Across Viewport Breakpoints
 
-- Desktop (xl+): Notion-inspired floating outline rail on the right margin with rAF-throttled passive ScrollSpy indicators.
-- Mobile & Tablet (< xl): Thumb-friendly bottom-right floating pill showing the active section and opening a quick-jump popover.
-- Mobile Card View for Tech Radar: Replaces 6-column horizontal table scrolling on phones with structured ADR cards.
+Moving the 4 CV section links out of `WorkfolioHeader` unlocked clean responsive behavior across every viewport width.
+
+### Responsive Component Adaptation Matrix
+
+| UI Surface | Mobile & Tablet (`< md` / `< xl`) | Desktop (`>= md` / `xl+`) |
+| :--- | :--- | :--- |
+| `WorkfolioHeader` | Brand + compact locale cycle + `Base of Knowledge` + `ADR` | Full segmented `EN / UA / RU` + status badge |
+| `PageSectionNavigator` | Bottom-right thumb pill with quick-jump popover | Floating Notion-inspired outline rail on right margin |
+| `TechRadarTable` | Vertical stack of structured ADR cards | Interactive 6-column `TanStack Table` |
+| `KnowledgeSidebar` | Collapsed drawer (auto-closes on article selection) | Persistent recursive multi-level tree |

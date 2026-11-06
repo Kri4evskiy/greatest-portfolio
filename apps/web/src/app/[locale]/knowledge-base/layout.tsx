@@ -18,8 +18,8 @@ export default async function KnowledgeBaseLayout({
   const totalArticles = tree.reduce((acc, node) => acc + node.articleCount, 0)
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
-      <div className="flex flex-col gap-6 md:flex-row md:items-start md:gap-8">
+    <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
+      <div className="flex flex-col gap-6 md:flex-row md:items-start md:gap-7">
         <KnowledgeSidebar tree={tree} totalArticles={totalArticles} />
         <div className="min-w-0 flex-1">{children}</div>
       </div>

@@ -1,11 +1,12 @@
 import { DEFAULT_LOCALE, getKnowledgeCategoryLabel, SUPPORTED_LOCALES, SupportedLocaleEnum } from '@repo/shared-schemas'
 import { Badge, Callout, Card, CardContent, CardDescription, CardHeader, CardTitle } from '@repo/ui'
-import { ArrowLeft, ArrowRight, Calendar, ChevronRight, Clock, FolderOpen, Globe, Sparkles } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Calendar, ChevronRight, Clock, FolderOpen, Globe, Sparkles, Zap } from 'lucide-react'
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { getTranslations } from 'next-intl/server'
 import { ArticleMetricsBar } from '@/components/knowledge/article-metrics-bar'
-import { MdxArticleRenderer } from '@/components/knowledge/mdx-article-renderer'
+import { DesktopArticleToc, MobileArticleToc } from '@/components/knowledge/article-toc'
+import { MdxArticleRenderer, renderInlineMarkdown } from '@/components/knowledge/mdx-article-renderer'
 import { Link } from '@/i18n/navigation'
 import {
   buildKnowledgeBreadcrumbs,
@@ -66,7 +67,7 @@ function BreadcrumbsNav({ rootLabel, items }: { rootLabel: string; items: readon
       aria-label="Breadcrumb"
       className="mb-4 flex flex-wrap items-center gap-1 font-mono text-xs text-muted-foreground"
     >
-      <Link href="/knowledge-base" className="hover:text-foreground transition-colors">
+      <Link href="/knowledge-base" className="transition-colors hover:text-foreground">
         {rootLabel}
       </Link>
       {items.map((crumb, idx) => {
@@ -77,7 +78,7 @@ function BreadcrumbsNav({ rootLabel, items }: { rootLabel: string; items: readon
             {isLast ? (
               <span className="truncate font-semibold text-foreground">{crumb.label}</span>
             ) : (
-              <Link href={crumb.href} className="truncate hover:text-foreground transition-colors">
+              <Link href={crumb.href} className="truncate transition-colors hover:text-foreground">
                 {crumb.label}
               </Link>
             )}
@@ -102,48 +103,71 @@ export default async function KnowledgeCatchAllPage({ params }: CatchAllKnowledg
     const parentHref = slug.length > 1 ? `/knowledge-base/${slug.slice(0, -1).join('/')}` : '/knowledge-base'
 
     return (
-      <article className="rounded-xl border border-border bg-card p-5 shadow-sm sm:p-8">
-        <BreadcrumbsNav rootLabel={t('breadcrumbsRoot')} items={breadcrumbs} />
+      <div className="flex flex-col gap-6 xl:flex-row xl:items-start">
+        <article className="min-w-0 flex-1 rounded-xl border border-border bg-card p-5 shadow-sm sm:p-8">
+          <BreadcrumbsNav rootLabel={t('breadcrumbsRoot')} items={breadcrumbs} />
 
-        {article.isFallback ? (
-          <Callout variant="info" icon={<Globe className="h-4 w-4" />} className="mb-4 text-xs">
-            {t('fallbackNotice', { fallbackLocale: article.locale.toUpperCase() })}
-          </Callout>
-        ) : null}
+          {article.isFallback ? (
+            <Callout variant="info" icon={<Globe className="h-4 w-4" />} className="mb-4 text-xs">
+              {t('fallbackNotice', { fallbackLocale: article.locale.toUpperCase() })}
+            </Callout>
+          ) : null}
 
-        <header className="space-y-3 border-b border-border/70 pb-5">
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="secondary" className="font-mono text-xs">
-              {getKnowledgeCategoryLabel(article.category, resolvedLocale)}
-            </Badge>
-            <span className="flex items-center gap-1 font-mono text-xs text-muted-foreground">
-              <Clock className="h-3.5 w-3.5" />
-              {article.readingTime}
-            </span>
-            <span className="flex items-center gap-1 font-mono text-xs text-muted-foreground">
-              <Calendar className="h-3.5 w-3.5" />
-              {article.publishedAt}
-            </span>
+          <header className="space-y-3 border-b border-border/70 pb-5">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="secondary" className="font-mono text-xs">
+                {getKnowledgeCategoryLabel(article.category, resolvedLocale)}
+              </Badge>
+              <span className="flex items-center gap-1 font-mono text-xs text-muted-foreground">
+                <Clock className="h-3.5 w-3.5" />
+                {article.readingTime}
+              </span>
+              <span className="flex items-center gap-1 font-mono text-xs text-muted-foreground">
+                <Calendar className="h-3.5 w-3.5" />
+                {article.publishedAt}
+              </span>
+            </div>
+
+            <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{article.title}</h1>
+            <p className="text-sm leading-relaxed text-muted-foreground">{article.summary}</p>
+          </header>
+
+          {/* Quick Recall (TL;DR) Cheat-Sheet Box */}
+          {article.tldr.length > 0 ? (
+            <div className="my-5 rounded-xl border border-primary/30 bg-primary/5 p-4">
+              <div className="mb-2 flex items-center gap-2 font-mono text-xs font-semibold uppercase tracking-wider text-primary">
+                <Zap className="h-4 w-4 text-amber-500" />
+                <span>{t('tldrTitle')}</span>
+              </div>
+              <ul className="list-disc space-y-1.5 pl-5 text-xs leading-relaxed text-foreground/90 sm:text-sm">
+                {article.tldr.map((point) => (
+                  <li key={point}>{renderInlineMarkdown(point, point.slice(0, 24))}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
+          {/* Mobile & Tablet Inline Collapsible Table of Contents (< xl) */}
+          <MobileArticleToc items={article.toc} />
+
+          <ArticleMetricsBar slug={article.slug} category={article.category} />
+
+          <MdxArticleRenderer blocks={article.blocks} />
+
+          <div className="mt-8 border-t border-border/70 pt-5">
+            <Link
+              href={parentHref}
+              className="inline-flex items-center gap-1.5 font-mono text-xs text-muted-foreground hover:text-foreground"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+              <span>{t('backToAll')}</span>
+            </Link>
           </div>
+        </article>
 
-          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{article.title}</h1>
-          <p className="text-sm text-muted-foreground leading-relaxed">{article.summary}</p>
-        </header>
-
-        <ArticleMetricsBar slug={article.slug} category={article.category} />
-
-        <MdxArticleRenderer blocks={article.blocks} />
-
-        <div className="mt-8 border-t border-border/70 pt-5">
-          <Link
-            href={parentHref}
-            className="inline-flex items-center gap-1.5 font-mono text-xs text-muted-foreground hover:text-foreground"
-          >
-            <ArrowLeft className="h-3.5 w-3.5" />
-            <span>{t('backToAll')}</span>
-          </Link>
-        </div>
-      </article>
+        {/* Desktop Sticky Right-Rail Table of Contents (xl+) */}
+        <DesktopArticleToc items={article.toc} />
+      </div>
     )
   }
 
@@ -184,7 +208,7 @@ export default async function KnowledgeCatchAllPage({ params }: CatchAllKnowledg
                 <div className="flex items-center justify-between rounded-xl border border-border bg-muted/20 p-4 transition-all group-hover:border-primary/50 group-hover:bg-accent/40">
                   <div className="flex min-w-0 items-center gap-2.5">
                     <FolderOpen className="h-4 w-4 shrink-0 text-amber-500" />
-                    <span className="truncate font-semibold text-sm text-foreground group-hover:text-primary">
+                    <span className="truncate text-sm font-semibold text-foreground group-hover:text-primary">
                       {sub.label}
                     </span>
                   </div>

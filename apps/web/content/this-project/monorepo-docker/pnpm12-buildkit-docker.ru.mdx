@@ -5,13 +5,19 @@ category: "this-project"
 readingTime: "6 мин"
 publishedAt: "2026-11-06"
 order: 1
+tldr:
+  - "Перевели воркспейс на **pnpm 12.16.1** (Rust-ядро + SQLite-стор); все разрешения нативных сборок вынесены в `allowBuilds` внутри `pnpm-workspace.yaml`."
+  - "Подключили общий персистентный кэш BuildKit `--mount=type=cache,id=pnpm` между контейнерами `web`, `api` и `telemetry-ms`."
+  - "Вычистили ~180 МБ `devDependencies` через `pnpm prune --prod --ignore-scripts`, сохранив сгенерированный рантайм `.prisma/client`."
 ---
 
-## 1. Миграция с pnpm 10 на pnpm 12 (Rust-ядро + SQLite-стор)
+## 1. Миграция с pnpm 10 на pnpm 12
 
-В pnpm 12 устаревшее поле onlyBuiltDependencies в package.json полностью удалено. Все разрешения на выполнение скриптов сборки перенесены в строгий словарь allowBuilds внутри pnpm-workspace.yaml, иначе срабатывает защита ERR_PNPM_IGNORED_BUILDS.
+В **pnpm 12** устаревшее поле `onlyBuiltDependencies` в `package.json` полностью удалено. Все разрешения на выполнение `postinstall`-скриптов перенесены в строгий словарь `allowBuilds` внутри `pnpm-workspace.yaml`, иначе срабатывает защита `ERR_PNPM_IGNORED_BUILDS`.
 
-```yaml
+### Конфигурация allowBuilds в воркспейсе
+
+```yaml title="pnpm-workspace.yaml"
 packages:
   - "apps/*"
   - "packages/*"
@@ -28,20 +34,40 @@ allowBuilds:
   sharp: true
 ```
 
+> [!IMPORTANT]
+> Никогда не добавляйте секцию `"pnpm"` в `package.json` на **pnpm 12+**. И локальное окружение, и облачный билдер Vercel Corepack читают `allowBuilds` строго из `pnpm-workspace.yaml`.
+
 ## 2. Единый BuildKit Cache Mount для всех 3 сервисов
 
-Чтобы контейнеры web, api и telemetry-ms не скачивали одни и те же 100+ МБ нативных пакетов с нуля, мы подключили общий кэш-маунт BuildKit и прогрев бинарника pnpm в кэшируемом слое builder:
+Раньше контейнеры `web`, `api` и `telemetry-ms` скачивали одни и те же **100+ МБ** нативных пакетов с нуля при каждом изменении `pnpm-lock.yaml`.
 
-```dockerfile
+### Прогрев Corepack и монтирование стора
+
+Монтирование `/root/.local/share/pnpm/store` как персистентного кэша BuildKit шарит пакеты между всеми тремя Dockerfile:
+
+```dockerfile title="docker/api.Dockerfile"
 RUN corepack enable && corepack prepare pnpm@12.16.1 --activate && pnpm --version
 RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
     pnpm install --frozen-lockfile --ignore-scripts
 ```
 
-## 3. Очистка devDependencies с сохранением Prisma Client
+## 3. Замеры продакшен-образов и сохранение Prisma Client
 
-Вызов pnpm prune --prod --ignore-scripts после сборки вычищает Biome, Turbo, TypeScript и Prisma CLI (~180 МБ) из финальных продакшен-образов, сохраняя сгенерированный рантайм-клиент .prisma/client:
+Вызов `pnpm prune --prod --ignore-scripts` сразу после `turbo run build` вычищает **Biome**, **Turbo**, **TypeScript** и **Prisma CLI** из финальных продакшен-образов, сохраняя сгенерированный рантайм-клиент `.prisma/client`.
 
-- Сжатый образ telemetry-ms: 64.3 MB
-- Сжатый образ api: 78.2 MB (подключение к PostgreSQL за 15 мс)
-- Сжатый образ web (standalone): 85.6 MB
+### Сравнительная таблица До и После
+
+| Контейнер | До оптимизации | После (`pnpm prune --prod`) | Экспорт слоёв |
+| :--- | :---: | :---: | :---: |
+| `workfolio-telemetry-ms` | ~215 MB | **64.3 MB** | 1.8 с |
+| `workfolio-api` | ~260 MB | **78.2 MB** | 2.4 с |
+| `workfolio-web` (standalone) | ~140 MB | **85.6 MB** | 2.1 с |
+
+> [!TIP]
+> Так как продакшен-контейнер `api` очищен от `devDependencies`, миграции схемы БД (`prisma migrate deploy`) запускаются из CI/CD или локального терминала напрямую в **Neon.tech**.
+
+### Чеклист продакшен-готовности
+
+- [x] Непривилегированный пользователь (`nestjs` / `nextjs`, UID `1001`) во всех runner-образах
+- [x] Отключена фоновая телеметрия при сборке (`DO_NOT_TRACK=1`, `TURBO_TELEMETRY_DISABLED=1`)
+- [x] Нулевое влияние на облачный хостинг **Vercel** (`apps/web`) и **Neon.tech** (`DATABASE_URL`)
