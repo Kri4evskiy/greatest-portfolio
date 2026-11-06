@@ -14,6 +14,7 @@ import {
   Zap,
 } from 'lucide-react'
 import { useTranslations } from 'next-intl'
+import { useSectionNavigation } from '@/hooks/use-section-navigation'
 import { useVisitorProfile } from '@/hooks/use-visitor-profile'
 import { useRouter } from '@/i18n/navigation'
 import { trackEvent } from '@/lib/analytics'
@@ -58,6 +59,7 @@ const EXPERIENCE_KEYS = ['senior', 'fullstack'] as const
 export function WorkfolioHeroSection() {
   const t = useTranslations('Hero')
   const router = useRouter()
+  const { scrollToSection } = useSectionNavigation()
   const { data: profile } = useVisitorProfile()
   const openGuestPassModal = useUIStore((s) => s.openGuestPassModal)
 
@@ -73,44 +75,50 @@ export function WorkfolioHeroSection() {
   }
 
   return (
-    <section id="about" className="scroll-mt-20 space-y-6 pt-6">
+    <section id="about" className="scroll-mt-20 space-y-6 pt-3 sm:pt-6">
       <div className="space-y-4">
         <div className="flex flex-wrap items-center gap-2">
-          <Badge variant="success" className="font-mono text-xs">
+          <Badge variant="success" className="font-mono text-[11px] sm:text-xs">
             {t('openBadge')}
           </Badge>
-          <Badge variant="outline" className="font-mono text-xs">
+          <Badge variant="outline" className="font-mono text-[11px] sm:text-xs">
             {t('stackBadge')}
           </Badge>
         </div>
 
-        <h1 className="text-3xl font-bold tracking-tight sm:text-5xl">{t('title')}</h1>
+        <h1 className="text-2xl font-bold tracking-tight sm:text-5xl">{t('title')}</h1>
 
-        <p className="max-w-3xl text-base leading-relaxed text-muted-foreground sm:text-lg">{t('description')}</p>
+        <p className="max-w-3xl text-sm leading-relaxed text-muted-foreground sm:text-lg">{t('description')}</p>
 
-        <div className="flex flex-wrap items-center gap-3 pt-1">
-          <Button type="button" size="lg" onClick={() => handleOpenKnowledgeBase('/knowledge-base')} className="gap-2">
+        <div className="flex flex-col gap-2.5 pt-1 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
+          <Button
+            type="button"
+            size="lg"
+            onClick={() => handleOpenKnowledgeBase('/knowledge-base')}
+            className="w-full justify-center gap-2 sm:w-auto"
+          >
             {isUnlocked ? (
               <>
-                <LockOpen className="h-4 w-4 text-emerald-400" />
-                <span>{t('ctaUnlocked')}</span>
+                <LockOpen className="h-4 w-4 shrink-0 text-emerald-400" />
+                <span className="truncate">{t('ctaUnlocked')}</span>
               </>
             ) : (
               <>
-                <Lock className="h-4 w-4 text-amber-400" />
-                <span>{t('ctaLocked')}</span>
+                <Lock className="h-4 w-4 shrink-0 text-amber-400" />
+                <span className="truncate">{t('ctaLocked')}</span>
               </>
             )}
-            <ArrowUpRight className="h-4 w-4" />
+            <ArrowUpRight className="h-4 w-4 shrink-0" />
           </Button>
 
-          <a
-            href="#tech-radar"
-            className="inline-flex h-10 items-center gap-2 rounded-md border border-border bg-background px-4 text-sm font-medium hover:bg-accent"
+          <button
+            type="button"
+            onClick={() => scrollToSection('tech-radar')}
+            className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md border border-border bg-background px-4 text-sm font-medium transition-colors hover:bg-accent sm:w-auto"
           >
-            <Cpu className="h-4 w-4" />
+            <Cpu className="h-4 w-4 shrink-0" />
             <span>{t('ctaTechRadar')}</span>
-          </a>
+          </button>
         </div>
       </div>
 

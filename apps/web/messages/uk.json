@@ -12,11 +12,14 @@
       "techRadar": "Tech Radar (16 ADR)"
     },
     "knowledgeBase": "Base of Knowledge",
+    "knowledgeBaseShort": "База",
     "protectedBadge": "Захищено • 1-Клік",
     "logoutTitle": "Вийти з сесії ({name})",
     "guestBanner": "Гостьовий режим. Випустіть 1-Click Guest Pass для повного доступу.",
     "languageLabel": "Мова",
-    "themeToggle": "Перемкнути світлу / темну тему"
+    "themeToggle": "Перемкнути світлу / темну тему",
+    "sectionNavTitle": "Навігація по сторінці",
+    "scrollToTop": "Догори"
   },
   "Hero": {
     "openBadge": "● Відкритий до пропозицій Senior Full-Stack / Tech Lead",

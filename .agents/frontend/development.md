@@ -6,12 +6,17 @@
 
 Стартовая страница — это ссылка-визитка, которую получают рекрутеры, тимлиды и СТО. Она сочетает минималистичную структуру **Notion Workfolio** (`https://www.notion.com/templates/workfolio`) и живую демонстрацию нашей Full-Stack архитектуры:
 
-1. **Sticky Top Header (Шапка сайта):**
-   - Слева: Имя / логотип в стиле хлебных крошек Notion (`workspace / portfolio`) + статус-бейдж.
-   - По центру / справа: Навигация по секциям резюме (`About`, `Projects`, `Experience`, `Tech Radar`) и **главная кнопка-переход `Base of Knowledge`**.
+1. **Sticky Top Header (Разгруженная шапка сайта — Mobile-First):**
+   - Слева: Имя / логотип в стиле хлебных крошек Notion (`workspace / workfolio-cv`) + статус-бейдж (`md+`).
+   - Справа: `ThemeToggle`, адаптивный `LanguageSwitcher` (компактная циклическая кнопка на `< sm`, сегментированный переключатель `EN | UA | RU` на `>= sm`), **главная кнопка `Base of Knowledge`** и единственная быстрая кнопка **`ADR`** (на главной программно скроллит к `#tech-radar`, внутри Базы Знаний заменяется на `CV`).
+   - Центральный список якорных ссылок из хедера **вынесен** в отдельный парящий навигатор страницы (`PageSectionNavigator`), чтобы не перегружать шапку на мобильных и планшетных экранах.
    - **Индикация доступа на кнопке `Base of Knowledge`:**
      - Для роли `GUEST`: иконка замка `🔒 Base of Knowledge` + бейдж `Protected`. Клик открывает микро-модалку получения `Guest Pass` в 1 клик.
-     - Для ролей `USER` / `ADMIN`: иконка открытого замка `🔓 Base of Knowledge` + имя гостя и прямой переход в `/knowledge-base`.
+     - Для ролей `USER` / `ADMIN`: иконка открытого замка `🔓 Base of Knowledge` + роль и прямой переход в `/knowledge-base`.
+       1.1. **Боковой Навигатор Секций (`PageSectionNavigator` + `useSectionNavigation`):**
+   - Отслеживает текущую видимую секцию (`about`, `projects`, `experience`, `tech-radar`) через `IntersectionObserver` (`ScrollSpy`).
+   - Гарантирует плавный повторный скролл (`scrollIntoView`) даже если хэш в URL уже совпадает с выбранной секцией.
+   - На десктопе (`xl:`) рендерится как минималистичный парящий outline-индикатор в духе Notion сбоку от контента; на мобильных и планшетах (`< xl`) — как компактная плавающая кнопка-таблетка в правом нижнем углу с всплывающим списком разделов.
 2. **Hero & Personal Intro (в стиле Workfolio):**
    - Лаконичное позиционирование, ключевая специализация (Full-Stack TypeScript: Next.js, NestJS, Microservices, Architecture), быстрые ссылки (GitHub, LinkedIn, Telegram, Download CV) и краткий `Callout`-блок об архитектуре самого сайта.
 3. **Featured Case Studies & Project Gallery (Workfolio Cards):**

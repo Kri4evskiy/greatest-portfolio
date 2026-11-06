@@ -119,7 +119,7 @@ export function GuestPassModal() {
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => (open ? openModal() : closeModal())}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="max-h-[90dvh] w-[calc(100vw-1.5rem)] overflow-y-auto p-4 sm:max-w-lg sm:p-6">
         <DialogHeader>
           <div className="flex items-center gap-2">
             <Badge variant="outline" className="font-mono text-[11px]">

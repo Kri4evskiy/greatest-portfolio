@@ -184,7 +184,7 @@ export function TechRadarTable() {
       </div>
 
       <div className="flex flex-col gap-3 rounded-lg border border-border bg-card p-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-wrap gap-1.5">
+        <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0">
           {CATEGORIES.map((category) => {
             const active = categoryFilter === category
             return (
@@ -192,7 +192,7 @@ export function TechRadarTable() {
                 key={category}
                 type="button"
                 onClick={() => setCategoryFilter(category)}
-                className={`rounded-md px-2.5 py-1 font-mono text-xs transition-colors ${
+                className={`shrink-0 rounded-md px-2.5 py-1 font-mono text-xs transition-colors ${
                   active
                     ? 'bg-primary text-primary-foreground font-medium'
                     : 'bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground'
@@ -215,7 +215,66 @@ export function TechRadarTable() {
         </div>
       </div>
 
-      <div className="overflow-x-auto rounded-lg border border-border bg-card shadow-sm">
+      {/* Mobile Card View (< md) — Zero horizontal table scroll */}
+      <div className="grid gap-3 md:hidden">
+        {table.getRowModel().rows.length > 0 ? (
+          table.getRowModel().rows.map((row) => {
+            const item = row.original
+            const levelVariant = item.level === 'Core' ? 'success' : item.level === 'Production' ? 'default' : 'warning'
+            return (
+              <div key={row.id} className="rounded-lg border border-border bg-card p-3.5 shadow-sm">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-mono text-xs font-semibold text-muted-foreground">
+                      #{String(item.adrNumber).padStart(2, '0')}
+                    </span>
+                    <Badge variant="secondary" className="font-mono text-[10px]">
+                      {item.category}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Badge variant={levelVariant} className="font-mono text-[10px]">
+                      {item.level}
+                    </Badge>
+                    <span className="font-mono text-[11px] font-medium text-muted-foreground">
+                      {t('yearsSuffix', { years: item.experienceYears })}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="mt-2 font-semibold text-sm text-foreground">{item.name}</div>
+                <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-muted-foreground">{item.summary}</p>
+
+                <div className="mt-3 border-t border-border/60 pt-2.5">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      openAdrInspector(item)
+                      trackEvent('adr_popover_inspected', {
+                        adrNumber: item.adrNumber,
+                        name: item.name,
+                      })
+                    }}
+                    className="h-8 w-full justify-center gap-1.5 font-mono text-xs"
+                  >
+                    <BookOpenCheck className="h-3.5 w-3.5" />
+                    <span>{t('inspectBtn')}</span>
+                  </Button>
+                </div>
+              </div>
+            )
+          })
+        ) : (
+          <div className="rounded-lg border border-border bg-card py-8 text-center text-sm text-muted-foreground">
+            {t('emptyResult')}
+          </div>
+        )}
+      </div>
+
+      {/* Desktop Notion Database Table View (>= md) */}
+      <div className="hidden overflow-x-auto rounded-lg border border-border bg-card shadow-sm md:block">
         <table className="w-full border-collapse text-left text-sm">
           <thead>
             {table.getHeaderGroups().map((headerGroup) => (
@@ -256,7 +315,7 @@ export function TechRadarTable() {
           if (!open) closeAdrInspector()
         }}
       >
-        <DialogContent className="sm:max-w-xl">
+        <DialogContent className="max-h-[88dvh] w-[calc(100vw-1.5rem)] overflow-y-auto p-4 sm:max-w-xl sm:p-6">
           {activeDialogItem ? (
             <>
               <DialogHeader>

@@ -48,8 +48,8 @@ export function WorkfolioFooter() {
   }, [])
 
   return (
-    <footer className="mt-20 border-t border-border/70 bg-muted/30">
-      <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-8 sm:px-6 md:flex-row md:items-center md:justify-between">
+    <footer className="mt-16 border-t border-border/70 bg-muted/30 sm:mt-20">
+      <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 pb-20 pt-8 sm:px-6 md:flex-row md:items-center md:justify-between xl:pb-8">
         <div className="space-y-1">
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-mono text-xs font-semibold text-foreground">greatest-portfolio</span>
@@ -67,16 +67,16 @@ export function WorkfolioFooter() {
           </p>
         </div>
 
-        <div className="flex items-center gap-3 rounded-lg border border-border/80 bg-background px-3.5 py-2 shadow-sm">
-          <div className="flex items-center gap-1.5">
+        <div className="flex min-w-0 flex-wrap items-center gap-2 rounded-lg border border-border/80 bg-background px-3 py-2 shadow-sm sm:flex-nowrap sm:gap-3 sm:px-3.5">
+          <div className="flex shrink-0 items-center gap-1.5">
             <span
               className={`h-2 w-2 rounded-full ${sseConnected ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`}
             />
             <Radio className="h-3.5 w-3.5 text-muted-foreground" />
             <span className="font-mono text-[11px] font-medium">{sseConnected ? 'SSE LIVE' : 'SSE STANDBY'}</span>
           </div>
-          <div className="h-4 w-px bg-border" />
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground max-w-xs sm:max-w-md truncate">
+          <div className="hidden h-4 w-px bg-border sm:block" />
+          <div className="flex min-w-0 flex-1 items-center gap-1.5 text-xs text-muted-foreground sm:max-w-md">
             {latestEvent ? (
               <>
                 <Activity className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
@@ -87,7 +87,7 @@ export function WorkfolioFooter() {
             ) : (
               <>
                 <Server className="h-3.5 w-3.5 shrink-0" />
-                <span className="font-mono text-[11px]">{t('waitingPulse')}</span>
+                <span className="truncate font-mono text-[11px]">{t('waitingPulse')}</span>
               </>
             )}
           </div>

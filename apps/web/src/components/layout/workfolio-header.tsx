@@ -3,6 +3,7 @@
 import { Badge, Button } from '@repo/ui'
 import { BookOpen, FileText, Lock, LockOpen, LogOut, ShieldAlert } from 'lucide-react'
 import { useTranslations } from 'next-intl'
+import { useSectionNavigation } from '@/hooks/use-section-navigation'
 import { useLogoutMutation, useVisitorProfile } from '@/hooks/use-visitor-profile'
 import { Link, usePathname, useRouter } from '@/i18n/navigation'
 import { trackEvent } from '@/lib/analytics'
@@ -14,6 +15,7 @@ export function WorkfolioHeader() {
   const t = useTranslations('Header')
   const pathname = usePathname()
   const router = useRouter()
+  const { scrollToSection, scrollToTop } = useSectionNavigation()
   const { data: profile } = useVisitorProfile()
   const logoutMutation = useLogoutMutation()
   const openGuestPassModal = useUIStore((s) => s.openGuestPassModal)
@@ -33,66 +35,58 @@ export function WorkfolioHeader() {
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-border/70 bg-background/90 backdrop-blur-md">
-      <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4 sm:px-6">
-        <div className="flex items-center gap-2 text-sm">
+      <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-2 px-3 sm:px-6">
+        <div className="flex min-w-0 items-center gap-2 text-sm">
           <Link
             href="/"
-            className="flex items-center gap-2 font-medium text-foreground transition-opacity hover:opacity-80"
+            onClick={(e) => {
+              if (pathname === '/') {
+                e.preventDefault()
+                scrollToTop()
+              }
+            }}
+            className="flex min-w-0 items-center gap-1.5 font-medium text-foreground transition-opacity hover:opacity-80 sm:gap-2"
           >
-            <span className="flex h-6 w-6 items-center justify-center rounded border border-border bg-muted font-mono text-xs font-bold">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded border border-border bg-muted font-mono text-xs font-bold">
               W
             </span>
-            <span className="font-mono text-xs text-muted-foreground hidden sm:inline">workspace /</span>
-            <span className="font-semibold tracking-tight">workfolio-cv</span>
+            <span className="hidden font-mono text-xs text-muted-foreground md:inline">workspace /</span>
+            <span className="truncate font-semibold tracking-tight text-xs sm:text-sm">workfolio-cv</span>
           </Link>
 
           {isInsideKnowledgeBase ? (
             <>
-              <span className="font-mono text-xs text-muted-foreground">/</span>
-              <Badge variant="secondary" className="font-mono text-xs">
+              <span className="hidden font-mono text-xs text-muted-foreground sm:inline">/</span>
+              <Badge variant="secondary" className="hidden font-mono text-xs sm:inline-flex">
                 knowledge-base
               </Badge>
             </>
           ) : (
-            <Badge variant="success" className="hidden md:inline-flex text-[11px]">
+            <Badge variant="success" className="hidden text-[11px] lg:inline-flex">
               {t('availableBadge')}
             </Badge>
           )}
         </div>
 
-        <nav className="hidden lg:flex items-center gap-5 text-xs font-medium text-muted-foreground">
-          <Link href="/#about" className="hover:text-foreground transition-colors">
-            {t('nav.about')}
-          </Link>
-          <Link href="/#projects" className="hover:text-foreground transition-colors">
-            {t('nav.projects')}
-          </Link>
-          <Link href="/#experience" className="hover:text-foreground transition-colors">
-            {t('nav.experience')}
-          </Link>
-          <Link href="/#tech-radar" className="hover:text-foreground transition-colors">
-            {t('nav.techRadar')}
-          </Link>
-        </nav>
-
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
           <ThemeToggle />
           <LanguageSwitcher />
 
           {isUnlocked ? (
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1 sm:gap-1.5">
               <Button
                 type="button"
                 variant={isInsideKnowledgeBase ? 'secondary' : 'default'}
                 size="sm"
                 onClick={handleKnowledgeBaseClick}
-                className="gap-1.5 text-xs"
+                className="h-8 gap-1 px-2.5 text-xs sm:gap-1.5 sm:px-3"
               >
-                <LockOpen className="h-3.5 w-3.5 text-emerald-400" />
+                <LockOpen className="h-3.5 w-3.5 shrink-0 text-emerald-400" />
+                <span className="sm:hidden">{t('knowledgeBaseShort')}</span>
                 <span className="hidden sm:inline">{t('knowledgeBase')}</span>
                 <Badge
                   variant={currentRole === 'ADMIN' ? 'warning' : 'success'}
-                  className="ml-0.5 px-1.5 py-0 font-mono text-[10px]"
+                  className="hidden px-1.5 py-0 font-mono text-[10px] md:inline-flex"
                 >
                   {currentRole}
                 </Badge>
@@ -121,30 +115,32 @@ export function WorkfolioHeader() {
               size="sm"
               onClick={handleKnowledgeBaseClick}
               onMouseEnter={() => router.prefetch('/knowledge-base')}
-              className="group gap-2 border-primary/30 bg-background text-xs font-medium hover:border-primary hover:bg-accent"
+              className="group h-8 gap-1.5 border-primary/30 bg-background px-2.5 text-xs font-medium hover:border-primary hover:bg-accent sm:gap-2 sm:px-3"
             >
-              <Lock className="h-3.5 w-3.5 text-amber-600 transition-transform group-hover:scale-110" />
-              <span>{t('knowledgeBase')}</span>
-              <Badge variant="warning" className="hidden sm:inline-flex px-1.5 py-0 font-mono text-[10px]">
+              <Lock className="h-3.5 w-3.5 shrink-0 text-amber-600 transition-transform group-hover:scale-110" />
+              <span className="sm:hidden">{t('knowledgeBaseShort')}</span>
+              <span className="hidden sm:inline">{t('knowledgeBase')}</span>
+              <Badge variant="warning" className="hidden px-1.5 py-0 font-mono text-[10px] md:inline-flex">
                 {t('protectedBadge')}
               </Badge>
             </Button>
           )}
 
           {!isInsideKnowledgeBase ? (
-            <a
-              href="#tech-radar"
-              className="hidden sm:inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 font-mono text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
+            <button
+              type="button"
+              onClick={() => scrollToSection('tech-radar')}
+              className="inline-flex h-8 items-center gap-1 rounded-md border border-border px-2 font-mono text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground sm:px-2.5"
             >
-              <FileText className="h-3.5 w-3.5" />
+              <FileText className="h-3.5 w-3.5 shrink-0" />
               <span>ADR</span>
-            </a>
+            </button>
           ) : (
             <Link
               href="/"
-              className="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 font-mono text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
+              className="inline-flex h-8 items-center gap-1 rounded-md border border-border px-2 font-mono text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground sm:px-2.5"
             >
-              <BookOpen className="h-3.5 w-3.5" />
+              <BookOpen className="h-3.5 w-3.5 shrink-0" />
               <span>CV</span>
             </Link>
           )}
