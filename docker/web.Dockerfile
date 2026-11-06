@@ -1,6 +1,8 @@
 # Stage 1: Prune monorepo subgraph for @repo/web
 FROM node:22-alpine AS pruner
 RUN apk add --no-cache libc6-compat
+ENV DO_NOT_TRACK=1
+ENV TURBO_TELEMETRY_DISABLED=1
 RUN npm install -g turbo@^2
 WORKDIR /app
 COPY . .
@@ -9,16 +11,19 @@ RUN turbo prune @repo/web --docker
 # Stage 2: Install dependencies and build
 FROM node:22-alpine AS builder
 RUN apk add --no-cache libc6-compat
-RUN corepack enable && corepack prepare pnpm@12.16.1 --activate
+ENV DO_NOT_TRACK=1
+ENV TURBO_TELEMETRY_DISABLED=1
+ENV NEXT_TELEMETRY_DISABLED=1
+RUN corepack enable && corepack prepare pnpm@12.16.1 --activate && pnpm --version
 WORKDIR /app
 
 COPY --from=pruner /app/out/json/ .
 COPY --from=pruner /app/out/pnpm-lock.yaml ./pnpm-lock.yaml
-RUN pnpm install --frozen-lockfile --ignore-scripts
+RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
+    pnpm install --frozen-lockfile --ignore-scripts
 
 COPY --from=pruner /app/out/full/ .
 COPY tsconfig.base.json ./tsconfig.base.json
-ENV NEXT_TELEMETRY_DISABLED=1
 ENV DOCKER_STANDALONE=true
 ENV API_INTERNAL_URL=http://api:4000
 RUN pnpm turbo run build --filter=@repo/web...

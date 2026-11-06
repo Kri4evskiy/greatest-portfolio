@@ -39,3 +39,4 @@
 2. Никогда не ставь `ESLint` или `Prettier` — проект использует исключительно `Biome.js`.
 3. Никогда не храни серверные данные API в `Zustand` (для этого есть `TanStack Query` + `IndexedDB Persister`).
 4. Никогда не храни JWT-токены в `LocalStorage` (только `HttpOnly, Secure, SameSite=Lax Cookies`).
+5. Никогда не добавляй секцию `"pnpm"` (например, `onlyBuiltDependencies`) в `package.json` — в `pnpm 12+` все настройки воркспейса и `allowBuilds` живут строго в `pnpm-workspace.yaml`.
