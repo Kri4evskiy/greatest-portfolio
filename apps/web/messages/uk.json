@@ -22,7 +22,8 @@
     "sectionNavTitle": "Навігація по сторінці",
     "scrollToTop": "Догори",
     "searchPlaceholder": "Пошук...",
-    "searchAria": "Відкрити глобальний пошук (Ctrl+K)"
+    "searchAria": "Відкрити глобальний пошук (Ctrl+K)",
+    "cvButtonTitle": "Переглянути та завантажити резюме (PDF)"
   },
   "Hero": {
     "openBadge": "● Відкритий до пропозицій Senior Frontend / Fullstack",
@@ -30,6 +31,7 @@
     "description": "Frontend Engineer із 5+ роками комерційного досвіду в екосистемі React та Next.js і компетенціями Fullstack (Node.js, NestJS, Python, PostgreSQL). Спеціалізуюся на оптимізації продуктивності (-15–40% LCP/TTI), візуальних графах і воркфлоу (XYFlow, D3.js), суворій типізації та AI-інжинірингу (Cursor, Claude, LLM workflows).",
     "ctaUnlocked": "Відкрити Інженерну Базу Знань",
     "ctaLocked": "Розблокувати Базу Знань (1-Click Guest Pass)",
+    "ctaCvPdf": "Переглянути та скачати CV (PDF)",
     "ctaTechRadar": "Матриця 16 технологій (ADR)",
     "ctaRoadmap": "Tech Debt, Ідеї та Компроміси",
     "calloutTitle": "Як цей живий монорепозиторій доповнює моє CV",
@@ -165,6 +167,7 @@
     "cmdArticlesHeading": "Конспекти Бази Знань",
     "cmdHeadingsMatch": "Розділ:",
     "cmdActionCvHome": "Workfolio CV — Головна та Досвід",
+    "cmdActionCvPdf": "CV / Резюме — Перегляд та завантаження PDF",
     "cmdActionTechRadar": "Tech Radar — Матриця 16 технологій (ADR)",
     "cmdActionRoadmap": "Інженерний Беклог — Tech Debt, Ідеї та Компроміси",
     "cmdActionKbOverview": "База Знань — Усі теми та підтеми",
@@ -197,5 +200,25 @@
   "Footer": {
     "contactPrompt": "Відкритий до пропозицій на позиції Senior Frontend / Fullstack",
     "waitingPulse": "/api/telemetry/stream • Очікування пульсу..."
+  },
+  "CvPage": {
+    "metaTitle": "Станіслав Кричевський — CV / Резюме (PDF та повний профіль)",
+    "metaDescription": "Перегляд і завантаження актуального PDF-резюме Станіслава Кричевського (Senior Frontend / Fullstack Engineer, 5+ років React, Next.js, TypeScript, NestJS).",
+    "backToWorkfolio": "На головну Workfolio",
+    "updatedLabel": "Оновлено:",
+    "missingPdfBadge": "PDF не знайдено у public/cv/",
+    "downloadPdfBtn": "Завантажити CV (PDF)",
+    "openFullscreenBtn": "Відкрити PDF у новій вкладці",
+    "tabPdfPreview": "Оригінал PDF-документа",
+    "tabStructuredCv": "Повна веб-версія (ATS)",
+    "mobileViewerHint": "Перемикання між вбудованим PDF та текстовою версією",
+    "mobilePdfBanner": "Мобільні браузери можуть показувати лише 1-шу сторінку всередині вбудованого фрейму. Відкрийте PDF на весь екран або увімкніть веб-версію:",
+    "pdfFallbackText": "Ваш браузер не підтримує вбудований перегляд PDF. Натисніть кнопку нижче, щоб завантажити повне резюме.",
+    "summaryHeading": "Профіль (Summary)",
+    "hardSkillsHeading": "Технічні навички (Hard Skills)",
+    "experienceHeading": "Комерційний досвід (2020 – 2026)",
+    "educationHeading": "Освіта",
+    "coursesHeading": "Курси",
+    "languagesHeading": "Мови"
   }
 }

@@ -22,7 +22,8 @@
     "sectionNavTitle": "Навигация по странице",
     "scrollToTop": "Наверх",
     "searchPlaceholder": "Поиск...",
-    "searchAria": "Открыть глобальный поиск (Ctrl+K)"
+    "searchAria": "Открыть глобальный поиск (Ctrl+K)",
+    "cvButtonTitle": "Посмотреть и скачать резюме (PDF)"
   },
   "Hero": {
     "openBadge": "● Открыт к предложениям Senior Frontend / Fullstack",
@@ -30,6 +31,7 @@
     "description": "Frontend Engineer с 5+ годами коммерческого опыта в экосистеме React и Next.js с компетенциями Fullstack (Node.js, NestJS, Python, PostgreSQL). Специализируюсь на оптимизации производительности (-15–40% LCP/TTI), визуальных графах и воркфлоу (XYFlow, D3.js), строгой сквозной типизации и AI-инжиниринге (Cursor, Claude, LLM workflows).",
     "ctaUnlocked": "Открыть Инженерную Базу Знаний",
     "ctaLocked": "Разблокировать Базу Знаний (1-Click Guest Pass)",
+    "ctaCvPdf": "Открыть и скачать CV (PDF)",
     "ctaTechRadar": "Матрица 16 технологий (ADR)",
     "ctaRoadmap": "Tech Debt, Идеи и Компромиссы",
     "calloutTitle": "Как этот живой монорепозиторий дополняет моё резюме",
@@ -165,6 +167,7 @@
     "cmdArticlesHeading": "Конспекты Базы Знаний",
     "cmdHeadingsMatch": "Раздел:",
     "cmdActionCvHome": "Workfolio CV — Главная и Опыт",
+    "cmdActionCvPdf": "CV / Резюме — Просмотр и скачивание PDF",
     "cmdActionTechRadar": "Tech Radar — Матрица 16 технологий (ADR)",
     "cmdActionRoadmap": "Инженерный Бэклог — Tech Debt, Идеи и Компромиссы",
     "cmdActionKbOverview": "База Знаний — Все темы и подтемы",
@@ -197,5 +200,25 @@
   "Footer": {
     "contactPrompt": "Открыт к диалогу по позициям Senior Frontend / Fullstack",
     "waitingPulse": "/api/telemetry/stream • Waiting for pulse..."
+  },
+  "CvPage": {
+    "metaTitle": "Станислав Кричевский — CV / Резюме (PDF и полный профиль)",
+    "metaDescription": "Просмотр и скачивание актуального PDF-резюме Станислава Кричевского (Senior Frontend / Fullstack Engineer, 5+ лет React, Next.js, TypeScript, NestJS).",
+    "backToWorkfolio": "На главную Workfolio",
+    "updatedLabel": "Обновлено:",
+    "missingPdfBadge": "PDF не найден в public/cv/",
+    "downloadPdfBtn": "Скачать CV (PDF)",
+    "openFullscreenBtn": "Открыть PDF в новой вкладке",
+    "tabPdfPreview": "Оригинал PDF-документа",
+    "tabStructuredCv": "Полная веб-версия (ATS)",
+    "mobileViewerHint": "Переключение между встроенным PDF и текстовой версией",
+    "mobilePdfBanner": "Мобильные браузеры могут показывать только 1-ю страницу внутри встроенного фрейма. Откройте PDF на весь экран или переключитесь на веб-версию:",
+    "pdfFallbackText": "Ваш браузер не поддерживает встроенный просмотр PDF. Нажмите кнопку ниже, чтобы скачать полное резюме.",
+    "summaryHeading": "О себе (Summary)",
+    "hardSkillsHeading": "Технические навыки (Hard Skills)",
+    "experienceHeading": "Коммерческий опыт (2020 – 2026)",
+    "educationHeading": "Образование",
+    "coursesHeading": "Курсы",
+    "languagesHeading": "Языки"
   }
 }

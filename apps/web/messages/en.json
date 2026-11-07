@@ -22,7 +22,8 @@
     "sectionNavTitle": "On this page",
     "scrollToTop": "Back to top",
     "searchPlaceholder": "Search notes...",
-    "searchAria": "Open global search (Ctrl+K)"
+    "searchAria": "Open global search (Ctrl+K)",
+    "cvButtonTitle": "View & Download Resume (PDF)"
   },
   "Hero": {
     "openBadge": "● Open to Senior Frontend / Fullstack Proposals",
@@ -30,6 +31,7 @@
     "description": "Frontend Engineer with 5+ years of commercial experience specializing in the React & Next.js ecosystem with Fullstack capabilities (Node.js, NestJS, Python, PostgreSQL). Focused on performance optimization (-15–40% LCP/TTI), interactive data & workflow visualization (XYFlow, D3.js), strict typesafe architectures, and AI-assisted engineering (Cursor, Claude, LLM workflows).",
     "ctaUnlocked": "Open Engineering Knowledge Base",
     "ctaLocked": "Unlock Knowledge Base (1-Click Guest Pass)",
+    "ctaCvPdf": "View & Download CV (PDF)",
     "ctaTechRadar": "16-Technology Matrix (ADR)",
     "ctaRoadmap": "Tech Debt & Ideas Log",
     "calloutTitle": "How this live monorepo complements my CV",
@@ -165,6 +167,7 @@
     "cmdArticlesHeading": "Knowledge Base Notes",
     "cmdHeadingsMatch": "Section:",
     "cmdActionCvHome": "Workfolio CV — Overview & Experience",
+    "cmdActionCvPdf": "CV / Resume — Visual PDF Preview & Download",
     "cmdActionTechRadar": "Tech Radar — 16 Architecture Decisions (ADR)",
     "cmdActionRoadmap": "Engineering Backlog — Tech Debt, Ideas & Trade-offs",
     "cmdActionKbOverview": "Knowledge Base — All Topics & Subtopics",
@@ -197,5 +200,25 @@
   "Footer": {
     "contactPrompt": "Available for Senior Frontend / Fullstack conversations",
     "waitingPulse": "/api/telemetry/stream • Waiting for pulse..."
+  },
+  "CvPage": {
+    "metaTitle": "Stanislav Krychevskyi — CV / Resume (PDF & Full Profile)",
+    "metaDescription": "View and download the latest PDF resume of Stanislav Krychevskyi (Senior Frontend / Fullstack Engineer, 5+ years React, Next.js, TypeScript, NestJS).",
+    "backToWorkfolio": "Back to Workfolio Home",
+    "updatedLabel": "Updated:",
+    "missingPdfBadge": "PDF not found in public/cv/",
+    "downloadPdfBtn": "Download CV (PDF)",
+    "openFullscreenBtn": "Open PDF in New Tab",
+    "tabPdfPreview": "Original PDF Document",
+    "tabStructuredCv": "Full Web / ATS Version",
+    "mobileViewerHint": "Switch between embedded PDF and copyable text view",
+    "mobilePdfBanner": "Mobile browsers may show only Page 1 inside embedded PDF frames. Open fullscreen or switch to the Web Version to read both pages comfortably:",
+    "pdfFallbackText": "Your browser does not support inline PDF rendering. Click below to download the full 2-page PDF directly.",
+    "summaryHeading": "Summary",
+    "hardSkillsHeading": "Hard Skills",
+    "experienceHeading": "Commercial Experience (2020 – 2026)",
+    "educationHeading": "Education",
+    "coursesHeading": "Courses",
+    "languagesHeading": "Languages"
   }
 }

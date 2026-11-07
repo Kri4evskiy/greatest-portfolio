@@ -2,7 +2,20 @@
 
 import { getKnowledgeFormatLabel, type SupportedLocale } from '@repo/shared-schemas'
 import { Badge } from '@repo/ui'
-import { ArrowRight, BookOpen, Compass, Cpu, FileText, Hash, Home, Lock, Search, Sparkles, X } from 'lucide-react'
+import {
+  ArrowRight,
+  BookOpen,
+  Compass,
+  Cpu,
+  FileDown,
+  FileText,
+  Hash,
+  Home,
+  Lock,
+  Search,
+  Sparkles,
+  X,
+} from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSectionNavigation } from '@/hooks/use-section-navigation'
@@ -23,7 +36,7 @@ type PaletteEntry =
       kind: 'quick-action'
       id: string
       label: string
-      actionType: 'cv-home' | 'tech-radar' | 'roadmap' | 'kb-overview'
+      actionType: 'cv-home' | 'cv-pdf' | 'tech-radar' | 'roadmap' | 'kb-overview'
     }
   | {
       kind: 'article'
@@ -93,6 +106,7 @@ export function CommandPaletteModal({ items, topTags, locale }: CommandPaletteMo
 
   const quickActions = useMemo<PaletteEntry[]>(
     () => [
+      { kind: 'quick-action', id: 'qa-cv-pdf', label: t('cmdActionCvPdf'), actionType: 'cv-pdf' },
       { kind: 'quick-action', id: 'qa-kb', label: t('cmdActionKbOverview'), actionType: 'kb-overview' },
       { kind: 'quick-action', id: 'qa-radar', label: t('cmdActionTechRadar'), actionType: 'tech-radar' },
       { kind: 'quick-action', id: 'qa-roadmap', label: t('cmdActionRoadmap'), actionType: 'roadmap' },
@@ -176,6 +190,10 @@ export function CommandPaletteModal({ items, topTags, locale }: CommandPaletteMo
       if (entry.kind === 'quick-action') {
         if (entry.actionType === 'cv-home') {
           router.push('/')
+          return
+        }
+        if (entry.actionType === 'cv-pdf') {
+          router.push('/cv')
           return
         }
         if (entry.actionType === 'tech-radar') {
@@ -337,6 +355,8 @@ export function CommandPaletteModal({ items, topTags, locale }: CommandPaletteMo
                         <span className="flex min-w-0 items-center gap-2.5 truncate">
                           {entry.actionType === 'cv-home' ? (
                             <Home className="h-4 w-4 shrink-0 text-primary" />
+                          ) : entry.actionType === 'cv-pdf' ? (
+                            <FileDown className="h-4 w-4 shrink-0 text-primary" />
                           ) : entry.actionType === 'tech-radar' ? (
                             <Cpu className="h-4 w-4 shrink-0 text-primary" />
                           ) : entry.actionType === 'roadmap' ? (

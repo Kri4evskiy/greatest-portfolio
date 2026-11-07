@@ -10,6 +10,7 @@ import {
   Compass,
   Cpu,
   ExternalLink,
+  FileDown,
   GitBranch,
   Github,
   GraduationCap,
@@ -36,7 +37,7 @@ import {
 } from '@/data/author-profile'
 import { useSectionNavigation } from '@/hooks/use-section-navigation'
 import { useVisitorProfile } from '@/hooks/use-visitor-profile'
-import { useRouter } from '@/i18n/navigation'
+import { Link, useRouter } from '@/i18n/navigation'
 import { trackEvent } from '@/lib/analytics'
 import { useUIStore } from '@/store/use-ui-store'
 
@@ -195,6 +196,14 @@ export function WorkfolioHeroSection() {
             )}
             <ArrowUpRight className="h-4 w-4 shrink-0" />
           </Button>
+
+          <Link
+            href="/cv"
+            className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md border border-primary/30 bg-primary/5 px-4 text-sm font-medium text-foreground transition-colors hover:border-primary hover:bg-primary/10 sm:w-auto"
+          >
+            <FileDown className="h-4 w-4 shrink-0 text-primary" />
+            <span>{t('ctaCvPdf')}</span>
+          </Link>
 
           <button
             type="button"

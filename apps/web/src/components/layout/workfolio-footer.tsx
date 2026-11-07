@@ -2,10 +2,23 @@
 
 import { APP_VERSION, SupportedLocaleEnum, type TelemetryEvent, TelemetryEventSchema } from '@repo/shared-schemas'
 import { Badge } from '@repo/ui'
-import { Activity, Database, ExternalLink, Github, Linkedin, Mail, MapPin, Radio, Send, Server } from 'lucide-react'
+import {
+  Activity,
+  Database,
+  ExternalLink,
+  FileDown,
+  Github,
+  Linkedin,
+  Mail,
+  MapPin,
+  Radio,
+  Send,
+  Server,
+} from 'lucide-react'
 import { useLocale, useTranslations } from 'next-intl'
 import { useEffect, useState } from 'react'
 import { AUTHOR_PROFILE, pickLocalized } from '@/data/author-profile'
+import { Link } from '@/i18n/navigation'
 
 export function WorkfolioFooter() {
   const t = useTranslations('Footer')
@@ -76,6 +89,13 @@ export function WorkfolioFooter() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            <Link
+              href="/cv"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/5 px-3 py-1.5 font-mono text-xs font-medium text-foreground transition-colors hover:border-primary hover:bg-primary/10"
+            >
+              <FileDown className="h-3.5 w-3.5 text-primary" />
+              <span>CV (PDF)</span>
+            </Link>
             <a
               href={AUTHOR_PROFILE.contacts.telegramUrl}
               target="_blank"

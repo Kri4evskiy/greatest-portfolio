@@ -69,6 +69,10 @@ export const AUTHOR_PROFILE = {
       ru: 'Магистр международных отношений',
     } satisfies LocalizedText,
   },
+  courses: [
+    'Frontend Developer Course — Andersen Lab (Dec 2019 – Mar 2020)',
+    'Frontend Developer Course — CyberBionic Systematic (Aug 2019 – Nov 2019)',
+  ],
   spokenLanguages: {
     en: 'English — Upper-Intermediate (B2) • Ukrainian — Native',
     uk: 'English — Upper-Intermediate (B2) • Українська — Рідна',

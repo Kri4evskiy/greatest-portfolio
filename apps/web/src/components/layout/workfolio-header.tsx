@@ -1,7 +1,7 @@
 'use client'
 
 import { Badge, Button } from '@repo/ui'
-import { BookOpen, FileText, Lock, LockOpen, LogOut, Search, ShieldAlert } from 'lucide-react'
+import { FileDown, FileText, Lock, LockOpen, LogOut, Search, ShieldAlert } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { AUTHOR_PROFILE } from '@/data/author-profile'
 import { useSectionNavigation } from '@/hooks/use-section-navigation'
@@ -25,6 +25,7 @@ export function WorkfolioHeader() {
   const currentRole = profile?.role ?? 'GUEST'
   const isUnlocked = currentRole === 'USER' || currentRole === 'ADMIN'
   const isInsideKnowledgeBase = pathname.startsWith('/knowledge-base')
+  const isOnCvPage = pathname === '/cv'
 
   const handleKnowledgeBaseClick = () => {
     if (isUnlocked) {
@@ -61,6 +62,13 @@ export function WorkfolioHeader() {
               <span className="hidden font-mono text-xs text-muted-foreground sm:inline">/</span>
               <Badge variant="secondary" className="hidden font-mono text-xs sm:inline-flex">
                 knowledge-base
+              </Badge>
+            </>
+          ) : isOnCvPage ? (
+            <>
+              <span className="hidden font-mono text-xs text-muted-foreground sm:inline">/</span>
+              <Badge variant="secondary" className="hidden font-mono text-xs sm:inline-flex">
+                cv.pdf
               </Badge>
             </>
           ) : (
@@ -142,24 +150,27 @@ export function WorkfolioHeader() {
             </Button>
           )}
 
-          {!isInsideKnowledgeBase ? (
-            <button
-              type="button"
-              onClick={() => scrollToSection('tech-radar')}
-              className="inline-flex h-8 items-center gap-1 rounded-md border border-border px-2 font-mono text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground sm:px-2.5"
-            >
-              <FileText className="h-3.5 w-3.5 shrink-0" />
-              <span>ADR</span>
-            </button>
-          ) : (
-            <Link
-              href="/"
-              className="inline-flex h-8 items-center gap-1 rounded-md border border-border px-2 font-mono text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground sm:px-2.5"
-            >
-              <BookOpen className="h-3.5 w-3.5 shrink-0" />
-              <span>CV</span>
-            </Link>
-          )}
+          <Link
+            href="/cv"
+            title={t('cvButtonTitle')}
+            className={`inline-flex h-8 items-center gap-1 rounded-md border px-2 font-mono text-xs font-medium transition-colors sm:px-2.5 ${
+              isOnCvPage
+                ? 'border-primary bg-primary text-primary-foreground shadow-2xs'
+                : 'border-border bg-background text-foreground hover:border-primary/40 hover:bg-accent'
+            }`}
+          >
+            <FileDown className="h-3.5 w-3.5 shrink-0" />
+            <span>CV</span>
+          </Link>
+
+          <button
+            type="button"
+            onClick={() => scrollToSection('tech-radar')}
+            className="hidden h-8 items-center gap-1 rounded-md border border-border px-2 font-mono text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground sm:inline-flex sm:px-2.5"
+          >
+            <FileText className="h-3.5 w-3.5 shrink-0" />
+            <span>ADR</span>
+          </button>
         </div>
       </div>
 

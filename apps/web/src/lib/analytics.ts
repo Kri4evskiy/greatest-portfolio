@@ -5,6 +5,7 @@ export type AnalyticsEventName =
   | 'article_read'
   | 'article_helpful_clicked'
   | 'command_palette_article_selected'
+  | 'cv_pdf_downloaded'
   | 'language_switched'
   | 'theme_toggled'
 
