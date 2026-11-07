@@ -4,7 +4,6 @@
     "description": "Interactive Workfolio CV and Engineering Knowledge Base by Stanislav Krychevskyi (5+ yrs React, Next.js 16, NestJS, TypeScript, XYFlow, D3.js, Prisma, AI Workflows)."
   },
   "Header": {
-    "availableBadge": "● Open to Senior Frontend / Fullstack Roles",
     "nav": {
       "about": "About & Contacts",
       "projects": "Architecture Cases",

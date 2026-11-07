@@ -57,25 +57,14 @@ export function WorkfolioHeader() {
             <span className="truncate font-semibold tracking-tight text-xs sm:text-sm">Stanislav Krychevskyi</span>
           </Link>
 
-          {isInsideKnowledgeBase ? (
+          {isInsideKnowledgeBase || isOnCvPage ? (
             <>
               <span className="hidden font-mono text-xs text-muted-foreground sm:inline">/</span>
               <Badge variant="secondary" className="hidden font-mono text-xs sm:inline-flex">
-                knowledge-base
+                {isInsideKnowledgeBase ? 'knowledge-base' : 'cv.pdf'}
               </Badge>
             </>
-          ) : isOnCvPage ? (
-            <>
-              <span className="hidden font-mono text-xs text-muted-foreground sm:inline">/</span>
-              <Badge variant="secondary" className="hidden font-mono text-xs sm:inline-flex">
-                cv.pdf
-              </Badge>
-            </>
-          ) : (
-            <Badge variant="success" className="hidden text-[11px] lg:inline-flex">
-              {t('availableBadge')}
-            </Badge>
-          )}
+          ) : null}
         </div>
 
         <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">

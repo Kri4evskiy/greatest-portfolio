@@ -4,7 +4,6 @@
     "description": "Інтерактивне Workfolio CV та Інженерна База Знань Станіслава Кричевського (5+ років: React, Next.js 16, NestJS, TypeScript, XYFlow, D3.js, Prisma, AI Workflows)."
   },
   "Header": {
-    "availableBadge": "● Відкритий до пропозицій Senior Frontend / Fullstack",
     "nav": {
       "about": "Про мене і контакти",
       "projects": "Архітектурні кейси",
