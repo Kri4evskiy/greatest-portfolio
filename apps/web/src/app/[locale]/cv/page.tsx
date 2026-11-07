@@ -1,10 +1,12 @@
-import { DEFAULT_LOCALE, SupportedLocaleEnum } from '@repo/shared-schemas'
+import { DEFAULT_LOCALE, SUPPORTED_LOCALES, SupportedLocaleEnum } from '@repo/shared-schemas'
 import type { Metadata } from 'next'
 import { getTranslations } from 'next-intl/server'
 import { CvDocumentShowcase } from '@/components/workfolio/cv-document-showcase'
 import { getLatestCvFileMetadata } from '@/lib/cv-file'
 
-export const dynamic = 'force-dynamic'
+export function generateStaticParams() {
+  return SUPPORTED_LOCALES.map((locale) => ({ locale }))
+}
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const { locale } = await params
