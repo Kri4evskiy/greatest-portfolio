@@ -82,8 +82,18 @@
 
 ### 5. Content & Workfolio Polish (`apps/web/content/*`)
 
-- [ ] **Новые инженерные статьи в `.mdx`:** Расширить базу знаний новыми разборами (например, проектирование `pnpm` + `Turborepo` пайплайнов, паттерны `NestJS Microservices` + `SSE`, `Zero-Trust Auth` с `HttpOnly` куками).
+- [x] **Выделенный корневой раздел `NestJS` (`apps/web/content/nestjs/*`):** добавлена отдельная корневая тема `nestjs` в `KnowledgeCategoryEnum` и трёхъязычный архитектурный разбор `nestjs/ai-mcp/nestjs-ai-and-mcp-architecture.{en,uk,ru}.mdx` с интерактивной схемой `<NestAiMcpDiagram />`.
+- [ ] **Новые инженерные статьи в `.mdx`:** Расширить раздел `NestJS` и смежные темы новыми разборами (паттерны `DI & Custom Providers`, `Guards / Pipes / Interceptors`, проектирование `pnpm` + `Turborepo` пайплайнов, `NestJS Microservices` + `SSE`).
 - [ ] **Интерактивный фильтр в матрице ADR:** Добавить фильтрацию по категориям (`Frontend`, `Backend`, `DevOps`, `Architecture`) и полнотекстовый поиск в `TechRadarTable`.
+
+### 6. Backend AI & Model Context Protocol (`apps/api` — Future Backend Milestone)
+
+- [ ] **Бесплатный Read-Only шоукейс на `@nestjs/mcp` (`$0` за токены, статус `evaluating`):** при переходе к этапу доработки бэкенда выставить в `apps/api` публичный MCP-эндпоинт (`Streamable HTTP`) с 16 ADR, таймлайном опыта из CV и краткими выжимками (`TL;DR`) статей для подключения `Cursor` / `Claude Desktop`. **Обязательные здравые ограничения перед запуском:**
+  1. Строго **Read-Only** контур (никаких мутаций БД, чтения ФС или переменных окружения).
+  2. Предварительно включённый **`@nestjs/throttler`** (лимит запросов по IP, например `20 req/мин`, и лимит активных сессий для защиты `512 MB` RAM бесплатного контейнера).
+  3. Жёсткие верхние лимиты входных параметров в `Zod` (`limit <= 16`, `.max(60)` на поисковые строки).
+  4. Строгое соблюдение политики **`<Redact />`** (не отдавать закрытые `ADMIN`-метрики в публичный MCP-ответ).
+- [ ] _(Осознанно отложено / `deferred`)_ **Живой агент на `@nestjs/ai` (`AiModule` под защитой `Guest Pass`):** так как вызову нейросети на стороне сервера требуются платные токены провайдеров (`Anthropic` / `OpenAI`), сейчас он не нужен (поиск по базе мгновенно и бесплатно закрывает `Cmd+K`). Если вернёмся к этой идее позже — использовать `AiModule.forRoot` (`maxOutputTokens`, `pricing`, авто-фолбэк моделей) + `@AgentFunction` со сквозными `Zod`-схемами из `@repo/shared-schemas` строго за `@UseGuards(JwtRolesGuard)` (`HttpOnly` кука `Guest Pass`).
 
 ---
 
