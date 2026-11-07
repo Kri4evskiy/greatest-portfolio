@@ -262,43 +262,102 @@ export const ENGINEERING_ROADMAP_ITEMS: readonly EngineeringRoadmapItem[] = [
     },
   },
   {
+    id: 'nestjs-mcp-zero-cost-server',
+    status: 'evaluating',
+    kind: 'architecture',
+    priority: 'P2',
+    effort: 'S',
+    title: {
+      en: 'Read-Only @nestjs/mcp Portfolio Context Server ($0 Token Cost)',
+      uk: 'Read-Only MCP-сервер портфоліо на @nestjs/mcp ($0 за токени)',
+      ru: 'Read-Only MCP-сервер портфолио на @nestjs/mcp ($0 за токены)',
+    },
+    summary: {
+      en: 'Expose the 16 ADRs, commercial CV timeline, and MDX summaries via @nestjs/mcp (Streamable HTTP) in apps/api so reviewing CTOs can connect Cursor or Claude Desktop directly to the API.',
+      uk: 'Відкрити 16 ADR, комерційний досвід із CV та конспекти Бази Знань як MCP-ресурси через @nestjs/mcp (Streamable HTTP), щоб CTO міг підключити Cursor або Claude прямо до нашого API.',
+      ru: 'Отдавать 16 ADR, коммерческий опыт из CV и конспекты Базы Знаний как MCP-ресурсы через @nestjs/mcp (Streamable HTTP), чтобы тимлид мог подключить Cursor или Claude к нашему API.',
+    },
+    rationale: {
+      en: 'Strong candidate for the upcoming backend milestone: unlike a hosted chat bot, @nestjs/mcp costs $0 in server LLM tokens (inference runs inside the reviewer’s own Cursor/Claude client) and reuses our @repo/shared-schemas Zod contracts.',
+      uk: 'Перспективний шоукейс для бекенд-етапу: на відміну від вбудованого чату, @nestjs/mcp витрачає $0 серверних токенів (генерацію оплачує клієнт Cursor/Claude рев’юера) та напряму перевикористовує наші Zod-схеми.',
+      ru: 'Перспективный бесплатный шоукейс для этапа доработки бэкенда: в отличие от живого чата, @nestjs/mcp стоит $0 серверных токенов (генерацию выполняет сам Cursor/Claude ревьюера) и нативно ложится на наши Zod-контракты.',
+    },
+    pros: {
+      en: [
+        '$0 ongoing LLM API cost — zero server API keys required',
+        'Demonstrates cutting-edge NestJS 12 MCP ecosystem mastery in live technical interviews',
+      ],
+      uk: [
+        '$0 витрат на LLM API — сервер взагалі не потребує платних ключів моделей',
+        'Наочна демонстрація володіння найновішим стеком NestJS 12 MCP на співбесіді',
+      ],
+      ru: [
+        '$0 расходов на токены LLM API — на сервере вообще не нужны платные ключи провайдеров',
+        'Яркая демонстрация владения свежайшей экосистемой NestJS 12 MCP для техлида/CTO',
+      ],
+    },
+    constraints: {
+      en: [
+        'Must ship strictly after @nestjs/throttler (P1) with hard per-IP quotas (e.g. 20 req/min) and SSE session caps to protect 512 MB free-tier containers.',
+        'Strictly Read-Only scope with bounded Zod limits (limit <= 16) and mandatory masking of ADMIN-only <Redact /> NDA metrics.',
+      ],
+      uk: [
+        'Запускати виключно після @nestjs/throttler (P1) із жорстким лімітом запитів за IP (20 req/хв) та обмеженням активних сесій.',
+        'Суворий Read-Only контур із лімітами Zod (limit <= 16) і маскуванням закритих NDA-метрик <Redact />.',
+      ],
+      ru: [
+        'Внедрять строго после настройки @nestjs/throttler (P1) с жёстким лимитом по IP (20 req/мин) и потолком активных сессий.',
+        'Строго Read-Only контур без мутаций БД, с верхними лимитами в Zod (limit <= 16) и маскированием закрытых метрик <Redact />.',
+      ],
+    },
+  },
+  {
     id: 'ai-rag-chat-vs-cmdk',
     status: 'deferred',
     kind: 'idea',
     priority: 'P3',
     effort: 'L',
     title: {
-      en: 'LLM RAG Assistant ("Ask My Second Brain / CV") vs Static Cmd+K Index',
-      uk: 'LLM RAG-асистент («Запитай моє CV / Базу Знань») проти статичного Cmd+K',
-      ru: 'LLM RAG-ассистент («Спроси моё CV и Базу Знаний») против статического Cmd+K',
+      en: 'Live @nestjs/ai Agent ("Ask My CV / Second Brain" behind Guest Pass) vs Static Cmd+K',
+      uk: 'Живий агент на @nestjs/ai («Запитай моє CV» під захистом Guest Pass) проти Cmd+K',
+      ru: 'Живой агент на @nestjs/ai («Спроси моё CV» под защитой Guest Pass) против Cmd+K',
     },
     summary: {
-      en: 'Semantic vector search (pgvector + LLM streaming answers) over MDX notes and experience.',
-      uk: 'Семантичний векторний пошук (pgvector + стрімінг відповідей LLM) по статтях і досвіду.',
-      ru: 'Семантический векторный поиск (pgvector + стриминг ответов LLM) по моим статьям и опыту.',
+      en: 'Conversational LLM assistant built on @nestjs/ai (AiModule.forRoot, @AgentFunction + Zod, model fallbacks) gated behind our HttpOnly Guest Pass cookie.',
+      uk: 'Діалоговий LLM-асистент на базі @nestjs/ai (AiModule.forRoot, @AgentFunction + Zod, фолбеки моделей) під захистом нашої HttpOnly куки Guest Pass.',
+      ru: 'Диалоговый LLM-ассистент на базе @nestjs/ai (AiModule.forRoot, @AgentFunction + Zod, фолбэки моделей) под защитой нашей HttpOnly куки Guest Pass.',
     },
     rationale: {
-      en: 'Consciously deferred (YAGNI at current scale): for < 300 structured notes, our build-time RSC Cmd+K index matches titles, #tags, and h2/h3 anchors in < 5ms at $0/month, works offline, and never hallucinates.',
-      uk: 'Свідомо відкладено (YAGNI на поточному масштабі): до 300 структурованих статей статичний RSC-індекс Cmd+K шукає по заголовках h2/h3 і #тегах за < 5 мс, коштує $0/міс і не галюцинує.',
-      ru: 'Осознанно отложено (принцип YAGNI на текущем объёме): до 300 структурированных конспектов наш статический RSC-индекс Cmd+K ищет по заголовкам h2/h3 и #тегам быстрее 5 мс, стоит $0/мес, работает оффлайн и не галлюцинирует.',
+      en: 'Consciously deferred because paid LLM inference is unnecessary right now: static Cmd+K searches titles, #tags, and h2/h3 anchors in < 5ms for $0/month. If revisited later, @nestjs/ai + JwtRolesGuard + maxOutputTokens is our chosen blueprint.',
+      uk: 'Свідомо відкладено, бо платна генерація зараз не потрібна: статичний Cmd+K шукає по статтях і заголовках h2/h3 за < 5 мс і $0/міс. Якщо повернемося пізніше — базою стане саме @nestjs/ai + Guest Pass + maxOutputTokens.',
+      ru: 'Осознанно отложено, так как агент платный и сейчас избыточен: статический индекс Cmd+K ищет по конспектам и секциям h2/h3 быстрее 5 мс за $0/мес. Если решим добавить позже — архитектура ляжет на @nestjs/ai + Guest Pass + maxOutputTokens.',
     },
     pros: {
-      en: ['Natural-language Q&A for recruiters ("Does Stanislav have FinTech / Stripe experience?")'],
-      uk: ['Відповіді природною мовою для рекрутерів («Чи є досвід зі Stripe та високими навантаженнями?»)'],
-      ru: ['Ответы естественным языком для рекрутеров («Какой опыт со Stripe, D3.js и высокими нагрузками?»)'],
+      en: [
+        'Natural-language Q&A for recruiters ("Summarize Stanislav’s FinTech & D3.js experience")',
+        'AiModule natively enforces maxOutputTokens, pricing tracking, and Claude -> GPT fallbacks',
+      ],
+      uk: [
+        'Відповіді природною мовою для рекрутерів («Підсумуй досвід зі Stripe та D3.js»)',
+        'AiModule із коробки контролює maxOutputTokens, ціну запиту та фолбек Claude -> GPT',
+      ],
+      ru: [
+        'Ответы естественным языком для рекрутеров («Резюмируй опыт со Stripe, D3.js и высокими нагрузками»)',
+        'AiModule из коробки даёт жёсткий лимит maxOutputTokens, подсчёт цены и авто-фолбэк Claude -> GPT',
+      ],
     },
     constraints: {
       en: [
-        'Requires ongoing LLM API token budget, strict rate-limiting against abuse, and prompt-injection guardrails.',
-        'Adds 800–2000ms network latency where deterministic Cmd+K search responds instantaneously.',
+        'Requires recurring paid LLM token budget, response caching for common questions, and prompt-injection defenses.',
+        'Adds 800–2000ms streaming latency where deterministic Cmd+K search responds instantaneously offline.',
       ],
       uk: [
-        'Вимагає витрат на токени LLM API, жорсткого захисту від зловживань і prompt-injection.',
+        'Вимагає постійного бюджету на платні токени LLM, кешування частих запитань і захисту від prompt-injection.',
         'Додає 800–2000 мс мережевої затримки там, де детермінований пошук Cmd+K відповідає миттєво.',
       ],
       ru: [
-        'Требует постоянного бюджета на токены LLM API, жёсткой защиты от спам-запросов и prompt-injection.',
-        'Добавляет 800–2000 мс сетевой задержки там, где детерминированный поиск Cmd+K отвечает за единицы миллисекунд.',
+        'Требует постоянного бюджета на платные токены LLM, кэша частых вопросов и защиты от prompt-injection.',
+        'Добавляет 800–2000 мс сетевой задержки там, где детерминированный поиск Cmd+K отвечает мгновенно и оффлайн.',
       ],
     },
   },

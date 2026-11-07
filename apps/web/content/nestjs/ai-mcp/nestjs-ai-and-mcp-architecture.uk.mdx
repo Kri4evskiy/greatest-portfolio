@@ -1,0 +1,227 @@
+---
+title: "Архітектура NestJS AI та MCP: оркестрація LLM через @nestjs/ai і безкоштовний контекст-сервер @nestjs/mcp"
+sidebarLabel: "NestJS AI та MCP"
+summary: "Глибокий розбір нових офіційних модулів екосистеми NestJS: як AiModule (@nestjs/ai) керує бюджетами токенів, Zod-інструментами та фолбеками моделей, і як @nestjs/mcp відкриває контекст бекенду для Cursor і Claude за $0 витрат сервера."
+category: "nestjs"
+format: "deep-dive"
+tags: ["nestjs", "ai", "mcp", "zod", "architecture", "security"]
+readingTime: "9 хв"
+publishedAt: "2026-11-07"
+order: 1
+tldr:
+  - "@nestjs/ai (AiModule) відповідає за вихідні виклики LLM усередині NestJS: глобальні ліміти maxOutputTokens, підрахунок вартості запитів, таймаути, автоматичний фолбек між провайдерами та декоратор @AgentFunction із валідацією через Zod."
+  - "@nestjs/mcp реалізує вхідний Model Context Protocol (Streamable HTTP / SSE): зовнішні клієнти (Cursor, Claude Desktop) читають структуровані ресурси нашого API, оплачуючи генерацію власними токенами ($0 витрат на нашому бекенді)."
+  - "Обидва пакети працюють поверх нативного DI та конвеєра NestJS, тому наші @UseGuards(JwtRolesGuard), @nestjs/throttler і спільні Zod-схеми з @repo/shared-schemas підключаються без дублювання коду."
+  - "Прагматичне рішення для Workfolio: закласти в бекенд-план Read-Only шоукейс на @nestjs/mcp ($0 за токени) із жорсткими лімітами безпеки, а платний живий чат на @nestjs/ai залишити свідомо відкладеним."
+---
+
+## 1. Навіщо в екосистемі NestJS з’явилися `@nestjs/ai` та `@nestjs/mcp`
+
+До появи офіційних AI-пакетів у екосистемі **NestJS 12** інтеграція великих мовних моделей у продакшен-бекенд на Node.js зазвичай перетворювалася на набір розрізнених «милиць»:
+
+- **Пряма прив’язка до SDK вендорів:** сервіси напряму імпортували `openai` або `@anthropic-ai/sdk`, змішуючи бізнес-логіку зі специфічними форматами стрімів і помилок кожного провайдера.
+- **Неконтрольований бюджет токенів:** один забутий параметр `max_tokens` або відсутність тротлінгу дозволяли ботам спалити десятки доларів балансу API за лічені хвилини.
+- **Подвійна валідація схем:** розробники окремо описували DTO для REST-контролерів і вручну дублювали JSON Schema для виклику функцій (`tool calling`) у LLM.
+- **Відсутність стандарту для зовнішніх AI-агентів:** щоб дати змогу **Cursor** чи **Claude Desktop** безпечно читати документацію, ADR або метрики проєкту, доводилося писати кастомні адаптери.
+
+Свіжий реліз екосистеми NestJS чисто розділяє ці два напрями між двома нативними пакетами:
+
+1. **`@nestjs/ai` (`AiModule`) — Вихідна оркестрація LLM:** використовується, коли **сам бекенд NestJS звертається до нейросетей**, викликає інструменти (`@AgentFunction`), рахує вартість токенів і автоматично перемикається на резервну модель при збоях.
+2. **`@nestjs/mcp` — Вхідний сервер Model Context Protocol:** використовується, коли **зовнішні AI-клієнти (`Cursor`, `Claude Desktop`, `VS Code`) підключаються до вашого NestJS API**, щоб читати ресурси та викликати дозволені інструменти при **`$0` витрат на токени з боку сервера**.
+
+<NestAiMcpDiagram />
+
+---
+
+## 2. Як влаштований `@nestjs/ai`: `AiModule`, бюджети, фолбеки та `@AgentFunction`
+
+### Централізований реєстр моделей і контроль витрат (`AiModule.forRoot`)
+
+Замість створення клієнтів SDK у кожному модулі, `AiModule.forRoot()` реєструє логічні рівні моделей (`default`, `fast`, `backup`) у глобальному DI-контейнері. Ліміти `maxOutputTokens`, таймаути, тарифікація (`pricing`) і ланцюжок резервування задаються декларативно в одному місці:
+
+```typescript title="apps/api/src/app.module.ts"
+import { anthropic } from '@ai-sdk/anthropic'
+import { openai } from '@ai-sdk/openai'
+import { AiModule } from '@nestjs/ai'
+import { Module } from '@nestjs/common'
+
+@Module({
+  imports: [
+    AiModule.forRoot({
+      isGlobal: true,
+      models: {
+        default: {
+          model: anthropic('claude-sonnet-4-5'),
+          pricing: { input: 3, output: 15, cachedInput: 0.3 },
+          maxOutputTokens: 2_000,
+          fallback: 'backup',
+        },
+        fast: {
+          model: anthropic('claude-haiku-4-5'),
+          pricing: { input: 0.25, output: 1.25 },
+          timeout: '15s',
+          maxOutputTokens: 800,
+        },
+        backup: openai('gpt-4.1'),
+      },
+      defaults: {
+        timeout: '30s',
+        maxOutputTokens: 1_000,
+      },
+    }),
+  ],
+})
+export class AppModule {}
+```
+
+> [!NOTE] Відсутність Vendor Lock-In у бізнес-сервісах
+> Прикладні сервіси не знають про конкретні назви моделей вендорів — вони запитують логічний профіль `model: 'fast'` або `model: 'default'`. Якщо Anthropic поверне помилку перевантаження `529`, `AiModule` автоматично перенаправить запит у `backup` (`OpenAI`).
+
+### Декларативні інструменти агента `@AgentFunction` зі спільними `Zod`-схемами
+
+У нашому монорепозиторії пакет `@repo/shared-schemas` вже містить єдині `Zod`-контракти (`KnowledgeCategoryEnum`, `SupportedLocaleEnum`). Модуль `AiModule` автоматично знаходить методи з декоратором `@AgentFunction()` і валідує згенеровані моделлю аргументи прямо через ці `Zod`-схеми до запуску коду сервісу:
+
+```typescript title="apps/api/src/modules/ai/portfolio-agent.tools.ts"
+import { AgentFunction, type AgentFunctionContext } from '@nestjs/ai'
+import { Injectable } from '@nestjs/common'
+import { KnowledgeCategoryEnum, SupportedLocaleEnum } from '@repo/shared-schemas'
+import { z } from 'zod'
+import { KnowledgeService } from '../knowledge/knowledge.service.js'
+
+const LookupAdrInputSchema = z.object({
+  category: KnowledgeCategoryEnum,
+  locale: SupportedLocaleEnum.default('uk'),
+  keyword: z.string().trim().min(2).max(60),
+})
+
+type LookupAdrInput = z.infer<typeof LookupAdrInputSchema>
+
+@Injectable()
+export class PortfolioAgentTools {
+  constructor(private readonly knowledgeService: KnowledgeService) {}
+
+  @AgentFunction({
+    name: 'lookup_architecture_decision',
+    description: 'Пошук затверджених архітектурних рішень (ADR) та конспектів Бази Знань за категорією',
+    inputSchema: LookupAdrInputSchema,
+  })
+  async lookupAdr(input: LookupAdrInput, _ctx: AgentFunctionContext) {
+    return this.knowledgeService.findPublicSummaries(input.category, input.locale, input.keyword)
+  }
+}
+```
+
+### Стрімінг відповідей під захистом `HttpOnly` JWT Cookie (`Guest Pass`)
+
+Під час стрімінгу тексту в браузер стандартні гварди NestJS (`@UseGuards(JwtRolesGuard)`) відпрацьовують **до** відкриття платного з’єднання з LLM:
+
+```typescript title="apps/api/src/modules/ai/ai.controller.ts"
+import { AiService } from '@nestjs/ai'
+import { Body, Controller, Post, Res, UseGuards } from '@nestjs/common'
+import type { Response } from 'express'
+import { Roles } from '../auth/roles.decorator.js'
+import { JwtRolesGuard } from '../auth/jwt-roles.guard.js'
+
+@Controller('ai')
+@UseGuards(JwtRolesGuard)
+export class AiController {
+  constructor(private readonly ai: AiService) {}
+
+  @Post('ask-architecture')
+  @Roles('GUEST', 'USER', 'ADMIN')
+  async askArchitecture(@Body() body: { question: string }, @Res() response: Response): Promise<void> {
+    const stream = this.ai.streamText({
+      model: 'fast',
+      instructions: 'Відповідай виключно на основі перевірених даних ADR та CV у 3 стислих пунктах.',
+      prompt: body.question.slice(0, 500),
+    })
+
+    await stream.pipeTextStreamToResponse(response)
+  }
+}
+```
+
+---
+
+## 3. Як працює `@nestjs/mcp`: безкоштовний MCP-сервер (`$0` за токени) для Cursor і Claude
+
+Якщо `@nestjs/ai` витрачає серверні токени на роботу внутрішнього агента, то **`@nestjs/mcp`** працює у зворотному напрямку. Пакет реалізує стандарт **Model Context Protocol (MCP)** поверх `Streamable HTTP`, `SSE` або `STDIO`, перетворюючи ваш NestJS API на постачальника структурованого контексту.
+
+### Чому `@nestjs/mcp` коштує `$0` на бекенді
+
+Коли CTO або техлід додає MCP-ендпоінт вашого портфоліо (`https://api.example.com/mcp`) у свій **Cursor** або **Claude Desktop**:
+
+1. IDE рев’юера надсилає JSON-RPC запит `tools/list` або `tools/call` по `Streamable HTTP`.
+2. Ваш сервер NestJS виконує швидку детерміновану вибірку даних у пам’яті або PostgreSQL і повертає компактний JSON (`< 15 мс`).
+3. **Усю генерацію відповіді виконує власна підписка Cursor / Claude на боці користувача** — наш сервер не зберігає платних API-ключів LLM і витрачає рівно **`$0.00` за запит**.
+
+```typescript title="apps/api/src/modules/mcp/portfolio-mcp.provider.ts"
+import { Injectable } from '@nestjs/common'
+import { McpResource, McpTool } from '@nestjs/mcp'
+import { SupportedLocaleEnum } from '@repo/shared-schemas'
+import { z } from 'zod'
+
+const AdrQuerySchema = z.object({
+  domain: z.enum(['frontend', 'backend', 'security', 'devops', 'all']).default('all'),
+  locale: SupportedLocaleEnum.default('uk'),
+  limit: z.number().int().min(1).max(16).default(8),
+})
+
+@Injectable()
+export class PortfolioMcpProvider {
+  @McpResource({
+    uri: 'workfolio://profile/cv-summary',
+    name: 'Stanislav Krychevskyi — Senior Full-Stack CV Snapshot',
+    mimeType: 'application/json',
+  })
+  getCvSnapshot() {
+    return {
+      author: 'Stanislav Krychevskyi',
+      role: 'Senior Frontend / Full-Stack Engineer',
+      experienceYears: '5+',
+      coreStack: ['React 19', 'Next.js 16', 'TypeScript 5.8', 'NestJS 12', 'Prisma', 'Turborepo'],
+    }
+  }
+
+  @McpTool({
+    name: 'query_portfolio_adrs',
+    description: 'Перегляд 16 архітектурних рішень (ADR), на яких побудовано цей монорепозиторій',
+    parameters: AdrQuerySchema,
+  })
+  queryAdrs(params: z.infer<typeof AdrQuerySchema>) {
+    // Детермінована Read-Only відповідь — $0 витрат на токени
+    return {
+      domain: params.domain,
+      locale: params.locale,
+      limit: params.limit,
+      totalAdrs: 16,
+    }
+  }
+}
+```
+
+### Обов’язкові обмеження безпеки перед публікацією MCP-ендпоінту
+
+> [!WARNING] Ніколи не відкривайте публічний MCP-сервер без захисних лімітів
+> Навіть за нульової вартості токенів публічний MCP-ендпоінт залишається відкритою точкою входу у ваш контейнер. Перед реалізацією `@nestjs/mcp` в `apps/api` обов’язковими є чотири інженерні запобіжники:
+
+- [x] **1. Суворий Read-Only контур:** віддавати лише публічні зрізи (`16 ADR`, досвід із `CV`, заголовки та `TL;DR` статей). Жодних інструментів запису в БД, доступу до файлової системи чи змінних оточення.
+- [x] **2. Жорсткий Rate Limiting за IP (`@nestjs/throttler`):** обмежити частоту викликів (наприклад, `20 req/хв`) і кількість одночасних `SSE` / `Streamable HTTP` сесій, щоб боти не вичерпали пам’ять безкоштовного контейнера (`512 MB` на Render/Koyeb).
+- [x] **3. Верхні межі вхідних параметрів у `Zod`:** обмежувати довжину рядків пошуку (`.max(60)`) та розмір вибірки (`limit <= 16`) у кожному `@McpTool`.
+- [x] **4. Дотримання політики `<Redact />` (NDA):** публічні MCP-відповіді не повинні розкривати закриті комерційні метрики, доступні лише ролі `ADMIN`.
+
+---
+
+## 4. Порівняльна матриця та наше архітектурне рішення для Workfolio
+
+| Критерій | `@nestjs/mcp` (Контекст-сервер) | `@nestjs/ai` (`AiModule` агент) | Vercel AI SDK (`ai` у Next.js) |
+| :--- | :--- | :--- | :--- |
+| **Напрямок трафіку** | Вхідний (`Cursor / Claude` ➔ `NestJS`) | Вихідний (`NestJS` ➔ `Anthropic / OpenAI`) | Вихідний (`Next.js Route` ➔ `LLM`) |
+| **Витрати сервера на LLM** | **`$0 / міс`** (Генерація на боці клієнта) | Оплата за кожен `input / output` токен | Оплата за кожен `input / output` токен |
+| **Валідація схем** | Нативний `Zod` (`@repo/shared-schemas`) | Нативний `Zod` через `@AgentFunction` | Нативний `Zod` через `tool()` |
+| **Інтеграція з NestJS DI** | Повна підтримка `@UseGuards` + `Throttler` | Повна підтримка `@UseGuards` + бюджетів | Працює поза DI-контейнером NestJS |
+| **Статус у нашому проєкті** | **В оцінці (`P2` Backend Showcase)** | **Свідомо відкладено (`P3`)** | Не потрібен (пошук закриває `Cmd+K`) |
+
+> [!TIP] Підсумковий інженерний вердикт (зафіксовано в `/#roadmap`)
+> 1. **Додати `@nestjs/mcp` у бекенд-план розвитку (`$0` за токени):** після завершення візуального етапу `UI v2` та підключення `@nestjs/throttler` (`P1`), Read-Only MCP-сервер для наших 16 ADR і CV стане сильною демонстрацією володіння передовим стеком NestJS без жодних витрат на LLM API.
+> 2. **Залишити платний живий агент на `@nestjs/ai` відкладеним (`YAGNI`):** на самому сайті миттєвий пошук `Cmd+K` знаходить потрібну статтю чи підзаголовок `h2/h3` швидше ніж за `5 мс` оффлайн і за `$0`. Якщо ж у майбутньому знадобиться діалоговий асистент, зв’язка `AiModule.forRoot` + `Guest Pass` (`HttpOnly` кука) + `maxOutputTokens` вже спроєктована.

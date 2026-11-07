@@ -65,7 +65,10 @@ export type MdxBlock =
     }
   | { type: 'callout'; kind: MdxCalloutKind; title?: string | undefined; lines: string[] }
   | { type: 'hr' }
-  | { type: 'component'; name: 'ReactRenderGraphD3' | 'ArchitectureFlowD3' | 'ArticleImageGrid' }
+  | {
+      type: 'component'
+      name: 'ReactRenderGraphD3' | 'ArchitectureFlowD3' | 'ArticleImageGrid' | 'NestAiMcpDiagram'
+    }
 
 export interface MdxArticleDocument extends MdxArticleFrontmatter {
   toc: ArticleTocEntry[]
@@ -260,7 +263,8 @@ function isSpecialBlockStart(rawLine: string, nextLine?: string): boolean {
   if (
     trimmed === '<ReactRenderGraphD3 />' ||
     trimmed === '<ArchitectureFlowD3 />' ||
-    trimmed === '<ArticleImageGrid />'
+    trimmed === '<ArticleImageGrid />' ||
+    trimmed === '<NestAiMcpDiagram />'
   ) {
     return true
   }
@@ -321,6 +325,12 @@ function parseRawMdx(
 
     if (line === '<ArticleImageGrid />') {
       blocks.push({ type: 'component', name: 'ArticleImageGrid' })
+      i += 1
+      continue
+    }
+
+    if (line === '<NestAiMcpDiagram />') {
+      blocks.push({ type: 'component', name: 'NestAiMcpDiagram' })
       i += 1
       continue
     }
