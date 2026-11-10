@@ -226,13 +226,13 @@ const AI_EDGES: readonly DiagramEdge[] = [
   { fromX: 525, toX: 565, label: 'Fallback' },
 ]
 
-export function NestAiMcpDiagram() {
+export function NestAiMcpDiagram({ defaultMode = 'mcp' }: { defaultMode?: DiagramMode | undefined }) {
   const rawLocale = useLocale()
   const parsedLocale = SupportedLocaleEnum.safeParse(rawLocale)
   const locale: SupportedLocale = parsedLocale.success ? parsedLocale.data : DEFAULT_LOCALE
 
-  const [mode, setMode] = useState<DiagramMode>('mcp')
-  const [selectedIndex, setSelectedIndex] = useState<number>(2)
+  const [mode, setMode] = useState<DiagramMode>(defaultMode)
+  const [selectedIndex, setSelectedIndex] = useState<number>(defaultMode === 'ai' ? 1 : 2)
 
   const nodes = mode === 'mcp' ? MCP_NODES : AI_NODES
   const edges = mode === 'mcp' ? MCP_EDGES : AI_EDGES
@@ -304,7 +304,7 @@ export function NestAiMcpDiagram() {
               markerHeight="6"
               orient="auto"
             >
-              <path d="M 0 1 L 10 5 L 0 9 z" fill="#10b981" />
+              <path d="M 0 1 L 10 5 L 0 9 z" fill="hsl(var(--chart-1))" />
             </marker>
           </defs>
 
@@ -341,7 +341,7 @@ export function NestAiMcpDiagram() {
                   y1={120}
                   x2={edge.toX}
                   y2={120}
-                  stroke="#10b981"
+                  stroke="hsl(var(--chart-1))"
                   strokeWidth="2"
                   markerEnd="url(#nest-flow-arrow)"
                 />
@@ -386,7 +386,7 @@ export function NestAiMcpDiagram() {
                   height={76}
                   rx={10}
                   fill={isSelected ? 'hsl(var(--primary))' : 'hsl(var(--muted))'}
-                  stroke={isSelected ? '#10b981' : 'hsl(var(--border))'}
+                  stroke={isSelected ? 'hsl(var(--chart-1))' : 'hsl(var(--border))'}
                   strokeWidth={isSelected ? 2.5 : 1.5}
                 />
                 <text
@@ -396,7 +396,7 @@ export function NestAiMcpDiagram() {
                   fontFamily="monospace"
                   fontSize="9"
                   fontWeight="700"
-                  fill={isSelected ? 'hsl(var(--primary-foreground))' : '#10b981'}
+                  fill={isSelected ? 'hsl(var(--primary-foreground))' : 'hsl(var(--chart-1))'}
                 >
                   {`STEP ${node.step}`}
                 </text>
@@ -431,7 +431,7 @@ export function NestAiMcpDiagram() {
       <div className="mt-2 rounded-lg border border-border/80 bg-muted/40 p-3 text-xs">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-1.5 font-mono font-semibold text-foreground">
-            <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
+            <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-success" />
             <span>
               {activeNode.step}. {activeNode.label} — {activeNode.sub[locale]}
             </span>

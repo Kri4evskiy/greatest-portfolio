@@ -3,8 +3,7 @@
 import { Badge } from '@repo/ui'
 import * as d3 from 'd3'
 import { Network } from 'lucide-react'
-import { useEffect, useRef } from 'react'
-import { useUIStore } from '@/store/use-ui-store'
+import { useEffect, useRef, useState } from 'react'
 
 interface ArchNode {
   id: string
@@ -75,8 +74,7 @@ const ARCH_LINKS: ReadonlyArray<{ source: string; target: string; label: string 
 
 export function ArchitectureFlowD3() {
   const svgRef = useRef<SVGSVGElement | null>(null)
-  const activeNodeId = useUIStore((s) => s.archFlowActiveNode)
-  const setActiveNodeId = useUIStore((s) => s.setArchFlowActiveNode)
+  const [activeNodeId, setActiveNodeId] = useState<string>(DEFAULT_ARCH_NODE.id)
 
   const selectedNode = ARCH_NODES.find((n) => n.id === activeNodeId) ?? DEFAULT_ARCH_NODE
 
@@ -105,7 +103,7 @@ export function ArchitectureFlowD3() {
         .append('path')
         .attr('d', pathData)
         .attr('fill', 'none')
-        .attr('stroke', isLoopback ? '#10b981' : '#64748b')
+        .attr('stroke', isLoopback ? 'hsl(var(--chart-1))' : 'hsl(var(--muted-foreground))')
         .attr('stroke-width', 2)
         .attr('stroke-dasharray', isLoopback ? '4,4' : 'none')
     }
@@ -131,7 +129,7 @@ export function ArchitectureFlowD3() {
       .attr('height', 52)
       .attr('rx', 8)
       .attr('fill', (d) => (d.id === selectedNode.id ? 'hsl(var(--primary))' : 'hsl(var(--muted))'))
-      .attr('stroke', (d) => (d.id === selectedNode.id ? '#10b981' : 'hsl(var(--border))'))
+      .attr('stroke', (d) => (d.id === selectedNode.id ? 'hsl(var(--chart-1))' : 'hsl(var(--border))'))
       .attr('stroke-width', (d) => (d.id === selectedNode.id ? 2.5 : 1.5))
 
     nodeGroup
@@ -154,7 +152,7 @@ export function ArchitectureFlowD3() {
         d.id === selectedNode.id ? 'hsl(var(--primary-foreground))' : 'hsl(var(--muted-foreground))',
       )
       .text((d) => d.sub)
-  }, [selectedNode.id, setActiveNodeId])
+  }, [selectedNode.id])
 
   return (
     <div className="my-6 rounded-xl border border-border bg-card p-4 shadow-sm">

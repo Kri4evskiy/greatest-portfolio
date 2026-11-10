@@ -4,7 +4,8 @@ import { Badge, Button } from '@repo/ui'
 import * as d3 from 'd3'
 import { Cpu, RefreshCw, Sparkles } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import { useUIStore } from '@/store/use-ui-store'
+
+export type ReactRenderMode = 'react18' | 'react19'
 
 interface RenderTreeNode {
   id: string
@@ -74,8 +75,7 @@ const COMPONENT_TREE: RenderTreeNode = {
 export function ReactRenderGraphD3() {
   const svgRef = useRef<SVGSVGElement | null>(null)
   const pulseCounterRef = useRef(0)
-  const mode = useUIStore((s) => s.reactGraphMode)
-  const setMode = useUIStore((s) => s.setReactGraphMode)
+  const [mode, setMode] = useState<ReactRenderMode>('react19')
   const [triggerCount, setTriggerCount] = useState(1)
 
   useEffect(() => {
@@ -99,7 +99,7 @@ export function ReactRenderGraphD3() {
       .append('path')
       .attr('class', 'link')
       .attr('fill', 'none')
-      .attr('stroke', mode === 'react19' ? '#10b981' : '#f59e0b')
+      .attr('stroke', mode === 'react19' ? 'hsl(var(--chart-1))' : 'hsl(var(--chart-3))')
       .attr('stroke-width', 2)
       .attr('stroke-dasharray', mode === 'react19' ? 'none' : '5,3')
       .attr(
@@ -123,9 +123,9 @@ export function ReactRenderGraphD3() {
       .attr('r', 14)
       .attr('fill', (d) => {
         if (mode === 'react18') {
-          return d.data.react18Status === 'rerendered' ? '#ef4444' : '#f59e0b'
+          return d.data.react18Status === 'rerendered' ? 'hsl(var(--destructive))' : 'hsl(var(--chart-3))'
         }
-        return d.data.react19Status === 'streamed-use' ? '#3b82f6' : '#10b981'
+        return d.data.react19Status === 'streamed-use' ? 'hsl(var(--chart-2))' : 'hsl(var(--chart-1))'
       })
       .attr('stroke', 'hsl(var(--card))')
       .attr('stroke-width', 2)
@@ -146,7 +146,7 @@ export function ReactRenderGraphD3() {
       .attr('text-anchor', 'middle')
       .attr('font-family', 'monospace')
       .attr('font-size', '10px')
-      .attr('fill', mode === 'react19' ? '#059669' : '#d97706')
+      .attr('fill', mode === 'react19' ? 'hsl(var(--success))' : 'hsl(var(--warning))')
       .text((d) =>
         mode === 'react19'
           ? `${d.data.renderCostMs19}ms (${d.data.react19Status} #${triggerCount})`

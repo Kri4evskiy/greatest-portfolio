@@ -2,6 +2,7 @@
 
 import { Skeleton } from '@repo/ui'
 import dynamic from 'next/dynamic'
+import type { MdxWidgetName } from '@/lib/mdx-content'
 import { ArticleImageGrid } from './article-image-grid'
 import { NestAiMcpDiagram } from './nest-ai-mcp-diagram'
 
@@ -17,8 +18,10 @@ const ArchitectureFlowD3 = dynamic(() => import('./d3-architecture-flow').then((
 
 export function MdxInteractiveWidget({
   name,
+  widgetProps = {},
 }: {
-  name: 'ReactRenderGraphD3' | 'ArchitectureFlowD3' | 'ArticleImageGrid' | 'NestAiMcpDiagram'
+  name: MdxWidgetName
+  widgetProps?: Readonly<Record<string, string>> | undefined
 }) {
   if (name === 'ReactRenderGraphD3') {
     return <ReactRenderGraphD3 />
@@ -27,7 +30,8 @@ export function MdxInteractiveWidget({
     return <ArchitectureFlowD3 />
   }
   if (name === 'NestAiMcpDiagram') {
-    return <NestAiMcpDiagram />
+    const defaultMode = widgetProps.defaultMode === 'ai' ? 'ai' : 'mcp'
+    return <NestAiMcpDiagram defaultMode={defaultMode} />
   }
   return <ArticleImageGrid />
 }

@@ -11,7 +11,12 @@ import {
   type SupportedLocale,
   SupportedLocaleEnum,
 } from '@repo/shared-schemas'
+import matter from 'gray-matter'
+import type { Blockquote, Code, Content, Heading, List, Paragraph, PhrasingContent, Root, Table } from 'mdast'
 import { cache } from 'react'
+import remarkGfm from 'remark-gfm'
+import remarkParse from 'remark-parse'
+import { unified } from 'unified'
 
 export interface ArticleTocEntry {
   id: string
@@ -44,31 +49,47 @@ export interface MdxArticleFrontmatter {
   tldr: string[]
 }
 
-export interface MdxListItem {
-  text: string
-  checked?: boolean | undefined
-  subItems: string[]
-}
-
 export type MdxCalloutKind = 'note' | 'tip' | 'important' | 'warning' | 'caution' | 'quote'
 
+export type MdxWidgetName = 'ReactRenderGraphD3' | 'ArchitectureFlowD3' | 'ArticleImageGrid' | 'NestAiMcpDiagram'
+
+const SUPPORTED_MDX_WIDGETS = new Set<MdxWidgetName>([
+  'ReactRenderGraphD3',
+  'ArchitectureFlowD3',
+  'ArticleImageGrid',
+  'NestAiMcpDiagram',
+])
+
+export type MdxInlineNode =
+  | { type: 'text'; value: string }
+  | { type: 'inlineCode'; value: string }
+  | { type: 'strong'; children: MdxInlineNode[] }
+  | { type: 'emphasis'; children: MdxInlineNode[] }
+  | { type: 'delete'; children: MdxInlineNode[] }
+  | { type: 'link'; url: string; title?: string | undefined; children: MdxInlineNode[] }
+  | { type: 'image'; url: string; alt: string; title?: string | undefined }
+  | { type: 'break' }
+
+export interface MdxListItemNode {
+  checked?: boolean | undefined
+  blocks: MdxBlock[]
+}
+
 export type MdxBlock =
-  | { type: 'heading'; level: 2 | 3 | 4; id: string; text: string; plainText: string }
-  | { type: 'paragraph'; text: string }
-  | { type: 'list'; ordered: boolean; items: MdxListItem[] }
+  | { type: 'heading'; level: 2 | 3 | 4; id: string; inlines: MdxInlineNode[]; plainText: string }
+  | { type: 'paragraph'; inlines: MdxInlineNode[] }
+  | { type: 'image'; url: string; alt: string; caption?: string | undefined }
+  | { type: 'list'; ordered: boolean; items: MdxListItemNode[] }
   | { type: 'code'; language: string; title?: string | undefined; code: string }
   | {
       type: 'table'
-      headers: string[]
+      headers: MdxInlineNode[][]
       alignments: Array<'left' | 'center' | 'right'>
-      rows: string[][]
+      rows: MdxInlineNode[][][]
     }
-  | { type: 'callout'; kind: MdxCalloutKind; title?: string | undefined; lines: string[] }
+  | { type: 'callout'; kind: MdxCalloutKind; title?: string | undefined; blocks: MdxBlock[] }
   | { type: 'hr' }
-  | {
-      type: 'component'
-      name: 'ReactRenderGraphD3' | 'ArchitectureFlowD3' | 'ArticleImageGrid' | 'NestAiMcpDiagram'
-    }
+  | { type: 'component'; name: MdxWidgetName; props: Record<string, string> }
 
 export interface MdxArticleDocument extends MdxArticleFrontmatter {
   toc: ArticleTocEntry[]
@@ -99,6 +120,8 @@ export interface KnowledgeBreadcrumbItem {
   href: string
 }
 
+const markdownProcessor = unified().use(remarkParse).use(remarkGfm)
+
 function resolveContentRoot(): string {
   const candidates = [join(process.cwd(), 'content'), join(process.cwd(), 'apps', 'web', 'content')]
   for (const dir of candidates) {
@@ -113,14 +136,12 @@ function extractBaseSlug(filename: string): string {
   return filename.replace(/\.(en|uk|ru)\.mdx$/, '').replace(/\.mdx$/, '')
 }
 
-function stripInlineMarkdown(raw: string): string {
-  return raw
-    .replace(/`([^`]+)`/g, '$1')
-    .replace(/\*\*([^*]+)\*\*/g, '$1')
-    .replace(/\*([^*]+)\*/g, '$1')
-    .replace(/~~([^~]+)~~/g, '$1')
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+function normalizeTag(rawTag: string): string {
+  return rawTag
     .trim()
+    .replace(/^["'#]+|["']+$/g, '')
+    .toLowerCase()
+    .replace(/\s+/g, '-')
 }
 
 function createHeadingSlug(plainText: string, usedIds: Map<string, number>): string {
@@ -136,145 +157,347 @@ function createHeadingSlug(plainText: string, usedIds: Map<string, number>): str
   return seenCount === 0 ? base : `${base}-${seenCount + 1}`
 }
 
-function parseTableCells(rowLine: string): string[] {
-  const trimmed = rowLine.trim().replace(/^\|/, '').replace(/\|$/, '')
-  return trimmed.split('|').map((cell) => cell.trim())
+function extractPlainTextFromInlines(nodes: readonly MdxInlineNode[]): string {
+  let out = ''
+  for (const node of nodes) {
+    switch (node.type) {
+      case 'text':
+      case 'inlineCode':
+        out += node.value
+        break
+      case 'image':
+        out += node.alt
+        break
+      case 'break':
+        out += ' '
+        break
+      case 'strong':
+      case 'emphasis':
+      case 'delete':
+      case 'link':
+        out += extractPlainTextFromInlines(node.children)
+        break
+    }
+  }
+  return out.trim()
 }
 
-function isTableSeparatorLine(line: string): boolean {
-  const trimmed = line.trim()
-  if (!trimmed.includes('|') || !trimmed.includes('-')) return false
-  const cells = parseTableCells(trimmed)
-  return cells.length > 0 && cells.every((c) => /^:?-{2,}:?$/.test(c))
-}
+function convertPhrasingNodes(nodes: readonly PhrasingContent[]): MdxInlineNode[] {
+  const result: MdxInlineNode[] = []
 
-function parseCodeFenceHeader(fenceRest: string): { language: string; title?: string | undefined } {
-  const trimmed = fenceRest.trim()
-  if (!trimmed) {
-    return { language: 'typescript' }
+  for (const node of nodes) {
+    switch (node.type) {
+      case 'text':
+        if (node.value) {
+          result.push({ type: 'text', value: node.value })
+        }
+        break
+      case 'inlineCode':
+        result.push({ type: 'inlineCode', value: node.value })
+        break
+      case 'strong':
+        result.push({ type: 'strong', children: convertPhrasingNodes(node.children) })
+        break
+      case 'emphasis':
+        result.push({ type: 'emphasis', children: convertPhrasingNodes(node.children) })
+        break
+      case 'delete':
+        result.push({ type: 'delete', children: convertPhrasingNodes(node.children) })
+        break
+      case 'link':
+        result.push({
+          type: 'link',
+          url: node.url,
+          title: node.title ?? undefined,
+          children: convertPhrasingNodes(node.children),
+        })
+        break
+      case 'image':
+        result.push({
+          type: 'image',
+          url: node.url,
+          alt: node.alt ?? '',
+          title: node.title ?? undefined,
+        })
+        break
+      case 'break':
+        result.push({ type: 'break' })
+        break
+      case 'html':
+        if (node.value.trim() === '<br>' || node.value.trim() === '<br/>' || node.value.trim() === '<br />') {
+          result.push({ type: 'break' })
+        } else if (node.value) {
+          result.push({ type: 'text', value: node.value })
+        }
+        break
+      default:
+        break
+    }
   }
 
-  const titleAttrMatch = trimmed.match(/^(\S+)\s+title=["']([^"']+)["']/)
-  if (titleAttrMatch) {
+  return result
+}
+
+export function parseInlineMarkdownToAst(raw: string): MdxInlineNode[] {
+  const trimmed = raw.trim()
+  if (!trimmed) return []
+  const tree = markdownProcessor.parse(trimmed) as Root
+  const firstChild = tree.children[0]
+  if (firstChild && firstChild.type === 'paragraph') {
+    return convertPhrasingNodes(firstChild.children)
+  }
+  return [{ type: 'text', value: trimmed }]
+}
+
+function parseCustomWidgetTag(rawHtml: string): { name: MdxWidgetName; props: Record<string, string> } | null {
+  const trimmed = rawHtml.trim()
+  const tagMatch = trimmed.match(/^<([A-Z][A-Za-z0-9]*)\b([^>]*)\/>$/)
+  if (!tagMatch) return null
+
+  const candidateName = tagMatch[1] as MdxWidgetName
+  if (!SUPPORTED_MDX_WIDGETS.has(candidateName)) {
+    return null
+  }
+
+  const rawAttrs = tagMatch[2] ?? ''
+  const props: Record<string, string> = {}
+  const attrRegex = /([a-zA-Z][a-zA-Z0-9_-]*)=["']([^"']*)["']/g
+  let match = attrRegex.exec(rawAttrs)
+  while (match !== null) {
+    const propKey = match[1]
+    const propVal = match[2]
+    if (propKey !== undefined && propVal !== undefined) {
+      props[propKey] = propVal
+    }
+    match = attrRegex.exec(rawAttrs)
+  }
+
+  return { name: candidateName, props }
+}
+
+function parseCodeMetaTitle(meta?: string | null): string | undefined {
+  if (!meta) return undefined
+  const trimmed = meta.trim()
+  if (!trimmed) return undefined
+
+  const titleMatch = trimmed.match(/title=["']([^"']+)["']/)
+  if (titleMatch?.[1]) {
+    return titleMatch[1]
+  }
+
+  return trimmed.replace(/^["']|["']$/g, '') || undefined
+}
+
+function convertParagraphNode(node: Paragraph): MdxBlock | null {
+  // Promote standalone Markdown image `![alt](url "caption")` into a dedicated figure block
+  if (node.children.length === 1 && node.children[0]?.type === 'image') {
+    const img = node.children[0]
     return {
-      language: titleAttrMatch[1] ?? 'typescript',
-      title: titleAttrMatch[2],
+      type: 'image',
+      url: img.url,
+      alt: img.alt ?? '',
+      caption: img.title ?? (img.alt || undefined),
     }
   }
 
-  const parts = trimmed.split(/\s+/)
-  const language = parts[0] ?? 'typescript'
-  const restTitle = parts.slice(1).join(' ').trim()
+  const inlines = convertPhrasingNodes(node.children)
+  if (inlines.length === 0) return null
+  return { type: 'paragraph', inlines }
+}
+
+function convertHeadingNode(
+  node: Heading,
+  usedHeadingIds: Map<string, number>,
+  toc: ArticleTocEntry[] | null,
+): MdxBlock {
+  const level: 2 | 3 | 4 = node.depth <= 2 ? 2 : node.depth === 3 ? 3 : 4
+  const inlines = convertPhrasingNodes(node.children)
+  const plainText = extractPlainTextFromInlines(inlines)
+  const id = createHeadingSlug(plainText, usedHeadingIds)
+
+  if (toc) {
+    toc.push({ id, text: plainText, level })
+  }
+
   return {
-    language,
-    title: restTitle ? restTitle.replace(/^["']|["']$/g, '') : undefined,
+    type: 'heading',
+    level,
+    id,
+    inlines,
+    plainText,
   }
 }
 
-function normalizeTag(rawTag: string): string {
-  return rawTag
-    .trim()
-    .replace(/^["'#]+|["']+$/g, '')
-    .toLowerCase()
-    .replace(/\s+/g, '-')
+function convertCodeNode(node: Code): MdxBlock {
+  return {
+    type: 'code',
+    language: node.lang?.trim() || 'typescript',
+    title: parseCodeMetaTitle(node.meta),
+    code: node.value,
+  }
 }
 
-function parseFrontmatterBlock(rawBody: string): {
-  meta: Record<string, string>
-  tldr: string[]
-  tags: string[]
-  markdownBody: string
-} {
-  const meta: Record<string, string> = {}
-  const tldr: string[] = []
-  const tags: string[] = []
-  let markdownBody = rawBody.trim()
+function convertTableNode(node: Table): MdxBlock {
+  const headerRow = node.children[0]
+  const bodyRows = node.children.slice(1)
+  const headers: MdxInlineNode[][] = headerRow
+    ? headerRow.children.map((cell) => convertPhrasingNodes(cell.children))
+    : []
 
-  if (!markdownBody.startsWith('---')) {
-    return { meta, tldr, tags, markdownBody }
+  const alignments: Array<'left' | 'center' | 'right'> = headers.map((_, idx) => {
+    const align = node.align?.[idx]
+    if (align === 'center' || align === 'right') return align
+    return 'left'
+  })
+
+  const rows: MdxInlineNode[][][] = bodyRows.map((row) =>
+    row.children.map((cell) => convertPhrasingNodes(cell.children)),
+  )
+
+  return {
+    type: 'table',
+    headers,
+    alignments,
+    rows,
   }
+}
 
-  const endIdx = markdownBody.indexOf('---', 3)
-  if (endIdx === -1) {
-    return { meta, tldr, tags, markdownBody }
+function convertListNode(node: List, usedHeadingIds: Map<string, number>): MdxBlock {
+  const items: MdxListItemNode[] = node.children.map((listItem) => ({
+    checked: listItem.checked === null ? undefined : listItem.checked,
+    blocks: convertMdastChildren(listItem.children, usedHeadingIds, null),
+  }))
+
+  return {
+    type: 'list',
+    ordered: Boolean(node.ordered),
+    items,
   }
+}
 
-  const frontmatterLines = markdownBody.slice(3, endIdx).trim().split(/\r?\n/)
-  let idx = 0
+function convertBlockquoteNode(node: Blockquote, usedHeadingIds: Map<string, number>): MdxBlock {
+  const firstChild = node.children[0]
 
-  while (idx < frontmatterLines.length) {
-    const rawLine = frontmatterLines[idx] ?? ''
-    const trimmedLine = rawLine.trim()
-    if (!trimmedLine) {
-      idx += 1
-      continue
-    }
+  // Check for GitHub Alert syntax: > [!NOTE] Optional Title
+  if (firstChild && firstChild.type === 'paragraph' && firstChild.children[0]?.type === 'text') {
+    const firstTextNode = firstChild.children[0]
+    const rawValue = firstTextNode.value
+    const newlineIdx = rawValue.indexOf('\n')
+    const firstLine = (newlineIdx === -1 ? rawValue : rawValue.slice(0, newlineIdx)).trim()
+    const alertMatch = firstLine.match(/^\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]\s*(.*)$/i)
 
-    const colonIdx = trimmedLine.indexOf(':')
-    if (colonIdx !== -1) {
-      const key = trimmedLine.slice(0, colonIdx).trim()
-      const rawVal = trimmedLine.slice(colonIdx + 1).trim()
+    if (alertMatch) {
+      const kind = (alertMatch[1] ?? 'note').toLowerCase() as MdxCalloutKind
+      const customTitle = (alertMatch[2] ?? '').trim() || undefined
+      const remainingSameText = newlineIdx === -1 ? '' : rawValue.slice(newlineIdx + 1).trimStart()
 
-      if ((key === 'tldr' || key === 'tags') && !rawVal) {
-        idx += 1
-        while (idx < frontmatterLines.length) {
-          const itemLine = (frontmatterLines[idx] ?? '').trim()
-          if (!itemLine.startsWith('- ')) break
-          const cleanedItem = itemLine
-            .slice(2)
-            .trim()
-            .replace(/^["']|["']$/g, '')
-          if (cleanedItem) {
-            if (key === 'tldr') {
-              tldr.push(cleanedItem)
-            } else {
-              const tag = normalizeTag(cleanedItem)
-              if (tag && !tags.includes(tag)) tags.push(tag)
-            }
-          }
-          idx += 1
+      const clonedParagraphChildren: PhrasingContent[] = []
+      if (remainingSameText) {
+        clonedParagraphChildren.push({ type: 'text', value: remainingSameText })
+      }
+      for (const sibling of firstChild.children.slice(1)) {
+        // Strip leading soft break right after [!ALERT] header line
+        if (clonedParagraphChildren.length === 0 && sibling.type === 'break') {
+          continue
         }
-        continue
+        clonedParagraphChildren.push(sibling)
       }
 
-      if (key === 'tags' && rawVal) {
-        const stripped = rawVal.replace(/^\[/, '').replace(/\]$/, '')
-        for (const piece of stripped.split(',')) {
-          const tag = normalizeTag(piece)
-          if (tag && !tags.includes(tag)) tags.push(tag)
-        }
-        idx += 1
-        continue
+      const modifiedBlockChildren: Content[] = []
+      if (clonedParagraphChildren.length > 0) {
+        modifiedBlockChildren.push({
+          type: 'paragraph',
+          children: clonedParagraphChildren,
+        })
       }
+      modifiedBlockChildren.push(...node.children.slice(1))
 
-      meta[key] = rawVal.replace(/^["']|["']$/g, '')
+      return {
+        type: 'callout',
+        kind,
+        title: customTitle,
+        blocks: convertMdastChildren(modifiedBlockChildren, usedHeadingIds, null),
+      }
     }
-
-    idx += 1
   }
 
-  markdownBody = markdownBody.slice(endIdx + 3).trim()
-  return { meta, tldr, tags, markdownBody }
+  return {
+    type: 'callout',
+    kind: 'quote',
+    blocks: convertMdastChildren(node.children, usedHeadingIds, null),
+  }
 }
 
-function isSpecialBlockStart(rawLine: string, nextLine?: string): boolean {
-  const trimmed = rawLine.trim()
-  if (!trimmed) return true
-  if (
-    trimmed === '<ReactRenderGraphD3 />' ||
-    trimmed === '<ArchitectureFlowD3 />' ||
-    trimmed === '<ArticleImageGrid />' ||
-    trimmed === '<NestAiMcpDiagram />'
-  ) {
-    return true
+function convertMdastChildren(
+  children: readonly Content[],
+  usedHeadingIds: Map<string, number>,
+  toc: ArticleTocEntry[] | null,
+): MdxBlock[] {
+  const blocks: MdxBlock[] = []
+
+  for (const child of children) {
+    switch (child.type) {
+      case 'heading':
+        blocks.push(convertHeadingNode(child, usedHeadingIds, toc))
+        break
+      case 'paragraph': {
+        const converted = convertParagraphNode(child)
+        if (converted) blocks.push(converted)
+        break
+      }
+      case 'code':
+        blocks.push(convertCodeNode(child))
+        break
+      case 'table':
+        blocks.push(convertTableNode(child))
+        break
+      case 'list':
+        blocks.push(convertListNode(child, usedHeadingIds))
+        break
+      case 'blockquote':
+        blocks.push(convertBlockquoteNode(child, usedHeadingIds))
+        break
+      case 'thematicBreak':
+        blocks.push({ type: 'hr' })
+        break
+      case 'html': {
+        const widget = parseCustomWidgetTag(child.value)
+        if (widget) {
+          blocks.push({ type: 'component', name: widget.name, props: widget.props })
+        }
+        break
+      }
+      default:
+        break
+    }
   }
-  if (/^#{2,4}\s+/.test(trimmed)) return true
-  if (trimmed.startsWith('```')) return true
-  if (/^(-{3,}|\*{3,})$/.test(trimmed)) return true
-  if (trimmed.startsWith('>')) return true
-  if (/^([-*]|\d+\.)\s+/.test(trimmed)) return true
-  if (trimmed.includes('|') && nextLine !== undefined && isTableSeparatorLine(nextLine)) return true
-  return false
+
+  return blocks
+}
+
+function extractStringArray(rawField: unknown): string[] {
+  if (Array.isArray(rawField)) {
+    return rawField.map((v) => String(v).trim()).filter(Boolean)
+  }
+  if (typeof rawField === 'string' && rawField.trim()) {
+    return rawField
+      .replace(/^\[/, '')
+      .replace(/\]$/, '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
+  }
+  return []
+}
+
+function formatPublishedDate(rawDate: unknown): string {
+  if (rawDate instanceof Date && !Number.isNaN(rawDate.getTime())) {
+    return rawDate.toISOString().slice(0, 10)
+  }
+  if (typeof rawDate === 'string' && rawDate.trim()) {
+    return rawDate.trim()
+  }
+  return '2026-10-15'
 }
 
 function parseRawMdx(
@@ -285,224 +508,53 @@ function parseRawMdx(
   locale: SupportedLocale,
   isFallback: boolean,
 ): MdxArticleDocument {
-  const { meta, tldr, tags, markdownBody } = parseFrontmatterBlock(raw)
+  const parsedMatter = matter(raw)
+  const meta = parsedMatter.data as Record<string, unknown>
 
   const parsedCategory = KnowledgeCategoryEnum.safeParse(meta.category)
   const category = parsedCategory.success ? parsedCategory.data : fallbackCategory
   const parsedFormat = KnowledgeNoteFormatEnum.safeParse(meta.format)
   const format: KnowledgeNoteFormat = parsedFormat.success ? parsedFormat.data : 'deep-dive'
+
   const pathSegments = [category, ...relativeSubSegments, leafSlug]
   const routePath = pathSegments.join('/')
-  const metricSlug = meta.metricSlug || (relativeSubSegments.length === 0 ? leafSlug : pathSegments.join('--'))
-  const parsedOrder = meta.order ? Number.parseInt(meta.order, 10) : Number.NaN
+  const metricSlug =
+    typeof meta.metricSlug === 'string' && meta.metricSlug.trim()
+      ? meta.metricSlug.trim()
+      : relativeSubSegments.length === 0
+        ? leafSlug
+        : pathSegments.join('--')
 
-  const lines = markdownBody.split(/\r?\n/)
-  const blocks: MdxBlock[] = []
-  const toc: ArticleTocEntry[] = []
-  const usedHeadingIds = new Map<string, number>()
-  let i = 0
+  const rawOrder = typeof meta.order === 'number' ? meta.order : Number.parseInt(String(meta.order ?? ''), 10)
+  const order = Number.isFinite(rawOrder) ? rawOrder : 999
 
-  while (i < lines.length) {
-    const rawLine = lines[i] ?? ''
-    const line = rawLine.trim()
-
-    if (!line) {
-      i += 1
-      continue
+  const rawTags = extractStringArray(meta.tags)
+  const tags: string[] = []
+  for (const rawTag of rawTags) {
+    const normalized = normalizeTag(rawTag)
+    if (normalized && !tags.includes(normalized)) {
+      tags.push(normalized)
     }
-
-    if (line === '<ReactRenderGraphD3 />') {
-      blocks.push({ type: 'component', name: 'ReactRenderGraphD3' })
-      i += 1
-      continue
-    }
-
-    if (line === '<ArchitectureFlowD3 />') {
-      blocks.push({ type: 'component', name: 'ArchitectureFlowD3' })
-      i += 1
-      continue
-    }
-
-    if (line === '<ArticleImageGrid />') {
-      blocks.push({ type: 'component', name: 'ArticleImageGrid' })
-      i += 1
-      continue
-    }
-
-    if (line === '<NestAiMcpDiagram />') {
-      blocks.push({ type: 'component', name: 'NestAiMcpDiagram' })
-      i += 1
-      continue
-    }
-
-    if (/^(-{3,}|\*{3,})$/.test(line)) {
-      blocks.push({ type: 'hr' })
-      i += 1
-      continue
-    }
-
-    const headingMatch = line.match(/^(#{2,4})\s+(.+)$/)
-    if (headingMatch) {
-      const hashes = headingMatch[1] ?? '##'
-      const rawHeadingText = (headingMatch[2] ?? '').trim()
-      const level = (hashes.length === 3 ? 3 : hashes.length === 4 ? 4 : 2) as 2 | 3 | 4
-      const plainText = stripInlineMarkdown(rawHeadingText)
-      const id = createHeadingSlug(plainText, usedHeadingIds)
-
-      blocks.push({
-        type: 'heading',
-        level,
-        id,
-        text: rawHeadingText,
-        plainText,
-      })
-      toc.push({
-        id,
-        text: plainText,
-        level,
-      })
-      i += 1
-      continue
-    }
-
-    if (line.startsWith('```')) {
-      const { language, title } = parseCodeFenceHeader(line.slice(3))
-      const codeLines: string[] = []
-      i += 1
-      while (i < lines.length && !(lines[i] ?? '').trim().startsWith('```')) {
-        codeLines.push(lines[i] ?? '')
-        i += 1
-      }
-      i += 1
-      blocks.push({
-        type: 'code',
-        language,
-        title,
-        code: codeLines.join('\n'),
-      })
-      continue
-    }
-
-    // GFM Markdown Table
-    if (line.includes('|') && i + 1 < lines.length && isTableSeparatorLine(lines[i + 1] ?? '')) {
-      const headers = parseTableCells(line)
-      const separatorCells = parseTableCells(lines[i + 1] ?? '')
-      const alignments: Array<'left' | 'center' | 'right'> = separatorCells.map((sep) => {
-        if (sep.startsWith(':') && sep.endsWith(':')) return 'center'
-        if (sep.endsWith(':')) return 'right'
-        return 'left'
-      })
-      i += 2
-      const rows: string[][] = []
-      while (i < lines.length) {
-        const candidate = (lines[i] ?? '').trim()
-        if (!candidate.includes('|')) break
-        rows.push(parseTableCells(candidate))
-        i += 1
-      }
-      blocks.push({
-        type: 'table',
-        headers,
-        alignments,
-        rows,
-      })
-      continue
-    }
-
-    // GitHub Alert Callout or Blockquote (> [!TIP] / > text)
-    if (line.startsWith('>')) {
-      const quoteLines: string[] = []
-      while (i < lines.length && (lines[i] ?? '').trim().startsWith('>')) {
-        quoteLines.push((lines[i] ?? '').trim().replace(/^>\s?/, '').trim())
-        i += 1
-      }
-
-      const firstQuote = quoteLines[0] ?? ''
-      const alertMatch = firstQuote.match(/^\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]\s*(.*)$/i)
-      if (alertMatch) {
-        const rawKind = (alertMatch[1] ?? 'note').toLowerCase() as MdxCalloutKind
-        const customTitle = (alertMatch[2] ?? '').trim() || undefined
-        const bodyLines = quoteLines.slice(1).filter(Boolean)
-        blocks.push({
-          type: 'callout',
-          kind: rawKind,
-          title: customTitle,
-          lines: bodyLines,
-        })
-      } else {
-        blocks.push({
-          type: 'callout',
-          kind: 'quote',
-          lines: quoteLines.filter(Boolean),
-        })
-      }
-      continue
-    }
-
-    // Ordered or Unordered Lists (with nested 2+ space indented sub-items & task checkboxes)
-    if (/^([-*]|\d+\.)\s+/.test(line)) {
-      const ordered = /^\d+\.\s+/.test(line)
-      const items: MdxListItem[] = []
-
-      while (i < lines.length) {
-        const currentRaw = lines[i] ?? ''
-        const currentTrimmed = currentRaw.trim()
-        if (!currentTrimmed) break
-
-        const isNestedSubItem = /^\s{2,}([-*]|\d+\.)\s+/.test(currentRaw)
-        if (isNestedSubItem && items.length > 0) {
-          const lastItem = items[items.length - 1]
-          const subCleaned = currentTrimmed.replace(/^([-*]|\d+\.)\s+/, '')
-          lastItem?.subItems.push(subCleaned)
-          i += 1
-          continue
-        }
-
-        if (!/^([-*]|\d+\.)\s+/.test(currentTrimmed)) break
-
-        let itemText = currentTrimmed.replace(/^([-*]|\d+\.)\s+/, '')
-        let checked: boolean | undefined
-        if (itemText.startsWith('[x] ') || itemText.startsWith('[X] ')) {
-          checked = true
-          itemText = itemText.slice(4).trim()
-        } else if (itemText.startsWith('[ ] ')) {
-          checked = false
-          itemText = itemText.slice(4).trim()
-        }
-
-        items.push({
-          text: itemText,
-          checked,
-          subItems: [],
-        })
-        i += 1
-      }
-
-      blocks.push({
-        type: 'list',
-        ordered,
-        items,
-      })
-      continue
-    }
-
-    // Multi-line Paragraph
-    const paragraphLines: string[] = [line]
-    i += 1
-    while (i < lines.length && !isSpecialBlockStart(lines[i] ?? '', lines[i + 1])) {
-      const nextTrimmed = (lines[i] ?? '').trim()
-      if (!nextTrimmed) break
-      paragraphLines.push(nextTrimmed)
-      i += 1
-    }
-
-    blocks.push({
-      type: 'paragraph',
-      text: paragraphLines.join(' '),
-    })
   }
 
-  const resolvedTitle = meta.title ?? leafSlug
+  const tldr = extractStringArray(meta.tldr)
+
+  const mdastRoot = markdownProcessor.parse(parsedMatter.content) as Root
+  const toc: ArticleTocEntry[] = []
+  const usedHeadingIds = new Map<string, number>()
+  const blocks = convertMdastChildren(mdastRoot.children, usedHeadingIds, toc)
+
+  const resolvedTitle = typeof meta.title === 'string' && meta.title.trim() ? meta.title.trim() : leafSlug
+  const sidebarLabel =
+    typeof meta.sidebarLabel === 'string' && meta.sidebarLabel.trim() ? meta.sidebarLabel.trim() : resolvedTitle
+  const summary = typeof meta.summary === 'string' ? meta.summary.trim() : ''
+  const readingTime =
+    typeof meta.readingTime === 'string' && meta.readingTime.trim()
+      ? meta.readingTime.trim()
+      : typeof meta.readTime === 'string' && meta.readTime.trim()
+        ? meta.readTime.trim()
+        : '5 min'
+
   return {
     slug: metricSlug,
     leafSlug,
@@ -512,11 +564,11 @@ function parseRawMdx(
     locale,
     isFallback,
     title: resolvedTitle,
-    sidebarLabel: meta.sidebarLabel || resolvedTitle,
-    summary: meta.summary ?? '',
-    readingTime: meta.readingTime ?? meta.readTime ?? '5 min',
-    publishedAt: meta.publishedAt ?? '2026-10-15',
-    order: Number.isFinite(parsedOrder) ? parsedOrder : 999,
+    sidebarLabel,
+    summary,
+    readingTime,
+    publishedAt: formatPublishedDate(meta.publishedAt),
+    order,
     format,
     tags,
     tldr,
@@ -809,11 +861,8 @@ export const getKnowledgeSearchIndex = cache((localeInput?: string): KnowledgeSe
   const docs = getAllKnowledgeArticles(locale)
 
   return docs.map((doc) => {
-    const topicLabel = formatKnowledgeSegmentLabel(doc.category, locale)
-    const subtopicLabel = doc.pathSegments
-      .slice(1, -1)
-      .map((seg) => formatKnowledgeSegmentLabel(seg, locale))
-      .join(' / ')
+    const subSegments = doc.pathSegments.slice(1, -1)
+    const subtopicLabel = subSegments.map((seg) => formatKnowledgeSegmentLabel(seg, locale)).join(' / ')
 
     return {
       routePath: doc.routePath,
@@ -821,12 +870,12 @@ export const getKnowledgeSearchIndex = cache((localeInput?: string): KnowledgeSe
       sidebarLabel: doc.sidebarLabel,
       summary: doc.summary,
       category: doc.category,
-      topicLabel,
+      topicLabel: formatKnowledgeSegmentLabel(doc.category, locale),
       subtopicLabel,
       format: doc.format,
       tags: doc.tags,
       readingTime: doc.readingTime,
-      headings: doc.toc.map((h) => ({ id: h.id, text: h.text })),
+      headings: doc.toc.filter((h) => h.level === 2 || h.level === 3).map((h) => ({ id: h.id, text: h.text })),
     }
   })
 })
@@ -846,55 +895,60 @@ export const getAllKnowledgeTags = cache((localeInput?: string): Array<{ tag: st
     .sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag))
 })
 
-function flattenTreeArticles(nodes: readonly KnowledgeTreeNode[]): MdxArticleFrontmatter[] {
-  const out: MdxArticleFrontmatter[] = []
-  for (const node of nodes) {
-    if (node.type === 'article') {
-      out.push(node.article)
-    } else {
-      out.push(...flattenTreeArticles(node.children))
-    }
-  }
-  return out
-}
-
-export interface AdjacentAndRelatedArticles {
+export function getAdjacentAndRelatedArticles(
+  currentRoutePath: string,
+  localeInput?: string,
+): {
   prev: MdxArticleFrontmatter | null
   next: MdxArticleFrontmatter | null
   related: MdxArticleFrontmatter[]
-}
+} {
+  const locale = normalizeLocale(localeInput)
+  const tree = getKnowledgeTree(locale)
+  const orderedFrontmatters: MdxArticleFrontmatter[] = []
 
-export const getAdjacentAndRelatedArticles = cache(
-  (routePath: string, localeInput?: string): AdjacentAndRelatedArticles => {
-    const locale = normalizeLocale(localeInput)
-    const tree = getKnowledgeTree(locale)
-    const ordered = flattenTreeArticles(tree)
-    const currentIndex = ordered.findIndex((item) => item.routePath === routePath)
-
-    const prev = currentIndex > 0 ? (ordered[currentIndex - 1] ?? null) : null
-    const next = currentIndex >= 0 && currentIndex < ordered.length - 1 ? (ordered[currentIndex + 1] ?? null) : null
-    const current = currentIndex >= 0 ? ordered[currentIndex] : undefined
-
-    if (!current) {
-      return { prev, next, related: [] }
+  const flattenArticles = (nodes: readonly KnowledgeTreeNode[]) => {
+    for (const node of nodes) {
+      if (node.type === 'article') {
+        orderedFrontmatters.push(node.article)
+      } else {
+        flattenArticles(node.children)
+      }
     }
+  }
 
-    const currentTags = new Set(current.tags)
-    const scored = ordered
-      .filter((candidate) => candidate.routePath !== routePath)
-      .map((candidate) => {
-        let sharedTagScore = 0
-        for (const tag of candidate.tags) {
-          if (currentTags.has(tag)) sharedTagScore += 2
-        }
-        const sameCategoryBonus = candidate.category === current.category ? 1 : 0
-        return { candidate, score: sharedTagScore + sameCategoryBonus, sharedTagScore }
-      })
-      .filter((entry) => entry.sharedTagScore > 0)
-      .sort((a, b) => b.score - a.score || a.candidate.order - b.candidate.order)
-      .slice(0, 2)
-      .map((entry) => entry.candidate)
+  flattenArticles(tree)
 
-    return { prev, next, related: scored }
-  },
-)
+  const currentIdx = orderedFrontmatters.findIndex((a) => a.routePath === currentRoutePath)
+  const current = currentIdx !== -1 ? orderedFrontmatters[currentIdx] : undefined
+  const prev = currentIdx > 0 ? (orderedFrontmatters[currentIdx - 1] ?? null) : null
+  const next =
+    currentIdx !== -1 && currentIdx < orderedFrontmatters.length - 1
+      ? (orderedFrontmatters[currentIdx + 1] ?? null)
+      : null
+
+  if (!current) {
+    return { prev, next, related: [] }
+  }
+
+  const currentTagSet = new Set(current.tags)
+  const related = orderedFrontmatters
+    .filter((candidate) => candidate.routePath !== current.routePath)
+    .map((candidate) => {
+      let sharedTags = 0
+      for (const tag of candidate.tags) {
+        if (currentTagSet.has(tag)) sharedTags += 1
+      }
+      const sameCategoryBonus = candidate.category === current.category ? 0.5 : 0
+      return {
+        candidate,
+        score: sharedTags + sameCategoryBonus,
+      }
+    })
+    .filter((entry) => entry.score > 0)
+    .sort((a, b) => b.score - a.score || a.candidate.order - b.candidate.order)
+    .slice(0, 3)
+    .map((entry) => entry.candidate)
+
+  return { prev, next, related }
+}
