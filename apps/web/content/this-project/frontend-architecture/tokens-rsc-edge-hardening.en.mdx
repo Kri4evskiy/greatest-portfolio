@@ -1,0 +1,90 @@
+---
+title: "Pre-UI v2 Architecture Hardening: Multi-Theme Tokens, RSC Diet, AST MDX & Edge Web Crypto"
+sidebarLabel: "Tokens, RSC & Edge Hardening"
+summary: "Why and how we refactored 5 core frontend subsystems before the UI v2 redesign: semantic multi-theme/multi-tenant CSS tokens, Dual-Theme Shiki, RSC locale slicing + on-demand Cmd+K index, server remark AST, and Edge HS256 JWT verification."
+category: "this-project"
+format: "adr"
+tags: ["architecture", "design-tokens", "rsc", "mdx", "security", "react-compiler", "performance"]
+readingTime: "9 min"
+publishedAt: "2026-11-07"
+order: 2
+tldr:
+  - "Expanded `@repo/ui` into a multi-palette / multi-tenant semantic CSS token matrix (`[data-palette]` + `.dark`) and switched `Shiki v4` to Dual-Theme CSS variables (`0 KB` client JS)."
+  - "Moved the `Cmd+K` search index out of `layout.tsx` into a static SSG endpoint (`/search-index/[locale]`) and converted home CV sections into Server Components with micro client islands."
+  - "Replaced line-by-line regex parsing with a server-side `gray-matter` + `remark` AST pipeline (`0 KB` client JS) and upgraded Edge Proxy cookie checks to cryptographic `HMAC-SHA256` (`crypto.subtle`)."
+---
+
+## 1. Context: Fixing Architectural Bottlenecks Before Visual Redesign
+
+Redesigning UI surfaces on top of hardcoded utility colors, client-heavy sections, or naive regex parsers compounds technical debt. Before starting **Notion Workfolio UI v2**, we ran an architectural audit of the frontend core and hardened five foundational layers while keeping `strict: true` TypeScript and zero runtime bloat.
+
+| Subsystem | Previous Bottleneck ("Before") | Hardened Architecture ("After") |
+| :--- | :--- | :--- |
+| **Design Tokens & Shiki** | Narrow `:root` palette, `@repo/ui` scanning `../../apps/web`, hardcoded `#0d1117` Shiki & `slate-*` badges | Semantic `Design Tokens v2` + `[data-palette]` presets, Tailwind `preset` export, Dual-Theme `Shiki` CSS variables |
+| **RSC & `Cmd+K` Index** | Root `layout.tsx` serialized the full search index into every HTML page; `'use client'` sections bundled all 3 locales | Static SSG `/search-index/[locale]` fetched on demand (`0 KB` initial HTML) + Server Components with micro islands |
+| **MDX Engine** | Custom line-by-line `RegExp` loop broke on nested code in callouts/lists, complex links, or native `![alt](url)` | Server-only `gray-matter` + `unified` / `remark-parse` / `remark-gfm` recursive AST (`0 KB` client JS) |
+| **Edge Proxy Auth** | `proxy.ts` only checked `token.split('.').length === 3` (any `a.b.c` cookie bypassed Edge) | Web Crypto `crypto.subtle` `HMAC-SHA256` (`HS256`) signature + `exp` verification with cached `CryptoKey` |
+| **Compiler & State** | `babel-plugin-react-compiler` wasn't wired; `withRedact` was a no-op stub; D3 demo flags lived in global `Zustand` | `reactCompiler: true` enabled in `next.config.ts`, `withRedact` removed, D3 state colocated, `sessionStorage` tree sync |
+
+---
+
+## 2. Multi-Theme & Multi-Tenant Design Tokens v2 + Dual-Theme `Shiki`
+
+A single dark/light toggle is not enough when preparing for multiple frontend palettes (`Warm Paper`, `Graphite`, `Sepia`) or hypothetical multi-tenant white-labeling. We redesigned `packages/ui/src/styles/globals.css` around **three strict rules**:
+
+1. **Semantic Surfaces & Statuses:** Added `--surface-subtle`, `--surface-elevated`, `--popover`, `--success`, `--warning`, `--info`, `--destructive`, `--chart-1..4`, and `--code-bg / --code-header / --code-border`. Components in `@repo/ui` (`Badge`, `Callout`) and `D3.js` SVG diagrams consume `hsl(var(--...))` exclusively—zero hardcoded `emerald-*`, `amber-*`, or `#hex` literals.
+2. **Orthogonal Theme Axes (`class="dark"` x `data-palette="..."`):** Adding a new brand or tenant theme requires overriding ~20 HSL variables under `[data-palette="graphite"]` without touching a single `.tsx` component.
+3. **Dependency Inversion Fix & Dual-Theme `Shiki`:** `@repo/ui` no longer reaches upward into `../../apps/web/src/**/*`; instead it exports `@repo/ui/tailwind.config` as a clean Tailwind `preset`. Meanwhile, `highlightCodeServer` runs `Shiki v4` with `themes: { light: 'github-light-default', dark: 'github-dark-default' }` and `defaultColor: false`, switching themes purely via CSS variables in `0ms` with `0 KB` client JS.
+
+---
+
+## 3. RSC Payload Diet & Scaling `Cmd+K` Past 100+ Notes
+
+Two subtle traps often inflate Next.js App Router bundles:
+
+- **Trap 1 — Serializing Global Data in Root Layouts:** Passing `searchIndex` into `<CommandPaletteModal />` inside `app/[locale]/layout.tsx` duplicated every article's title, tags, and `h2/h3` headings inside the initial HTML + RSC flight payload of **every page**, even if the visitor never pressed `Cmd+K`.
+- **Trap 2 — Importing Multilingual Constants Inside `'use client'` Sections:** Importing `AUTHOR_PROFILE` or `TECH_RADAR_DATA` inside `'use client'` wrappers forced Webpack/Turbopack to ship English, Ukrainian, and Russian strings together into the browser JS bundle.
+
+```typescript title="apps/web/src/app/search-index/[locale]/route.ts"
+export const dynamic = 'force-static'
+
+export function generateStaticParams() {
+  return SUPPORTED_LOCALES.map((locale) => ({ locale }))
+}
+
+export async function GET(_request: Request, context: RouteContext) {
+  const { locale } = await context.params
+  // Pre-rendered at build time into a static JSON asset (0 runtime CPU, 0 KB initial HTML)
+  return NextResponse.json({
+    items: getKnowledgeSearchIndex(safeLocale),
+    popularTags: getPopularTags(safeLocale, 14),
+  })
+}
+```
+
+Now `WorkfolioHeroSection`, `WorkfolioProjectsSection`, `WorkfolioExperienceSection`, and `WorkfolioFooter` execute strictly as **Server Components**—slicing only the active locale on the server and delegating interactivity to tiny client islands (`HeroActionButtons`, `ProjectArticleTrigger`, `ExperienceCollapsibleList`, `FooterSseStatus` with `pagehide/pageshow` `bfcache` support). And `search-index-client.ts` prefetches `/search-index/${locale}` on button hover/focus or `Cmd+K` open with in-memory Promise deduplication.
+
+---
+
+## 4. Server-Side `remark` AST Pipeline (`0 KB` Client JS)
+
+Custom line-by-line regex parsers are fast to prototype, but as soon as engineering articles include **fenced code blocks nested inside `> [!TIP]` callouts**, **multi-paragraph list items**, **Markdown images `![Diagram](/img.webp "Caption")`**, or **JSX props `<NestAiMcpDiagram defaultMode="ai" />`**, regex state machines become brittle.
+
+We replaced the line scanner in `mdx-content.ts` with `gray-matter` + `unified().use(remarkParse).use(remarkGfm)` strictly on the server:
+- Converts `mdast` nodes recursively into serializable `MdxBlock` and `MdxInlineNode` trees (`strong`, `emphasis`, `delete`, `inlineCode`, `link`, `image`).
+- `MdxArticleRenderer` traverses nested blocks recursively, highlights all code blocks in parallel via `Promise.all` + `Shiki`, and ships pure static HTML to the browser.
+
+---
+
+## 5. Cryptographic Edge JWT Verification (`HS256` Web Crypto) & Core Hygiene
+
+Previously, `apps/web/src/proxy.ts` checked `token?.split('.').length !== 3` as a lightweight UX gate, relying on `NestJS` `JwtRolesGuard` to protect `/api/*`. However, because `.mdx` pages are statically rendered (`SSG`), a manually forged cookie `kb_access_token=a.b.c` in DevTools could view static article routes without a valid signature.
+
+Using the native Edge **Web Crypto API (`crypto.subtle`)**, `verifyEdgeJwtHs256` in `apps/web/src/lib/edge-jwt.ts` (sharing `KB_ACCESS_COOKIE_NAME` and `resolveJwtSecret` via `@repo/shared-schemas`) performs full cryptographic verification in `< 0.2ms` with **zero external npm dependencies**:
+1. Validates Base64URL structure, `alg === 'HS256'`, and numeric `payload.exp * 1000 > Date.now()`.
+2. Caches the imported `HMAC-SHA256` `CryptoKey` per Edge isolate and verifies the signature in constant time via `crypto.subtle.verify`, automatically purging forged or expired cookies on redirect.
+
+> [!NOTE]
+> **Future Backend Milestone:** When we return to the `apps/api` backend phase, we will complement Edge `HS256` verification with short-lived `Access` (`15m`) + `Refresh` (`7d`) token rotation and server-side session revocation.
+
+Finally, we enabled the real **`reactCompiler: true`** (`babel-plugin-react-compiler`) in `next.config.ts`, removed the placeholder `withRedact()` wrapper, removed global `console.error` mutation from `ThemeProvider`, moved D3 simulation toggles into local component state, and persisted `expandedKbFolders` into `sessionStorage` with hydration-safe `useEffect` restoration.

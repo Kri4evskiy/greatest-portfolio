@@ -52,10 +52,10 @@
     1. Граф сравнения пайплайна рендеринга и мемоизации `React 18 vs React 19` (`useCallback`, `useMemo`, React Compiler, `use()`).
     2. Интерактивный граф архитектуры этого монорепозитория (`Client -> Next.js Edge -> NestJS API -> Prisma/Neon -> Telemetry Microservice -> SSE`).
 
-## 3. Экспериментальный рантайм `TanStack Redact`
+## 3. Оптимизация бандла: `React 19 Compiler` и RSC-острова
 
-- В `next.config.ts` подготовлена обертка `withRedact` и `@next/bundle-analyzer`, управляемая через флаг окружения `ENABLE_REDACT=true`.
-- Результаты сравнения бандла (стандартный React DOM против TanStack Redact) задокументированы в виде отдельной инженерной статьи внутри Базы Знаний.
+- В `next.config.ts` активированы `reactCompiler: true` (`babel-plugin-react-compiler`), `@next/bundle-analyzer` (`ANALYZE=true`) и `optimizePackageImports`.
+- Поисковый индекс `Cmd+K` вынесен из `layout.tsx` в статический SSG-роут `/search-index/[locale]`, а мультиязычные словари нарезаются строго на сервере.
 
 ## 4. Стандарты Next.js AI Agents & Vercel React Best Practices
 

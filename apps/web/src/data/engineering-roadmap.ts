@@ -1,4 +1,5 @@
-import type { LocalizedText } from './author-profile'
+import type { SupportedLocale } from '@repo/shared-schemas'
+import { type LocalizedText, pickLocalized } from './author-profile'
 
 /**
  * 🛠️ ENGINEERING BACKLOG, TECH DEBT & ARCHITECTURAL TRADE-OFFS REGISTRY
@@ -133,7 +134,7 @@ export const ENGINEERING_ROADMAP_ITEMS: readonly EngineeringRoadmapItem[] = [
   },
   {
     id: 'sse-bfcache-lifecycle',
-    status: 'planned',
+    status: 'shipped',
     kind: 'tech-debt',
     priority: 'P2',
     effort: 'S',
@@ -437,4 +438,107 @@ export const ENGINEERING_ROADMAP_ITEMS: readonly EngineeringRoadmapItem[] = [
       ru: ['Новые поля фронтматтера централизованно типизируются через парсер mdx-content.ts'],
     },
   },
+  {
+    id: 'pre-ui-v2-foundation-hardening',
+    status: 'shipped',
+    kind: 'architecture',
+    priority: 'P1',
+    effort: 'L',
+    title: {
+      en: 'Pre-UI v2 Hardening: Design Tokens v2, RSC Diet, Remark AST & Edge Web Crypto JWT',
+      uk: 'Харденінг перед UI v2: Design Tokens v2, RSC-дієта, Remark AST та Edge Web Crypto JWT',
+      ru: 'Харденинг перед UI v2: Design Tokens v2, RSC-диета, Remark AST и Edge Web Crypto JWT',
+    },
+    summary: {
+      en: 'Multi-theme/multi-tenant CSS token matrix + Dual-Theme Shiki, static /search-index/[locale] (0 KB initial HTML), server remark AST, Edge HS256 JWT verification via crypto.subtle, and React 19 Compiler.',
+      uk: 'Мульти-палітрові семантичні CSS-токени + Dual-Theme Shiki, статичний /search-index/[locale] (0 КБ у HTML), серверний remark AST, крипто-перевірка HS256 JWT на Edge та React 19 Compiler.',
+      ru: 'Мульти-палитровые/multi-tenant CSS-токены + Dual-Theme Shiki, статический /search-index/[locale] (0 КБ в HTML), серверный remark AST, крипто-проверка HS256 JWT на Edge и React 19 Compiler.',
+    },
+    rationale: {
+      en: 'Eliminated token narrow-coupling, 3-locale client bundle duplication, regex parser fragility, and superficial Edge cookie checks before starting the UI v2 redesign.',
+      uk: 'Прибрали вузькі місця палітр, дублювання локалей у клієнтському бандлі, крихкість RegExp-парсера та поверхневу перевірку кук до старту UI v2.',
+      ru: 'Устранили узкую палитру токенов, дублирование 3 локалей в клиентском JS, хрупкость RegExp-парсера и поверхностную проверку кук до старта редизайна UI v2.',
+    },
+    pros: {
+      en: [
+        'Instant theme/tenant switching via CSS variables ([data-palette] + .dark) with 0 KB Shiki client JS',
+        'Scales cleanly past 100+ articles while blocking forged JWT cookies directly at the Edge in <0.2ms',
+      ],
+      uk: [
+        'Миттєва зміна палітр/тенантів через CSS-змінні ([data-palette] + .dark) при 0 КБ клієнтського JS у Shiki',
+        'Масштабується за 100+ конспектів і відсікає підроблені JWT-куки прямо на Edge за <0.2 мс',
+      ],
+      ru: [
+        'Мгновенная смена тем и палитр тенантов через CSS-переменные ([data-palette] + .dark) при 0 КБ JS у Shiki',
+        'Масштабируется за 100+ статей и криптографически отсекает поддельные JWT-куки на Edge за <0.2 мс',
+      ],
+    },
+    constraints: {
+      en: [
+        'Server-side session revocation awaits short-lived Access + Refresh token rotation in the Backend Milestone',
+      ],
+      uk: ['Миттєве відкликання сесій на сервері буде додано через пару Access + Refresh токенів на етапі бекенду'],
+      ru: ['Мгновенный отзыв сессий на сервере будет закрыт ротацией Access + Refresh токенов на этапе бэкенда'],
+    },
+  },
+  {
+    id: 'jwt-access-refresh-rotation',
+    status: 'planned',
+    kind: 'architecture',
+    priority: 'P2',
+    effort: 'M',
+    title: {
+      en: 'Short-Lived Access (15m) + Refresh (7d) JWT Rotation & Session Revocation',
+      uk: 'Ротація короткоживучих Access (15m) + Refresh (7d) JWT та відкликання сесій',
+      ru: 'Ротация короткоживущих Access (15m) + Refresh (7d) JWT и отзыв сессий',
+    },
+    summary: {
+      en: 'Complement Edge HS256 signature verification with short-lived Access cookies and rotating HttpOnly Refresh tokens backed by VisitorSession in PostgreSQL.',
+      uk: 'Доповнити Edge HS256 верифікацію короткоживучим Access-токеном та ротацією HttpOnly Refresh-токенів із записом у PostgreSQL.',
+      ru: 'Дополнить крипто-проверку HS256 на Edge связкой короткоживущего Access-токена (15 мин) и ротируемого HttpOnly Refresh-токена с хранением сессии в PostgreSQL.',
+    },
+    rationale: {
+      en: 'Stateless 7-day JWTs verify cryptographically in <0.2ms at the Edge without DB latency, whereas adding Refresh rotation in the Backend Milestone enables instant session revocation.',
+      uk: 'Stateless JWT перевіряється на Edge за <0.2 мс без запитів у БД, а ротація Refresh-токенів на етапі бекенду дасть миттєве відкликання сесій.',
+      ru: 'Stateless JWT проверяется на Edge за <0.2 мс без похода в БД, а ротация Refresh-токенов на бэкенд-этапе позволит мгновенно отзывать выданные доступы.',
+    },
+    pros: {
+      en: ['Sub-millisecond Edge checks + server-controlled revocation window of <=15 minutes'],
+      uk: ['Субмілісекундна перевірка на Edge + контрольоване вікно відкликання <=15 хвилин'],
+      ru: ['Субмиллисекундная проверка на Edge + управляемое окно отзыва доступа не более 15 минут'],
+    },
+    constraints: {
+      en: ['Requires silent token refresh interceptor on 401 responses without race conditions across parallel tabs'],
+      uk: ['Потребує безшовного перехоплення 401 із захистом від гонитви запитів між відкритими вкладками'],
+      ru: ['Требует аккуратного бесшовного обновления по 401 с защитой от гонки запросов из соседних вкладок'],
+    },
+  },
 ]
+
+export interface LocalizedRoadmapItem {
+  id: string
+  status: RoadmapItemStatus
+  kind: RoadmapItemKind
+  priority: RoadmapPriority
+  effort: RoadmapEffort
+  title: string
+  summary: string
+  rationale: string
+  pros: readonly string[]
+  constraints: readonly string[]
+}
+
+export function getLocalizedRoadmapItems(locale: SupportedLocale): LocalizedRoadmapItem[] {
+  return ENGINEERING_ROADMAP_ITEMS.map((item) => ({
+    id: item.id,
+    status: item.status,
+    kind: item.kind,
+    priority: item.priority,
+    effort: item.effort,
+    title: pickLocalized(item.title, locale),
+    summary: pickLocalized(item.summary, locale),
+    rationale: pickLocalized(item.rationale, locale),
+    pros: item.pros[locale] ?? item.pros.en,
+    constraints: item.constraints[locale] ?? item.constraints.en,
+  }))
+}

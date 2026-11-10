@@ -1,0 +1,88 @@
+---
+title: "Архітектурний харденінг перед UI v2: Мульти-темні токени, RSC-дієта, AST MDX та Edge Web Crypto"
+sidebarLabel: "Токени, RSC та Edge-захист"
+summary: "Чому і як ми модернізували 5 ключових підсистем фронтенду перед редизайном UI v2: семантичні мульти-темні CSS-токени, Dual-Theme Shiki, RSC-нарізка локалей + лінивий індекс Cmd+K, серверний remark AST та крипто-перевірка HS256 JWT на Edge."
+category: "this-project"
+format: "adr"
+tags: ["architecture", "design-tokens", "rsc", "mdx", "security", "react-compiler", "performance"]
+readingTime: "9 хв"
+publishedAt: "2026-11-07"
+order: 2
+tldr:
+  - "Розширили `@repo/ui` до мульти-палітрової / multi-tenant матриці семантичних CSS-токенів (`[data-palette]` + `.dark`) і перевели `Shiki v4` на Dual-Theme CSS-змінні (`0 КБ` клієнтського JS)."
+  - "Винесли пошуковий індекс `Cmd+K` із `layout.tsx` в окремий статичний SSG-роут (`/search-index/[locale]`), а секції головної сторінки перевели у чисті Server Components із мікро-островами."
+  - "Замінили порядковий `RegExp`-парсер на серверний AST-конвеєр `gray-matter` + `remark` (`0 КБ` клієнтського JS) і впровадили криптографічну перевірку `HMAC-SHA256` (`crypto.subtle`) у `proxy.ts`."
+---
+
+## 1. Контекст: Чому архітектуру потрібно зміцнювати ДО візуального редизайну
+
+Редизайн інтерфейсу поверх захардкоджених кольорів, клієнтських секцій з усіма локалями або крихкого `RegExp`-парсера лише консервує технічний борг. Перед стартом **Notion Workfolio UI v2** ми провели ревізію фронтенд-ядра та закрили 5 фундаментальних вузлів без жодного компромісу зі суворим TypeScript (`strict: true`).
+
+| Підсистема | Вузьке місце («До») | Оновлена архітектура («Після») |
+| :--- | :--- | :--- |
+| **Токени та Shiki** | Вузька палітра `:root`, імпорт `../../apps/web` у `@repo/ui`, хардкод `#0d1117` у Shiki та `slate-*` у бейджах | Семантична система `Design Tokens v2` + пресети `[data-palette]`, експорт Tailwind `preset`, Dual-Theme `Shiki` на CSS-змінних |
+| **RSC та індекс `Cmd+K`** | `layout.tsx` серіалізував увесь індекс пошуку в HTML кожної сторінки; `'use client'` секції тягнули всі 3 мови в JS | Статичний SSG-роут `/search-index/[locale]` за вимогою (`0 КБ` у первинному HTML) + Server Components із мікро-островами |
+| **Рушій MDX** | Самописний порядковий цикл `RegExp` ламався на коді всередині callout/списків і стандартних зображеннях `![alt](url)` | Серверний рекурсивний AST `gray-matter` + `unified` / `remark-parse` / `remark-gfm` (`0 КБ` клієнтського JS) |
+| **Edge Proxy Auth** | `proxy.ts` перевіряв лише `token.split('.').length === 3` (будь-яка кука `a.b.c` проходила Edge) | Криптографічна перевірка `HMAC-SHA256` (`HS256`) та `exp` через Web Crypto `crypto.subtle` з кешуванням `CryptoKey` |
+| **Компілятор і стейт** | `babel-plugin-react-compiler` не був підключений; `withRedact` був заглушкою; прапорці D3 жили в глобальному `Zustand` | Увімкнено реальний `reactCompiler: true`, видалено `withRedact`, стейт графів ізольовано, дерево БЗ синхронізовано з `sessionStorage` |
+
+---
+
+## 2. Мульти-темна / Multi-Tenant система токенів (`Design Tokens v2`) і Dual-Theme `Shiki`
+
+Одного перемикача `Light / Dark` недостатньо, коли проєкту потрібні різні фронтенд-теми (`Warm Paper`, `Graphite`, `Sepia`) та готовність до потенційної `multi-tenant` кастомізації. Матриця `packages/ui/src/styles/globals.css` перебудована за трьома принципами:
+
+1. **Семантичні поверхні та статуси:** додано `--surface-subtle`, `--surface-elevated`, `--popover`, `--success`, `--warning`, `--info`, `--destructive`, `--chart-1..4` та `--code-bg / --code-header / --code-border`. Компоненти `@repo/ui` (`Badge`, `Callout`) і всі SVG/D3-діаграми читають виключно `hsl(var(--...))`.
+2. **Незалежні осі тем (`class="dark"` x `data-palette="..."`):** нова палітра або клієнтський бренд додається перевизначенням ~20 HSL-змінних у CSS без правок у React-компонентах.
+3. **Чистий Tailwind Preset та Dual-Theme `Shiki`:** пакет `@repo/ui` більше не сканує `../../apps/web`, а експортує `@repo/ui/tailwind.config` як незалежний `preset`. А `Shiki v4` генерує парні CSS-змінні (`github-light-default` + `github-dark-default`, `defaultColor: false`), перемикаючи теми за `0 мс` при `0 КБ` клієнтського JS.
+
+---
+
+## 3. RSC-дієта головної сторінки та масштабування `Cmd+K` за 100+ конспектів
+
+Ми усунули дві класичні пастки Next.js App Router:
+
+- **Пастка 1 — Серіалізація індексу пошуку в кореневому `layout.tsx`:** раніше масив усіх статей і підзаголовків `h2/h3` вшивався в початковий HTML і RSC-пейлоад **кожної** сторінки, навіть якщо відвідувач читав лише резюме.
+- **Пастка 2 — Імпорт мультимовних словників у `'use client'` компоненти:** імпорт `AUTHOR_PROFILE` або `TECH_RADAR_DATA` всередині клієнтських секцій змушував бандлер пакувати тексти англійською, українською та російською одночасно.
+
+```typescript title="apps/web/src/app/search-index/[locale]/route.ts"
+export const dynamic = 'force-static'
+
+export function generateStaticParams() {
+  return SUPPORTED_LOCALES.map((locale) => ({ locale }))
+}
+
+export async function GET(_request: Request, context: RouteContext) {
+  const { locale } = await context.params
+  // Пререндериться під час збірки у статичний JSON (0 CPU в рантаймі, 0 КБ у початковому HTML)
+  return NextResponse.json({
+    items: getKnowledgeSearchIndex(safeLocale),
+    popularTags: getPopularTags(safeLocale, 14),
+  })
+}
+```
+
+Тепер `WorkfolioHeroSection`, `WorkfolioProjectsSection`, `WorkfolioExperienceSection` та `WorkfolioFooter` працюють як справжні **Server Components**, нарізаючи лише активну локаль на сервері та передаючи інтерактивність у крихітні клієнтські острови (включно з `FooterSseStatus`, що коректно закриває `EventSource` на `pagehide` для миттєвого мобільного `bfcache`). А клієнт `search-index-client.ts` підвантажує `/search-index/${locale}` при наведенні на кнопку пошуку або натисканні `Cmd+K`.
+
+---
+
+## 4. Серверний AST-парсер Markdown/MDX (`gray-matter` + `remark`)
+
+Порядковий `RegExp`-парсер замінено на стандартний серверний конвеєр `gray-matter` + `unified().use(remarkParse).use(remarkGfm)`:
+- Рекурсивно транслює `mdast`-дерево у серіалізовані блоки `MdxBlock` та інлайн-вузли `MdxInlineNode` (підтримка вкладеного коду та списків усередині `> [!TIP]` / `[!WARNING]`, вкладеного форматування всередині посилань, нативних зображень `![Підпис](/img.webp)` та пропсів кастомних компонентів `<NestAiMcpDiagram defaultMode="ai" />`).
+- `MdxArticleRenderer` паралельно підсвічує всі блоки коду (включно з вкладеними) через `Promise.all` + `Shiki`, зберігаючи **`0 КБ` клієнтського парсера в браузері**.
+
+---
+
+## 5. Криптографічна верифікація `HS256` JWT на Edge та чистота стейту
+
+Раніше `apps/web/src/proxy.ts` перевіряв лише формат `token?.split('.').length !== 3`, покладаючись на `NestJS` `JwtRolesGuard` для `/api/*`. Проте оскільки `.mdx`-конспекти віддаються як статичний `SSG`, підроблена вручну в DevTools кука `kb_access_token=a.b.c` могла обійти поверхневу перевірку.
+
+Тепер `verifyEdgeJwtHs256` у `apps/web/src/lib/edge-jwt.ts` (зі спільними `KB_ACCESS_COOKIE_NAME` та `resolveJwtSecret` із `@repo/shared-schemas`) використовує нативний для Edge Runtime **Web Crypto API (`crypto.subtle`)** без жодної зовнішньої залежності (`0 КБ`):
+1. Перевіряє валідність Base64URL, алгоритм `alg === 'HS256'` та термін дії `payload.exp * 1000 > Date.now()`.
+2. Кешує імпортований ключ `CryptoKey` у межах Edge-ізолята та за `< 0.2 мс` перевіряє підпис `HMAC-SHA256` у константний час (`crypto.subtle.verify`), автоматично очищуючи биту або прострочену куку при редіректі.
+
+> [!NOTE]
+> **Наступний крок на етапі бекенду:** під час подальшого розвитку `apps/api` ця схема буде доповнена парою короткоживучого `Access` (`15m`) + `Refresh` (`7d`) токенів із можливістю миттєвого відкликання сесій.
+
+Паралельно в `next.config.ts` увімкнено справжній **`reactCompiler: true`** (`babel-plugin-react-compiler`), видалено бутафорську обгортку `withRedact()`, очищено `ThemeProvider` від перевизначення `console.error`, перенесено локальний стан графів `D3.js` всередину самих компонентів і додано безпечну синхронізацію розгорнутих папок `KnowledgeSidebar` із `sessionStorage`.

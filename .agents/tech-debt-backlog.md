@@ -51,6 +51,13 @@
 - [x] **Живая интерактивная секция `Engineering Backlog, Tech Debt & Trade-offs` (`#roadmap` — `engineering-roadmap.ts` + `EngineeringRoadmapBoard`):** открытая доска идей, техдолга и осознанно отложенных решений с аргументами «За» и «Ограничения / Компромиссы» прямо на главной странице (интегрирована в `PageSectionNavigator` `05` и глобальный поиск `Cmd+K`).
 - [x] **Флагманская статья в разделе `Этот проект` (`this-project/knowledge-engine/three-tier-mdx-cmdk-architecture.{en,uk,ru}.mdx`)** + выделение переиспользуемого агентского скилла `.agents/skills/mobile-first-workfolio/SKILL.md`.
 
+### ✅ Этап 5.5 (Pre-UI v2 Hardening): Мульти-темные токены, RSC-диета, серверный AST MDX и Edge Web Crypto JWT
+
+- [x] **Design Tokens v2 & Dual-Theme `Shiki` (`packages/ui/src/styles/globals.css`, `shiki-highlighter.ts`):** расширена семантическая матрица токенов (`--surface-subtle`, `--surface-elevated`, `--popover`, `--success`, `--warning`, `--info`, `--destructive`, `--chart-1..4`, `--code-*`), заложена поддержка палитр/тенантов `[data-palette="..."]`, устранена инверсия зависимостей в `@repo/ui/tailwind.config` (`preset`), а `Shiki v4` переведён на Dual-Theme CSS-переменные (`0 KB` client JS).
+- [x] **RSC-диета и масштабирование `Cmd+K` за 100+ конспектов:** поисковый индекс вынесен из корневого `layout.tsx` в статический SSG-роут `/search-index/[locale]` (`0 KB` в начальном HTML, ленивый prefetch в `search-index-client.ts`); секции главной страницы переведены в Server Components с нарезкой только активной локали и микро-островами интерактивности.
+- [x] **Серверный AST-парсер Markdown/MDX (`gray-matter` + `unified` + `remark-parse` + `remark-gfm`):** заменён построчный `RegExp`-сканер с сохранением `0 KB` клиентского JS, поддержкой вложенного кода в callout/списках, нативных изображений `![alt](url)` и пропсов кастомных MDX-виджетов.
+- [x] **Крипто-проверка `HS256` JWT на Edge (`apps/web/src/proxy.ts`) и чистота ядра:** внедрена проверка `HMAC-SHA256` и `exp` через Edge Web Crypto (`crypto.subtle`), включён реальный `reactCompiler: true` в `next.config.ts`, удалён стаб `withRedact`, изолированы локальные состояния D3-графов и добавлена синхронизация `expandedKbFolders` с `sessionStorage`. Оформлена трёхъязычная статья `this-project/frontend-architecture/tokens-rsc-edge-hardening.{en,uk,ru}.mdx`.
+
 ### ⏳ Этап 6 (Next Epoch — UI v2): Визуальный редизайн в аутентичной эстетике Notion Workfolio
 
 - [ ] **Notion Workfolio Authentic Visual Redesign (`UI v2`):** перевести визуальный язык с классических SaaS-карточек ближе к оригинальному Notion Workfolio (обложка и аватар страницы в стиле Notion, мягкая палитра «тёплой бумаги и чернил» для Light/Dark, облегчённые списки/таблицы без тяжёлых рамок, спокойная типографика) поверх уже готового архитектурного ядра Этапов 1–5.
@@ -61,11 +68,13 @@
 
 ### 1. Performance & Lighthouse 100/100 (`apps/web`)
 
-- [ ] **SSE Lifecycle & Back/Forward Cache (`bfcache`):** В `apps/web/src/components/workfolio-footer.tsx` закрывать соединение `EventSource('/api/telemetry/stream')` по браузерному событию `pagehide` и переподключать на `pageshow`, чтобы браузер беспрепятственно помещал страницу в `bfcache`.
-- [ ] **Production Bundle Analysis:** Добавить `@next/bundle-analyzer` в `apps/web/next.config.ts` для контроля веса клиентских чанков `D3.js` и `TanStack Table`.
+- [x] **SSE Lifecycle & Back/Forward Cache (`bfcache`):** В клиентском острове `apps/web/src/components/layout/footer-sse-status.tsx` соединение `EventSource('/api/telemetry/stream')` закрывается по событию `pagehide` и переподключается на `pageshow`, обеспечивая совместимость с мобильным `bfcache`.
+- [x] **Production Bundle Analysis & React Compiler:** В `apps/web/next.config.ts` подключены `@next/bundle-analyzer` (`ANALYZE=true`), `babel-plugin-react-compiler` (`reactCompiler: true`) и `optimizePackageImports`.
 
 ### 2. Security & Production Hardening (`apps/web`, `apps/api`)
 
+- [x] **Edge Cryptographic JWT Verification (`HS256`):** В `apps/web/src/proxy.ts` реализована проверка подписи `HMAC-SHA256` и `exp` через `crypto.subtle` с авто-очисткой битых/просроченных кук.
+- [ ] **Access + Refresh JWT Rotation (Backend Milestone):** Дополнить stateless Edge-верификацию парой короткоживущего `Access` (`15m`) + ротируемого `HttpOnly Refresh` (`7d`) токенов с хранением и отзывом сессий в `VisitorSession` (`PostgreSQL`).
 - [ ] **HTTP Security Headers (CSP & HSTS):** Настроить строгие заголовки `Content-Security-Policy`, `Strict-Transport-Security`, `X-Content-Type-Options: nosniff` и `Referrer-Policy` в `apps/web/next.config.ts` (и `helmet` в `apps/api`).
 - [ ] **Rate Limiting:** Подключить `@nestjs/throttler` на эндпоинт `POST /api/auth/login` в `apps/api` для защиты от брутфорса паролей (`ADMIN` / `GUEST`).
 

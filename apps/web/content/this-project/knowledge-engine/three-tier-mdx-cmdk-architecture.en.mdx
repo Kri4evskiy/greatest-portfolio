@@ -10,7 +10,7 @@ publishedAt: "2026-11-06"
 order: 1
 tldr:
   - "Structured content into a strict 3-tier hierarchy (`Topic -> Subtopic Tabs -> Articles`) powered by a recursive catch-all route `/[locale]/knowledge-base/[...slug]`."
-  - "Moved syntax highlighting (`Shiki`) and Markdown AST parsing strictly to the server (`0 KB` client JS), shipping only a lightweight metadata & heading index to `CommandPaletteModal` (`Cmd+K`)."
+  - "Moved syntax highlighting (`Shiki` Dual-Theme CSS variables) and Markdown AST parsing (`gray-matter` + `remark`) strictly to the server (`0 KB` client JS), exposing a static SSG `/search-index/[locale]` endpoint fetched on demand by `CommandPaletteModal` (`Cmd+K`)."
   - "Embedded a transparent Engineering Backlog & Trade-offs board (`#roadmap`) on the home page so product ideas, tech debt, and YAGNI decisions are documented with clear engineering arguments."
 ---
 
@@ -27,11 +27,11 @@ Flat lists break down as soon as a personal knowledge base grows beyond 15–20 
 > [!TIP]
 > Clicking any Topic or Subtopic row in the left sidebar simultaneously expands its children and opens the corresponding Hub overview, while clicking the chevron toggles the branch in-place without leaving your current note.
 
-## 2. Zero-Client-JS Shiki & Lightweight RSC Search Index
+## 2. Zero-Client-JS `remark` AST, Dual-Theme `Shiki` & Static `Cmd+K` Endpoint
 
-Syntax highlighters are notoriously heavy when shipped to the browser. Instead of hydrating Prism or Highlight.js on the client, our `MdxArticleRenderer` invokes `Shiki` asynchronously inside React Server Components (`RSC`) with dual CSS-variable themes (`github-light` / `github-dark`).
+Syntax highlighters and Markdown parsers are heavy when shipped to the browser. Instead of hydrating client-side bundles, `mdx-content.ts` parses frontmatter via `gray-matter` and builds a recursive `mdast` tree via `unified` + `remark-parse` + `remark-gfm` strictly on the server, while `MdxArticleRenderer` invokes `Shiki v4` with dual CSS-variable themes (`github-light-default` / `github-dark-default`, `defaultColor: false`).
 
-Similarly, to power instant `< 5ms` global `Cmd+K` search across titles, `#tags`, and `h2 / h3` anchors without bloating HTML hydration payloads, `getKnowledgeSearchIndex` strips all Markdown AST blocks on the server before passing props to `CommandPaletteModal`:
+Similarly, to power instant `< 5ms` global `Cmd+K` search across 100+ articles without adding a single byte to initial page HTML, `app/search-index/[locale]/route.ts` pre-renders the search index at build time (`force-static`) and `CommandPaletteModal` fetches + caches it on hover or `Cmd+K`:
 
 ```typescript title="apps/web/src/lib/mdx-content.ts"
 export function getKnowledgeSearchIndex(locale: SupportedLocale): KnowledgeSearchItem[] {
@@ -57,5 +57,5 @@ export function getKnowledgeSearchIndex(locale: SupportedLocale): KnowledgeSearc
 Rather than mixing visual experimentation with core routing and security plumbing, we executed Phases 1–5 in strict architectural order and surfaced an interactive **Engineering Backlog, Tech Debt & Trade-offs** board (`/#roadmap`) directly on the Workfolio home page:
 
 - **Planned Next (`P1`):** Authentic **Notion Workfolio Visual Redesign (UI v2)** — applying warmer paper/ink aesthetics and borderless Notion views safely on top of our completed routing and state foundation.
-- **Tracked Tech Debt:** `EventSource` `pagehide/pageshow` lifecycle for mobile `bfcache`, plus `CSP / HSTS` headers and `@nestjs/throttler` before public cloud deployment.
+- **Tracked Tech Debt:** Strict `CSP / HSTS` headers, `@nestjs/throttler`, and `Access + Refresh` JWT rotation before public cloud deployment.
 - **Consciously Deferred (`Trade-offs`):** Rejecting a database-backed WYSIWYG CMS and paid LLM RAG vector search while deterministic `Cmd+K` over Git-versioned `.mdx` delivers `0ms` offline reads at `$0/month`.
