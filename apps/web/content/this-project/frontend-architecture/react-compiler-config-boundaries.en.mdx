@@ -1,0 +1,77 @@
+---
+title: "React 19 Compiler in Production: Next.js 16 Config, use no memo Isolation & Mutability Boundaries"
+sidebarLabel: "React Compiler & use no memo"
+summary: "How React 19 Compiler is configured and architected in this project: compilationMode: 'infer' and panicThreshold: 'none' in next.config.ts, React Hook Form (useWatch) compatibility, and isolating TanStack Table via 'use no memo'."
+category: "this-project"
+format: "deep-dive"
+tags: ["react-compiler", "react-19", "nextjs", "tanstack-table", "react-hook-form", "performance"]
+readingTime: "6 min"
+publishedAt: "2026-11-10"
+order: 3
+tldr:
+  - "Configures `compilationMode: 'infer'` (enabling Next.js's fast SWC/Rust pre-filter before invoking Babel) and `panicThreshold: 'none'` in `apps/web/next.config.ts`."
+  - "Uses `useWatch({ control, name })` instead of the incompatible `useForm().watch()` method in `GuestPassModal` so the entire auth modal stays compiler-optimized."
+  - "Isolates `useReactTable` (`@tanstack/react-table`) inside a child `DesktopTechRadarDataTable` marked with `'use no memo'`, allowing the parent `TechRadarTable`, mobile cards, and `Dialog` to be auto-memoized without manual `useMemo` hooks."
+---
+
+## 1. `reactCompiler` Configuration in `apps/web/next.config.ts`
+
+In Next.js 16, `reactCompiler` accepts a typed `ReactCompilerOptions` object:
+
+```typescript title="apps/web/next.config.ts"
+const nextConfig: NextConfig = {
+  reactStrictMode: true,
+  reactCompiler: {
+    compilationMode: 'infer',
+    panicThreshold: 'none',
+  },
+}
+```
+
+### Why These Options Were Chosen
+
+| Option | Value | Engineering Rationale |
+| :--- | :---: | :--- |
+| **`compilationMode`** | `'infer'` | Next.js runs its own Rust/SWC heuristics before invoking `babel-plugin-react-compiler`, compiling only files that define PascalCase JSX components or `use*` hooks and skipping pure server/utility modules (`mdx-content.ts`, `edge-jwt.ts`) |
+| **`panicThreshold`** | `'none'` | Guarantees resilient CI/CD builds: if the compiler encounters a third-party hook with interior mutability, it safely skips optimizing that function instead of failing `next build` |
+
+---
+
+## 2. Built-in `knownIncompatible` Registry & `React Hook Form`
+
+Inside `babel-plugin-react-compiler` (`DefaultModuleTypeProvider`), the compiler maintains a registry of third-party APIs that rely on interior mutability:
+
+1. **`react-hook-form` (`useForm().watch`)**: because `watch()` mutates internal subscriptions without changing its function identity, the compiler flags it as `knownIncompatible`. In `apps/web/src/features/auth/guest-pass-modal.tsx`, we subscribe via **`useWatch({ control, name: 'visitorType' })`**, keeping `GuestPassModal` 100% compatible with automatic memoization.
+2. **`@tanstack/react-table` (`useReactTable`)**: returns a single stable table reference and mutates its properties in place. Whenever `useReactTable` is called inside a component, the compiler bails out of optimizing that entire component function.
+
+---
+
+## 3. `'use no memo'` Boundary Isolation in `TechRadarTable`
+
+`TechRadarTable` (`apps/web/src/components/workfolio/tech-radar-table.tsx`) renders the search bar, category filters, mobile card stack (`< md`), desktop table (`>= md`), and the ADR inspector `Dialog`.
+
+Calling `useReactTable` directly at the top of `TechRadarTable` would cause the compiler to skip the entire 360-line component. By extracting the desktop `<table />` into a dedicated child component with `'use no memo'`, only the thin table wrapper opts out:
+
+```tsx title="apps/web/src/components/workfolio/tech-radar-table.tsx"
+function DesktopTechRadarDataTable({ data, columns, emptyResultLabel }: DesktopTechRadarDataTableProps) {
+  'use no memo'
+
+  const [sorting, setSorting] = useState<SortingState>([{ id: 'adrNumber', desc: false }])
+  const table = useReactTable({
+    data,
+    columns,
+    state: { sorting },
+    onSortingChange: setSorting,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+  })
+
+  return (
+    <div className="hidden overflow-x-auto rounded-lg border border-border bg-card shadow-sm md:block">
+      {/* TanStack Table header and row rendering */}
+    </div>
+  )
+}
+```
+
+With `useReactTable` isolated inside `DesktopTechRadarDataTable`, the parent `TechRadarTable` needs zero manual `useMemo` hooks around `filteredData`, `activeDialogItem`, or `columns`—`React 19 Compiler` caches each derived value and JSX subtree automatically via `useMemoCache` slots.

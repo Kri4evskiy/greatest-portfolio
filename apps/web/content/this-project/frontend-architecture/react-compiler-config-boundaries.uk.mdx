@@ -1,0 +1,77 @@
+---
+title: "React 19 Compiler у продакшені: налаштування Next.js 16, ізоляція use no memo та межі мутабельності"
+sidebarLabel: "React Compiler та use no memo"
+summary: "Як налаштований і впроваджений React 19 Compiler у цьому проєкті: опції compilationMode: 'infer' та panicThreshold: 'none' у next.config.ts, сумісність із React Hook Form (useWatch) та ізоляція TanStack Table через 'use no memo'."
+category: "this-project"
+format: "deep-dive"
+tags: ["react-compiler", "react-19", "nextjs", "tanstack-table", "react-hook-form", "performance"]
+readingTime: "6 хв"
+publishedAt: "2026-11-10"
+order: 3
+tldr:
+  - "В `apps/web/next.config.ts` явно задані `compilationMode: 'infer'` (що вмикає швидкий SWC/Rust пре-фільтр Next.js перед викликом Babel) та `panicThreshold: 'none'` для відмовостійкої збірки."
+  - "У `GuestPassModal` замість несумісного методу `watch()` із `react-hook-form` використовується хук `useWatch({ control, name })`, що зберігає повну авто-мемоїзацію форми."
+  - "У `TechRadarTable` виклик `useReactTable` (`@tanstack/react-table`) ізольований у дочірньому компоненті `DesktopTechRadarDataTable` із директивою `'use no memo'`, щоб батьківський компонент, мобільні картки та `Dialog` компілювалися без ручних `useMemo`."
+---
+
+## 1. Конфігурація `reactCompiler` в `apps/web/next.config.ts`
+
+У Next.js 16 налаштування `reactCompiler` приймає типізований об'єкт `ReactCompilerOptions`. У проєкті зафіксована конфігурація:
+
+```typescript title="apps/web/next.config.ts"
+const nextConfig: NextConfig = {
+  reactStrictMode: true,
+  reactCompiler: {
+    compilationMode: 'infer',
+    panicThreshold: 'none',
+  },
+}
+```
+
+### Чому обрані саме ці параметри
+
+| Параметр | Значення | Інженерне обґрунтування |
+| :--- | :---: | :--- |
+| **`compilationMode`** | `'infer'` | Next.js застосовує власні швидкі евристики на Rust/SWC до виклику `babel-plugin-react-compiler`: компілятор запускається лише для файлів із PascalCase-компонентами (JSX) та хуками `use*`, не витрачаючи час збірки на утиліти (`mdx-content.ts`, `edge-jwt.ts`) |
+| **`panicThreshold`** | `'none'` | При зустрічі зі складним мутабельним SDK компілятор безпечно пропускає оптимізацію конкретної функції замість аварійної зупинки `next build` у CI/CD |
+
+---
+
+## 2. Внутрішня таблиця `knownIncompatible` та `React Hook Form`
+
+Усередині `babel-plugin-react-compiler` (`DefaultModuleTypeProvider`) зашитий список хуків сторонніх бібліотек, які повертають нестабільні або мутабельні об'єкти:
+
+1. **`react-hook-form` (`useForm().watch`)**: метод `watch()` мутує внутрішні підписки без зміни посилання, тому компілятор позначає його як `knownIncompatible`. В `apps/web/src/features/auth/guest-pass-modal.tsx` ми використовуємо сумісний хук **`useWatch({ control, name: 'visitorType' })`**, завдяки чому вся модалка `GuestPassModal` успішно проходить авто-мемоїзацію.
+2. **`@tanstack/react-table` (`useReactTable`)**: повертає стабільне посилання на об'єкт таблиці та мутує його поля на місці (`interior mutability`). При виявленні `useReactTable` компілятор вимикає оптимізацію для **всієї функції-компонента**, в якій викликано цей хук.
+
+---
+
+## 3. Патерн граничної ізоляції `'use no memo'` в `TechRadarTable`
+
+Компонент `TechRadarTable` (`apps/web/src/components/workfolio/tech-radar-table.tsx`) поєднує пошук, фільтр категорій, мобільний стек карток (`< md`), десктопну таблицю (`>= md`) та модальне вікно інспектора `ADR`.
+
+Якщо викликати `useReactTable` просто в тілі `TechRadarTable`, компілятор пропустить увесь 360-рядковий компонент. Щоб зберегти автоматичну мемоїзацію (`Memo ✨`) для фільтрів, мобільних карток і `Dialog`, сам `useReactTable` винесений у вузький дочірній компонент із явною директивою `'use no memo'`:
+
+```tsx title="apps/web/src/components/workfolio/tech-radar-table.tsx"
+function DesktopTechRadarDataTable({ data, columns, emptyResultLabel }: DesktopTechRadarDataTableProps) {
+  'use no memo'
+
+  const [sorting, setSorting] = useState<SortingState>([{ id: 'adrNumber', desc: false }])
+  const table = useReactTable({
+    data,
+    columns,
+    state: { sorting },
+    onSortingChange: setSorting,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+  })
+
+  return (
+    <div className="hidden overflow-x-auto rounded-lg border border-border bg-card shadow-sm md:block">
+      {/* Рендер заголовків та рядків TanStack Table */}
+    </div>
+  )
+}
+```
+
+Завдяки цьому розділенню в батьківському `TechRadarTable` повністю видалені ручні обгортки `useMemo` навколо `filteredData`, `activeDialogItem` і `columns` — їхнє кешування по слотах `useMemoCache` бере на себе `React 19 Compiler`.

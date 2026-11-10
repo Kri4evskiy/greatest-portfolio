@@ -14,7 +14,10 @@ const nextConfig: NextConfig = {
   ...(process.env.DOCKER_STANDALONE === 'true' ? { output: 'standalone' } : {}),
   ...(process.env.NEXT_DIST_DIR ? { distDir: process.env.NEXT_DIST_DIR } : {}),
   reactStrictMode: true,
-  reactCompiler: true,
+  reactCompiler: {
+    compilationMode: 'infer',
+    panicThreshold: 'none',
+  },
   transpilePackages: ['@repo/ui', '@repo/shared-schemas'],
   experimental: {
     optimizePackageImports: ['lucide-react', 'd3', '@repo/ui'],

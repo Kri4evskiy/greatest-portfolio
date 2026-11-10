@@ -12,7 +12,7 @@ import {
 } from '@tanstack/react-table'
 import { ArrowUpDown, BookOpenCheck, Compass, Layers, Search, Sparkles } from 'lucide-react'
 import { useTranslations } from 'next-intl'
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { trackEvent } from '@/lib/analytics'
 import { useUIStore } from '@/store/use-ui-store'
 
@@ -25,6 +25,73 @@ const CATEGORIES: ReadonlyArray<TechCategory | 'ALL'> = [
   'Architecture',
 ]
 
+interface DesktopTechRadarDataTableProps {
+  data: TechRadarItem[]
+  columns: ColumnDef<TechRadarItem>[]
+  emptyResultLabel: string
+}
+
+/**
+ * Isolated TanStack Table v8 boundary:
+ * `useReactTable` returns a stable object reference with interior mutability,
+ * which `babel-plugin-react-compiler` marks as `knownIncompatible`.
+ * Isolating it here with `'use no memo'` allows the parent `TechRadarTable`
+ * (filters, mobile card stack, and ADR dialog) to be fully compiled by React Compiler.
+ */
+function DesktopTechRadarDataTable({ data, columns, emptyResultLabel }: DesktopTechRadarDataTableProps) {
+  'use no memo'
+
+  const [sorting, setSorting] = useState<SortingState>([{ id: 'adrNumber', desc: false }])
+
+  const table = useReactTable({
+    data,
+    columns,
+    state: {
+      sorting,
+    },
+    onSortingChange: setSorting,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+  })
+
+  return (
+    <div className="hidden overflow-x-auto rounded-lg border border-border bg-card shadow-sm md:block">
+      <table className="w-full border-collapse text-left text-sm">
+        <thead>
+          {table.getHeaderGroups().map((headerGroup) => (
+            <tr key={headerGroup.id} className="border-b border-border bg-muted/40">
+              {headerGroup.headers.map((header) => (
+                <th key={header.id} className="px-3.5 py-2.5 font-mono text-xs font-semibold text-muted-foreground">
+                  {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
+                </th>
+              ))}
+            </tr>
+          ))}
+        </thead>
+        <tbody className="divide-y divide-border/70">
+          {table.getRowModel().rows.length > 0 ? (
+            table.getRowModel().rows.map((row) => (
+              <tr key={row.id} className="transition-colors hover:bg-muted/30">
+                {row.getVisibleCells().map((cell) => (
+                  <td key={cell.id} className="px-3.5 py-3 align-middle">
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  </td>
+                ))}
+              </tr>
+            ))
+          ) : (
+            <tr>
+              <td colSpan={columns.length} className="py-8 text-center text-sm text-muted-foreground">
+                {emptyResultLabel}
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
 export function TechRadarTable({ items: localizedItems }: { items: readonly TechRadarItem[] }) {
   const t = useTranslations('TechRadar')
 
@@ -36,135 +103,116 @@ export function TechRadarTable({ items: localizedItems }: { items: readonly Tech
   const openAdrInspector = useUIStore((s) => s.openAdrInspector)
   const closeAdrInspector = useUIStore((s) => s.closeAdrInspector)
 
-  const [sorting, setSorting] = useState<SortingState>([{ id: 'adrNumber', desc: false }])
+  const activeDialogItem = selectedAdrItem
+    ? (localizedItems.find((item) => item.id === selectedAdrItem.id) ?? selectedAdrItem)
+    : null
 
-  const activeDialogItem = useMemo(() => {
-    if (!selectedAdrItem) return null
-    return localizedItems.find((item) => item.id === selectedAdrItem.id) ?? selectedAdrItem
-  }, [localizedItems, selectedAdrItem])
-
-  const filteredData = useMemo(() => {
-    const normalizedQuery = searchQuery.trim().toLowerCase()
-    return localizedItems.filter((item) => {
-      const matchesCategory = categoryFilter === 'ALL' || item.category === categoryFilter
-      if (!matchesCategory) return false
-      if (!normalizedQuery) return true
-      return (
-        item.name.toLowerCase().includes(normalizedQuery) ||
-        item.summary.toLowerCase().includes(normalizedQuery) ||
-        item.category.toLowerCase().includes(normalizedQuery)
-      )
-    })
-  }, [categoryFilter, localizedItems, searchQuery])
-
-  const columns = useMemo<ColumnDef<TechRadarItem>[]>(
-    () => [
-      {
-        accessorKey: 'adrNumber',
-        header: ({ column }) => (
-          <button
-            type="button"
-            onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
-            className="flex items-center gap-1 font-mono text-xs font-semibold text-muted-foreground hover:text-foreground"
-          >
-            <span>ADR #</span>
-            <ArrowUpDown className="h-3 w-3" />
-          </button>
-        ),
-        cell: ({ row }) => (
-          <span className="font-mono text-xs text-muted-foreground">
-            #{String(row.original.adrNumber).padStart(2, '0')}
-          </span>
-        ),
-      },
-      {
-        accessorKey: 'name',
-        header: t('colTech'),
-        cell: ({ row }) => (
-          <div>
-            <div className="font-medium text-sm text-foreground">{row.original.name}</div>
-            <div className="text-xs text-muted-foreground line-clamp-1">{row.original.summary}</div>
-          </div>
-        ),
-      },
-      {
-        accessorKey: 'category',
-        header: t('colDomain'),
-        cell: ({ row }) => (
-          <Badge variant="secondary" className="font-mono text-[11px] whitespace-nowrap">
-            {row.original.category}
-          </Badge>
-        ),
-      },
-      {
-        accessorKey: 'level',
-        header: t('colStatus'),
-        cell: ({ row }) => {
-          const level = row.original.level
-          const variant = level === 'Core' ? 'success' : level === 'Production' ? 'default' : 'warning'
-          return (
-            <Badge variant={variant} className="font-mono text-[10px]">
-              {level}
-            </Badge>
-          )
-        },
-      },
-      {
-        accessorKey: 'experienceYears',
-        header: ({ column }) => (
-          <button
-            type="button"
-            onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
-            className="flex items-center gap-1 font-mono text-xs font-semibold text-muted-foreground hover:text-foreground"
-          >
-            <span>{t('colExp')}</span>
-            <ArrowUpDown className="h-3 w-3" />
-          </button>
-        ),
-        cell: ({ row }) => (
-          <span className="font-mono text-xs font-medium">
-            {t('yearsSuffix', { years: row.original.experienceYears })}
-          </span>
-        ),
-      },
-      {
-        id: 'actions',
-        header: () => <span className="sr-only">ADR</span>,
-        cell: ({ row }) => (
-          <div className="text-right">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                openAdrInspector(row.original)
-                trackEvent('adr_popover_inspected', {
-                  adrNumber: row.original.adrNumber,
-                  name: row.original.name,
-                })
-              }}
-              className="h-7 gap-1 font-mono text-xs"
-            >
-              <BookOpenCheck className="h-3.5 w-3.5" />
-              <span>{t('inspectBtn')}</span>
-            </Button>
-          </div>
-        ),
-      },
-    ],
-    [openAdrInspector, t],
-  )
-
-  const table = useReactTable({
-    data: filteredData,
-    columns,
-    state: {
-      sorting,
-    },
-    onSortingChange: setSorting,
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
+  const normalizedQuery = searchQuery.trim().toLowerCase()
+  const filteredData = localizedItems.filter((item) => {
+    const matchesCategory = categoryFilter === 'ALL' || item.category === categoryFilter
+    if (!matchesCategory) return false
+    if (!normalizedQuery) return true
+    return (
+      item.name.toLowerCase().includes(normalizedQuery) ||
+      item.summary.toLowerCase().includes(normalizedQuery) ||
+      item.category.toLowerCase().includes(normalizedQuery)
+    )
   })
+
+  const columns: ColumnDef<TechRadarItem>[] = [
+    {
+      accessorKey: 'adrNumber',
+      header: ({ column }) => (
+        <button
+          type="button"
+          onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+          className="flex items-center gap-1 font-mono text-xs font-semibold text-muted-foreground hover:text-foreground"
+        >
+          <span>ADR #</span>
+          <ArrowUpDown className="h-3 w-3" />
+        </button>
+      ),
+      cell: ({ row }) => (
+        <span className="font-mono text-xs text-muted-foreground">
+          #{String(row.original.adrNumber).padStart(2, '0')}
+        </span>
+      ),
+    },
+    {
+      accessorKey: 'name',
+      header: t('colTech'),
+      cell: ({ row }) => (
+        <div>
+          <div className="font-medium text-sm text-foreground">{row.original.name}</div>
+          <div className="text-xs text-muted-foreground line-clamp-1">{row.original.summary}</div>
+        </div>
+      ),
+    },
+    {
+      accessorKey: 'category',
+      header: t('colDomain'),
+      cell: ({ row }) => (
+        <Badge variant="secondary" className="font-mono text-[11px] whitespace-nowrap">
+          {row.original.category}
+        </Badge>
+      ),
+    },
+    {
+      accessorKey: 'level',
+      header: t('colStatus'),
+      cell: ({ row }) => {
+        const level = row.original.level
+        const variant = level === 'Core' ? 'success' : level === 'Production' ? 'default' : 'warning'
+        return (
+          <Badge variant={variant} className="font-mono text-[10px]">
+            {level}
+          </Badge>
+        )
+      },
+    },
+    {
+      accessorKey: 'experienceYears',
+      header: ({ column }) => (
+        <button
+          type="button"
+          onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+          className="flex items-center gap-1 font-mono text-xs font-semibold text-muted-foreground hover:text-foreground"
+        >
+          <span>{t('colExp')}</span>
+          <ArrowUpDown className="h-3 w-3" />
+        </button>
+      ),
+      cell: ({ row }) => (
+        <span className="font-mono text-xs font-medium">
+          {t('yearsSuffix', { years: row.original.experienceYears })}
+        </span>
+      ),
+    },
+    {
+      id: 'actions',
+      header: () => <span className="sr-only">ADR</span>,
+      cell: ({ row }) => (
+        <div className="text-right">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              openAdrInspector(row.original)
+              trackEvent('adr_popover_inspected', {
+                adrNumber: row.original.adrNumber,
+                name: row.original.name,
+              })
+            }}
+            className="h-7 gap-1 font-mono text-xs"
+          >
+            <BookOpenCheck className="h-3.5 w-3.5" />
+            <span>{t('inspectBtn')}</span>
+          </Button>
+        </div>
+      ),
+    },
+  ]
 
   return (
     <section id="tech-radar" className="scroll-mt-20 space-y-4">
@@ -215,12 +263,11 @@ export function TechRadarTable({ items: localizedItems }: { items: readonly Tech
 
       {/* Mobile Card View (< md) — Zero horizontal table scroll */}
       <div className="grid gap-3 md:hidden">
-        {table.getRowModel().rows.length > 0 ? (
-          table.getRowModel().rows.map((row) => {
-            const item = row.original
+        {filteredData.length > 0 ? (
+          filteredData.map((item) => {
             const levelVariant = item.level === 'Core' ? 'success' : item.level === 'Production' ? 'default' : 'warning'
             return (
-              <div key={row.id} className="rounded-lg border border-border bg-card p-3.5 shadow-sm">
+              <div key={item.id} className="rounded-lg border border-border bg-card p-3.5 shadow-sm">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-1.5">
                     <span className="font-mono text-xs font-semibold text-muted-foreground">
@@ -272,40 +319,7 @@ export function TechRadarTable({ items: localizedItems }: { items: readonly Tech
       </div>
 
       {/* Desktop Notion Database Table View (>= md) */}
-      <div className="hidden overflow-x-auto rounded-lg border border-border bg-card shadow-sm md:block">
-        <table className="w-full border-collapse text-left text-sm">
-          <thead>
-            {table.getHeaderGroups().map((headerGroup) => (
-              <tr key={headerGroup.id} className="border-b border-border bg-muted/40">
-                {headerGroup.headers.map((header) => (
-                  <th key={header.id} className="px-3.5 py-2.5 font-mono text-xs font-semibold text-muted-foreground">
-                    {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
-                  </th>
-                ))}
-              </tr>
-            ))}
-          </thead>
-          <tbody className="divide-y divide-border/70">
-            {table.getRowModel().rows.length > 0 ? (
-              table.getRowModel().rows.map((row) => (
-                <tr key={row.id} className="transition-colors hover:bg-muted/30">
-                  {row.getVisibleCells().map((cell) => (
-                    <td key={cell.id} className="px-3.5 py-3 align-middle">
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </td>
-                  ))}
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan={columns.length} className="py-8 text-center text-sm text-muted-foreground">
-                  {t('emptyResult')}
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      <DesktopTechRadarDataTable data={filteredData} columns={columns} emptyResultLabel={t('emptyResult')} />
 
       <Dialog
         open={activeDialogItem !== null}

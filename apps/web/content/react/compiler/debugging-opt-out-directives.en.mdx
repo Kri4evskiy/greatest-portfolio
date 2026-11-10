@@ -30,6 +30,6 @@ export function LegacyChartWrapper({ mutableInstance }: { mutableInstance: Exter
 
 | Directive / Mode | Effect | When to Use |
 | :--- | :--- | :--- |
-| Default (`infer` / `all`) | Compiles every valid component & hook | Greenfield Next.js 16 projects (our setup) |
-| `'use no memo'` | Skips compiling a specific function | Debugging a suspect third-party mutation bug |
-| `'use memo'` (`annotation` mode) | Opt-in compilation per component | Gradual migration of legacy 500k+ LOC codebases |
+| Default (`compilationMode: 'infer'`) | Next.js SWC pre-filter targets PascalCase components & `use*` hooks | Greenfield Next.js 16 projects (our setup) |
+| `'use no memo'` | Skips compiling a specific function (e.g. a `useReactTable` wrapper) | Isolating third-party hooks with interior mutability |
+| `'use memo'` (`compilationMode: 'annotation'`) | Opt-in compilation per component | Gradual migration of legacy 500k+ LOC codebases |

@@ -55,7 +55,10 @@ export function ProjectFilterList({ items, query }: { items: Project[]; query: s
 import type { NextConfig } from 'next'
 
 const nextConfig: NextConfig = {
-  reactCompiler: true,
+  reactCompiler: {
+    compilationMode: 'infer',
+    panicThreshold: 'none',
+  },
 }
 
 export default nextConfig

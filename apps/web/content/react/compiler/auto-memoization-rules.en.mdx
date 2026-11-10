@@ -55,7 +55,10 @@ At build time, the compiler caches `visible` **and** the resulting `<ul>` JSX no
 import type { NextConfig } from 'next'
 
 const nextConfig: NextConfig = {
-  reactCompiler: true,
+  reactCompiler: {
+    compilationMode: 'infer',
+    panicThreshold: 'none',
+  },
 }
 
 export default nextConfig
