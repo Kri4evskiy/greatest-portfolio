@@ -1,25 +1,33 @@
+import { KB_ACCESS_COOKIE_NAME } from '@repo/shared-schemas'
 import { type NextRequest, NextResponse } from 'next/server'
 import createMiddleware from 'next-intl/middleware'
 import { routing } from './i18n/routing'
+import { verifyEdgeJwtHs256 } from './lib/edge-jwt'
 
-const KB_ACCESS_COOKIE_NAME = 'kb_access_token'
 const handleI18nRouting = createMiddleware(routing)
 
 const PROTECTED_KB_REGEX = /^(?:\/(en|ua|ru))?\/knowledge-base(?:\/.*)?$/
 
-export function proxy(request: NextRequest): NextResponse {
+export async function proxy(request: NextRequest): Promise<NextResponse> {
   const { pathname } = request.nextUrl
   const kbMatch = pathname.match(PROTECTED_KB_REGEX)
 
   if (kbMatch) {
     const token = request.cookies.get(KB_ACCESS_COOKIE_NAME)?.value
-    if (token?.split('.').length !== 3) {
+    const isValid = await verifyEdgeJwtHs256(token)
+
+    if (!isValid) {
       const matchedLocale = kbMatch[1]
       const homePath = matchedLocale && matchedLocale !== routing.defaultLocale ? `/${matchedLocale}` : '/'
       const redirectUrl = new URL(homePath, request.url)
       redirectUrl.searchParams.set('unlock', 'knowledge-base')
       redirectUrl.searchParams.set('redirect', pathname)
-      return NextResponse.redirect(redirectUrl)
+
+      const response = NextResponse.redirect(redirectUrl)
+      if (token) {
+        response.cookies.delete(KB_ACCESS_COOKIE_NAME)
+      }
+      return response
     }
   }
 
@@ -27,5 +35,5 @@ export function proxy(request: NextRequest): NextResponse {
 }
 
 export const config = {
-  matcher: ['/((?!api|_next|_vercel|.*\\..*).*)'],
+  matcher: ['/((?!api|search-index|_next|_vercel|.*\\..*).*)'],
 }

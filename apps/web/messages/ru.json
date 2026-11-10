@@ -68,9 +68,9 @@
         "metrics": "0 XSS token leaks • <15ms Edge RBAC check"
       },
       "offline-first-redact-docker": {
-        "title": "IndexedDB Offline-First Cache, TanStack Redact & Multi-Stage Docker",
-        "subtitle": "Персистентный кэш TanStack Query в IndexedDB (отдача за 0 мс в авиарежиме), эксперимент с рантаймом TanStack Redact и 3-ступенчатая сборка с turbo prune.",
-        "metrics": "0ms Offline Reads • -21% JS Bundle"
+        "title": "IndexedDB Offline-First Cache, React 19 Compiler & Multi-Stage Docker",
+        "subtitle": "Персистентный кэш TanStack Query в IndexedDB (отдача за 0 мс в авиарежиме), React 19 Compiler + RSC-диета бандла и 3-ступенчатая сборка с turbo prune.",
+        "metrics": "0ms Offline Reads • -32% JS Bundle"
       }
     }
   },

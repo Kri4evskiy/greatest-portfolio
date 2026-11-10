@@ -1,5 +1,6 @@
 import { Global, Module } from '@nestjs/common'
 import { JwtModule } from '@nestjs/jwt'
+import { resolveJwtSecret } from '@repo/shared-schemas'
 import { AuthController } from './auth.controller.js'
 import { AuthService } from './auth.service.js'
 import { JwtRolesGuard } from './jwt-roles.guard.js'
@@ -8,7 +9,7 @@ import { JwtRolesGuard } from './jwt-roles.guard.js'
 @Module({
   imports: [
     JwtModule.register({
-      secret: process.env.JWT_SECRET ?? 'workfolio-super-secret-jwt-key-2026',
+      secret: resolveJwtSecret(process.env.JWT_SECRET),
       signOptions: {
         expiresIn: '7d',
       },

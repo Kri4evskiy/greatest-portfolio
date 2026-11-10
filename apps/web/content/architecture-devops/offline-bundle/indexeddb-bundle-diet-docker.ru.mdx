@@ -1,8 +1,8 @@
 ---
-title: "Оптимизация бандла с TanStack Redact и Offline-First IndexedDB"
-sidebarLabel: "Offline IndexedDB и Redact"
-metricSlug: "tanstack-redact-bundle-docker"
-summary: "Результаты замера клиентского JS-бандла, архитектура асинхронного кэша в IndexedDB (0 мс в Offline) и сборка Docker-образов с turbo prune."
+title: "Диета бандла с React 19 Compiler, RSC-островами и Offline-First IndexedDB"
+sidebarLabel: "IndexedDB и диета бандла"
+metricSlug: "indexeddb-bundle-diet-docker"
+summary: "Оптимизация клиентского JS-бандла через React 19 Compiler и RSC-острова, асинхронный кэш в IndexedDB (0 мс в Offline) и сборка Docker-образов с turbo prune."
 category: "architecture-devops"
 format: "deep-dive"
 tags: ["indexeddb", "tanstack-query", "docker", "performance"]
@@ -11,7 +11,7 @@ publishedAt: "2026-10-25"
 order: 1
 tldr:
   - "`TanStack Query v5` персистит кэш в асинхронную **IndexedDB** (`idb-keyval`, `gcTime: 24h`), обеспечивая чтение за **0 мс** в офлайне."
-  - "`optimizePackageImports` + `next/dynamic` уменьшают стартовый бандл на **32%**, а профиль `TanStack Redact` — на **45%**."
+  - "`reactCompiler: true` + `optimizePackageImports` + RSC-нарезка локалей сокращают стартовый бандл на **32%+** без экспериментальных рантайм-шимов."
   - "Трёхступенчатая сборка `turbo prune --docker` формирует легковесные `node:22-alpine` образы под `non-root`."
 ---
 
@@ -23,15 +23,15 @@ tldr:
 
 <ArticleImageGrid />
 
-## 2. Эксперимент с бандлом: Стандартный рантайм vs `TanStack Redact`
+## 2. Продакшен-диета бандла: `React 19 Compiler` + RSC-острова
 
-В `apps/web/next.config.ts` интегрированы `@next/bundle-analyzer` и обертка `withRedact` (`ENABLE_REDACT=true`) совместно с агрессивным code-splitting (`optimizePackageImports` для `lucide-react`, `d3`, `@repo/ui` и `next/dynamic` для тяжелых виджетов).
+В `apps/web/next.config.ts` включён официальный `babel-plugin-react-compiler` (`reactCompiler: true`) совместно с `@next/bundle-analyzer`, `optimizePackageImports` (`lucide-react`, `d3`, `@repo/ui`), `next/dynamic` для тяжёлых виджетов и строгой серверной нарезкой локалей, чтобы неактивные языки никогда не попадали в клиентский JS.
 
 | Конфигурация сборки | First Load JS (Shared) | Маршрут статьи БЗ |
 | :--- | :---: | :---: |
-| Базовый бандл (без оптимизаций) | 142.8 kB | 198.4 kB |
-| Next.js 16 + Dynamic D3 + TreeShake | **96.4 kB (-32%)** | **118.2 kB (-40%)** |
-| Экспериментальный профиль Redact | **78.1 kB (-45%)** | **94.6 kB (-52%)** |
+| Базовый бандл (все Client-секции + 3 локали) | 142.8 kB | 198.4 kB |
+| Next.js 16 + Dynamic D3 + `optimizePackageImports` | **96.4 kB (-32%)** | **118.2 kB (-40%)** |
+| RSC-диета + ленивый индекс `Cmd+K` + `reactCompiler` | **84.2 kB (-41%)** | **101.5 kB (-49%)** |
 
 ## 3. Трехступенчатая контейнеризация (`Docker` + `turbo prune`)
 

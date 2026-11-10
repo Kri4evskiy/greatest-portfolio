@@ -2,6 +2,8 @@ import { Inject, Injectable } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
 import {
   type GuestPassFormInput,
+  KB_ACCESS_COOKIE_NAME,
+  KB_COOKIE_MAX_AGE_MS,
   type Role,
   type SessionProfile,
   VISITOR_ROLE_LABELS,
@@ -10,8 +12,7 @@ import {
 import { PrismaService } from '../../prisma/prisma.service.js'
 import { TelemetryService } from '../telemetry/telemetry.service.js'
 
-export const KB_ACCESS_COOKIE_NAME = 'kb_access_token'
-export const KB_COOKIE_MAX_AGE_MS = 1000 * 60 * 60 * 24 * 7 // 7 days
+export { KB_ACCESS_COOKIE_NAME, KB_COOKIE_MAX_AGE_MS }
 
 export interface JwtSessionPayload {
   sub: string

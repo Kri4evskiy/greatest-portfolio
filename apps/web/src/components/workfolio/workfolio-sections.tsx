@@ -67,7 +67,7 @@ const CASE_STUDY_CONFIGS: readonly CaseStudyConfig[] = [
   {
     id: 'offline-first-redact-docker',
     tags: ['IndexedDB', 'TanStack Query v5', 'React Compiler', 'Docker BuildKit', 'Sentry'],
-    articleSlug: 'offline-bundle/tanstack-redact-bundle-docker',
+    articleSlug: 'offline-bundle/indexeddb-bundle-diet-docker',
     articleCategory: 'architecture-devops',
   },
 ]

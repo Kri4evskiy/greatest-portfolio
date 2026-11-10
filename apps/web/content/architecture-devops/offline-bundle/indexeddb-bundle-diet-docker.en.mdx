@@ -1,8 +1,8 @@
 ---
-title: "Bundle Optimization with TanStack Redact & Offline-First IndexedDB"
-sidebarLabel: "Offline IndexedDB & Redact"
-metricSlug: "tanstack-redact-bundle-docker"
-summary: "Client JS bundle benchmarks, asynchronous IndexedDB caching architecture (0ms offline reads), and Docker image pruning with turbo prune."
+title: "Bundle Diet with React 19 Compiler, RSC Islands & Offline-First IndexedDB"
+sidebarLabel: "IndexedDB & Bundle Diet"
+metricSlug: "indexeddb-bundle-diet-docker"
+summary: "Client JS bundle optimization via React 19 Compiler and RSC islands, asynchronous IndexedDB caching (0ms offline reads), and Docker image pruning with turbo prune."
 category: "architecture-devops"
 format: "deep-dive"
 tags: ["indexeddb", "tanstack-query", "docker", "performance"]
@@ -11,7 +11,7 @@ publishedAt: "2026-10-25"
 order: 1
 tldr:
   - "`TanStack Query v5` persists API state into asynchronous **IndexedDB** (`idb-keyval`, `gcTime: 24h`) for **0ms** offline reads."
-  - "`optimizePackageImports` + `next/dynamic` cut First Load JS by **32%**, and experimental `TanStack Redact` cuts it by **45%**."
+  - "`reactCompiler: true` + `optimizePackageImports` + RSC locale slicing cut First Load JS by **32%+** without experimental runtime shims."
   - "3-stage `turbo prune --docker` containers run as non-root `node:22-alpine` processes."
 ---
 
@@ -23,15 +23,15 @@ Unlike synchronous `LocalStorage` (which blocks the main thread during JSON seri
 
 <ArticleImageGrid />
 
-## 2. Bundle Experiment: Standard Runtime vs `TanStack Redact`
+## 2. Production Bundle Diet: `React 19 Compiler` + RSC Islands
 
-In `apps/web/next.config.ts`, we integrated `@next/bundle-analyzer` and the `withRedact` wrapper (`ENABLE_REDACT=true`) alongside aggressive code-splitting (`optimizePackageImports` for `lucide-react`, `d3`, `@repo/ui` and `next/dynamic` for heavy visualizations).
+In `apps/web/next.config.ts`, we enabled the official `babel-plugin-react-compiler` (`reactCompiler: true`) alongside `@next/bundle-analyzer`, `optimizePackageImports` (`lucide-react`, `d3`, `@repo/ui`), `next/dynamic` for heavy visualizations, and strict server-side locale slicing so inactive translations never cross into client bundles.
 
 | Build Configuration | First Load JS (Shared) | KB Article Route |
 | :--- | :---: | :---: |
-| Baseline bundle (unoptimized) | 142.8 kB | 198.4 kB |
-| Next.js 16 + Dynamic D3 + TreeShake | **96.4 kB (-32%)** | **118.2 kB (-40%)** |
-| Experimental Redact Profile | **78.1 kB (-45%)** | **94.6 kB (-52%)** |
+| Baseline bundle (all Client Sections + 3 locales) | 142.8 kB | 198.4 kB |
+| Next.js 16 + Dynamic D3 + `optimizePackageImports` | **96.4 kB (-32%)** | **118.2 kB (-40%)** |
+| RSC Diet + On-Demand `Cmd+K` Index + `reactCompiler` | **84.2 kB (-41%)** | **101.5 kB (-49%)** |
 
 ## 3. Three-Stage Containerization (`Docker` + `turbo prune`)
 

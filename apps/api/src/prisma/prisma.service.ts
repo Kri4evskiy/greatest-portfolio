@@ -38,7 +38,7 @@ const INITIAL_ARTICLES: Array<{
     helpfulCount: 51,
   },
   {
-    slug: 'tanstack-redact-bundle-docker',
+    slug: 'indexeddb-bundle-diet-docker',
     category: 'architecture-devops',
     viewsCount: 129,
     helpfulCount: 44,

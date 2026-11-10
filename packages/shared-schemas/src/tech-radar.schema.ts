@@ -123,16 +123,16 @@ export const TECH_RADAR_ITEMS_RU: readonly TechRadarItem[] = [
   {
     id: 'tanstack-table-redact',
     adrNumber: 8,
-    name: 'TanStack Table & TanStack Redact',
+    name: 'TanStack Table & React 19 Compiler',
     category: 'Frontend',
     experienceYears: 3,
-    level: 'Experimental',
-    summary: 'Headless-движок таблиц для Tech Radar и эксперимент по уменьшению React-бандла на ~20%.',
+    level: 'Core',
+    summary: 'Headless-движок таблиц для Tech Radar, авто-мемоизация React Compiler и агрессивный Tree-Shaking.',
     adrWhy:
-      'TanStack Table берет на себя математику сортировки и мульти-фильтрации при 100% контроле верстки, а TanStack Redact уменьшает клиентский рантайм на ~35 KB.',
-    adrWhere: 'Матрица навыков Tech Radar на странице CV и конфигурация next.config.ts.',
+      'TanStack Table берет на себя математику сортировки и мульти-фильтрации при 100% контроле верстки, а babel-plugin-react-compiler и optimizePackageImports устраняют лишние ререндеры и мертвый JS-код.',
+    adrWhere: 'Матрица навыков Tech Radar на странице CV и конфигурация reactCompiler: true в next.config.ts.',
     adrHow:
-      'Таблица с фильтрами и ADR-поповерами на главной странице + флаг ENABLE_REDACT и замер бандла в Базе Знаний.',
+      'Таблица с фильтрами и ADR-инспектором на главной странице + авто-мемоизация React 19 Compiler и @next/bundle-analyzer.',
   },
   {
     id: 'mdx-webp-d3',
@@ -349,16 +349,16 @@ export const TECH_RADAR_ITEMS_EN: readonly TechRadarItem[] = [
   {
     id: 'tanstack-table-redact',
     adrNumber: 8,
-    name: 'TanStack Table & TanStack Redact',
+    name: 'TanStack Table & React 19 Compiler',
     category: 'Frontend',
     experienceYears: 3,
-    level: 'Experimental',
-    summary: 'Headless table engine for the Tech Radar and an experimental ~20% React bundle reduction.',
+    level: 'Core',
+    summary: 'Headless table engine for the Tech Radar, React Compiler auto-memoization, and aggressive tree-shaking.',
     adrWhy:
-      'TanStack Table handles sorting and multi-filtering math with 100% markup freedom, while TanStack Redact trims client runtime overhead.',
-    adrWhere: 'Interactive Tech Radar matrix on the CV page and next.config.ts.',
+      'TanStack Table handles sorting and multi-filtering math with 100% markup freedom, while babel-plugin-react-compiler and optimizePackageImports eliminate redundant re-renders and dead client JS.',
+    adrWhere: 'Interactive Tech Radar matrix on the CV page and reactCompiler: true in next.config.ts.',
     adrHow:
-      'Sortable/filterable ADR matrix with inspector dialogs + ENABLE_REDACT flag and bundle benchmarks in the Knowledge Base.',
+      'Sortable/filterable ADR matrix with inspector dialogs + React 19 Compiler auto-memoization and @next/bundle-analyzer.',
   },
   {
     id: 'mdx-webp-d3',
@@ -575,16 +575,16 @@ export const TECH_RADAR_ITEMS_UK: readonly TechRadarItem[] = [
   {
     id: 'tanstack-table-redact',
     adrNumber: 8,
-    name: 'TanStack Table & TanStack Redact',
+    name: 'TanStack Table & React 19 Compiler',
     category: 'Frontend',
     experienceYears: 3,
-    level: 'Experimental',
-    summary: 'Headless-рушій таблиць для Tech Radar та експеримент зі зменшення React-бандла на ~20%.',
+    level: 'Core',
+    summary: 'Headless-рушій таблиць для Tech Radar, авто-мемоїзація React Compiler та агресивний Tree-Shaking.',
     adrWhy:
-      'TanStack Table бере на себе математику сортування й мульти-фільтрації при 100% контролі верстки, а TanStack Redact зменшує клієнтський рантайм.',
-    adrWhere: 'Матриця навичок Tech Radar на сторінці CV та конфігурація next.config.ts.',
+      'TanStack Table бере на себе математику сортування й мульти-фільтрації при 100% контролі верстки, а babel-plugin-react-compiler та optimizePackageImports прибирають зайві ререндери й мертвий JS-код.',
+    adrWhere: 'Матриця навичок Tech Radar на сторінці CV та конфігурація reactCompiler: true в next.config.ts.',
     adrHow:
-      'Таблиця з фільтрами та ADR-діалогами на головній сторінці + прапорець ENABLE_REDACT і вимір бандла в Базі Знань.',
+      'Таблиця з фільтрами та ADR-діалогами на головній сторінці + авто-мемоїзація React 19 Compiler і @next/bundle-analyzer.',
   },
   {
     id: 'mdx-webp-d3',

@@ -30,12 +30,12 @@ Toggle between **React 18** and **React 19** modes in the interactive simulation
 
 <ReactRenderGraphD3 />
 
-## 3. Integrating `D3.js` + `Zustand` Without Extra Re-renders
+## 3. Integrating `D3.js` Without Virtual DOM Collisions
 
-Interactive SVG graphs built with `D3.js` clash with React's Virtual DOM if animation coordinates live in `useState`. Our architecture enforces two rules:
+Interactive SVG graphs built with `D3.js` clash with React's Virtual DOM if animation coordinates live in React state. Our architecture enforces two rules:
 
-```typescript title="Atomic Zustand Subscription + Imperative SVG Ref"
-const mode = useUIStore((s) => s.reactGraphMode)
+```typescript title="Colocated Widget State + Imperative SVG Ref"
+const [mode, setMode] = useState<ReactRenderMode>('react19')
 const svgRef = useRef<SVGSVGElement | null>(null)
 ```
 

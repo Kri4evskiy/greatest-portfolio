@@ -68,9 +68,9 @@
         "metrics": "0 XSS token leaks • <15ms Edge RBAC check"
       },
       "offline-first-redact-docker": {
-        "title": "IndexedDB Offline-First Cache, TanStack Redact & Multi-Stage Docker",
-        "subtitle": "Persistent TanStack Query cache in IndexedDB (0ms offline reads), experimental TanStack Redact runtime benchmarks, and 3-stage Docker builds with turbo prune.",
-        "metrics": "0ms Offline Reads • -21% JS Bundle"
+        "title": "IndexedDB Offline-First Cache, React 19 Compiler & Multi-Stage Docker",
+        "subtitle": "Persistent TanStack Query cache in IndexedDB (0ms offline reads), React 19 Compiler + RSC bundle diet, and 3-stage Docker builds with turbo prune.",
+        "metrics": "0ms Offline Reads • -32% JS Bundle"
       }
     }
   },

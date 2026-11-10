@@ -30,12 +30,12 @@ tldr:
 
 <ReactRenderGraphD3 />
 
-## 3. Інтеграція `D3.js` та `Zustand` без зайвих ререндерів
+## 3. Інтеграція `D3.js` без конфліктів із Virtual DOM
 
-Щоб імперативна математика `D3.js` не конфліктувала з React, проміжні координати ніколи не зберігаються у `useState`:
+Щоб імперативна математика `D3.js` не конфліктувала з React, проміжні координати ніколи не зберігаються у стані компонента:
 
-```typescript title="Атомарна підписка на Zustand + ізоляція SVG"
-const mode = useUIStore((s) => s.reactGraphMode)
+```typescript title="Локальний режим віджета + ізоляція SVG"
+const [mode, setMode] = useState<ReactRenderMode>('react19')
 const svgRef = useRef<SVGSVGElement | null>(null)
 ```
 

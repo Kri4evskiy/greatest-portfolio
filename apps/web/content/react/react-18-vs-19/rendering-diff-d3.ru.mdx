@@ -30,12 +30,12 @@ tldr:
 
 <ReactRenderGraphD3 />
 
-## 3. Связка `D3.js` и `Zustand` без лишних ререндеров
+## 3. Интеграция `D3.js` без конфликтов с Virtual DOM
 
-Чтобы императивная анимация `D3.js` не конфликтовала с React, координаты никогда не кладутся в `useState`:
+Чтобы императивная анимация `D3.js` не конфликтовала с React, координаты узлов никогда не кладутся в React-стейт:
 
-```typescript title="Атомарная подписка на Zustand + useRef"
-const mode = useUIStore((s) => s.reactGraphMode)
+```typescript title="Локальный режим виджета + изолированный useRef"
+const [mode, setMode] = useState<ReactRenderMode>('react19')
 const svgRef = useRef<SVGSVGElement | null>(null)
 ```
 
