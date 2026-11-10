@@ -1,23 +1,12 @@
-'use client'
-
-import { SupportedLocaleEnum } from '@repo/shared-schemas'
-import { Badge, Button, Callout, Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@repo/ui'
+import type { SupportedLocale } from '@repo/shared-schemas'
+import { Badge, Callout, Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@repo/ui'
 import {
-  ArrowUpRight,
   Briefcase,
-  ChevronDown,
-  ChevronUp,
-  Compass,
-  Cpu,
-  ExternalLink,
-  FileDown,
   GitBranch,
   Github,
   GraduationCap,
   Languages,
   Linkedin,
-  Lock,
-  LockOpen,
   Mail,
   MapPin,
   Send,
@@ -26,8 +15,7 @@ import {
   Terminal,
   Zap,
 } from 'lucide-react'
-import { useLocale, useTranslations } from 'next-intl'
-import { useState } from 'react'
+import { getTranslations } from 'next-intl/server'
 import {
   AUTHOR_PROFILE,
   AUTHOR_SKILL_GROUPS,
@@ -35,11 +23,7 @@ import {
   type CommercialExperienceItem,
   pickLocalized,
 } from '@/data/author-profile'
-import { useSectionNavigation } from '@/hooks/use-section-navigation'
-import { useVisitorProfile } from '@/hooks/use-visitor-profile'
-import { Link, useRouter } from '@/i18n/navigation'
-import { trackEvent } from '@/lib/analytics'
-import { useUIStore } from '@/store/use-ui-store'
+import { CaseStudyReadButton, EarlierRolesDisclosure, HeroActionRow } from './workfolio-client-islands'
 
 interface CaseStudyConfig {
   id:
@@ -57,7 +41,7 @@ interface CaseStudyConfig {
 const CASE_STUDY_CONFIGS: readonly CaseStudyConfig[] = [
   {
     id: 'this-project-engine',
-    tags: ['MDX 2.0', 'Shiki 0KB JS', 'Cmd+K Search', '3-Tier Multi-Slug', 'Mobile-First'],
+    tags: ['MDX 2.0 AST', 'Dual-Theme Shiki', 'Lazy Cmd+K', '3-Tier Multi-Slug', 'Mobile-First'],
     articleSlug: 'knowledge-engine/three-tier-mdx-cmdk-architecture',
     articleCategory: 'this-project',
     isFlagship: true,
@@ -70,7 +54,7 @@ const CASE_STUDY_CONFIGS: readonly CaseStudyConfig[] = [
   },
   {
     id: 'react19-compiler-d3',
-    tags: ['React 19', 'Next.js 16', 'D3.js', 'Zustand', 'SSG'],
+    tags: ['React 19 Compiler', 'Next.js 16', 'D3.js', 'Zustand', 'SSG'],
     articleSlug: 'react-18-vs-19/rendering-diff-d3',
     articleCategory: 'react',
   },
@@ -82,33 +66,14 @@ const CASE_STUDY_CONFIGS: readonly CaseStudyConfig[] = [
   },
   {
     id: 'offline-first-redact-docker',
-    tags: ['IndexedDB', 'TanStack Query v5', 'TanStack Redact', 'Docker BuildKit', 'Sentry'],
+    tags: ['IndexedDB', 'TanStack Query v5', 'React Compiler', 'Docker BuildKit', 'Sentry'],
     articleSlug: 'offline-bundle/tanstack-redact-bundle-docker',
     articleCategory: 'architecture-devops',
   },
 ]
 
-export function WorkfolioHeroSection() {
-  const t = useTranslations('Hero')
-  const router = useRouter()
-  const rawLocale = useLocale()
-  const parsedLocale = SupportedLocaleEnum.safeParse(rawLocale)
-  const locale = parsedLocale.success ? parsedLocale.data : 'en'
-
-  const { scrollToSection } = useSectionNavigation()
-  const { data: profile } = useVisitorProfile()
-  const openGuestPassModal = useUIStore((s) => s.openGuestPassModal)
-
-  const isUnlocked = profile?.role === 'USER' || profile?.role === 'ADMIN'
-
-  const handleOpenKnowledgeBase = (targetPath = '/knowledge-base') => {
-    if (isUnlocked) {
-      router.push(targetPath)
-      return
-    }
-    trackEvent('guest_pass_modal_opened', { source: 'hero_cta' })
-    openGuestPassModal(targetPath)
-  }
+export async function WorkfolioHeroSection({ locale }: { locale: SupportedLocale }) {
+  const t = await getTranslations({ locale, namespace: 'Hero' })
 
   return (
     <section id="about" className="scroll-mt-20 space-y-6 pt-3 sm:pt-6">
@@ -175,57 +140,17 @@ export function WorkfolioHeroSection() {
           </a>
         </div>
 
-        {/* Primary Action CTAs */}
-        <div className="flex flex-col gap-2.5 pt-1 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
-          <Button
-            type="button"
-            size="lg"
-            onClick={() => handleOpenKnowledgeBase('/knowledge-base')}
-            className="w-full justify-center gap-2 sm:w-auto"
-          >
-            {isUnlocked ? (
-              <>
-                <LockOpen className="h-4 w-4 shrink-0 text-emerald-400" />
-                <span className="truncate">{t('ctaUnlocked')}</span>
-              </>
-            ) : (
-              <>
-                <Lock className="h-4 w-4 shrink-0 text-amber-400" />
-                <span className="truncate">{t('ctaLocked')}</span>
-              </>
-            )}
-            <ArrowUpRight className="h-4 w-4 shrink-0" />
-          </Button>
-
-          <Link
-            href="/cv"
-            className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md border border-primary/30 bg-primary/5 px-4 text-sm font-medium text-foreground transition-colors hover:border-primary hover:bg-primary/10 sm:w-auto"
-          >
-            <FileDown className="h-4 w-4 shrink-0 text-primary" />
-            <span>{t('ctaCvPdf')}</span>
-          </Link>
-
-          <button
-            type="button"
-            onClick={() => scrollToSection('tech-radar')}
-            className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md border border-border bg-background px-4 text-sm font-medium transition-colors hover:bg-accent sm:w-auto"
-          >
-            <Cpu className="h-4 w-4 shrink-0 text-primary" />
-            <span>{t('ctaTechRadar')}</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => scrollToSection('roadmap')}
-            className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md border border-border bg-background px-4 text-sm font-medium transition-colors hover:bg-accent sm:w-auto"
-          >
-            <Compass className="h-4 w-4 shrink-0 text-primary" />
-            <span>{t('ctaRoadmap')}</span>
-          </button>
-        </div>
+        {/* Client Island: Primary Action CTAs */}
+        <HeroActionRow
+          ctaUnlocked={t('ctaUnlocked')}
+          ctaLocked={t('ctaLocked')}
+          ctaCvPdf={t('ctaCvPdf')}
+          ctaTechRadar={t('ctaTechRadar')}
+          ctaRoadmap={t('ctaRoadmap')}
+        />
       </div>
 
-      {/* Hard Skills Matrix from CV */}
+      {/* Hard Skills Matrix from CV (100% Server-Rendered) */}
       <div className="grid gap-3 sm:grid-cols-2">
         {AUTHOR_SKILL_GROUPS.map((group) => (
           <div key={group.id} className="rounded-xl border border-border/80 bg-card p-3.5 shadow-2xs">
@@ -263,23 +188,8 @@ export function WorkfolioHeroSection() {
   )
 }
 
-export function WorkfolioProjectsSection() {
-  const t = useTranslations('Projects')
-  const router = useRouter()
-  const { data: profile } = useVisitorProfile()
-  const openGuestPassModal = useUIStore((s) => s.openGuestPassModal)
-
-  const isUnlocked = profile?.role === 'USER' || profile?.role === 'ADMIN'
-
-  const handleReadCaseStudy = (category: string, slug: string) => {
-    const targetUrl = `/knowledge-base/${category}/${slug}`
-    if (isUnlocked) {
-      router.push(targetUrl)
-      return
-    }
-    trackEvent('guest_pass_modal_opened', { source: `case_study_${slug}` })
-    openGuestPassModal(targetUrl)
-  }
+export async function WorkfolioProjectsSection({ locale }: { locale: SupportedLocale }) {
+  const t = await getTranslations({ locale, namespace: 'Projects' })
 
   return (
     <section id="projects" className="scroll-mt-20 space-y-4">
@@ -307,7 +217,7 @@ export function WorkfolioProjectsSection() {
                   {item.isFlagship ? (
                     <Sparkles className="mr-1 h-3 w-3" />
                   ) : (
-                    <Zap className="mr-1 h-3 w-3 text-amber-500" />
+                    <Zap className="mr-1 h-3 w-3 text-warning" />
                   )}
                   {t(`items.${item.id}.metrics`)}
                 </Badge>
@@ -332,16 +242,12 @@ export function WorkfolioProjectsSection() {
             </CardContent>
 
             <CardFooter className="border-t border-border/60 pt-3">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => handleReadCaseStudy(item.articleCategory, item.articleSlug)}
-                className="w-full justify-between font-mono text-xs"
-              >
-                <span>{isUnlocked ? t('readUnlocked') : t('readLocked')}</span>
-                <ExternalLink className="h-3.5 w-3.5" />
-              </Button>
+              <CaseStudyReadButton
+                category={item.articleCategory}
+                slug={item.articleSlug}
+                readUnlockedLabel={t('readUnlocked')}
+                readLockedLabel={t('readLocked')}
+              />
             </CardFooter>
           </Card>
         ))}
@@ -356,7 +262,7 @@ function ExperienceCard({
   projectsLabel,
 }: {
   item: CommercialExperienceItem
-  locale: 'en' | 'uk' | 'ru'
+  locale: SupportedLocale
   projectsLabel: string
 }) {
   const highlights = item.highlights[locale] ?? item.highlights.en
@@ -387,7 +293,7 @@ function ExperienceCard({
       <ul className="mt-3 space-y-2 text-xs leading-relaxed text-muted-foreground sm:text-sm">
         {highlights.map((point) => (
           <li key={point} className="flex items-start gap-2">
-            <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+            <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-success" />
             <span>{point}</span>
           </li>
         ))}
@@ -404,13 +310,8 @@ function ExperienceCard({
   )
 }
 
-export function WorkfolioExperienceSection() {
-  const t = useTranslations('Experience')
-  const rawLocale = useLocale()
-  const parsedLocale = SupportedLocaleEnum.safeParse(rawLocale)
-  const locale = parsedLocale.success ? parsedLocale.data : 'en'
-
-  const [showEarlierRoles, setShowEarlierRoles] = useState(false)
+export async function WorkfolioExperienceSection({ locale }: { locale: SupportedLocale }) {
+  const t = await getTranslations({ locale, namespace: 'Experience' })
 
   const featuredRoles = COMMERCIAL_EXPERIENCE.filter((role) => role.featured)
   const earlierRoles = COMMERCIAL_EXPERIENCE.filter((role) => !role.featured)
@@ -431,27 +332,14 @@ export function WorkfolioExperienceSection() {
         ))}
 
         {earlierRoles.length > 0 ? (
-          <div className="space-y-3">
-            <button
-              type="button"
-              aria-expanded={showEarlierRoles}
-              onClick={() => setShowEarlierRoles((prev) => !prev)}
-              className="flex w-full items-center justify-between rounded-xl border border-dashed border-border bg-muted/30 px-4 py-2.5 text-left font-mono text-xs font-medium text-foreground transition-colors hover:border-primary/40 hover:bg-muted/60"
-            >
-              <span>
-                {showEarlierRoles ? t('hideEarlierRoles') : t('showEarlierRoles', { count: earlierRoles.length })}
-              </span>
-              {showEarlierRoles ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-            </button>
-
-            {showEarlierRoles ? (
-              <div className="space-y-3">
-                {earlierRoles.map((role) => (
-                  <ExperienceCard key={role.id} item={role} locale={locale} projectsLabel={t('projectsLabel')} />
-                ))}
-              </div>
-            ) : null}
-          </div>
+          <EarlierRolesDisclosure
+            showLabel={t('showEarlierRoles', { count: earlierRoles.length })}
+            hideLabel={t('hideEarlierRoles')}
+          >
+            {earlierRoles.map((role) => (
+              <ExperienceCard key={role.id} item={role} locale={locale} projectsLabel={t('projectsLabel')} />
+            ))}
+          </EarlierRolesDisclosure>
         ) : null}
       </div>
 

@@ -11,6 +11,7 @@ import {
   FileText,
   Hash,
   Home,
+  Loader2,
   Lock,
   Search,
   Sparkles,
@@ -23,11 +24,14 @@ import { useVisitorProfile } from '@/hooks/use-visitor-profile'
 import { useRouter } from '@/i18n/navigation'
 import { trackEvent } from '@/lib/analytics'
 import type { KnowledgeSearchItem } from '@/lib/mdx-content'
+import {
+  getCachedKnowledgeSearchIndex,
+  type KnowledgeSearchPayload,
+  loadKnowledgeSearchIndex,
+} from '@/lib/search-index-client'
 import { useUIStore } from '@/store/use-ui-store'
 
 interface CommandPaletteModalProps {
-  items: readonly KnowledgeSearchItem[]
-  topTags: ReadonlyArray<{ tag: string; count: number }>
   locale: SupportedLocale
 }
 
@@ -45,7 +49,7 @@ type PaletteEntry =
       matchedHeading?: { id: string; text: string } | undefined
     }
 
-export function CommandPaletteModal({ items, topTags, locale }: CommandPaletteModalProps) {
+export function CommandPaletteModal({ locale }: CommandPaletteModalProps) {
   const t = useTranslations('KnowledgeBase')
   const router = useRouter()
   const { scrollToSection } = useSectionNavigation()
@@ -59,9 +63,36 @@ export function CommandPaletteModal({ items, topTags, locale }: CommandPaletteMo
 
   const [query, setQuery] = useState('')
   const [activeIndex, setActiveIndex] = useState(0)
+  const [indexPayload, setIndexPayload] = useState<KnowledgeSearchPayload | null>(() =>
+    getCachedKnowledgeSearchIndex(locale),
+  )
   const inputRef = useRef<HTMLInputElement | null>(null)
 
+  const items = indexPayload?.items ?? []
+  const topTags = indexPayload?.topTags ?? []
+  const isLoadingIndex = isOpen && indexPayload === null
+
   const isUnlocked = profile?.role === 'USER' || profile?.role === 'ADMIN'
+
+  // Lazy-fetch static search index on first palette open (0 KB in initial page HTML)
+  useEffect(() => {
+    const cached = getCachedKnowledgeSearchIndex(locale)
+    if (cached) {
+      setIndexPayload(cached)
+      return
+    }
+    if (!isOpen) return
+
+    let active = true
+    void loadKnowledgeSearchIndex(locale).then((payload) => {
+      if (active) {
+        setIndexPayload(payload)
+      }
+    })
+    return () => {
+      active = false
+    }
+  }, [isOpen, locale])
 
   // Sync query when opened with a pre-filled tag or query
   useEffect(() => {
@@ -270,7 +301,11 @@ export function CommandPaletteModal({ items, topTags, locale }: CommandPaletteMo
       <div className="flex max-h-[80dvh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
         {/* Search Input Header */}
         <div className="flex items-center gap-2.5 border-b border-border px-3.5 py-3 sm:px-4">
-          <Search className="h-4 w-4 shrink-0 text-primary" />
+          {isLoadingIndex ? (
+            <Loader2 className="h-4 w-4 shrink-0 animate-spin text-primary" />
+          ) : (
+            <Search className="h-4 w-4 shrink-0 text-primary" />
+          )}
           <input
             ref={inputRef}
             type="text"
@@ -395,7 +430,7 @@ export function CommandPaletteModal({ items, topTags, locale }: CommandPaletteMo
                               {getKnowledgeFormatLabel(entry.item.format, locale)}
                             </Badge>
                             {!isUnlocked ? (
-                              <span className="inline-flex items-center gap-1 rounded bg-amber-500/15 px-1.5 py-0.5 font-mono text-[10px] text-amber-600 dark:text-amber-400">
+                              <span className="inline-flex items-center gap-1 rounded bg-warning/15 px-1.5 py-0.5 font-mono text-[10px] text-warning">
                                 <Lock className="h-2.5 w-2.5" />
                                 {t('cmdLockedBadge')}
                               </span>

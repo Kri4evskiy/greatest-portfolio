@@ -1,6 +1,5 @@
 'use client'
 
-import { SupportedLocaleEnum } from '@repo/shared-schemas'
 import { Badge } from '@repo/ui'
 import {
   CheckCircle2,
@@ -14,18 +13,14 @@ import {
   ShieldAlert,
   Sparkles,
 } from 'lucide-react'
-import { useLocale, useTranslations } from 'next-intl'
+import { useTranslations } from 'next-intl'
 import { useMemo, useState } from 'react'
-import { pickLocalized } from '@/data/author-profile'
-import { ENGINEERING_ROADMAP_ITEMS, type RoadmapItemKind, type RoadmapItemStatus } from '@/data/engineering-roadmap'
+import type { LocalizedRoadmapItem, RoadmapItemKind, RoadmapItemStatus } from '@/data/engineering-roadmap'
 
 type FilterTab = 'all' | RoadmapItemStatus
 
-export function EngineeringRoadmapBoard() {
+export function EngineeringRoadmapBoard({ items }: { items: readonly LocalizedRoadmapItem[] }) {
   const t = useTranslations('Roadmap')
-  const rawLocale = useLocale()
-  const parsedLocale = SupportedLocaleEnum.safeParse(rawLocale)
-  const locale = parsedLocale.success ? parsedLocale.data : 'en'
 
   const [activeFilter, setActiveFilter] = useState<FilterTab>('all')
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({
@@ -34,24 +29,24 @@ export function EngineeringRoadmapBoard() {
 
   const counts = useMemo(() => {
     const result: Record<FilterTab, number> = {
-      all: ENGINEERING_ROADMAP_ITEMS.length,
+      all: items.length,
       planned: 0,
       evaluating: 0,
       deferred: 0,
       shipped: 0,
     }
-    for (const item of ENGINEERING_ROADMAP_ITEMS) {
+    for (const item of items) {
       result[item.status] += 1
     }
     return result
-  }, [])
+  }, [items])
 
   const filteredItems = useMemo(() => {
     if (activeFilter === 'all') {
-      return ENGINEERING_ROADMAP_ITEMS
+      return items
     }
-    return ENGINEERING_ROADMAP_ITEMS.filter((item) => item.status === activeFilter)
-  }, [activeFilter])
+    return items.filter((item) => item.status === activeFilter)
+  }, [activeFilter, items])
 
   const toggleExpanded = (id: string) => {
     setExpandedIds((prev) => ({
@@ -94,7 +89,7 @@ export function EngineeringRoadmapBoard() {
         )
       case 'evaluating':
         return (
-          <span className="inline-flex items-center gap-1 rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 font-mono text-[11px] font-medium text-amber-600 dark:text-amber-400">
+          <span className="inline-flex items-center gap-1 rounded-md border border-warning/30 bg-warning/10 px-2 py-0.5 font-mono text-[11px] font-medium text-warning">
             <Lightbulb className="h-3 w-3" />
             {t('statusEvaluating')}
           </span>
@@ -108,7 +103,7 @@ export function EngineeringRoadmapBoard() {
         )
       case 'shipped':
         return (
-          <span className="inline-flex items-center gap-1 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 font-mono text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
+          <span className="inline-flex items-center gap-1 rounded-md border border-success/30 bg-success/10 px-2 py-0.5 font-mono text-[11px] font-medium text-success">
             <CheckCircle2 className="h-3 w-3" />
             {t('statusShipped')}
           </span>
@@ -158,8 +153,6 @@ export function EngineeringRoadmapBoard() {
       <div className="space-y-3">
         {filteredItems.map((item) => {
           const isExpanded = Boolean(expandedIds[item.id])
-          const prosList = item.pros[locale] ?? item.pros.en
-          const constraintsList = item.constraints[locale] ?? item.constraints.en
 
           return (
             <div
@@ -187,12 +180,8 @@ export function EngineeringRoadmapBoard() {
                 </div>
               </div>
 
-              <h3 className="mt-2.5 text-base font-semibold leading-snug text-foreground">
-                {pickLocalized(item.title, locale)}
-              </h3>
-              <p className="mt-1 text-xs leading-relaxed text-muted-foreground sm:text-sm">
-                {pickLocalized(item.summary, locale)}
-              </p>
+              <h3 className="mt-2.5 text-base font-semibold leading-snug text-foreground">{item.title}</h3>
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground sm:text-sm">{item.summary}</p>
 
               <div className="mt-3">
                 <button
@@ -214,32 +203,32 @@ export function EngineeringRoadmapBoard() {
                       <Sparkles className="h-3.5 w-3.5 shrink-0" />
                       <span>{t('rationaleHeading')}</span>
                     </div>
-                    <p className="mt-1 leading-relaxed text-foreground/90">{pickLocalized(item.rationale, locale)}</p>
+                    <p className="mt-1 leading-relaxed text-foreground/90">{item.rationale}</p>
                   </div>
 
                   <div className="grid gap-3 md:grid-cols-2">
-                    <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3">
-                      <div className="font-mono text-[11px] font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                    <div className="rounded-lg border border-success/25 bg-success/5 p-3">
+                      <div className="font-mono text-[11px] font-semibold uppercase tracking-wider text-success">
                         {t('prosHeading')}
                       </div>
                       <ul className="mt-1.5 space-y-1.5 text-muted-foreground">
-                        {prosList.map((pro) => (
+                        {item.pros.map((pro) => (
                           <li key={pro} className="flex items-start gap-2">
-                            <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                            <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-success" />
                             <span>{pro}</span>
                           </li>
                         ))}
                       </ul>
                     </div>
 
-                    <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3">
-                      <div className="font-mono text-[11px] font-semibold uppercase tracking-wider text-amber-600 dark:text-amber-400">
+                    <div className="rounded-lg border border-warning/25 bg-warning/5 p-3">
+                      <div className="font-mono text-[11px] font-semibold uppercase tracking-wider text-warning">
                         {t('constraintsHeading')}
                       </div>
                       <ul className="mt-1.5 space-y-1.5 text-muted-foreground">
-                        {constraintsList.map((con) => (
+                        {item.constraints.map((con) => (
                           <li key={con} className="flex items-start gap-2">
-                            <ShieldAlert className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
+                            <ShieldAlert className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warning" />
                             <span>{con}</span>
                           </li>
                         ))}

@@ -1,6 +1,6 @@
 'use client'
 
-import { getTechRadarItems, type SupportedLocale, type TechCategory, type TechRadarItem } from '@repo/shared-schemas'
+import type { TechCategory, TechRadarItem } from '@repo/shared-schemas'
 import { Badge, Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Input } from '@repo/ui'
 import {
   type ColumnDef,
@@ -11,7 +11,7 @@ import {
   useReactTable,
 } from '@tanstack/react-table'
 import { ArrowUpDown, BookOpenCheck, Compass, Layers, Search, Sparkles } from 'lucide-react'
-import { useLocale, useTranslations } from 'next-intl'
+import { useTranslations } from 'next-intl'
 import { useMemo, useState } from 'react'
 import { trackEvent } from '@/lib/analytics'
 import { useUIStore } from '@/store/use-ui-store'
@@ -25,10 +25,8 @@ const CATEGORIES: ReadonlyArray<TechCategory | 'ALL'> = [
   'Architecture',
 ]
 
-export function TechRadarTable() {
-  const locale = useLocale() as SupportedLocale
+export function TechRadarTable({ items: localizedItems }: { items: readonly TechRadarItem[] }) {
   const t = useTranslations('TechRadar')
-  const localizedItems = useMemo(() => getTechRadarItems(locale), [locale])
 
   const categoryFilter = useUIStore((s) => s.techRadarCategoryFilter)
   const searchQuery = useUIStore((s) => s.techRadarSearch)

@@ -1,19 +1,26 @@
 'use client'
 
+import { DEFAULT_LOCALE, SupportedLocaleEnum } from '@repo/shared-schemas'
 import { Badge, Button } from '@repo/ui'
 import { FileDown, FileText, Lock, LockOpen, LogOut, Search, ShieldAlert } from 'lucide-react'
-import { useTranslations } from 'next-intl'
-import { AUTHOR_PROFILE } from '@/data/author-profile'
+import { useLocale, useTranslations } from 'next-intl'
 import { useSectionNavigation } from '@/hooks/use-section-navigation'
 import { useLogoutMutation, useVisitorProfile } from '@/hooks/use-visitor-profile'
 import { Link, usePathname, useRouter } from '@/i18n/navigation'
 import { trackEvent } from '@/lib/analytics'
+import { prefetchKnowledgeSearchIndex } from '@/lib/search-index-client'
 import { useUIStore } from '@/store/use-ui-store'
 import { LanguageSwitcher } from './language-switcher'
 import { ThemeToggle } from './theme-toggle'
 
+const AUTHOR_INITIALS = 'SK'
+
 export function WorkfolioHeader() {
   const t = useTranslations('Header')
+  const rawLocale = useLocale()
+  const parsedLocale = SupportedLocaleEnum.safeParse(rawLocale)
+  const locale = parsedLocale.success ? parsedLocale.data : DEFAULT_LOCALE
+
   const pathname = usePathname()
   const router = useRouter()
   const { scrollToSection, scrollToTop } = useSectionNavigation()
@@ -51,7 +58,7 @@ export function WorkfolioHeader() {
             className="flex min-w-0 items-center gap-1.5 font-medium text-foreground transition-opacity hover:opacity-80 sm:gap-2"
           >
             <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded border border-border bg-muted font-mono text-[11px] font-bold">
-              {AUTHOR_PROFILE.initials}
+              {AUTHOR_INITIALS}
             </span>
             <span className="hidden font-mono text-xs text-muted-foreground md:inline">workfolio /</span>
             <span className="truncate font-semibold tracking-tight text-xs sm:text-sm">Stanislav Krychevskyi</span>
@@ -72,6 +79,8 @@ export function WorkfolioHeader() {
             type="button"
             aria-label={t('searchAria')}
             title={t('searchAria')}
+            onMouseEnter={() => prefetchKnowledgeSearchIndex(locale)}
+            onFocus={() => prefetchKnowledgeSearchIndex(locale)}
             onClick={() => openCommandPalette('')}
             className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-muted/30 text-muted-foreground transition-colors hover:border-primary/40 hover:bg-accent hover:text-foreground md:w-auto md:gap-2 md:px-2.5"
           >
@@ -94,7 +103,7 @@ export function WorkfolioHeader() {
                 onClick={handleKnowledgeBaseClick}
                 className="h-8 gap-1 px-2.5 text-xs sm:gap-1.5 sm:px-3"
               >
-                <LockOpen className="h-3.5 w-3.5 shrink-0 text-emerald-400" />
+                <LockOpen className="h-3.5 w-3.5 shrink-0 text-success" />
                 <span className="sm:hidden">{t('knowledgeBaseShort')}</span>
                 <span className="hidden sm:inline">{t('knowledgeBase')}</span>
                 <Badge
@@ -130,7 +139,7 @@ export function WorkfolioHeader() {
               onMouseEnter={() => router.prefetch('/knowledge-base')}
               className="group h-8 gap-1.5 border-primary/30 bg-background px-2.5 text-xs font-medium hover:border-primary hover:bg-accent sm:gap-2 sm:px-3"
             >
-              <Lock className="h-3.5 w-3.5 shrink-0 text-amber-600 transition-transform group-hover:scale-110" />
+              <Lock className="h-3.5 w-3.5 shrink-0 text-warning transition-transform group-hover:scale-110" />
               <span className="sm:hidden">{t('knowledgeBaseShort')}</span>
               <span className="hidden sm:inline">{t('knowledgeBase')}</span>
               <Badge variant="warning" className="hidden px-1.5 py-0 font-mono text-[10px] md:inline-flex">
@@ -164,7 +173,7 @@ export function WorkfolioHeader() {
       </div>
 
       {!isUnlocked && isInsideKnowledgeBase ? (
-        <div className="border-t border-amber-500/30 bg-amber-500/10 px-4 py-1 text-center text-xs text-amber-800 dark:text-amber-300">
+        <div className="border-t border-warning/30 bg-warning/10 px-4 py-1 text-center text-xs text-warning">
           <ShieldAlert className="mr-1 inline h-3.5 w-3.5" />
           {t('guestBanner')}
         </div>

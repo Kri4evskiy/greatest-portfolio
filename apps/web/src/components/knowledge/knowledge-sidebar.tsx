@@ -1,5 +1,6 @@
 'use client'
 
+import { DEFAULT_LOCALE, SupportedLocaleEnum } from '@repo/shared-schemas'
 import { Badge } from '@repo/ui'
 import {
   BookOpen,
@@ -14,10 +15,11 @@ import {
   Search,
   Sparkles,
 } from 'lucide-react'
-import { useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, usePathname } from '@/i18n/navigation'
 import type { KnowledgeTreeFolderNode, KnowledgeTreeNode } from '@/lib/mdx-content'
+import { prefetchKnowledgeSearchIndex } from '@/lib/search-index-client'
 import { useUIStore } from '@/store/use-ui-store'
 
 function collectAllFolderKeys(nodes: readonly KnowledgeTreeNode[]): string[] {
@@ -170,8 +172,12 @@ export function KnowledgeSidebar({
   totalArticles: number
 }) {
   const t = useTranslations('KnowledgeBase')
+  const rawLocale = useLocale()
+  const parsedLocale = SupportedLocaleEnum.safeParse(rawLocale)
+  const locale = parsedLocale.success ? parsedLocale.data : DEFAULT_LOCALE
   const pathname = usePathname()
   const expandedFolders = useUIStore((s) => s.expandedKbFolders)
+  const hydrateKbFoldersFromSession = useUIStore((s) => s.hydrateKbFoldersFromSession)
   const expandKbAncestors = useUIStore((s) => s.expandKbAncestors)
   const collapseAllKbFolders = useUIStore((s) => s.collapseAllKbFolders)
   const expandAllKbFolders = useUIStore((s) => s.expandAllKbFolders)
@@ -183,6 +189,10 @@ export function KnowledgeSidebar({
     () => allFolderKeys.some((key) => Boolean(expandedFolders[key])),
     [allFolderKeys, expandedFolders],
   )
+
+  useEffect(() => {
+    hydrateKbFoldersFromSession()
+  }, [hydrateKbFoldersFromSession])
 
   // Automatically expand only the active ancestor chain when opening a Topic, Subtopic, or Article
   useEffect(() => {
@@ -208,6 +218,8 @@ export function KnowledgeSidebar({
     <div className="space-y-3 rounded-xl border border-border bg-card p-3 shadow-sm">
       <button
         type="button"
+        onMouseEnter={() => prefetchKnowledgeSearchIndex(locale)}
+        onFocus={() => prefetchKnowledgeSearchIndex(locale)}
         onClick={() => {
           if (closeOnSelect) setIsMobileOpen(false)
           openCommandPalette('')
