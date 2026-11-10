@@ -13,8 +13,8 @@ export const buttonVariants = cva(
         secondary: 'bg-surface-subtle text-foreground border border-border/60 hover:bg-accent',
         ghost: 'text-foreground hover:bg-accent hover:text-accent-foreground',
         destructive: 'bg-destructive text-destructive-foreground shadow-sm hover:opacity-90',
-        locked: 'border border-warning/35 bg-warning/10 text-warning-foreground hover:bg-warning/20',
-        unlocked: 'border border-success/35 bg-success/10 text-success-foreground hover:bg-success/20',
+        locked: 'border border-warning/40 bg-warning/10 text-warning hover:bg-warning/20',
+        unlocked: 'border border-success/40 bg-success/10 text-success hover:bg-success/20',
       },
       size: {
         default: 'h-9 px-4 py-2',

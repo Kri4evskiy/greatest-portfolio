@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react'
+import { Badge } from './badge'
 import { Button } from './button'
 
 const meta: Meta<typeof Button> = {
@@ -18,17 +19,25 @@ export const Default: Story = {
 }
 
 export const LockedKnowledgeBase: Story = {
-  args: {
-    children: '🔒 Base of Knowledge',
-    variant: 'locked',
-  },
+  render: () => (
+    <Button variant="locked" size="sm" className="gap-2">
+      <span>🔒 Base of Knowledge</span>
+      <Badge variant="warning" className="px-1.5 py-0 font-mono text-[10px]">
+        Protected
+      </Badge>
+    </Button>
+  ),
 }
 
 export const UnlockedKnowledgeBase: Story = {
-  args: {
-    children: '🔓 Base of Knowledge',
-    variant: 'unlocked',
-  },
+  render: () => (
+    <Button variant="unlocked" size="sm" className="gap-2">
+      <span>🔓 Base of Knowledge</span>
+      <Badge variant="success" className="px-1.5 py-0 font-mono text-[10px]">
+        GUEST
+      </Badge>
+    </Button>
+  ),
 }
 
 export const Destructive: Story = {
