@@ -13,11 +13,11 @@ type Story = StoryObj<typeof Card>
 
 export const ProjectCaseStudy: Story = {
   render: () => (
-    <Card className="max-w-md">
+    <Card className="max-w-md" variant="default">
       <CardHeader>
         <div className="flex items-center justify-between">
           <Badge variant="core">Full-Stack Monorepo</Badge>
-          <span className="text-xs text-muted-foreground">ADR #1–#15</span>
+          <span className="text-xs text-muted-foreground">ADR #1–#16</span>
         </div>
         <CardTitle className="mt-2">Enterprise Portfolio & Knowledge Base</CardTitle>
         <CardDescription>
@@ -29,6 +29,28 @@ export const ProjectCaseStudy: Story = {
           Built with strict TypeScript, Biome.js, and zero-runtime overhead UI primitives.
         </p>
       </CardContent>
+    </Card>
+  ),
+}
+
+export const SubtleSurface: Story = {
+  render: () => (
+    <Card className="max-w-md" variant="subtle">
+      <CardHeader>
+        <CardTitle>Subtle Notion Surface</CardTitle>
+        <CardDescription>Uses --surface-subtle token for secondary recessed blocks.</CardDescription>
+      </CardHeader>
+    </Card>
+  ),
+}
+
+export const ElevatedSurface: Story = {
+  render: () => (
+    <Card className="max-w-md" variant="elevated">
+      <CardHeader>
+        <CardTitle>Elevated Surface</CardTitle>
+        <CardDescription>Uses --surface-elevated token for floating cards and modals.</CardDescription>
+      </CardHeader>
     </Card>
   ),
 }

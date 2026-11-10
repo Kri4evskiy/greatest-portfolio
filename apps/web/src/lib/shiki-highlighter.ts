@@ -27,6 +27,11 @@ function escapeHtmlFallback(raw: string): string {
     .replaceAll("'", '&#39;')
 }
 
+const SHIKI_THEMES = {
+  light: 'github-light-default',
+  dark: 'github-dark-default',
+} as const
+
 export async function highlightCodeServer(code: string, rawLanguage: string): Promise<string> {
   const normalized = rawLanguage.trim().toLowerCase()
   const lang = LANGUAGE_ALIASES[normalized] ?? (normalized || 'typescript')
@@ -34,13 +39,15 @@ export async function highlightCodeServer(code: string, rawLanguage: string): Pr
   try {
     return await codeToHtml(code, {
       lang,
-      theme: 'github-dark-default',
+      themes: SHIKI_THEMES,
+      defaultColor: false,
     })
   } catch {
     try {
       return await codeToHtml(code, {
         lang: 'text',
-        theme: 'github-dark-default',
+        themes: SHIKI_THEMES,
+        defaultColor: false,
       })
     } catch {
       return `<pre class="shiki"><code>${escapeHtmlFallback(code)}</code></pre>`

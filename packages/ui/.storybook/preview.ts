@@ -4,7 +4,7 @@ import '../src/styles/globals.css'
 const preview: Preview = {
   globalTypes: {
     theme: {
-      description: 'Global theme for @repo/ui components (Notion Workfolio Light / Dark)',
+      description: 'Global theme for @repo/ui components (Light / Dark)',
       toolbar: {
         title: 'Theme',
         icon: 'mirror',
@@ -15,15 +15,35 @@ const preview: Preview = {
         dynamicTitle: true,
       },
     },
+    palette: {
+      description: 'Semantic color palette preset ([data-palette])',
+      toolbar: {
+        title: 'Palette',
+        icon: 'paintbrush',
+        items: [
+          { value: 'default', title: 'Default (Workfolio Paper)' },
+          { value: 'graphite', title: 'Graphite (Cool Slate)' },
+          { value: 'sepia', title: 'Sepia (Reading Mode)' },
+        ],
+        dynamicTitle: true,
+      },
+    },
   },
   initialGlobals: {
     theme: 'light',
+    palette: 'default',
   },
   decorators: [
     (Story, context) => {
       const selectedTheme = (context.globals.theme as string | undefined) ?? 'light'
+      const selectedPalette = (context.globals.palette as string | undefined) ?? 'default'
       if (typeof document !== 'undefined') {
         document.documentElement.classList.toggle('dark', selectedTheme === 'dark')
+        if (selectedPalette === 'default') {
+          delete document.documentElement.dataset.palette
+        } else {
+          document.documentElement.dataset.palette = selectedPalette
+        }
       }
       return Story()
     },

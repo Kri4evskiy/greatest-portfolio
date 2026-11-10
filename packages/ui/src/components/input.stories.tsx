@@ -12,6 +12,14 @@ type Story = StoryObj<typeof Input>
 
 export const Default: Story = {
   args: {
-    placeholder: 'Filter 15 stack technologies or search ADR...',
+    placeholder: 'Filter 16 stack technologies or search ADR...',
+    variant: 'default',
+  },
+}
+
+export const Subtle: Story = {
+  args: {
+    placeholder: 'Search notes via Cmd+K...',
+    variant: 'subtle',
   },
 }

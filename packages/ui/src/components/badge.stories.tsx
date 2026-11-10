@@ -26,7 +26,14 @@ export const Production: Story = {
 
 export const Experimental: Story = {
   args: {
-    children: 'Experimental (Redact)',
+    children: 'Experimental (MCP)',
     variant: 'experimental',
+  },
+}
+
+export const Info: Story = {
+  args: {
+    children: 'Deep Dive ADR',
+    variant: 'info',
   },
 }

@@ -31,6 +31,13 @@ export const UnlockedKnowledgeBase: Story = {
   },
 }
 
+export const Destructive: Story = {
+  args: {
+    children: 'Revoke Guest Pass',
+    variant: 'destructive',
+  },
+}
+
 export const Outline: Story = {
   args: {
     children: 'Why in stack? (ADR)',

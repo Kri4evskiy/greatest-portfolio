@@ -25,12 +25,12 @@ export function CodeCopyButton({ code }: { code: string }) {
       type="button"
       onClick={() => void handleCopy()}
       aria-label={copied ? t('copiedCode') : t('copyCode')}
-      className="inline-flex items-center gap-1 rounded border border-slate-700/80 bg-slate-900/90 px-2 py-0.5 font-mono text-[10px] font-medium text-slate-300 transition-colors hover:border-slate-500 hover:bg-slate-800 hover:text-white"
+      className="inline-flex items-center gap-1 rounded border border-code-border bg-background/80 px-2 py-0.5 font-mono text-[10px] font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:bg-accent hover:text-foreground"
     >
       {copied ? (
         <>
-          <Check className="h-3 w-3 text-emerald-400" />
-          <span className="text-emerald-400">{t('copiedCode')}</span>
+          <Check className="h-3 w-3 text-success" />
+          <span className="text-success">{t('copiedCode')}</span>
         </>
       ) : (
         <>
