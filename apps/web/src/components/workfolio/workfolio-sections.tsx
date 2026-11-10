@@ -41,8 +41,8 @@ interface CaseStudyConfig {
 const CASE_STUDY_CONFIGS: readonly CaseStudyConfig[] = [
   {
     id: 'this-project-engine',
-    tags: ['MDX 2.0 AST', 'Dual-Theme Shiki', 'Lazy Cmd+K', '3-Tier Multi-Slug', 'Mobile-First'],
-    articleSlug: 'knowledge-engine/three-tier-mdx-cmdk-architecture',
+    tags: ['Server MDX AST', 'Dual-Theme Shiki', 'Lazy Cmd+K', '3-Tier Multi-Slug', 'Mobile-First'],
+    articleSlug: 'knowledge-engine/server-mdx-ast-dual-theme-shiki',
     articleCategory: 'this-project',
     isFlagship: true,
   },

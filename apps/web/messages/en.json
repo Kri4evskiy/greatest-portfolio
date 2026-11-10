@@ -36,7 +36,7 @@
     "calloutTitle": "How this live monorepo complements my CV",
     "pillar1Title": "1. 1-Click Zero-Trust RBAC",
     "pillar1Desc": "Clicking Base of Knowledge opens a RHF + Zod micro-form, issues an HttpOnly JWT cookie, and streams a live event over SSE.",
-    "pillar2Title": "2. 3-Tier MDX 2.0 + Cmd+K",
+    "pillar2Title": "2. 3-Tier MDX + Cmd+K",
     "pillar2Desc": "Multi-slug Knowledge Base (Topic -> Subtopic -> Notes) with 0 KB JS Shiki highlighting, #tags, and instant Cmd+K search.",
     "pillar3Title": "3. Transparent Trade-offs",
     "pillar3Desc": "Includes 16 interactive ADRs plus an open Engineering Backlog & Trade-offs board explaining what was built vs deferred."
@@ -48,7 +48,7 @@
     "readLocked": "🔒 Unlock & open article (1-Click)",
     "items": {
       "this-project-engine": {
-        "title": "This Platform: 3-Tier Multi-Slug MDX 2.0 Engine, Server Shiki & Cmd+K Search",
+        "title": "This Platform: 3-Tier Multi-Slug MDX Engine, Server Shiki & Cmd+K Search",
         "subtitle": "How this dual-purpose CV & Second Brain was architected from scratch: folded multi-slug sidebar, subtopic tabs, 0 KB client JS syntax highlighting, RSC search index, and Mobile-First section navigator.",
         "metrics": "Flagship Architecture • 0 KB Highlight JS • <5ms Cmd+K"
       },

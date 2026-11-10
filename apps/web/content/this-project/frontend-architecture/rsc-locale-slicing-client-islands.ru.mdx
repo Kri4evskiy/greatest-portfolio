@@ -1,0 +1,77 @@
+---
+title: "Архитектура RSC в Next.js: серверная нарезка локалей, микро-острова и React 19 Compiler"
+sidebarLabel: "RSC-острова и React Compiler"
+summary: "Как минимизировать клиентский JS-бандл в мультиязычном приложении на Next.js 16 и React 19: нарезка активной локали в Server Components, тонкие клиентские микро-острова, bfcache-безопасный SSE и React Compiler."
+category: "this-project"
+format: "deep-dive"
+tags: ["rsc", "nextjs", "react-compiler", "i18n", "performance", "zustand"]
+readingTime: "6 мин"
+publishedAt: "2026-11-10"
+order: 1
+tldr:
+  - "Секции главной страницы (`WorkfolioHeroSection`, `WorkfolioProjectsSection`, `WorkfolioExperienceSection`, `WorkfolioFooter`) являются чистыми Server Components и вырезают только активную локаль на сервере."
+  - "Вся интерактивность вынесена в минимальные клиентские микро-острова (`workfolio-client-islands.tsx`, `footer-sse-status.tsx`), получающие уже готовые строки через пропсы."
+  - "В `next.config.ts` активирован `reactCompiler: true`, а стейт разделён между локальным `useState` внутри D3-графов и глобальным `Zustand` с синхронизацией `sessionStorage`."
+---
+
+## 1. Серверная нарезка локалей (`Server Locale Slicing`)
+
+В мультиязычных проектах (`EN / UK / RU`) импорт типизированных словарей (опыт работы, кейсы, Tech Radar) внутри `'use client'` компонента заставляет бандлер упаковывать тексты сразу на всех трёх языках в браузерный JS-чанк.
+
+Чтобы клиент получал только одну активную локаль, крупные секции рендерятся как **Server Components**, выбирают нужный язык через `pickLocalized(field, locale)` на сервере и передают готовые строки в точечные клиентские острова:
+
+```tsx title="apps/web/src/components/workfolio/workfolio-sections.tsx"
+export async function WorkfolioExperienceSection({ locale }: { locale: SupportedLocale }) {
+  const t = await getTranslations({ locale, namespace: 'Experience' })
+  const primaryRoles = COMMERCIAL_EXPERIENCE.filter((item) => item.tier === 'primary')
+  const earlierRoles = COMMERCIAL_EXPERIENCE.filter((item) => item.tier === 'earlier')
+
+  return (
+    <section id="experience" className="scroll-mt-20 py-10">
+      {/* Основной список рендерится в статический HTML на сервере (0 КБ JS) */}
+      {primaryRoles.map((role) => (
+        <ExperienceCard key={role.id} role={role} locale={locale} />
+      ))}
+
+      {/* В клиентский остров передаются только готовые HTML-узлы (ReactNode) */}
+      <EarlierRolesDisclosure label={t('showEarlier')} hideLabel={t('hideEarlier')}>
+        {earlierRoles.map((role) => (
+          <ExperienceCard key={role.id} role={role} locale={locale} />
+        ))}
+      </EarlierRolesDisclosure>
+    </section>
+  )
+}
+```
+
+---
+
+## 2. Клиентские микро-острова и совместимость SSE с мобильным `bfcache`
+
+Каждая интерактивная точка изолирована в собственный легковесный клиентский компонент:
+
+| Микро-остров | Назначение | Передаваемые пропсы |
+| :--- | :--- | :--- |
+| **`HeroActionRow`** | Программный скролл к `#roadmap` или открытие модалки `Guest Pass` | Только локализованные подписи кнопок |
+| **`CaseStudyReadButton`** | Переход к статье кейса или вызов `openAuthModal(targetHref)` | `targetHref`, `readUnlockedLabel`, `readLockedLabel` |
+| **`EarlierRolesDisclosure`** | Аккордеон раннего опыта работы | Серверный `children: ReactNode` + текстовые метки |
+| **`FooterSseStatus`** | Живой индикатор пульса телеметрии `EventSource` | Строки статусов (`Online`, `Standby`) |
+
+Чтобы открытое соединение `EventSource` в `FooterSseStatus` не блокировало мгновенный возврат по кнопке «Назад» (**Back/Forward Cache — `bfcache`**) в мобильных браузерах, компонент закрывает поток на событии `pagehide` и переподключает его на `pageshow`:
+
+```typescript title="apps/web/src/components/layout/footer-sse-status.tsx"
+window.addEventListener('pagehide', closeStream)
+window.addEventListener('pageshow', (event) => {
+  if (event.persisted) connectStream()
+})
+```
+
+---
+
+## 3. `React 19 Compiler` и гигиена состояния (`useState` против `Zustand`)
+
+В `apps/web/next.config.ts` включён `reactCompiler: true` (`babel-plugin-react-compiler`), который автоматически мемоизирует вычисления и JSX-узлы на этапе сборки без ручных обёрток `useMemo` и `useCallback`.
+
+Для предсказуемой работы компилятора клиентское состояние разделено по области жизни:
+- **Локальный `useState`:** используется внутри интерактивных симуляций `D3.js` (`d3-architecture-flow.tsx`, `d3-react-render-graph.tsx`), чтобы переключение режимов графа не вызывало ререндер соседних компонентов страницы.
+- **Глобальный `Zustand` (`use-ui-store.ts`):** хранит только кросс-компонентное состояние UI (модалки `Cmd+K` / `Guest Pass` и раскрытые папки дерева Базы Знаний с SSR-безопасной синхронизацией в `sessionStorage`).

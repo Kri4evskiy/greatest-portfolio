@@ -1,0 +1,91 @@
+---
+title: "Матриця мульти-темних CSS-токенів, Tailwind Preset та архітектура пакета @repo/ui"
+sidebarLabel: "Дизайн-токени та Tailwind Preset"
+summary: "Як спроєктувати масштабовану дизайн-систему в монорепозиторії: двовимірна матриця тем (Light/Dark × палітри), інверсія залежностей через Tailwind Preset, Storybook 8 та адаптивні подання даних."
+category: "this-project"
+format: "deep-dive"
+tags: ["design-tokens", "tailwind", "ui-system", "storybook", "architecture"]
+readingTime: "6 хв"
+publishedAt: "2026-11-10"
+order: 1
+tldr:
+  - "Стилі в `packages/ui/src/styles/globals.css` побудовані на семантичних HSL-змінних і двох незалежних осях: режимі яскравості (`.dark`) та палітрі (`[data-palette=\"graphite\" | \"sepia\"]`)."
+  - "Пакет `@repo/ui` не залежить від застосунків: він експортує `@repo/ui/tailwind.config` як перевикористовуваний `preset`, який `apps/web` підключає в `presets: [uiPreset]`."
+  - "Складні дані автоматично змінюють подання: вертикальні картки на смартфонах (`< md`) та повнорозмірні таблиці `TanStack Table` / графи `D3.js` на десктопах (`>= md`)."
+---
+
+## 1. Двовимірна матриця семантичних токенів (`Light/Dark` × `Palette`)
+
+Замість прив'язки компонентів до конкретних палітр Tailwind (`slate-*`, `emerald-*`, `amber-*`) уся колірна система винесена в семантичні CSS-змінні у форматі `H S% L%` (сумісному з модифікаторами прозорості `hsl(var(--primary) / 0.15)`):
+
+- **Ієрархія поверхонь:** `--background`, `--surface-subtle`, `--surface-elevated`, `--card`, `--popover`.
+- **Семантичні статуси:** `--success`, `--warning`, `--info`, `--destructive` (із парними `*-foreground`).
+- **Візуалізація та код:** `--chart-1..4` для SVG/D3-діаграм і `--code-bg`, `--code-header`, `--code-border` для блоків коду.
+
+```css title="packages/ui/src/styles/globals.css"
+:root {
+  --background: 40 33% 98%;
+  --surface-subtle: 38 26% 95%;
+  --surface-elevated: 0 0% 100%;
+  --primary: 24 9.8% 10%;
+  --success: 152 69% 31%;
+  --warning: 38 92% 42%;
+  --info: 217 91% 52%;
+}
+
+:root.dark,
+.dark {
+  --background: 24 10% 8%;
+  --surface-subtle: 24 9% 11%;
+  --surface-elevated: 24 9% 14%;
+  --primary: 36 25% 94%;
+  --success: 152 60% 52%;
+}
+
+:root[data-palette="graphite"] {
+  --background: 220 20% 98%;
+  --surface-subtle: 220 16% 95%;
+  --info: 221 83% 53%;
+}
+```
+
+> [!TIP]
+> Розділення осей `.dark` і `data-palette` дозволяє підключити будь-яку нову тему або брендинг клієнта (`multi-tenant / white-label`) перевизначенням ~20 змінних у CSS без жодної правки в React-компонентах.
+
+---
+
+## 2. Інверсія залежностей через експорт `Tailwind Preset`
+
+Щоб пакет `@repo/ui` залишався повністю незалежним і не знав про файлову структуру `apps/web`, він експортує власний `tailwind.config.ts` як **Tailwind Preset**:
+
+```typescript title="apps/web/tailwind.config.ts"
+import uiPreset from '@repo/ui/tailwind.config'
+import type { Config } from 'tailwindcss'
+
+const config: Config = {
+  presets: [uiPreset],
+  content: [
+    './src/**/*.{ts,tsx,mdx}',
+    '../../packages/ui/src/**/*.{ts,tsx}',
+  ],
+}
+
+export default config
+```
+
+Така схема дає три архітектурні переваги:
+1. Єдине джерело мапінгу CSS-змінних у класи Tailwind (`bg-surface-subtle`, `text-warning`, `border-code-border`) як для `apps/web`, так і для ізольованого `Storybook 8`.
+2. Відсутність зворотних шляхів `../../apps/*` усередині пакета дизайн-системи.
+3. Можливість підключити другий фронтенд-сервіс до тієї ж дизайн-системи одним рядком `presets: [uiPreset]`.
+
+---
+
+## 3. Адаптивні подання щільних даних (`< md` проти `>= md`)
+
+У компонентах із високою щільністю інформації замість горизонтального стискання таблиць на вузьких екранах (`360px`) застосовується зміна патерну відображення:
+
+| Компонент | Смартфони (`< md`) | Планшети та десктоп (`>= md`) |
+| :--- | :--- | :--- |
+| **`TechRadarTable`** | Стек карток (`md:hidden`) зі швидким переходом до `ADR` | 6-колонкова таблиця `TanStack Table` (`hidden md:block`) із сортуванням і фільтрами |
+| **`D3.js` / `SVG` графи** | Горизонтальний скрол-контейнер `overflow-x-auto` з `min-w-[540px]` | Повна інтерактивна векторна сцена на всю ширину колонки |
+| **`Storybook 8` (`@repo/ui`)** | Перевірка контрасту та переносів у в'юпортах `360px` і `768px` | Інтерактивне перемикання тем `Warm Paper / Dark / Graphite / Sepia` в тулбарі |

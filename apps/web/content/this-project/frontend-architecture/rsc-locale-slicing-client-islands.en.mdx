@@ -1,0 +1,77 @@
+---
+title: "Next.js RSC Architecture: Server Locale Slicing, Client Micro-Islands & React 19 Compiler"
+sidebarLabel: "RSC Islands & React Compiler"
+summary: "How to minimize client JS bundles in a multilingual Next.js 16 and React 19 app: slicing active locales in Server Components, isolating interactivity into micro-islands, bfcache-safe SSE, and React Compiler."
+category: "this-project"
+format: "deep-dive"
+tags: ["rsc", "nextjs", "react-compiler", "i18n", "performance", "zustand"]
+readingTime: "6 min"
+publishedAt: "2026-11-10"
+order: 1
+tldr:
+  - "Renders primary home page sections (`WorkfolioHeroSection`, `WorkfolioProjectsSection`, `WorkfolioExperienceSection`, `WorkfolioFooter`) as pure Server Components that slice only the active locale on the server."
+  - "Isolates browser interactivity into tiny client micro-islands (`workfolio-client-islands.tsx`, `footer-sse-status.tsx`) receiving pre-resolved strings or `ReactNode` children."
+  - "Enables `reactCompiler: true` in `next.config.ts` and separates high-frequency local `D3.js` state from cross-page `Zustand` UI state."
+---
+
+## 1. Server Locale Slicing in Multilingual Next.js Apps
+
+In multilingual applications (`EN / UK / RU`), importing typed content dictionaries (experience history, case studies, Tech Radar) inside a `'use client'` component forces the bundler to ship all three translations inside the browser JS chunk.
+
+To ensure the browser receives only the active locale, major page sections run as **Server Components**, slice localized fields via `pickLocalized(field, locale)` on the server, and pass plain strings or pre-rendered `ReactNode` trees to small client islands:
+
+```tsx title="apps/web/src/components/workfolio/workfolio-sections.tsx"
+export async function WorkfolioExperienceSection({ locale }: { locale: SupportedLocale }) {
+  const t = await getTranslations({ locale, namespace: 'Experience' })
+  const primaryRoles = COMMERCIAL_EXPERIENCE.filter((item) => item.tier === 'primary')
+  const earlierRoles = COMMERCIAL_EXPERIENCE.filter((item) => item.tier === 'earlier')
+
+  return (
+    <section id="experience" className="scroll-mt-20 py-10">
+      {/* Primary roles render as pure static HTML on the server (0 KB JS) */}
+      {primaryRoles.map((role) => (
+        <ExperienceCard key={role.id} role={role} locale={locale} />
+      ))}
+
+      {/* The client island receives pre-rendered server ReactNodes as children */}
+      <EarlierRolesDisclosure label={t('showEarlier')} hideLabel={t('hideEarlier')}>
+        {earlierRoles.map((role) => (
+          <ExperienceCard key={role.id} role={role} locale={locale} />
+        ))}
+      </EarlierRolesDisclosure>
+    </section>
+  )
+}
+```
+
+---
+
+## 2. Client Micro-Islands & Mobile `bfcache`-Safe SSE
+
+Every interactive control is isolated into a dedicated micro-island:
+
+| Micro-Island | Responsibility | Serialized Props |
+| :--- | :--- | :--- |
+| **`HeroActionRow`** | Smooth scroll to `#roadmap` or open the `Guest Pass` modal | Plain localized button labels |
+| **`CaseStudyReadButton`** | Navigate to the case study note or trigger `openAuthModal(targetHref)` | `targetHref`, `readUnlockedLabel`, `readLockedLabel` |
+| **`EarlierRolesDisclosure`** | Expand/collapse earlier career roles | Server-rendered `children: ReactNode` + toggle labels |
+| **`FooterSseStatus`** | Live `EventSource` telemetry pulse indicator | Localized status labels (`Online`, `Standby`) |
+
+To prevent an open `EventSource` connection in `FooterSseStatus` from disqualifying pages from the browser's **Back/Forward Cache (`bfcache`)** on mobile Safari/Chrome, the island closes the stream on `pagehide` and reconnects when restored from `bfcache` on `pageshow`:
+
+```typescript title="apps/web/src/components/layout/footer-sse-status.tsx"
+window.addEventListener('pagehide', closeStream)
+window.addEventListener('pageshow', (event) => {
+  if (event.persisted) connectStream()
+})
+```
+
+---
+
+## 3. `React 19 Compiler` & State Boundaries (`useState` vs `Zustand`)
+
+`apps/web/next.config.ts` enables `reactCompiler: true` (`babel-plugin-react-compiler`), which automatically memoizes derived values and JSX subtrees at build time without manual `useMemo` or `useCallback` wrappers.
+
+To keep rendering predictable, client state follows strict boundaries:
+- **Component-Local `useState`:** used inside interactive `D3.js` simulations (`d3-architecture-flow.tsx`, `d3-react-render-graph.tsx`) so toggling simulation modes never triggers re-renders outside the graph card.
+- **Global `Zustand` (`use-ui-store.ts`):** reserved strictly for cross-component UI state (`Cmd+K` / `Guest Pass` modals and expanded Knowledge Base folders persisted to `sessionStorage` after hydration).

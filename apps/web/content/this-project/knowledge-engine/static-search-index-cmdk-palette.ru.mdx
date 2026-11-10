@@ -1,0 +1,84 @@
+---
+title: "Глобальный поиск Cmd+K: статический SSG-индекс маршрута и ленивая подгрузка по требованию"
+sidebarLabel: "Поиск Cmd+K и SSG-индекс"
+summary: "Как спроектировать мгновенный глобальный поиск по 100+ конспектам без внешней БД и без раздувания начального HTML страниц: статический Route Handler и кэширующий клиентский загрузчик."
+category: "this-project"
+format: "deep-dive"
+tags: ["cmdk", "search", "nextjs", "ssg", "performance"]
+readingTime: "5 мин"
+publishedAt: "2026-11-10"
+order: 2
+tldr:
+  - "Поисковый индекс вынесен из корневого `layout.tsx` в статический SSG-маршрут `/search-index/[locale]`, что экономит `100%` веса индекса в начальном HTML и RSC-пейлоаде страниц."
+  - "Route Handler с `dynamic = 'force-static'` собирает заголовки статей, `#теги` и якоря подзаголовков `h2/h3` один раз на этапе `next build` (`0 мс` CPU в рантайме)."
+  - "Клиентский модуль `search-index-client.ts` предзагружает JSON при наведении курсора на кнопку поиска или нажатии `Cmd+K`, кэшируя промис в памяти."
+---
+
+## 1. Вынос поискового индекса из корневого `layout.tsx`
+
+Глобальное модальное окно `CommandPaletteModal` (`Cmd+K`) монтируется в корневом `app/[locale]/layout.tsx`, чтобы быть доступным с любой страницы. Если передавать массив `searchIndex` напрямую через пропсы из `layout.tsx`, Next.js сериализует заголовки, теги и оглавления всех статей в первичный HTML и RSC-пейлоад **каждой** страницы, даже если пользователь не открывает поиск.
+
+Чтобы сохранить минимальный размер документа при росте базы знаний за `100+` статей, индекс выделен в отдельный статический JSON-эндпоинт.
+
+---
+
+## 2. Статический SSG Route Handler (`/search-index/[locale]`)
+
+Маршрут `apps/web/src/app/search-index/[locale]/route.ts` помечен директивой `export const dynamic = 'force-static'` и использует `generateStaticParams()`. Во время сборки он извлекает облегчённую проекцию статей (без AST-блоков контента) и список популярных тегов:
+
+```typescript title="apps/web/src/app/search-index/[locale]/route.ts"
+import { DEFAULT_LOCALE, SUPPORTED_LOCALES, SupportedLocaleEnum } from '@repo/shared-schemas'
+import { NextResponse } from 'next/server'
+import { getKnowledgeSearchIndex, getPopularTags } from '@/lib/mdx-content'
+
+export const dynamic = 'force-static'
+
+export function generateStaticParams() {
+  return SUPPORTED_LOCALES.map((locale) => ({ locale }))
+}
+
+export async function GET(_request: Request, context: { params: Promise<{ locale: string }> }) {
+  const { locale } = await context.params
+  const parsed = SupportedLocaleEnum.safeParse(locale)
+  const safeLocale = parsed.success ? parsed.data : DEFAULT_LOCALE
+
+  return NextResponse.json({
+    items: getKnowledgeSearchIndex(safeLocale),
+    popularTags: getPopularTags(safeLocale, 14),
+  })
+}
+```
+
+Каждая запись `KnowledgeSearchItem` содержит маршрут статьи, локализованные названия темы и подтемы, массив `#тегов` и массив заголовков `h2/h3` с их `id` для прямого прыжка к нужному абзацу (`/ru/knowledge-base/...#section-id`).
+
+---
+
+## 3. Клиентский загрузчик с дедупликацией промиса и предзагрузкой
+
+В `apps/web/src/lib/search-index-client.ts` две `Map`-таблицы хранят уже полученный ответ и активный in-flight промис, предотвращая повторные сетевые запросы при быстрых переключениях:
+
+```typescript title="apps/web/src/lib/search-index-client.ts"
+const resolvedCache = new Map<SupportedLocale, SearchIndexPayload>()
+const inflightRequests = new Map<SupportedLocale, Promise<SearchIndexPayload>>()
+
+export function fetchSearchIndexForLocale(locale: SupportedLocale): Promise<SearchIndexPayload> {
+  const cached = resolvedCache.get(locale)
+  if (cached) return Promise.resolve(cached)
+
+  const existing = inflightRequests.get(locale)
+  if (existing) return existing
+
+  const request = fetch(`/search-index/${locale}`)
+    .then((res) => res.json() as Promise<SearchIndexPayload>)
+    .then((payload) => {
+      resolvedCache.set(locale, payload)
+      inflightRequests.delete(locale)
+      return payload
+    })
+
+  inflightRequests.set(locale, request)
+  return request
+}
+```
+
+Кнопка поиска в `WorkfolioHeader` вызывает `preloadSearchIndex(locale)` на событиях `onMouseEnter` и `onFocus`, поэтому к моменту клика или нажатия `Cmd+K` индекс уже находится в памяти браузера.

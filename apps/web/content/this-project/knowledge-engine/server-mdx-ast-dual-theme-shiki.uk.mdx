@@ -1,0 +1,97 @@
+---
+title: "Серверний рушій MDX: роутинг [locale]/[...slug], remark AST та Dual-Theme Shiki (0 КБ JS)"
+sidebarLabel: "Рушій MDX, роутинг та Shiki"
+summary: "Архітектурний шаблон побудови багатомовної бази знань у Next.js App Router: рекурсивний catch-all маршрут [locale]/knowledge-base/[...slug], серверний парсер gray-matter + remark AST та підсвічування Shiki v4 на CSS-змінних."
+category: "this-project"
+format: "deep-dive"
+tags: ["mdx", "nextjs", "remark", "shiki", "routing", "ssg"]
+readingTime: "7 хв"
+publishedAt: "2026-11-10"
+order: 1
+tldr:
+  - "Один універсальний catch-all маршрут `/[locale]/knowledge-base/[...slug]` обслуговує і оглядові хаби розділів/підрозділів, і кінцеві статті, повністю збираючись у статику через `generateStaticParams`."
+  - "Конвеєр `gray-matter` + `unified` (`remark-parse` + `remark-gfm`) розбирає `.mdx` на сервері в рекурсивне типізоване дерево `MdxBlock`, відправляючи в браузер `0 КБ` парсерів."
+  - "Підсвічування синтаксису `Shiki v4` генерує парні CSS-змінні (`github-light-default` + `github-dark-default`, `defaultColor: false`), перемикаючи тему миттєво без клієнтського JS."
+---
+
+## 1. Архітектура маршруту `/[locale]/knowledge-base/[...slug]`
+
+Конспекти зберігаються у файловій системі за шаблоном `apps/web/content/<topic>/<subtopic>/<slug>.<locale>.mdx`. Щоб масштабувати базу знань на будь-яку глибину вкладеності без дублювання `page.tsx`, використовується єдиний catch-all маршрут `app/[locale]/knowledge-base/[...slug]/page.tsx`:
+
+| Глибина `slug` | Приклад URL | Що рендерить `page.tsx` |
+| :--- | :--- | :--- |
+| **1 сегмент (`[topic]`)** | `/uk/knowledge-base/this-project` | **Хаб теми:** вкладки підтем (`TopicSubtopicTabs`), картки підрозділів та список усіх статей розділу |
+| **2 сегменти (`[topic, subtopic]`)** | `/uk/knowledge-base/this-project/knowledge-engine` | **Хаб підтеми:** активна вкладка підтеми та відфільтровані картки конспектів цієї папки |
+| **3 сегменти (`[...path, article]`)** | `/uk/knowledge-base/this-project/knowledge-engine/server-mdx-ast-dual-theme-shiki` | **Сторінка статті:** `TL;DR`, рендер `MdxArticleRenderer`, правий `TOC` і навігація `Prev / Next` |
+
+На етапі збірки `generateStaticParams()` перемножує `SUPPORTED_LOCALES` (`en`, `uk`, `ru`) на всі шляхи папок і статей (`getAllStaticKnowledgeSlugArrays()`), передгенеруючи 100% маршрутів у `SSG`:
+
+```typescript title="apps/web/src/app/[locale]/knowledge-base/[...slug]/page.tsx"
+export function generateStaticParams() {
+  const slugArrays = getAllStaticKnowledgeSlugArrays()
+  return SUPPORTED_LOCALES.flatMap((locale) =>
+    slugArrays.map((slug) => ({
+      locale,
+      slug,
+    })),
+  )
+}
+```
+
+При запиті сторінки сервер спершу перевіряє, чи є шлях кінцевою статтею (`getArticleByPathSegments`), а якщо ні — шукає вузол директорії (`getFolderByPathSegments`) у рекурсивному дереві `buildKnowledgeTree(locale)`. Для типобезпечних переходів між локалями використовується обгортка `createNavigation(routing)` з `next-intl/navigation`.
+
+---
+
+## 2. Серверний AST-конвеєр (`gray-matter` + `unified` + `remark-gfm`)
+
+Парсинг `.mdx`-файлів виконується виключно на сервері в `apps/web/src/lib/mdx-content.ts`:
+
+1. **`gray-matter`** витягує YAML-фронтматер (`title`, `sidebarLabel`, `summary`, `category`, `format`, `tags`, `readingTime`, `order`, `tldr`).
+2. **`unified().use(remarkParse).use(remarkGfm).parse(content)`** будує стандартне синтаксичне дерево `mdast`.
+3. Рекурсивний трансформер перетворює вузли `mdast` на серіалізовані блоки `MdxBlock` і дерево інлайн-форматування `MdxInlineNode`:
+
+```typescript title="apps/web/src/lib/mdx-content.ts"
+function parseMdxAstBlocks(content: string): {
+  blocks: MdxBlock[]
+  toc: MdxTocHeading[]
+} {
+  const tree = unified().use(remarkParse).use(remarkGfm).parse(content)
+  const toc: MdxTocHeading[] = []
+  const blocks = transformMdastChildren(tree.children, toc, true)
+  return { blocks, toc }
+}
+```
+
+Завдяки рекурсивному обходу AST рушій нативно підтримує:
+- Вкладені блоки коду та списки всередині GitHub-style плашок `> [!TIP]`, `> [!IMPORTANT]`, `> [!WARNING]`.
+- Вкладене інлайн-форматування (`**жирний текст із `кодом` усередині посилання**`) та зображення `![Підпис](/path.webp)`.
+- Вбудовування інтерактивних клієнтських компонентів (`<D3ReactRenderGraph />`, `<D3ArchitectureFlow />`, `<NestAiMcpDiagram />`) із парсингом атрибутів.
+
+---
+
+## 3. Dual-Theme підсвічування коду `Shiki v4` (`0 КБ` клієнтського JS)
+
+Серверний компонент `MdxArticleRenderer` збирає всі блоки коду статті (включно з вкладеними у callout-плашки та списки) і підсвічує їх паралельно через `Promise.all` та `codeToHtml` із `Shiki v4`:
+
+```typescript title="apps/web/src/components/knowledge/mdx-article-renderer.tsx"
+const html = await codeToHtml(code, {
+  lang: normalizedLang,
+  themes: {
+    light: 'github-light-default',
+    dark: 'github-dark-default',
+  },
+  defaultColor: false,
+})
+```
+
+Опція `defaultColor: false` змушує `Shiki` записувати в кожен `<span>` лише дві CSS-змінні (`--shiki-light` і `--shiki-dark`). У `globals.css` перемикання теми відбувається миттєво силами браузерного CSS-каскаду без перемальовування DOM і з `0 КБ` JavaScript на клієнті:
+
+```css title="packages/ui/src/styles/globals.css"
+.shiki span {
+  color: var(--shiki-light);
+}
+
+.dark .shiki span {
+  color: var(--shiki-dark);
+}
+```

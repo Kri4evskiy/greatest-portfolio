@@ -62,9 +62,9 @@ export const ENGINEERING_ROADMAP_ITEMS: readonly EngineeringRoadmapItem[] = [
       ru: 'Приблизить визуальный язык к теплой эстетике оригинального Notion Workfolio: обложка и аватар страницы, мягкая палитра бумаги/чернил, облегченные списки вместо тяжелых карточных рамок.',
     },
     rationale: {
-      en: 'Architecture-first strategy: Phases 1–5 deliberately focused on multi-slug MDX 2.0 routing, Cmd+K search, RBAC, and Mobile-First mechanics so UI v2 becomes a pure design-token and layout pass without rewriting state or routing.',
-      uk: 'Підхід Architecture-First: на етапах 1–5 ми свідомо закрили мультислаг-роутинг MDX 2.0, пошук Cmd+K, RBAC і Mobile-First механіку, щоб редизайн UI v2 ліг поверх готової логіки чисто через дизайн-токени.',
-      ru: 'Подход Architecture-First: на этапах 1–5 мы осознанно сфокусировались на мультислаг-роутинге MDX 2.0, поиске Cmd+K, RBAC и Mobile-First навигации, чтобы редизайн UI v2 лёг поверх готовой логики без переписывания ядра.',
+      en: 'Architecture-first strategy: Phases 1–5 deliberately focused on multi-slug MDX routing, Cmd+K search, RBAC, and Mobile-First mechanics so UI v2 becomes a pure design-token and layout pass without rewriting state or routing.',
+      uk: 'Підхід Architecture-First: на етапах 1–5 ми свідомо закрили мультислаг-роутинг MDX, пошук Cmd+K, RBAC і Mobile-First механіку, щоб редизайн UI v2 ліг поверх готової логіки чисто через дизайн-токени.',
+      ru: 'Подход Architecture-First: на этапах 1–5 мы осознанно сфокусировались на мультислаг-роутинге MDX, поиске Cmd+K, RBAC и Mobile-First навигации, чтобы редизайн UI v2 лёг поверх готовой логики без переписывания ядра.',
     },
     pros: {
       en: [
@@ -410,9 +410,9 @@ export const ENGINEERING_ROADMAP_ITEMS: readonly EngineeringRoadmapItem[] = [
     priority: 'P1',
     effort: 'L',
     title: {
-      en: '3-Tier Multi-Slug MDX 2.0 Engine, Server Shiki, Cmd+K & Mobile-First Navigator',
-      uk: '3-рівневий мультислаг-рушій MDX 2.0, серверний Shiki, Cmd+K та Mobile-First навігатор',
-      ru: '3-уровневый мультислаг-движок MDX 2.0, серверный Shiki, Cmd+K и Mobile-First навигатор',
+      en: '3-Tier Multi-Slug MDX Engine, Server Shiki, Cmd+K & Mobile-First Navigator',
+      uk: '3-рівневий мультислаг-рушій MDX, серверний Shiki, Cmd+K та Mobile-First навігатор',
+      ru: '3-уровневый мультислаг-движок MDX, серверный Shiki, Cmd+K и Mobile-First навигатор',
     },
     summary: {
       en: 'Completed architectural foundation (Phases 1–5): Topic -> Subtopic Tabs -> Articles hierarchy, 0 KB client JS syntax highlighting, deep h2/h3 search, #tags, and thumb-friendly section navigation.',

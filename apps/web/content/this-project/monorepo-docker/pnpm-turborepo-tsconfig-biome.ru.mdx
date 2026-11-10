@@ -1,0 +1,131 @@
+---
+title: "Эталонная конфигурация монорепозитория: pnpm 12, Turborepo, строгий tsconfig и Biome"
+sidebarLabel: "pnpm 12, tsconfig и Biome"
+summary: "Архитектурный шаблон настройки современного Full-Stack монорепозитория: структура воркспейса pnpm 12 с allowBuilds, граф задач Turborepo, каскад строгих правил TypeScript и единый Rust-линтер Biome.js."
+category: "this-project"
+format: "deep-dive"
+tags: ["monorepo", "pnpm-12", "turborepo", "typescript", "biome"]
+readingTime: "6 мин"
+publishedAt: "2026-11-10"
+order: 1
+tldr:
+  - "Воркспейс разделён на приложения (`apps/web`, `apps/api`, `apps/telemetry-ms`) и переиспользуемые пакеты (`packages/ui`, `packages/shared-schemas`) под управлением `pnpm 12.16.1` с белым списком `allowBuilds`."
+  - "Граф `turbo.json` гарантирует топологическую сборку зависимостей (`^build`) перед запуском `typecheck`, `dev` или `build` в дочерних сервисах."
+  - "Единый `tsconfig.base.json` включает `strict`, `noUncheckedIndexedAccess` и `exactOptionalPropertyTypes`, а `biome.json` заменяет связку `ESLint + Prettier` одним быстрым Rust-бинарником."
+---
+
+## 1. Структура воркспейса `pnpm 12` и защита `allowBuilds`
+
+В корневом файле `pnpm-workspace.yaml` объявляются границы пакетов и строгий белый список `allowBuilds`. В **pnpm 12** любые `postinstall`-скрипты сторонних зависимостей заблокированы по умолчанию для защиты от supply-chain атак — право на компиляцию нативных бинарников получают только явно перечисленные пакеты:
+
+```yaml title="pnpm-workspace.yaml"
+packages:
+  - "apps/*"
+  - "packages/*"
+
+allowBuilds:
+  "@biomejs/biome": true
+  "@parcel/watcher": true
+  "@prisma/client": true
+  "@prisma/engines": true
+  "@swc/core": true
+  esbuild: true
+  lefthook: true
+  prisma: true
+  sharp: true
+```
+
+| Слой монорепозитория | Пакет | Назначение |
+| :--- | :--- | :--- |
+| **Приложения (`apps/*`)** | `@repo/web`, `@repo/api`, `@repo/telemetry-ms` | Next.js 16 фронтенд, NestJS 11 REST API и микросервис живой SSE-телеметрии |
+| **Контракты (`packages/shared-schemas`)** | `@repo/shared-schemas` | Единый источник Zod-схем, DTO, констант кук/локалей и RBAC-прав для фронта и бэка |
+| **Дизайн-система (`packages/ui`)** | `@repo/ui` | Стили `globals.css`, матрица токенов, Tailwind `preset`, примитивы `Radix UI` и `Storybook` |
+
+---
+
+## 2. Граф задач и кэширование в `Turborepo`
+
+Конфигурация `turbo.json` выстраивает детерминированный пайплайн: директива `"dependsOn": ["^build"]` заставляет Turborepo сначала скомпилировать `@repo/shared-schemas` в `dist/`, и только после этого запускать проверку типов или сборку `apps/web` и `apps/api`:
+
+```json title="turbo.json"
+{
+  "$schema": "https://turbo.build/schema.json",
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", ".env*"],
+      "outputs": [".next/**", "!.next/cache/**", "dist/**"]
+    },
+    "typecheck": {
+      "dependsOn": ["^build"],
+      "outputs": []
+    },
+    "dev": {
+      "dependsOn": ["^build"],
+      "cache": false,
+      "persistent": true
+    }
+  }
+}
+```
+
+---
+
+## 3. Каскад строгой типизации `tsconfig.base.json`
+
+Чтобы исключить класс ошибок `Cannot read properties of undefined` в рантайме, все пакеты монорепозитория наследуют корневой профиль `tsconfig.base.json`:
+
+```json title="tsconfig.base.json"
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "lib": ["ES2023"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "skipLibCheck": true
+  }
+}
+```
+
+> [!IMPORTANT]
+> Опция `noUncheckedIndexedAccess: true` автоматически добавляет `| undefined` к любому обращению по индексу массива или словаря (`items[0]`, `record[key]`), заставляя явно проверять граничные случаи на этапе компиляции.
+
+---
+
+## 4. Единый линтер и форматтер `Biome.js`
+
+Вместо десятка конфликтующих плагинов `ESLint + Prettier` весь код и CSS (включая директивы Tailwind) проверяются за `~100 мс` одним конфигом `biome.json`:
+
+```json title="biome.json"
+{
+  "$schema": "https://biomejs.dev/schemas/2.4.7/schema.json",
+  "assist": {
+    "actions": {
+      "source": { "organizeImports": "on" }
+    }
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": true,
+      "correctness": {
+        "noUnusedImports": "error",
+        "noUnusedVariables": "warn"
+      },
+      "suspicious": {
+        "noExplicitAny": "error"
+      }
+    }
+  },
+  "css": {
+    "parser": { "tailwindDirectives": true }
+  }
+}
+```

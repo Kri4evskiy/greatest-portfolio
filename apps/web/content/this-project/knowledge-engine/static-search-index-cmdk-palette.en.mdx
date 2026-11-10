@@ -1,0 +1,84 @@
+---
+title: "Global Cmd+K Search: Static SSG Route Index & On-Demand Lazy Prefetching"
+sidebarLabel: "Cmd+K Search & SSG Index"
+summary: "How to architect instant global search across 100+ engineering notes without an external database or initial HTML bloat: a static Route Handler paired with a deduplicated in-memory client loader."
+category: "this-project"
+format: "deep-dive"
+tags: ["cmdk", "search", "nextjs", "ssg", "performance"]
+readingTime: "5 min"
+publishedAt: "2026-11-10"
+order: 2
+tldr:
+  - "Decouples the search index from the root `layout.tsx` into a static SSG endpoint (`/search-index/[locale]`), eliminating `100%` of index payload overhead from initial page HTML."
+  - "Pre-renders article titles, `#tags`, and `h2/h3` section anchors once during `next build` via `dynamic = 'force-static'` (`0 ms` runtime CPU cost)."
+  - "Prefetches and caches the JSON payload in memory on search button hover or `Cmd+K` via `search-index-client.ts`."
+---
+
+## 1. Keeping the Root `layout.tsx` Free of Search Payloads
+
+Because `CommandPaletteModal` (`Cmd+K`) is mounted in the root `app/[locale]/layout.tsx`, passing a full `searchIndex` array as a prop would serialize every article's title, tags, and `h2/h3` headings into the initial HTML and RSC payload of **every page**, even when the visitor never opens search.
+
+To keep initial document payloads tiny as the Knowledge Base scales past `100+` notes, the search index is served from a dedicated static JSON route.
+
+---
+
+## 2. Static SSG Route Handler (`/search-index/[locale]`)
+
+The route handler `apps/web/src/app/search-index/[locale]/route.ts` declares `export const dynamic = 'force-static'` alongside `generateStaticParams()`. During `next build`, it extracts a lightweight projection of all localized notes (stripping AST content blocks) plus top tags:
+
+```typescript title="apps/web/src/app/search-index/[locale]/route.ts"
+import { DEFAULT_LOCALE, SUPPORTED_LOCALES, SupportedLocaleEnum } from '@repo/shared-schemas'
+import { NextResponse } from 'next/server'
+import { getKnowledgeSearchIndex, getPopularTags } from '@/lib/mdx-content'
+
+export const dynamic = 'force-static'
+
+export function generateStaticParams() {
+  return SUPPORTED_LOCALES.map((locale) => ({ locale }))
+}
+
+export async function GET(_request: Request, context: { params: Promise<{ locale: string }> }) {
+  const { locale } = await context.params
+  const parsed = SupportedLocaleEnum.safeParse(locale)
+  const safeLocale = parsed.success ? parsed.data : DEFAULT_LOCALE
+
+  return NextResponse.json({
+    items: getKnowledgeSearchIndex(safeLocale),
+    popularTags: getPopularTags(safeLocale, 14),
+  })
+}
+```
+
+Each `KnowledgeSearchItem` contains the article route, localized topic and subtopic labels, `#tags`, and `h2/h3` heading anchors (`id` + `text`) for deep-linking directly to a specific subsection (`/en/knowledge-base/...#section-id`).
+
+---
+
+## 3. Deduplicated In-Memory Client Loader & Hover Prefetch
+
+In `apps/web/src/lib/search-index-client.ts`, two `Map` instances cache resolved payloads and in-flight promises so rapid triggers never fire duplicate network requests:
+
+```typescript title="apps/web/src/lib/search-index-client.ts"
+const resolvedCache = new Map<SupportedLocale, SearchIndexPayload>()
+const inflightRequests = new Map<SupportedLocale, Promise<SearchIndexPayload>>()
+
+export function fetchSearchIndexForLocale(locale: SupportedLocale): Promise<SearchIndexPayload> {
+  const cached = resolvedCache.get(locale)
+  if (cached) return Promise.resolve(cached)
+
+  const existing = inflightRequests.get(locale)
+  if (existing) return existing
+
+  const request = fetch(`/search-index/${locale}`)
+    .then((res) => res.json() as Promise<SearchIndexPayload>)
+    .then((payload) => {
+      resolvedCache.set(locale, payload)
+      inflightRequests.delete(locale)
+      return payload
+    })
+
+  inflightRequests.set(locale, request)
+  return request
+}
+```
+
+The search trigger in `WorkfolioHeader` invokes `preloadSearchIndex(locale)` on `onMouseEnter` and `onFocus`, ensuring the index is already warm in memory before the modal opens.

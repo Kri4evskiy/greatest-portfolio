@@ -1,0 +1,107 @@
+---
+title: "Криптографическая защита на Edge: проверка HS256 JWT через Web Crypto API и единые контракты"
+sidebarLabel: "Edge JWT и Web Crypto"
+summary: "Архитектурный шаблон защиты SSG-маршрутов в Next.js 16 proxy.ts: единый источник констант в @repo/shared-schemas, криптографическая верификация HMAC-SHA256 через crypto.subtle и кэширование CryptoKey."
+category: "this-project"
+format: "deep-dive"
+tags: ["security", "jwt", "edge-runtime", "web-crypto", "nextjs"]
+readingTime: "6 мин"
+publishedAt: "2026-11-10"
+order: 2
+tldr:
+  - "Имя куки (`KB_ACCESS_COOKIE_NAME`), срок жизни (`KB_COOKIE_MAX_AGE_MS`) и резолвер секрета (`resolveJwtSecret`) вынесены в `@repo/shared-schemas` как единый контракт между Next.js и NestJS."
+  - "Модуль `apps/web/src/lib/edge-jwt.ts` проверяет подпись `HMAC-SHA256` и `exp` через встроенный в Edge Runtime `crypto.subtle` (`0 КБ` внешних npm-зависимостей) с кэшированием `CryptoKey`."
+  - "Файл `apps/web/src/proxy.ts` остаётся лаконичным (~40 строк), объединяя `next-intl` роутинг, проверку доступа к `/knowledge-base` и автоочистку невалидных кук."
+---
+
+## 1. Единый источник констант безопасности в `@repo/shared-schemas`
+
+Чтобы фронтенд (`apps/web`) и бэкенд (`apps/api`) никогда не рассинхронизировались в названии `HttpOnly`-куки, времени её жизни или правилах чтения `JWT_SECRET`, эти примитивы экспортируются из общего пакета `@repo/shared-schemas`:
+
+```typescript title="packages/shared-schemas/src/auth.schema.ts"
+export const KB_ACCESS_COOKIE_NAME = 'kb_access_token' as const
+export const KB_COOKIE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000 // 30 дней
+
+export function resolveJwtSecret(
+  envSecret: string | undefined,
+  nodeEnv: string | undefined,
+): string {
+  const trimmed = envSecret?.trim()
+  if (trimmed && trimmed.length >= 16) {
+    return trimmed
+  }
+  if (nodeEnv === 'production') {
+    throw new Error(
+      '[Security] JWT_SECRET environment variable must be explicitly configured (min 16 chars) in production.',
+    )
+  }
+  return DEFAULT_DEV_JWT_SECRET
+}
+```
+
+В `development` оба сервиса автоматически подхватывают локальный дефолт без обязательной ручной настройки `.env`, а в `production` отсутствие секрета немедленно останавливает запуск (`fail-fast`).
+
+---
+
+## 2. Верификация `HS256` через нативный Web Crypto API (`crypto.subtle`)
+
+Так как страницы Базы Знаний предгенерируются в статику (`SSG`), проверка доступа должна выполняться прямо на границе сети в Edge Runtime до отдачи HTML. Вместо подключения сторонних библиотек модуль `apps/web/src/lib/edge-jwt.ts` использует встроенный стандарт **Web Crypto API**:
+
+```typescript title="apps/web/src/lib/edge-jwt.ts"
+let cachedSecretString: string | null = null
+let cachedHmacKeyPromise: Promise<CryptoKey> | null = null
+
+function getHmacKey(secret: string): Promise<CryptoKey> {
+  if (cachedSecretString === secret && cachedHmacKeyPromise !== null) {
+    return cachedHmacKeyPromise
+  }
+  cachedSecretString = secret
+  cachedHmacKeyPromise = crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['verify'],
+  )
+  return cachedHmacKeyPromise
+}
+```
+
+Функция `verifyEdgeJwtHs256(token, secret)` за `< 0.2 мс` выполняет 4 проверки:
+1. Разбивает токен на 3 сегмента (`header.payload.signature`) и декодирует Base64URL в `Uint8Array`.
+2. Убеждается, что заголовок явно указывает `alg === 'HS256'` (защита от подмены алгоритма `alg: "none"`).
+3. Вызывает константную по времени проверку подписи `crypto.subtle.verify('HMAC', key, signatureBytes, signingInput)`.
+4. Проверяет срок действия `payload.exp * 1000 > Date.now()`.
+
+---
+
+## 3. Чистая композиция в `apps/web/src/proxy.ts`
+
+Вся криптографическая математика скрыта в `edge-jwt.ts`, поэтому сам `proxy.ts` отвечает исключительно за маршрутизацию:
+
+```typescript title="apps/web/src/proxy.ts"
+export default async function proxy(request: NextRequest) {
+  const { pathname } = request.nextUrl
+
+  if (isProtectedKnowledgeRoute(pathname)) {
+    const token = request.cookies.get(KB_ACCESS_COOKIE_NAME)?.value
+    const secret = resolveJwtSecret(process.env.JWT_SECRET, process.env.NODE_ENV)
+    const isValidToken = token ? await verifyEdgeJwtHs256(token, secret) : false
+
+    if (!isValidToken) {
+      const locale = extractLocale(pathname)
+      const redirectUrl = new URL(`/${locale}`, request.url)
+      redirectUrl.searchParams.set('auth', 'required')
+      redirectUrl.searchParams.set('from', pathname)
+
+      const response = NextResponse.redirect(redirectUrl)
+      if (token) {
+        response.cookies.delete(KB_ACCESS_COOKIE_NAME)
+      }
+      return response
+    }
+  }
+
+  return intlMiddleware(request)
+}
+```

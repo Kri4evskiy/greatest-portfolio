@@ -1,0 +1,70 @@
+---
+title: "Multi-Stage Docker в монорепозитории: BuildKit Cache Mounts, pnpm prune и Prisma"
+sidebarLabel: "Multi-Stage Docker и BuildKit"
+summary: "Архитектура контейнеризации Full-Stack монорепозитория: 3-стадийная сборка Next.js standalone и NestJS, общий кэш пакетов BuildKit, очистка devDependencies с сохранением Prisma Client и запуск под UID 1001."
+category: "this-project"
+format: "deep-dive"
+tags: ["docker", "buildkit", "pnpm-12", "prisma", "devops"]
+readingTime: "6 мин"
+publishedAt: "2026-11-10"
+order: 2
+tldr:
+  - "Сборка каждого сервиса (`web`, `api`, `telemetry-ms`) разделена на изолированные стадии `base -> deps -> builder -> runner` на базе легковесного `node:22-alpine`."
+  - "Монтирование `--mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store` разделяет единый кэш пакетов между всеми контейнерами монорепозитория."
+  - "Команда `pnpm prune --prod --ignore-scripts` удаляет ~180 МБ dev-инструментов (TypeScript, Biome, Turbo, Prisma CLI), сохраняя сгенерированный рантайм `.prisma/client`."
+---
+
+## 1. Трёхстадийный конвейер сборки (`deps -> builder -> runner`)
+
+Чтобы в продакшен-контейнеры не попадали исходники, компиляторы и кэши сборки, каждый Dockerfile в папке `docker/` строит образ в несколько изолированных шагов:
+
+1. **`base`:** активирует `pnpm 12.16.1` через `corepack` и отключает фоновую телеметрию (`DO_NOT_TRACK=1`, `TURBO_TELEMETRY_DISABLED=1`).
+2. **`deps`:** копирует только манифесты `package.json`, `pnpm-lock.yaml` и `pnpm-workspace.yaml`, чтобы слой зависимостей кэшировался до изменения версий пакетов.
+3. **`builder`:** компилирует Prisma-клиент и запускает `pnpm turbo run build --filter=...`, после чего отсекает `devDependencies`.
+4. **`runner`:** копирует только скомпилированные артефакты (`dist/` или `.next/standalone`) и запускает процесс от непривилегированного пользователя (`UID 1001`).
+
+---
+
+## 2. Общий BuildKit Cache Mount для всех сервисов
+
+При сборке нескольких микросервисов из одного монорепозитория монтирование `/root/.local/share/pnpm/store` через BuildKit `type=cache,id=pnpm` позволяет скачать общие пакеты один раз и переиспользовать их во всех образах:
+
+```dockerfile title="docker/api.Dockerfile"
+FROM node:22-alpine AS base
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+ENV DO_NOT_TRACK=1
+ENV TURBO_TELEMETRY_DISABLED=1
+RUN corepack enable && corepack prepare pnpm@12.16.1 --activate
+
+FROM base AS deps
+WORKDIR /app
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json tsconfig.base.json ./
+COPY apps/api/package.json ./apps/api/
+COPY packages/shared-schemas/package.json ./packages/shared-schemas/
+RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
+    pnpm install --frozen-lockfile --ignore-scripts
+```
+
+---
+
+## 3. Очистка `devDependencies` и сохранение `.prisma/client`
+
+В стадии `builder` после генерации Prisma-клиента и сборки TypeScript вызывается `pnpm prune --prod --ignore-scripts`. Флаг `--ignore-scripts` критически важен: он удаляет `prisma` CLI и другие тяжелые dev-пакеты, но не перезапускает хуки и оставляет сгенерированный бинарный движок в `node_modules/.pnpm/@prisma+client*/node_modules/.prisma/client`:
+
+```dockerfile title="docker/api.Dockerfile"
+RUN pnpm --filter @repo/api exec prisma generate
+RUN pnpm turbo run build --filter=@repo/api...
+RUN pnpm prune --prod --ignore-scripts
+```
+
+### Характеристики финальных продакшен-образов
+
+| Контейнер | Базовый образ | Финальный размер | Пользователь рантайма |
+| :--- | :---: | :---: | :---: |
+| `workfolio-telemetry-ms` | `node:22-alpine` | **64.3 MB** | `nestjs` (`UID 1001`) |
+| `workfolio-api` | `node:22-alpine` | **78.2 MB** | `nestjs` (`UID 1001`) |
+| `workfolio-web` (`standalone`) | `node:22-alpine` | **85.6 MB** | `nextjs` (`UID 1001`) |
+
+> [!TIP]
+> Так как продакшен-образ `api` не содержит `Prisma CLI`, миграции схемы БД (`prisma migrate deploy`) выполняются отдельным шагом в CI/CD перед переключением трафика.

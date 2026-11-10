@@ -1,0 +1,131 @@
+---
+title: "Еталонна конфігурація монорепозиторію: pnpm 12, Turborepo, суворий tsconfig та Biome"
+sidebarLabel: "pnpm 12, tsconfig та Biome"
+summary: "Архітектурний шаблон налаштування сучасного Full-Stack монорепозиторію: структура воркспейсу pnpm 12 з allowBuilds, граф задач Turborepo, каскад суворих правил TypeScript та єдиний Rust-лінтер Biome.js."
+category: "this-project"
+format: "deep-dive"
+tags: ["monorepo", "pnpm-12", "turborepo", "typescript", "biome"]
+readingTime: "6 хв"
+publishedAt: "2026-11-10"
+order: 1
+tldr:
+  - "Воркспейс розділений на застосунки (`apps/web`, `apps/api`, `apps/telemetry-ms`) та спільні пакети (`packages/ui`, `packages/shared-schemas`) під керуванням `pnpm 12.16.1` із білим списком `allowBuilds`."
+  - "Граф `turbo.json` гарантує топологічну збірку залежностей (`^build`) перед запуском `typecheck`, `dev` або `build` у сервісах."
+  - "Єдиний `tsconfig.base.json` вмикає `strict`, `noUncheckedIndexedAccess` і `exactOptionalPropertyTypes`, а `biome.json` замінює зв'язку `ESLint + Prettier` одним швидким Rust-бінарником."
+---
+
+## 1. Структура воркспейсу `pnpm 12` та захист `allowBuilds`
+
+У кореневому файлі `pnpm-workspace.yaml` оголошуються межі пакетів та суворий білий список `allowBuilds`. У **pnpm 12** будь-які `postinstall`-скрипти сторонніх залежностей заблоковані за замовчуванням для захисту від supply-chain атак — право на компіляцію нативних бінарників отримують лише явно перелічені пакети:
+
+```yaml title="pnpm-workspace.yaml"
+packages:
+  - "apps/*"
+  - "packages/*"
+
+allowBuilds:
+  "@biomejs/biome": true
+  "@parcel/watcher": true
+  "@prisma/client": true
+  "@prisma/engines": true
+  "@swc/core": true
+  esbuild: true
+  lefthook: true
+  prisma: true
+  sharp: true
+```
+
+| Шар монорепозиторію | Пакет | Призначення |
+| :--- | :--- | :--- |
+| **Застосунки (`apps/*`)** | `@repo/web`, `@repo/api`, `@repo/telemetry-ms` | Next.js 16 фронтенд, NestJS 11 REST API та мікросервіс живої SSE-телеметрії |
+| **Контракти (`packages/shared-schemas`)** | `@repo/shared-schemas` | Єдине джерело Zod-схем, DTO, констант кук/локалей і RBAC-прав для фронту та беку |
+| **Дизайн-система (`packages/ui`)** | `@repo/ui` | Стилі `globals.css`, матриця токенів, Tailwind `preset`, примітиви `Radix UI` та `Storybook` |
+
+---
+
+## 2. Граф задач і кешування в `Turborepo`
+
+Конфігурація `turbo.json` вибудовує детермінований пайплайн: директива `"dependsOn": ["^build"]` змушує Turborepo спершу скомпілювати `@repo/shared-schemas` у `dist/`, і лише після цього запускати перевірку типів чи збірку `apps/web` та `apps/api`:
+
+```json title="turbo.json"
+{
+  "$schema": "https://turbo.build/schema.json",
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", ".env*"],
+      "outputs": [".next/**", "!.next/cache/**", "dist/**"]
+    },
+    "typecheck": {
+      "dependsOn": ["^build"],
+      "outputs": []
+    },
+    "dev": {
+      "dependsOn": ["^build"],
+      "cache": false,
+      "persistent": true
+    }
+  }
+}
+```
+
+---
+
+## 3. Каскад суворої типізації `tsconfig.base.json`
+
+Щоб виключити клас помилок `Cannot read properties of undefined` у рантаймі, всі пакети монорепозиторію наслідують кореневий профіль `tsconfig.base.json`:
+
+```json title="tsconfig.base.json"
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "lib": ["ES2023"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "skipLibCheck": true
+  }
+}
+```
+
+> [!IMPORTANT]
+> Опція `noUncheckedIndexedAccess: true` автоматично додає `| undefined` до будь-якого звернення за індексом масиву чи словника (`items[0]`, `record[key]`), змушуючи явно перевіряти граничні випадки на етапі компіляції.
+
+---
+
+## 4. Єдиний лінтер і форматер `Biome.js`
+
+Замість десятка конфліктуючих плагінів `ESLint + Prettier` увесь код та CSS (включно з директивами Tailwind) перевіряються за `~100 мс` одним конфігом `biome.json`:
+
+```json title="biome.json"
+{
+  "$schema": "https://biomejs.dev/schemas/2.4.7/schema.json",
+  "assist": {
+    "actions": {
+      "source": { "organizeImports": "on" }
+    }
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": true,
+      "correctness": {
+        "noUnusedImports": "error",
+        "noUnusedVariables": "warn"
+      },
+      "suspicious": {
+        "noExplicitAny": "error"
+      }
+    }
+  },
+  "css": {
+    "parser": { "tailwindDirectives": true }
+  }
+}
+```

@@ -1,0 +1,131 @@
+---
+title: "Monorepo Configuration Blueprint: pnpm 12, Turborepo, Strict tsconfig & Biome"
+sidebarLabel: "pnpm 12, tsconfig & Biome"
+summary: "Reference blueprint for configuring a modern Full-Stack monorepo: pnpm 12 workspace layout with allowBuilds supply-chain protection, Turborepo task graph, strict TypeScript cascade, and single-binary Biome.js."
+category: "this-project"
+format: "deep-dive"
+tags: ["monorepo", "pnpm-12", "turborepo", "typescript", "biome"]
+readingTime: "6 min"
+publishedAt: "2026-11-10"
+order: 1
+tldr:
+  - "Splits the workspace into applications (`apps/web`, `apps/api`, `apps/telemetry-ms`) and shared packages (`packages/ui`, `packages/shared-schemas`) managed by `pnpm 12.16.1` with an explicit `allowBuilds` whitelist."
+  - "Configures `turbo.json` with topological `^build` dependencies so shared schemas compile before downstream `typecheck`, `dev`, or `build` tasks."
+  - "Enforces `strict`, `noUncheckedIndexedAccess`, and `exactOptionalPropertyTypes` via `tsconfig.base.json` and replaces `ESLint + Prettier` with a single Rust-powered `biome.json`."
+---
+
+## 1. `pnpm 12` Workspace Layout & `allowBuilds` Protection
+
+The root `pnpm-workspace.yaml` defines package boundaries and a strict `allowBuilds` allowlist. In **pnpm 12**, third-party `postinstall` scripts are blocked by default to prevent supply-chain attacks—only explicitly listed native packages are allowed to execute build scripts:
+
+```yaml title="pnpm-workspace.yaml"
+packages:
+  - "apps/*"
+  - "packages/*"
+
+allowBuilds:
+  "@biomejs/biome": true
+  "@parcel/watcher": true
+  "@prisma/client": true
+  "@prisma/engines": true
+  "@swc/core": true
+  esbuild: true
+  lefthook: true
+  prisma: true
+  sharp: true
+```
+
+| Monorepo Layer | Package | Responsibility |
+| :--- | :--- | :--- |
+| **Applications (`apps/*`)** | `@repo/web`, `@repo/api`, `@repo/telemetry-ms` | Next.js 16 frontend, NestJS 11 REST API, and live SSE telemetry microservice |
+| **Contracts (`packages/shared-schemas`)** | `@repo/shared-schemas` | Single source of truth for Zod schemas, DTOs, cookie/locale constants, and RBAC permissions |
+| **Design System (`packages/ui`)** | `@repo/ui` | `globals.css` token matrix, Tailwind `preset`, `Radix UI` primitives, and `Storybook` |
+
+---
+
+## 2. `Turborepo` Task Graph & Artifact Caching
+
+`turbo.json` orchestrates a deterministic pipeline: `"dependsOn": ["^build"]` ensures `@repo/shared-schemas` compiles its `dist/` output before `apps/web` or `apps/api` run typechecking or bundling:
+
+```json title="turbo.json"
+{
+  "$schema": "https://turbo.build/schema.json",
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", ".env*"],
+      "outputs": [".next/**", "!.next/cache/**", "dist/**"]
+    },
+    "typecheck": {
+      "dependsOn": ["^build"],
+      "outputs": []
+    },
+    "dev": {
+      "dependsOn": ["^build"],
+      "cache": false,
+      "persistent": true
+    }
+  }
+}
+```
+
+---
+
+## 3. Strict TypeScript Cascade (`tsconfig.base.json`)
+
+To eliminate runtime `Cannot read properties of undefined` bugs, every workspace package extends the root `tsconfig.base.json` profile:
+
+```json title="tsconfig.base.json"
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "lib": ["ES2023"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "skipLibCheck": true
+  }
+}
+```
+
+> [!IMPORTANT]
+> `noUncheckedIndexedAccess: true` automatically appends `| undefined` to every array or dictionary index lookup (`items[0]`, `record[key]`), forcing explicit boundary checks at compile time.
+
+---
+
+## 4. Unified Linting & Formatting with `Biome.js`
+
+Instead of maintaining a fragile chain of `ESLint + Prettier` plugins, the entire codebase and Tailwind CSS stylesheets are formatted and linted in `~100 ms` via a single `biome.json`:
+
+```json title="biome.json"
+{
+  "$schema": "https://biomejs.dev/schemas/2.4.7/schema.json",
+  "assist": {
+    "actions": {
+      "source": { "organizeImports": "on" }
+    }
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": true,
+      "correctness": {
+        "noUnusedImports": "error",
+        "noUnusedVariables": "warn"
+      },
+      "suspicious": {
+        "noExplicitAny": "error"
+      }
+    }
+  },
+  "css": {
+    "parser": { "tailwindDirectives": true }
+  }
+}
+```
