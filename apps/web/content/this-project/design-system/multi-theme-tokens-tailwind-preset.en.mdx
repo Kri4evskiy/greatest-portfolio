@@ -1,7 +1,7 @@
 ---
 title: "Multi-Theme CSS Token Matrix, Tailwind Preset & @repo/ui Package Architecture"
 sidebarLabel: "Design Tokens & Tailwind Preset"
-summary: "How to architect a scalable design system in a monorepo: 2D semantic token matrix (Light/Dark × palettes), Dependency Inversion via Tailwind Preset, Storybook 8, and responsive data views."
+summary: "How to architect a scalable design system in a monorepo: 2D semantic token matrix (Light/Dark × palettes), Dependency Inversion via Tailwind Preset, Storybook 10, and responsive data views."
 category: "this-project"
 format: "deep-dive"
 tags: ["design-tokens", "tailwind", "ui-system", "storybook", "architecture"]
@@ -74,7 +74,7 @@ export default config
 ```
 
 This architecture provides three advantages:
-1. A single source of truth mapping CSS variables to utility classes (`bg-surface-subtle`, `text-warning`, `border-code-border`) across both `apps/web` and `Storybook 8`.
+1. A single source of truth mapping CSS variables to utility classes (`bg-surface-subtle`, `text-warning`, `border-code-border`) across both `apps/web` and `Storybook 10`.
 2. Zero upward `../../apps/*` imports inside the shared design system package.
 3. Instant onboarding for any new frontend app in the monorepo via `presets: [uiPreset]`.
 
@@ -88,4 +88,4 @@ For information-dense components, rather than squeezing wide tables onto `360px`
 | :--- | :--- | :--- |
 | **`TechRadarTable`** | Stacked card list (`md:hidden`) with direct `ADR` action buttons | Full 6-column `TanStack Table` (`hidden md:block`) with sorting and filtering |
 | **`D3.js` / `SVG` Graphs** | Horizontal scroll container `overflow-x-auto` with `min-w-[540px]` | Full-width interactive vector simulation |
-| **`Storybook 8` (`@repo/ui`)** | Viewport presets for `360px` and `768px` contrast verification | Live toolbar switcher for `Warm Paper / Dark / Graphite / Sepia` |
+| **`Storybook 10` (`@repo/ui`)** | Viewport presets for `360px` and `768px` contrast verification | Live toolbar switcher for `Warm Paper / Dark / Graphite / Sepia` |

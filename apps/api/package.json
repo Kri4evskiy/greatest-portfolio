@@ -24,14 +24,14 @@
     "cookie-parser": "^1.4.7",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
-    "zod": "^3.24.2"
+    "zod": "^3.25.76"
   },
   "devDependencies": {
-    "@types/cookie-parser": "^1.4.8",
-    "@types/express": "^5.0.0",
-    "@types/node": "^22.13.10",
+    "@types/cookie-parser": "^1.4.10",
+    "@types/express": "^5.0.6",
+    "@types/node": "^22.20.5",
     "prisma": "6.4.1",
-    "tsx": "^4.19.3",
-    "typescript": "^5.8.2"
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3"
   }
 }

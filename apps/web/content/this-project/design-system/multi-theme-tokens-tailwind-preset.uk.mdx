@@ -1,7 +1,7 @@
 ---
 title: "Матриця мульти-темних CSS-токенів, Tailwind Preset та архітектура пакета @repo/ui"
 sidebarLabel: "Дизайн-токени та Tailwind Preset"
-summary: "Як спроєктувати масштабовану дизайн-систему в монорепозиторії: двовимірна матриця тем (Light/Dark × палітри), інверсія залежностей через Tailwind Preset, Storybook 8 та адаптивні подання даних."
+summary: "Як спроєктувати масштабовану дизайн-систему в монорепозиторії: двовимірна матриця тем (Light/Dark × палітри), інверсія залежностей через Tailwind Preset, Storybook 10 та адаптивні подання даних."
 category: "this-project"
 format: "deep-dive"
 tags: ["design-tokens", "tailwind", "ui-system", "storybook", "architecture"]
@@ -74,7 +74,7 @@ export default config
 ```
 
 Така схема дає три архітектурні переваги:
-1. Єдине джерело мапінгу CSS-змінних у класи Tailwind (`bg-surface-subtle`, `text-warning`, `border-code-border`) як для `apps/web`, так і для ізольованого `Storybook 8`.
+1. Єдине джерело мапінгу CSS-змінних у класи Tailwind (`bg-surface-subtle`, `text-warning`, `border-code-border`) як для `apps/web`, так і для ізольованого `Storybook 10`.
 2. Відсутність зворотних шляхів `../../apps/*` усередині пакета дизайн-системи.
 3. Можливість підключити другий фронтенд-сервіс до тієї ж дизайн-системи одним рядком `presets: [uiPreset]`.
 
@@ -88,4 +88,4 @@ export default config
 | :--- | :--- | :--- |
 | **`TechRadarTable`** | Стек карток (`md:hidden`) зі швидким переходом до `ADR` | 6-колонкова таблиця `TanStack Table` (`hidden md:block`) із сортуванням і фільтрами |
 | **`D3.js` / `SVG` графи** | Горизонтальний скрол-контейнер `overflow-x-auto` з `min-w-[540px]` | Повна інтерактивна векторна сцена на всю ширину колонки |
-| **`Storybook 8` (`@repo/ui`)** | Перевірка контрасту та переносів у в'юпортах `360px` і `768px` | Інтерактивне перемикання тем `Warm Paper / Dark / Graphite / Sepia` в тулбарі |
+| **`Storybook 10` (`@repo/ui`)** | Перевірка контрасту та переносів у в'юпортах `360px` і `768px` | Інтерактивне перемикання тем `Warm Paper / Dark / Graphite / Sepia` в тулбарі |

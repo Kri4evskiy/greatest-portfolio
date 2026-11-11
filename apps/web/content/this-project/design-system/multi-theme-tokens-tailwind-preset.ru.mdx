@@ -1,7 +1,7 @@
 ---
 title: "Матрица мульти-темных CSS-токенов, Tailwind Preset и архитектура пакета @repo/ui"
 sidebarLabel: "Дизайн-токены и Tailwind Preset"
-summary: "Как спроектировать масштабируемую дизайн-систему в монорепозитории: двумерная матрица тем (Light/Dark × палитры), инверсия зависимостей через Tailwind Preset, Storybook 8 и адаптивные представления данных."
+summary: "Как спроектировать масштабируемую дизайн-систему в монорепозитории: двумерная матрица тем (Light/Dark × палитры), инверсия зависимостей через Tailwind Preset, Storybook 10 и адаптивные представления данных."
 category: "this-project"
 format: "deep-dive"
 tags: ["design-tokens", "tailwind", "ui-system", "storybook", "architecture"]
@@ -74,7 +74,7 @@ export default config
 ```
 
 Такая схема даёт три архитектурных преимущества:
-1. Единый источник маппинга CSS-переменных в классы Tailwind (`bg-surface-subtle`, `text-warning`, `border-code-border`) как для `apps/web`, так и для изолированного `Storybook 8`.
+1. Единый источник маппинга CSS-переменных в классы Tailwind (`bg-surface-subtle`, `text-warning`, `border-code-border`) как для `apps/web`, так и для изолированного `Storybook 10`.
 2. Отсутствие обратных путей `../../apps/*` внутри пакета дизайн-системы.
 3. Возможность подключить второй фронтенд-сервис к той же дизайн-системе одной строкой `presets: [uiPreset]`.
 
@@ -88,4 +88,4 @@ export default config
 | :--- | :--- | :--- |
 | **`TechRadarTable`** | Стек карточек (`md:hidden`) с быстрым переходом к `ADR` | 6-колоночная таблица `TanStack Table` (`hidden md:block`) с сортировкой и фильтрами |
 | **`D3.js` / `SVG` графы** | Горизонтальный скролл-контейнер `overflow-x-auto` с `min-w-[540px]` | Полная интерактивная векторная сцена на всю ширину колонки |
-| **`Storybook 8` (`@repo/ui`)** | Проверка контраста и переносов во вьюпортах `360px` и `768px` | Интерактивное переключение тем `Warm Paper / Dark / Graphite / Sepia` в тулбаре |
+| **`Storybook 10` (`@repo/ui`)** | Проверка контраста и переносов во вьюпортах `360px` и `768px` | Интерактивное переключение тем `Warm Paper / Dark / Graphite / Sepia` в тулбаре |
