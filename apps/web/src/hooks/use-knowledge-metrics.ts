@@ -6,7 +6,7 @@ import { z } from 'zod'
 
 export const KNOWLEDGE_METRICS_QUERY_KEY = ['knowledge', 'metrics'] as const
 
-const ArticleMetaArraySchema = z.array(ArticleMetaSchema)
+const ArticleMetaArraySchema = z.array(ArticleMetaSchema).max(500)
 
 async function fetchKnowledgeMetrics(): Promise<ArticleMeta[]> {
   const res = await fetch('/api/knowledge/metrics', {

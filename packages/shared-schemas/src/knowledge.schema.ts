@@ -172,7 +172,7 @@ export const ArticleMetaSchema = z.object({
   category: KnowledgeCategoryEnum,
   viewsCount: z.number().int().nonnegative(),
   helpfulCount: z.number().int().nonnegative(),
-  updatedAt: z.string().datetime(),
+  updatedAt: z.iso.datetime(),
 })
 export type ArticleMeta = z.infer<typeof ArticleMetaSchema>
 

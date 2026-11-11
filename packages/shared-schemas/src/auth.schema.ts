@@ -19,11 +19,11 @@ export const GuestPassFormSchema = z.object({
 export type GuestPassFormInput = z.infer<typeof GuestPassFormSchema>
 
 export const SessionProfileSchema = z.object({
-  id: z.string().uuid().nullable(),
+  id: z.uuid().nullable(),
   displayName: z.string().nullable(),
   visitorType: VisitorRoleTypeEnum.nullable(),
   role: RoleEnum,
-  expiresAt: z.string().datetime().nullable(),
+  expiresAt: z.iso.datetime().nullable(),
 })
 
 export type SessionProfile = z.infer<typeof SessionProfileSchema>

@@ -10,12 +10,12 @@ export const TelemetryEventTypeEnum = z.enum([
 export type TelemetryEventType = z.infer<typeof TelemetryEventTypeEnum>
 
 export const TelemetryEventSchema = z.object({
-  id: z.string().uuid(),
+  id: z.uuid(),
   type: TelemetryEventTypeEnum,
   message: z.string().min(1),
   actorName: z.string().optional(),
   actorRole: VisitorRoleTypeEnum.optional(),
   slug: z.string().optional(),
-  timestamp: z.string().datetime(),
+  timestamp: z.iso.datetime(),
 })
 export type TelemetryEvent = z.infer<typeof TelemetryEventSchema>
