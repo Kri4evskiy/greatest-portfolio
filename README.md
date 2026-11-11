@@ -1,5 +1,6 @@
 # Greatest Portfolio & Engineering Knowledge Base
 
+[![CI](https://github.com/Kri4evskiy/greatest-portfolio/actions/workflows/ci.yml/badge.svg)](https://github.com/Kri4evskiy/greatest-portfolio/actions/workflows/ci.yml)
 ![Next.js](https://img.shields.io/badge/Next.js-16-000000?style=flat-square&logo=next.js&logoColor=white)
 ![React](https://img.shields.io/badge/React-19-149ECA?style=flat-square&logo=react&logoColor=white)
 ![NestJS](https://img.shields.io/badge/NestJS-12_ESM-E0234E?style=flat-square&logo=nestjs&logoColor=white)
@@ -128,9 +129,10 @@ docker compose up --build -d
 greatest-portfolio/
 ├── .agents/                    # Каскадная система контекста и ADR для ИИ-агентов
 │   ├── tech-debt-backlog.md    # Бэклог, Tech Debt и Post-MVP план развития
-│   ├── architecture/           # ADR-каталог, общие контракты, Docker & Observability
+│   ├── architecture/           # ADR-каталог, CI/CD, общие контракты, Docker & Observability
 │   ├── frontend/               # Правила Next.js, Workfolio UI, Storybook, State, Auth
 │   └── backend/                # Правила NestJS, JWT Security, Prisma, Microservices & SSE
+├── .github/                    # GitHub Actions CI/CD (ci.yml + setup-workspace action)
 ├── apps/
 │   ├── web/                    # Next.js 16 App Router (Workfolio CV + закрытая Knowledge Base)
 │   ├── api/                    # Основной бэкенд NestJS 12 (ESM) + Prisma + SSE Stream

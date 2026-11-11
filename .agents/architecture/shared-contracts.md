@@ -20,13 +20,13 @@
 - `GuestPassFormSchema`:
   - `displayName`: `z.string().trim().min(2).max(50)` — имя посетителя (в 1 клик для тимлида/рекрутера).
   - `visitorType`: `VisitorRoleType` — роль посетителя в компании.
-  - `adminPasscode`: `z.string().optional()` — опциональный секретный ключ владельца для повышения роли до `ADMIN`.
+  - `adminPasscode`: `z.string().trim().max(100).optional()` — опциональный секретный ключ владельца для повышения роли до `ADMIN`.
 - `SessionProfileSchema`:
-  - `id`: `z.string().uuid().optional()`
+  - `id`: `z.uuid().nullable()`
   - `displayName`: `z.string().nullable()`
   - `visitorType`: `VisitorRoleType.nullable()`
   - `role`: `RoleEnum`
-  - `expiresAt`: `z.string().datetime().nullable()`
+  - `expiresAt`: `z.iso.datetime().nullable()`
 
 ### 3. Метаданные Базы Знаний (`knowledge.schema.ts`)
 
@@ -37,19 +37,19 @@
   - `category`: `KnowledgeCategoryEnum`
   - `viewsCount`: `z.number().int().nonnegative()`
   - `helpfulCount`: `z.number().int().nonnegative()`
-  - `updatedAt`: `z.string().datetime()`
+  - `updatedAt`: `z.iso.datetime()`
 
 ### 4. События телеметрии и SSE (`telemetry.schema.ts`)
 
 - `TelemetryEventTypeEnum = z.enum(['GUEST_PASS_ISSUED', 'ARTICLE_VIEWED', 'ARTICLE_HELPFUL', 'SYSTEM_HEARTBEAT'])`
 - `TelemetryEventSchema`:
-  - `id`: `z.string().uuid()`
+  - `id`: `z.uuid()`
   - `type`: `TelemetryEventTypeEnum`
   - `message`: `z.string()`
   - `actorName`: `z.string().optional()`
   - `actorRole`: `VisitorRoleType.optional()`
   - `slug`: `z.string().optional()`
-  - `timestamp`: `z.string().datetime()`
+  - `timestamp`: `z.iso.datetime()`
 
 ### 5. Матрица технологий и ADR (`tech-radar.schema.ts`)
 

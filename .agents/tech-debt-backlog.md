@@ -87,7 +87,7 @@
 
 - [ ] **Unit & Integration Tests:** Настроить `Vitest` для тестирования Zod-схем (`@repo/shared-schemas`), Zustand-сторов и NestJS-сервисов.
 - [ ] **E2E Playwright Suite:** Добавить сценарий проверки RBAC-флоу (открытие `GuestPassModal` -> вход по `guest`/`admin` -> чтение `.mdx` статьи -> маскирование `<Redact>`).
-- [ ] **GitHub Actions CI/CD:** Создать `.github/workflows/ci.yml` с прогоном `pnpm biome check .`, `pnpm turbo typecheck` и `pnpm turbo build` на каждый Pull Request.
+- [x] **GitHub Actions CI/CD:** Настроен production-grade DAG-пайплайн `.github/workflows/ci.yml` с композитным экшеном `.github/actions/setup-workspace/action.yml`: параллельные `lint` (`Biome`), `security` (`pnpm audit --prod` + `docker compose config`) и `typecheck` (с кодогенерацией `@repo/shared-schemas`, Prisma, `next typegen`) -> параллельные `build` (`Turborepo`) и `storybook` (`build-storybook` в `turbo.json`), аудит-безопасной `concurrency` на `main` и `--affected` (`fetch-depth: 0`) на PR.
 
 ### 5. Content & Workfolio Polish (`apps/web/content/*`)
 
