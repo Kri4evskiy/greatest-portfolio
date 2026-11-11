@@ -1,0 +1,32 @@
+name: Setup Monorepo Workspace
+description: Install pnpm (from packageManager), Node.js 22 with pnpm store cache, frozen dependencies, and optional codegen.
+
+inputs:
+  prepare-codegen:
+    description: Build @repo/shared-schemas and generate Prisma Client before typecheck
+    required: false
+    default: "false"
+
+runs:
+  using: composite
+  steps:
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: "22"
+        cache: pnpm
+
+    - name: Install dependencies
+      shell: bash
+      run: pnpm install --frozen-lockfile
+
+    - name: Prepare generated types (@repo/shared-schemas, Prisma Client & Next.js routes)
+      if: inputs.prepare-codegen == 'true'
+      shell: bash
+      run: |
+        pnpm --filter @repo/shared-schemas build
+        pnpm --filter @repo/api prisma:generate
+        pnpm --filter @repo/web exec next typegen
