@@ -1,0 +1,211 @@
+---
+title: "GitHub Actions CI/CD in a pnpm + Turborepo Monorepo: Modular DAG, Concurrency & Security"
+sidebarLabel: "GitHub Actions CI/CD Pipeline"
+summary: "Deep dive into our production monorepo CI architecture: why a 5-job modular DAG beats a single consolidated job for Vitest/Playwright growth, audit-safe main concurrency, dynamic fetch-depth with Turborepo --affected, codegen prep, layered caching, and supply-chain gates."
+category: "this-project"
+format: "deep-dive"
+tags: ["github-actions", "ci-cd", "turborepo", "storybook", "biome", "security"]
+readingTime: "10 min"
+publishedAt: "2026-11-11"
+order: 3
+tldr:
+  - "**Modular 5-job DAG over one monolith:** `lint`, `security`, and `typecheck` run in parallel before `build` and `storybook`, trading ~20s of per-VM bootstrap for fail-fast signal clarity, privilege isolation, and plug-and-play `Vitest` / `Playwright` slots."
+  - "**Audit-safe `concurrency`:** PRs cancel superseded commits per PR number, while `main` isolates every merge with `github.run_id` (`cancel-in-progress: false`) so GitHub's 2-slot queue never drops intermediate commits."
+  - "**Graph-aware `--affected`:** Dynamic `fetch-depth` (`0` on PRs, `1` on `main`/lint/security) lets `Turborepo` skip unaffected apps without deadlocking Branch Protection—and catches `packages/shared-schemas` ripple effects automatically."
+  - "**Zero-`node_modules` `security` gate:** Runs `docker compose config --quiet` and `pnpm audit --prod --audit-level=high` straight off `pnpm-lock.yaml` (the exact gate that caught `GHSA-mrhx-c7xc-m3w5` and drove our Zod v4 migration)."
+---
+
+## 1. Architecture Overview: What Runs and How the DAG Is Wired
+
+Our CI pipeline lives in `.github/workflows/ci.yml`, backed by one DRY Composite Action (`.github/actions/setup-workspace/action.yml`) and the task graph in `turbo.json`. It triggers on `push` to `main`, `pull_request` targeting `main`, and manual `workflow_dispatch`, scoped globally to least-privilege `permissions: contents: read`.
+
+Instead of one monolithic script, checks form a two-stage **Directed Acyclic Graph (DAG)** designed to absorb future test suites without refactoring existing gates:
+
+```text
+Stage 1 (Parallel Fail-Fast & Graph Checks)       Stage 2 (Gated Heavy Artifacts)
+──────────────────────────────────────────       ───────────────────────────────
+[lint] (Biome 2.6, fetch-depth: 1) ──────────┐
+                                             ├──▶ [build] (Turborepo + .turbo + .next/cache)
+[typecheck] (tsc + prepare-codegen) ─────────┤
+                                             └──▶ [storybook] (@repo/ui build-storybook)
+[security] (Compose + pnpm audit, no install) ──▶ Independent supply-chain gate
+
+Planned Extension Slots (Zero Rewrite Needed):
+[unit-tests] (Vitest) ──────────────────────────▶ Parallel in Stage 1 (alongside lint / typecheck)
+[e2e] (Playwright + Chromium) ──────────────────▶ Stage 2/3 with needs: [ lint, typecheck, build ]
+```
+
+### Job Matrix & Execution Profiles
+
+| Job | Dependencies (`needs`) | Git `fetch-depth` | Installs `node_modules`? | Execution Command (`pull_request` vs `main`) |
+| :--- | :--- | :--- | :--- | :--- |
+| **`lint`** | — | `1` (shallow) | Yes (no codegen) | `pnpm run lint` (`biome check .` across the whole repo in ~150 ms) |
+| **`security`** | — | `1` (shallow) | **No** | `docker compose config --quiet` → `pnpm audit --prod --audit-level=high` |
+| **`typecheck`** | — | PR: `0`, `main`: `1` | Yes + `prepare-codegen` | PR: `turbo run typecheck --affected`; `main`: `pnpm run typecheck` |
+| **`build`** | `lint`, `typecheck` | PR: `0`, `main`: `1` | Yes | PR: `turbo run build --affected`; `main`: `pnpm run build` |
+| **`storybook`** | `lint`, `typecheck` | PR: `0`, `main`: `1` | Yes | PR: `turbo run build-storybook --affected`; `main`: `turbo run build-storybook` |
+
+---
+
+## 2. Why a Multi-Job DAG Beats One Fast Consolidated Job
+
+A common micro-optimization in small repos is collapsing every check into a single job to avoid paying ~15–30 seconds of GitHub VM spin-up and `checkout` overhead per job. We **deliberately rejected** the single-job shortcut in favor of a modular DAG for five concrete reasons:
+
+1. **Future `Vitest` & `Playwright` Readiness:** Our roadmap adds fast `Vitest` unit/contract suites next, followed by heavier `Playwright` end-to-end flows (`GuestPassModal` → `HttpOnly` cookie → MDX unlock). A DAG lets `unit-tests` attach cleanly in Stage 1 parallel to `typecheck`, while `e2e` hangs off `needs: [ lint, typecheck, build ]` with its own browser cache and API/Postgres lifecycle—never delaying Biome lint or Storybook builds.
+2. **Clear Fail-Fast Signals in GitHub PR UI:** When a check turns red, reviewers immediately see *which* domain broke (`Lint & Format`, `Security & Infra Config`, `Typecheck`, `Production Build`, or `Storybook Build`) instead of scrolling a single 2,000-line interleaved log. Even better, `needs: [ lint, typecheck ]` prevents heavy `next build` and `storybook build` runners from even booting if formatting or TypeScript failed.
+3. **Separation of Privilege & Checkout Depth:** The `security` job does not execute third-party package install scripts or download `node_modules` at all, and both `lint` and `security` clone with `fetch-depth: 1`. Merging everything into one job forces full git history and `pnpm install` across every concern.
+4. **Independent Branch Protection Required Checks:** GitHub Branch Protection rules can require each job individually (`Security`, `Typecheck`, `Build`, `Storybook`, and soon `Vitest` / `Playwright`) as atomic status gates.
+5. **Independent Supply-Chain Feedback:** Because `security` has no downstream `needs:` blockers on `build` or `storybook`, a newly disclosed upstream npm CVE still lets engineers verify whether their code compiles and bundles cleanly while remediation proceeds in parallel.
+
+> [!NOTE]
+> **Trade-off Acknowledged:** On a repo with tight paid private runner-minute budgets and zero external contributors, a consolidated 1–2 job pipeline can save ~30–60s of cumulative billing overhead per run. For a scalable portfolio monorepo growing toward Vitest, Playwright, and per-service CD, modularity and failure clarity outweigh pure VM startup time.
+
+---
+
+## 3. DRY Environment Setup (`.github/actions/setup-workspace/action.yml`)
+
+Every job that needs workspace dependencies calls a single local **Composite Action** instead of duplicating `pnpm` / `Node.js` / store-caching YAML five times:
+
+```yaml title=".github/actions/setup-workspace/action.yml"
+inputs:
+  prepare-codegen:
+    description: Build @repo/shared-schemas and generate Prisma Client before typecheck
+    required: false
+    default: "false"
+
+runs:
+  using: composite
+  steps:
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v5
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v6
+      with:
+        node-version: "22"
+        cache: pnpm
+
+    - name: Install dependencies
+      shell: bash
+      run: pnpm install --frozen-lockfile
+
+    - name: Prepare generated types (@repo/shared-schemas, Prisma Client & Next.js routes)
+      if: inputs.prepare-codegen == 'true'
+      shell: bash
+      run: |
+        pnpm --filter @repo/shared-schemas build
+        pnpm --filter @repo/api prisma:generate
+        pnpm --filter @repo/web exec next typegen
+```
+
+Why every detail in this bootstrap matters:
+
+- **`pnpm/action-setup@v5` runs before `actions/setup-node@v6`:** `setup-node` uses `cache: pnpm`, which requires the `pnpm` binary to already exist on `$PATH` to resolve the store directory. Moreover, `pnpm/action-setup` omits a hardcoded `version:` input so the root `package.json` (`"packageManager": "pnpm@12.16.1"`) remains the single source of truth.
+- **Node 24 Action Majors (`@v6` / `@v5`):** Using `actions/checkout@v6`, `actions/setup-node@v6`, `actions/cache@v5`, and `pnpm/action-setup@v5` keeps runner execution on modern action runtimes without Node 20 deprecation warnings.
+- **`pnpm install --frozen-lockfile` *without* `--ignore-scripts`:** Unlike production multi-stage Docker builds where native artifacts are pruned selectively, CI runs workspace lifecycle scripts governed strictly by `allowBuilds` in `pnpm-workspace.yaml` (so `@prisma/client`, `@swc/core`, and `@biomejs/biome` work out of the box while arbitrary transitive scripts stay blocked).
+- **`LEFTHOOK: 0` & Zero Telemetry Env:** Workflow-level `env:` sets `CI: true`, `LEFTHOOK: 0` (preventing root `prepare: "lefthook install"` from mutating `.git/hooks` on ephemeral runners), `DO_NOT_TRACK: 1`, `TURBO_TELEMETRY_DISABLED: 1`, and `NEXT_TELEMETRY_DISABLED: 1`.
+
+---
+
+## 4. Audit-Safe `concurrency` Without Dropping `main` History
+
+A subtle GitHub Actions trap: each `concurrency` group holds **at most 1 running + 1 pending workflow run**. If you assign a static group like `concurrency: ci-main` with `cancel-in-progress: false` and merge 3 PRs back-to-back, GitHub silently evicts the middle commit from the pending queue.
+
+Our workflow solves both PR churn and `main` auditability in two lines:
+
+```yaml title=".github/workflows/ci.yml"
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+```
+
+- **Isolated PR lanes:** PR #12 gets `CI-12` and PR #13 gets `CI-13`. Pushing a fixup commit to PR #12 cancels only outdated checks on PR #12 while leaving every other PR untouched.
+- **Zero lost `main` audits:** Merges into `main` (and `workflow_dispatch`) fall back to `${{ github.run_id }}` with `cancel-in-progress: false`. Every single commit that lands on `main` completes its full validation and security audit.
+
+---
+
+## 5. `Turborepo --affected` & Dynamic `fetch-depth` vs `paths:` Filters
+
+Using GitHub Actions `paths:` filters to skip frontend or backend jobs causes two classic monorepo failures:
+
+1. **Branch Protection Deadlock:** If `build` or `storybook` is configured as a required check and skipped by `paths:`, GitHub leaves the PR stuck in _Waiting for status to be reported_ indefinitely.
+2. **Shared-Contract Blind Spots:** An edit to `packages/shared-schemas` can silently break `apps/api`, `apps/telemetry-ms`, or `apps/web` if downstream workflows don't re-run.
+
+Instead, every job always runs, while `typecheck`, `build`, and `storybook` leverage Turborepo's package dependency graph via `--affected` on PRs paired with dynamic Git clone depth (`fetch-depth: ${{ github.event_name == 'pull_request' && 0 || 1 }}`):
+
+- **`apps/api/**` changed on PR:** Turborepo checks & builds **only `@repo/api`**; `@repo/web` and `@repo/ui` (`build-storybook`) skip in ~1s and still report clean exit `0` (`Success`) to Branch Protection.
+- **`packages/shared-schemas/**` changed on PR:** Turborepo traverses the reverse dependency graph and validates `@repo/shared-schemas`, `@repo/api`, `@repo/telemetry-ms`, and `@repo/web`.
+- **`packages/ui/**` changed on PR:** Rebuilds both `@repo/ui` (`build-storybook`) and `@repo/web`; backend services stay untouched.
+- **Root configs (`tsconfig.base.json`, `pnpm-workspace.yaml`):** Declared under `globalDependencies` in `turbo.json`, forcing full monorepo verification on workspace-wide compiler or dependency changes.
+
+> [!IMPORTANT]
+> **GitHub Actions PR Detached-HEAD Nuance (`TURBO_SCM_BASE`):** On `pull_request` triggers, `actions/checkout` lands on a detached `HEAD` merge commit where remote `origin/main` exists (thanks to `fetch-depth: 0`), while a local `main` branch ref may be absent. If `--affected` logs ever warn `Unable to resolve base branch` and fall back to building all packages, explicitly exporting `TURBO_SCM_BASE: origin/${{ github.base_ref }}` for PR runs locks comparisons onto `origin/main`.
+
+---
+
+## 6. The Clean-Runner `typecheck` Trap & Layered Caching
+
+### Why `typecheck` Sets `prepare-codegen: "true"`
+
+In `turbo.json`, `typecheck` declares `"dependsOn": ["^typecheck"]` rather than `"^build"` so packages typecheck concurrently rather than waiting on full Next.js/API bundles. On a clean runner right after `git checkout`, three generated artifacts referenced by `tsconfig` do not exist yet:
+
+1. `packages/shared-schemas/dist/index.d.ts` (package entry declarations consumed by `api`, `telemetry-ms`, and `web`).
+2. `@prisma/client` generated runtime & model types imported by `apps/api`.
+3. `.next/types/*` route & param types imported by `apps/web/next-env.d.ts`.
+
+Passing `prepare-codegen: "true"` exclusively inside the `typecheck` job pre-generates all three artifacts before `turbo run typecheck` executes. Meanwhile, the `build` job needs `prepare-codegen: "false"` because `turbo run build` runs `"dependsOn": ["^build"]` (compiling `@repo/shared-schemas` first) and `@repo/api`'s own build script runs `"prisma generate && tsc -p tsconfig.build.json"`.
+
+### Three-Layer Caching & Cache-Poisoning Isolation
+
+1. **pnpm Content-Addressable Store:** Cached via `actions/setup-node@v6` (`cache: pnpm`) across all workspace-installing jobs.
+2. **Turborepo Task Outputs (`.turbo`):** Restored in `build` using exact SHA key `${{ runner.os }}-turbo-build-${{ github.sha }}` with prefix fallback `${{ runner.os }}-turbo-build-`.
+3. **Next.js Compiler Cache (`apps/web/.next/cache`):** Restored in `build` keyed by lockfile + `apps/web/**` hashes so webpack/SWC compilation skips cold rebuilds cleanly (`No build cache found` avoided).
+
+> [!TIP]
+> **Built-in Cache Security:** GitHub Actions isolates cache write scopes by branch—Pull Requests can *read* `main`'s `.turbo` and `.next/cache` via `restore-keys`, but cannot overwrite `main`'s cache entries (preventing untrusted PR cache poisoning). When scaling further, dropping `TURBO_TOKEN` and `TURBO_TEAM` into repository secrets switches `.turbo` seamlessly to Vercel Remote Cache with zero DAG edits.
+
+---
+
+## 7. Supply-Chain `security` Gate & Evolution Roadmap
+
+### Inside the `security` Job (Zero `node_modules`)
+
+```yaml title=".github/workflows/ci.yml"
+  security:
+    name: Security & Infra Config
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository (shallow)
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+
+      - name: Validate Docker Compose configuration
+        run: docker compose config --quiet
+
+      - name: Audit production dependencies
+        run: pnpm audit --prod --audit-level=high
+```
+
+- **Fail-order discipline:** `docker compose config --quiet` runs *before* `pnpm audit` so a broken Compose service graph or env interpolation error isn't masked when an upstream npm advisory fails the audit step.
+- **Why `--prod --audit-level=high`:** `devDependencies` (Storybook, Vite, Biome, Turborepo) never ship inside our `docker/*.Dockerfile` production runtime containers. Scoping the blocking gate to `--prod` maintains high signal-to-noise without false-positive blocks on build tooling—while `pnpm audit` reads `pnpm-lock.yaml` directly without spending time or attack surface installing `node_modules`.
+- **Real Case Study (`GHSA-mrhx-c7xc-m3w5`):** This exact CI gate flagged a High-severity DoS/memory-exhaustion advisory in `zod < 4.6.6`. Instead of silencing it, we executed a clean workspace migration to `zod@^4.6.7` + `@hookform/resolvers@^7.0.5`, adapted `z.uuid()`, `z.iso.datetime()`, `ZodType<T>`, and `.max(500)` array bounds across `@repo/shared-schemas`, `apps/api`, and `apps/web`, returning the gate to `0 high/critical vulnerabilities`.
+- **`pnpm 12` Policy Exceptions:** If an unfixable false positive ever requires a temporary documented exception, `pnpm@12.16.1` uses the top-level `audit.ignore` block in `pnpm-workspace.yaml` (via `pnpm audit --ignore <GHSA>`) rather than the deprecated `auditConfig` key.
+
+### Concrete Extension Plan (Without Rewriting CI)
+
+1. **`unit-tests` (`Vitest`) — Next Milestone:** Add a parallel Stage 1 job (`needs: []`) running `turbo run test --affected` (with `prepare-codegen: "true"`) to verify `@repo/shared-schemas` Zod contracts, `Zustand` stores, and `NestJS` services.
+2. **`e2e` (`Playwright`) — Post-Unit Milestone:** Add a Stage 2 job (`needs: [ lint, typecheck, build ]`) caching Playwright Chromium browsers, validating `GuestPassModal` → `HttpOnly` JWT cookie → `.mdx` unlock & `<Redact />` end-to-end, and uploading trace artifacts on `failure()`.
+3. **Additional Security Hardening Candidates:**
+   - Weekly `schedule:` cron trigger in `ci.yml` + `.github/dependabot.yml` so newly published npm advisories trigger alerts even between code commits.
+   - `persist-credentials: false` on `actions/checkout@v6` for Defense-in-Depth `.git/config` isolation.
+   - `actionlint` inside `lint` to catch workflow YAML bugs locally not covered by Biome.
+4. **Decoupled Continuous Deployment (CD):** Separate per-service CD workflows (`apps/web` to Vercel with Turborepo Remote Cache; `apps/api` and `apps/telemetry-ms` via `docker/*.Dockerfile` + `turbo prune --docker`) so editing `.mdx` notes never triggers backend Docker image rebuilds.
