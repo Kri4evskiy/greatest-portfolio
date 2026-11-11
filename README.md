@@ -1,5 +1,15 @@
 # Greatest Portfolio & Engineering Knowledge Base
 
+![Next.js](https://img.shields.io/badge/Next.js-16-000000?style=flat-square&logo=next.js&logoColor=white)
+![React](https://img.shields.io/badge/React-19-149ECA?style=flat-square&logo=react&logoColor=white)
+![NestJS](https://img.shields.io/badge/NestJS-12_ESM-E0234E?style=flat-square&logo=nestjs&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?style=flat-square&logo=typescript&logoColor=white)
+![Prisma](https://img.shields.io/badge/Prisma-6-2D3748?style=flat-square&logo=prisma&logoColor=white)
+![Turborepo](https://img.shields.io/badge/Turborepo-Monorepo-EF4444?style=flat-square&logo=turborepo&logoColor=white)
+![pnpm](https://img.shields.io/badge/pnpm-12-F69220?style=flat-square&logo=pnpm&logoColor=white)
+![Biome](https://img.shields.io/badge/Biome-2.6-60A5FA?style=flat-square&logo=biome&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-Multi--Stage-2496ED?style=flat-square&logo=docker&logoColor=white)
+
 Production-grade Full-Stack монорепозиторий персонального портфолио (в эстетике **Notion Workfolio**) и закрытой интерактивной **Инженерной Базы Знаний** с демонстрацией современной Enterprise-архитектуры (`Next.js 16`, `NestJS 12 Native ESM`, `Prisma ORM`, `Microservices TCP + SSE`, `TanStack Query v5 + IndexedDB`, `D3.js`).
 
 ---
@@ -20,7 +30,7 @@ Production-grade Full-Stack монорепозиторий персональн�
 
 ```bash
 # 1. Клонировать репозиторий
-git clone <URL_РЕПОЗИТОРИЯ>
+git clone https://github.com/Kri4evskiy/greatest-portfolio.git
 cd greatest-portfolio
 
 # 2. Установить зависимости всех пакетов монорепозитория одной командой
