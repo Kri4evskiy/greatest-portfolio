@@ -27,7 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository (shallow)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 1
 
@@ -42,25 +42,30 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository (shallow)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 1
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v5
 
-      - name: Audit production dependencies
-        run: pnpm audit --prod --audit-level=high
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
 
       - name: Validate Docker Compose configuration
         run: docker compose config --quiet
+
+      - name: Audit production dependencies
+        run: pnpm audit --prod --audit-level=high
 
   typecheck:
     name: Typecheck (TypeScript)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: ${{ github.event_name == 'pull_request' && 0 || 1 }}
 
@@ -83,7 +88,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: ${{ github.event_name == 'pull_request' && 0 || 1 }}
 
@@ -91,12 +96,21 @@ jobs:
         uses: ./.github/actions/setup-workspace
 
       - name: Restore Turborepo cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: .turbo
           key: ${{ runner.os }}-turbo-build-${{ github.sha }}
           restore-keys: |
             ${{ runner.os }}-turbo-build-
+
+      - name: Restore Next.js build cache
+        uses: actions/cache@v5
+        with:
+          path: apps/web/.next/cache
+          key: ${{ runner.os }}-nextjs-${{ hashFiles('**/pnpm-lock.yaml') }}-${{ hashFiles('apps/web/**') }}
+          restore-keys: |
+            ${{ runner.os }}-nextjs-${{ hashFiles('**/pnpm-lock.yaml') }}-
+            ${{ runner.os }}-nextjs-
 
       - name: Run Turborepo build
         run: |
@@ -112,7 +126,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: ${{ github.event_name == 'pull_request' && 0 || 1 }}
 
