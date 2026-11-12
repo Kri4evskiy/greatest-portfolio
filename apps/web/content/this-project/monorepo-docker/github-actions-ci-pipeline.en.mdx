@@ -139,7 +139,7 @@ Instead, every job always runs, while `typecheck`, `build`, and `storybook` leve
 - **Root configs (`tsconfig.base.json`, `pnpm-workspace.yaml`):** Declared under `globalDependencies` in `turbo.json`, forcing full monorepo verification on workspace-wide compiler or dependency changes.
 
 > [!IMPORTANT]
-> **GitHub Actions PR Detached-HEAD Fix (`TURBO_SCM_BASE`):** On `pull_request` triggers, `actions/checkout` checks out a detached `HEAD` merge commit where remote `origin/main` exists (thanks to `fetch-depth: 0`), while a local `main` branch ref is absent. Because Turborepo otherwise warns `Unable to resolve base branch` and falls back to building all packages, PR runs explicitly pass `TURBO_SCM_BASE="origin/${{ github.base_ref }}"` to lock comparisons onto `origin/main`.
+> **GitHub Actions PR Detached-HEAD Fix (`TURBO_SCM_BASE`):** On `pull_request` triggers, `actions/checkout` fetches only `refs/pull/<n>/merge` in detached `HEAD` — neither a local `main` branch nor `origin/main` ref exists on the runner. Passing `TURBO_SCM_BASE="${{ github.event.pull_request.base.sha }}"` (present locally thanks to `fetch-depth: 0`) locks `--affected` cleanly onto the exact target base commit without extra network fetches.
 
 ---
 

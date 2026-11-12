@@ -68,7 +68,7 @@ concurrency:
   - Изменение в `packages/shared-schemas/**` → Turborepo автоматически перепроверяет `@repo/shared-schemas`, `@repo/api`, `@repo/telemetry-ms` и `@repo/web`.
   - Изменение в `packages/ui/**` → пересобираются `@repo/ui` (`build-storybook`) и `@repo/web`.
   - Изменение `tsconfig.base.json` или `pnpm-workspace.yaml` → `globalDependencies` в `turbo.json` помечает все пакеты затронутыми.
-- **Фикс `pull_request` в Detached HEAD (`TURBO_SCM_BASE`):** на раннерах GitHub Actions PR чекаутится в detached `HEAD` без локальной ветки `main` (но с `origin/main` при `fetch-depth: 0`). Чтобы Turborepo не падал в `WARNING unable to detect git range ... Unable to resolve base branch`, в PR-команды `typecheck`, `build` и `storybook` явно проброшена переменная `TURBO_SCM_BASE="origin/${{ github.base_ref }}"`.
+- **Фикс `pull_request` в Detached HEAD (`TURBO_SCM_BASE`):** на раннерах GitHub Actions `actions/checkout` при `pull_request` забирает только merge-ветку `refs/pull/<n>/merge` в detached `HEAD` (без локальной ветки `main` и даже без ref `origin/main`). Чтобы Turborepo не падал в ошибку/предупреждение `Unable to resolve base branch`, в PR-команды `typecheck`, `build` и `storybook` явно передаётся базовый SHA коммита целевой ветки: `TURBO_SCM_BASE="${{ github.event.pull_request.base.sha }}"` (при `fetch-depth: 0` он гарантированно присутствует в истории).
 
 ### 3.3. Подготовка кодогенерации перед `typecheck` (`prepare-codegen: 'true'`)
 
