@@ -131,7 +131,7 @@ concurrency:
 1. **Зависание Branch Protection:** пропущенная по `paths:` обязательная проверка вешает PR в бесконечном статусе _Waiting for status to be reported_.
 2. **Слепые зоны общих контрактов:** правка схемы в `packages/shared-schemas` способна уронить `apps/api`, `apps/telemetry-ms` или `apps/web`, если полагаться на ручные пути.
 
-Вместо этого все джобы запускаются всегда, а `typecheck`, `build` и `storybook` используют граф `Turborepo --affected` на PR в связке с динамическим `fetch-depth: ${{ github.event_name == 'pull_request' && 0 || 1 }}`:
+Вместо этого все джобы запускаются всегда, а `typecheck`, `build` и `storybook` используют граф `Turborepo --affected` на PR в связке с динамическим `fetch-depth: ${{ github.event_name == 'pull_request' && '0' || '1' }}` (строка `'0'` обязательна, так как число `0` в выражениях GitHub Actions считается `falsy`):
 
 - **Правки только в `apps/api/**`:** проверяется и собирается **исключительно `@repo/api`**; `web` и `storybook` пропускаются за ~1 секунду с честным кодом `0` (`Success`).
 - **Правки в `packages/shared-schemas/**`:** Turborepo автоматически вычисляет обратных потребителей и проверяет `@repo/shared-schemas`, `@repo/api`, `@repo/telemetry-ms` и `@repo/web`.

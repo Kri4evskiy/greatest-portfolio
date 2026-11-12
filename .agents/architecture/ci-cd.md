@@ -93,7 +93,7 @@ concurrency:
 
 ## 4. Расширение под тесты (`Vitest`, `Playwright`), hardening и CD
 
-- **`unit-tests` (`Vitest`):** добавить job в Stage 1 (параллельно с `lint`, `security` и `typecheck`) с `uses: ./.github/actions/setup-workspace`, `prepare-codegen: "true"` (при необходимости импорта из `@repo/shared-schemas` / Prisma) и `fetch-depth: ${{ github.event_name == 'pull_request' && 0 || 1 }}` для `turbo run test --affected`.
+- **`unit-tests` (`Vitest`):** добавить job в Stage 1 (параллельно с `lint`, `security` и `typecheck`) с `uses: ./.github/actions/setup-workspace`, `prepare-codegen: "true"` (при необходимости импорта из `@repo/shared-schemas` / Prisma) и `fetch-depth: ${{ github.event_name == 'pull_request' && '0' || '1' }}` (именно строкой `'0'`, так как число `0` в выражениях GitHub Actions считается falsy!) для `turbo run test --affected`.
 - **`e2e` (`Playwright`):** добавить job после `build` (`needs: [ lint, typecheck, build ]`) с кэшем браузеров Playwright, сборкой или поднятием тестируемого контура (`web` + `api` / тестовый Postgres service container или In-Memory fallback), прогоном RBAC/MDX-сценариев (`GuestPassModal` -> `HttpOnly` cookie -> `<Redact />`) и загрузкой отчёта/трейсов (`actions/upload-artifact`) только при `failure()`.
 - **Харденинг CI и гигиена безопасности (следующие улучшения):**
   1. **Регулярный скан CVE (`schedule` + Dependabot):** добавить еженедельный `schedule: - cron: ...` для триггера `security` и `.github/dependabot.yml` (для экосистем `npm` и `github-actions`), чтобы новые уязвимости ловились даже в недели без коммитов.

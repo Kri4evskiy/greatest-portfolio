@@ -131,7 +131,7 @@ Using GitHub Actions `paths:` filters to skip frontend or backend jobs causes tw
 1. **Branch Protection Deadlock:** If `build` or `storybook` is configured as a required check and skipped by `paths:`, GitHub leaves the PR stuck in _Waiting for status to be reported_ indefinitely.
 2. **Shared-Contract Blind Spots:** An edit to `packages/shared-schemas` can silently break `apps/api`, `apps/telemetry-ms`, or `apps/web` if downstream workflows don't re-run.
 
-Instead, every job always runs, while `typecheck`, `build`, and `storybook` leverage Turborepo's package dependency graph via `--affected` on PRs paired with dynamic Git clone depth (`fetch-depth: ${{ github.event_name == 'pull_request' && 0 || 1 }}`):
+Instead, every job always runs, while `typecheck`, `build`, and `storybook` leverage Turborepo's package dependency graph via `--affected` on PRs paired with dynamic Git clone depth (`fetch-depth: ${{ github.event_name == 'pull_request' && '0' || '1' }}` — quoted `'0'` because numeric `0` is falsy in GitHub Actions ternary expressions):
 
 - **`apps/api/**` changed on PR:** Turborepo checks & builds **only `@repo/api`**; `@repo/web` and `@repo/ui` (`build-storybook`) skip in ~1s and still report clean exit `0` (`Success`) to Branch Protection.
 - **`packages/shared-schemas/**` changed on PR:** Turborepo traverses the reverse dependency graph and validates `@repo/shared-schemas`, `@repo/api`, `@repo/telemetry-ms`, and `@repo/web`.
