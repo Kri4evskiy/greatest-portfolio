@@ -18,7 +18,7 @@ tldr:
 
 To keep source files, compilers, and build caches out of production images, every Dockerfile in `docker/` separates container construction into four deterministic stages:
 
-1. **`base`:** activates `pnpm 12.16.1` via `corepack` and disables background telemetry (`DO_NOT_TRACK=1`, `TURBO_TELEMETRY_DISABLED=1`).
+1. **`base`:** activates `pnpm 12.18.0` via `corepack` and disables background telemetry (`DO_NOT_TRACK=1`, `TURBO_TELEMETRY_DISABLED=1`).
 2. **`deps`:** copies only `package.json`, `pnpm-lock.yaml`, and `pnpm-workspace.yaml` manifests so the dependency layer stays cached until lockfile changes occur.
 3. **`builder`:** generates the Prisma client, runs `pnpm turbo run build --filter=...`, and prunes `devDependencies`.
 4. **`runner`:** copies only compiled artifacts (`dist/` or `.next/standalone`) and runs the process under a non-root user (`UID 1001`).
@@ -35,7 +35,7 @@ ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 ENV DO_NOT_TRACK=1
 ENV TURBO_TELEMETRY_DISABLED=1
-RUN corepack enable && corepack prepare pnpm@12.16.1 --activate
+RUN corepack enable && corepack prepare pnpm@12.18.0 --activate
 
 FROM base AS deps
 WORKDIR /app

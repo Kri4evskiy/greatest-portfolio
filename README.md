@@ -23,7 +23,7 @@ Production-grade Full-Stack монорепозиторий персональн�
 ### Предварительные требования
 
 - **Node.js:** `>= 22.0.0`
-- **pnpm:** `>= 12.x` (`pnpm@12.16.1`, можно активировать через `corepack enable` или `npm install -g pnpm@latest`)
+- **pnpm:** `>= 12.x` (`pnpm@12.18.0`, можно активировать через `corepack enable` или `npm install -g pnpm@latest`)
 
 ### Вариант 1: Мгновенный локальный запуск (без настройки БД и Docker)
 

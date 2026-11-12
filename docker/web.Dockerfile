@@ -14,7 +14,7 @@ RUN apk add --no-cache libc6-compat
 ENV DO_NOT_TRACK=1
 ENV TURBO_TELEMETRY_DISABLED=1
 ENV NEXT_TELEMETRY_DISABLED=1
-RUN corepack enable && corepack prepare pnpm@12.16.1 --activate && pnpm --version
+RUN corepack enable && corepack prepare pnpm@12.18.0 --activate && pnpm --version
 WORKDIR /app
 
 COPY --from=pruner /app/out/json/ .

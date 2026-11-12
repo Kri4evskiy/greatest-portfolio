@@ -100,7 +100,7 @@ runs:
 
 Чому кожен крок налаштований саме так:
 
-- **Суворий порядок `pnpm/action-setup@v5` до `actions/setup-node@v6`:** опція `cache: pnpm` потребує вже наявного бінарника `pnpm` для визначення шляху до стору. Версія в YAML не захардкоджена — екшен зчитує `"packageManager": "pnpm@12.16.1"` із кореневого `package.json`.
+- **Суворий порядок `pnpm/action-setup@v5` до `actions/setup-node@v6`:** опція `cache: pnpm` потребує вже наявного бінарника `pnpm` для визначення шляху до стору. Версія в YAML не захардкоджена — екшен зчитує `"packageManager": "pnpm@12.18.0"` із кореневого `package.json`.
 - **Мажорні версії з підтримкою Node 24:** `actions/checkout@v6`, `actions/setup-node@v6`, `actions/cache@v5` і `pnpm/action-setup@v5` позбавляють логи попереджень про застарілий Node 20.
 - **`pnpm install --frozen-lockfile` *без* `--ignore-scripts`:** на відміну від фінальних Docker-образів, у CI дозволеним пакетам (`@prisma/client`, `@swc/core`, `@biomejs/biome`) потрібно виконати postinstall-білд. Безпеку забезпечує білий список `allowBuilds` у `pnpm-workspace.yaml` (за замовчуванням у pnpm 12 будь-які сторонні `postinstall`-скрипти заблоковані).
 - **`LEFTHOOK: 0` та вимкнення телеметрії:** глобальні змінні `CI: true`, `LEFTHOOK: 0` (щоб скрипт `prepare` не ставив git-хуки в контейнері CI), `DO_NOT_TRACK: 1`, `TURBO_TELEMETRY_DISABLED: 1` і `NEXT_TELEMETRY_DISABLED: 1`.
@@ -198,7 +198,7 @@ concurrency:
 - **Правильний порядок перевірок:** спочатку швидка офлайн-валідація `docker compose config --quiet`, потім мережевий аудит `pnpm audit --prod --audit-level=high` — помилка реєстру чи нова вразливість не замаскує зламаний синтаксис `docker-compose.yml`.
 - **Чому саме `--prod --audit-level=high`:** інструменти розробки (`Storybook`, `Vite`, `Biome`, `Turbo`) не потрапляють у фінальні продакшен-контейнери `docker/*.Dockerfile` (`pnpm prune --prod`). Фокус на `--prod` дає високе співвідношення сигнал/шум без хибних блокувань через dev-залежності, а сам аудит читає `pnpm-lock.yaml` напряму без встановлення `node_modules`.
 - **Живий кейс (`GHSA-mrhx-c7xc-m3w5`):** саме ця джоба виявила High-severity вразливість DoS / Memory Exhaustion у `zod < 4.6.6`. Ми виконали контрольовану міграцію на `zod@^4.6.7` + `@hookform/resolvers@^7.0.5`, оновили `z.uuid()`, `z.iso.datetime()`, `ZodType<T>` та ліміт масиву `.max(500)`, повністю очистивши прод-граф (0 high/critical вразливостей).
-- **Винятки у `pnpm 12`:** якщо колись знадобиться тимчасово задокументувати хибнопозитивний чи недосяжний advisory, у `pnpm@12.16.1` використовується верхньорівневий блок `audit.ignore` у `pnpm-workspace.yaml` (через `pnpm audit --ignore <GHSA>`), а не застарілий `auditConfig`.
+- **Винятки у `pnpm 12`:** якщо колись знадобиться тимчасово задокументувати хибнопозитивний чи недосяжний advisory, у `pnpm@12.18.0` використовується верхньорівневий блок `audit.ignore` у `pnpm-workspace.yaml` (через `pnpm audit --ignore <GHSA>`), а не застарілий `auditConfig`.
 
 ### План еволюції CI/CD без переписування ядра
 

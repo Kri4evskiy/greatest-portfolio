@@ -100,7 +100,7 @@ runs:
 
 Why every detail in this bootstrap matters:
 
-- **`pnpm/action-setup@v5` runs before `actions/setup-node@v6`:** `setup-node` uses `cache: pnpm`, which requires the `pnpm` binary to already exist on `$PATH` to resolve the store directory. Moreover, `pnpm/action-setup` omits a hardcoded `version:` input so the root `package.json` (`"packageManager": "pnpm@12.16.1"`) remains the single source of truth.
+- **`pnpm/action-setup@v5` runs before `actions/setup-node@v6`:** `setup-node` uses `cache: pnpm`, which requires the `pnpm` binary to already exist on `$PATH` to resolve the store directory. Moreover, `pnpm/action-setup` omits a hardcoded `version:` input so the root `package.json` (`"packageManager": "pnpm@12.18.0"`) remains the single source of truth.
 - **Node 24 Action Majors (`@v6` / `@v5`):** Using `actions/checkout@v6`, `actions/setup-node@v6`, `actions/cache@v5`, and `pnpm/action-setup@v5` keeps runner execution on modern action runtimes without Node 20 deprecation warnings.
 - **`pnpm install --frozen-lockfile` *without* `--ignore-scripts`:** Unlike production multi-stage Docker builds where native artifacts are pruned selectively, CI runs workspace lifecycle scripts governed strictly by `allowBuilds` in `pnpm-workspace.yaml` (so `@prisma/client`, `@swc/core`, and `@biomejs/biome` work out of the box while arbitrary transitive scripts stay blocked).
 - **`LEFTHOOK: 0` & Zero Telemetry Env:** Workflow-level `env:` sets `CI: true`, `LEFTHOOK: 0` (preventing root `prepare: "lefthook install"` from mutating `.git/hooks` on ephemeral runners), `DO_NOT_TRACK: 1`, `TURBO_TELEMETRY_DISABLED: 1`, and `NEXT_TELEMETRY_DISABLED: 1`.
@@ -198,7 +198,7 @@ Passing `prepare-codegen: "true"` exclusively inside the `typecheck` job pre-gen
 - **Fail-order discipline:** `docker compose config --quiet` runs *before* `pnpm audit` so a broken Compose service graph or env interpolation error isn't masked when an upstream npm advisory fails the audit step.
 - **Why `--prod --audit-level=high`:** `devDependencies` (Storybook, Vite, Biome, Turborepo) never ship inside our `docker/*.Dockerfile` production runtime containers. Scoping the blocking gate to `--prod` maintains high signal-to-noise without false-positive blocks on build tooling—while `pnpm audit` reads `pnpm-lock.yaml` directly without spending time or attack surface installing `node_modules`.
 - **Real Case Study (`GHSA-mrhx-c7xc-m3w5`):** This exact CI gate flagged a High-severity DoS/memory-exhaustion advisory in `zod < 4.6.6`. Instead of silencing it, we executed a clean workspace migration to `zod@^4.6.7` + `@hookform/resolvers@^7.0.5`, adapted `z.uuid()`, `z.iso.datetime()`, `ZodType<T>`, and `.max(500)` array bounds across `@repo/shared-schemas`, `apps/api`, and `apps/web`, returning the gate to `0 high/critical vulnerabilities`.
-- **`pnpm 12` Policy Exceptions:** If an unfixable false positive ever requires a temporary documented exception, `pnpm@12.16.1` uses the top-level `audit.ignore` block in `pnpm-workspace.yaml` (via `pnpm audit --ignore <GHSA>`) rather than the deprecated `auditConfig` key.
+- **`pnpm 12` Policy Exceptions:** If an unfixable false positive ever requires a temporary documented exception, `pnpm@12.18.0` uses the top-level `audit.ignore` block in `pnpm-workspace.yaml` (via `pnpm audit --ignore <GHSA>`) rather than the deprecated `auditConfig` key.
 
 ### Concrete Extension Plan (Without Rewriting CI)
 

@@ -9,7 +9,7 @@ readingTime: "6 хв"
 publishedAt: "2026-11-10"
 order: 1
 tldr:
-  - "Воркспейс розділений на застосунки (`apps/web`, `apps/api`, `apps/telemetry-ms`) та спільні пакети (`packages/ui`, `packages/shared-schemas`) під керуванням `pnpm 12.16.1` із білим списком `allowBuilds`."
+  - "Воркспейс розділений на застосунки (`apps/web`, `apps/api`, `apps/telemetry-ms`) та спільні пакети (`packages/ui`, `packages/shared-schemas`) під керуванням `pnpm 12.18.0` із білим списком `allowBuilds`."
   - "Граф `turbo.json` гарантує топологічну збірку залежностей (`^build`) перед запуском `typecheck`, `dev` або `build` у сервісах."
   - "Єдиний `tsconfig.base.json` вмикає `strict`, `noUncheckedIndexedAccess` і `exactOptionalPropertyTypes`, а `biome.json` замінює зв'язку `ESLint + Prettier` одним швидким Rust-бінарником."
 ---

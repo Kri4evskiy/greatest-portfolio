@@ -9,7 +9,7 @@ readingTime: "6 min"
 publishedAt: "2026-11-10"
 order: 1
 tldr:
-  - "Splits the workspace into applications (`apps/web`, `apps/api`, `apps/telemetry-ms`) and shared packages (`packages/ui`, `packages/shared-schemas`) managed by `pnpm 12.16.1` with an explicit `allowBuilds` whitelist."
+  - "Splits the workspace into applications (`apps/web`, `apps/api`, `apps/telemetry-ms`) and shared packages (`packages/ui`, `packages/shared-schemas`) managed by `pnpm 12.18.0` with an explicit `allowBuilds` whitelist."
   - "Configures `turbo.json` with topological `^build` dependencies so shared schemas compile before downstream `typecheck`, `dev`, or `build` tasks."
   - "Enforces `strict`, `noUncheckedIndexedAccess`, and `exactOptionalPropertyTypes` via `tsconfig.base.json` and replaces `ESLint + Prettier` with a single Rust-powered `biome.json`."
 ---

@@ -18,7 +18,7 @@ tldr:
 
 Щоб у продакшен-контейнери не потрапляли сирці, компілятори та кеші збірки, кожен Dockerfile у папці `docker/` будує образ у декілька ізольованих кроків:
 
-1. **`base`:** активує `pnpm 12.16.1` через `corepack` і вимикає фонову телеметрію (`DO_NOT_TRACK=1`, `TURBO_TELEMETRY_DISABLED=1`).
+1. **`base`:** активує `pnpm 12.18.0` через `corepack` і вимикає фонову телеметрію (`DO_NOT_TRACK=1`, `TURBO_TELEMETRY_DISABLED=1`).
 2. **`deps`:** копіює лише маніфести `package.json`, `pnpm-lock.yaml` і `pnpm-workspace.yaml`, щоб шар залежностей кешувався до зміни версій пакетів.
 3. **`builder`:** компілює Prisma-клієнт і запускає `pnpm turbo run build --filter=...`, після чого відсікає `devDependencies`.
 4. **`runner`:** копіює лише скомпільовані артефакти (`dist/` або `.next/standalone`) та запускає процес від непривілейованого користувача (`UID 1001`).
@@ -35,7 +35,7 @@ ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 ENV DO_NOT_TRACK=1
 ENV TURBO_TELEMETRY_DISABLED=1
-RUN corepack enable && corepack prepare pnpm@12.16.1 --activate
+RUN corepack enable && corepack prepare pnpm@12.18.0 --activate
 
 FROM base AS deps
 WORKDIR /app

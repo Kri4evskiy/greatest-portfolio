@@ -83,7 +83,7 @@ concurrency:
 ### 3.4. `pnpm 12`, `allowBuilds`, кэши и `security`
 
 - Используются мажорные версии экшенов с поддержкой рантайма Node 24 (`actions/checkout@v6`, `actions/setup-node@v6`, `actions/cache@v5`, `pnpm/action-setup@v5`), чтобы исключить deprecation-предупреждения о Node 20.
-- `pnpm/action-setup@v5` ставится **до** `actions/setup-node@v6` (`cache: pnpm`) и считывает версию из `"packageManager": "pnpm@12.16.1"` в корневом `package.json`.
+- `pnpm/action-setup@v5` ставится **до** `actions/setup-node@v6` (`cache: pnpm`) и считывает версию из `"packageManager": "pnpm@12.18.0"` в корневом `package.json`.
 - `pnpm install --frozen-lockfile` запускается **без** `--ignore-scripts`, чтобы срабатывал белый список `allowBuilds` из `pnpm-workspace.yaml`, а переменная `LEFTHOOK: 0` отключает установку git-хуков в CI.
 - **Слои кэша и защита от Cache Poisoning:** в `build` кэшируются `.turbo` и `apps/web/.next/cache` через `actions/cache@v5`. Благодаря политике изоляции кэшей GitHub Actions, PR могут _читать_ кэш `main` через `restore-keys`, но **не могут** перезаписывать кэш базовой ветки. (`storybook` пока не восстанавливает `.turbo` ради простоты конфига; при росте UI-кита туда легко добавить аналогичный шаг или перейти на Turborepo Remote Caching через `TURBO_TOKEN` + `TURBO_TEAM`.)
 - **Порядок шагов в `security`:** сначала офлайн-валидация `docker compose config --quiet`, затем `pnpm audit --prod --audit-level=high` (аудит прод-графа по `pnpm-lock.yaml` без `node_modules` с высоким соотношением сигнал/шум).
