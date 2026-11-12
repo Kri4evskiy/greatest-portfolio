@@ -10,7 +10,7 @@ publishedAt: "2026-11-10"
 order: 1
 tldr:
   - "Splits the workspace into applications (`apps/web`, `apps/api`, `apps/telemetry-ms`) and shared packages (`packages/ui`, `packages/shared-schemas`) managed by `pnpm 12.18.0` with an explicit `allowBuilds` whitelist."
-  - "Configures `turbo.json` with topological `^build` dependencies so shared schemas compile before downstream `typecheck`, `dev`, or `build` tasks."
+  - "Configures `turbo.json` with topological `^build` dependencies for `build`, `build-storybook`, and `dev`, while `^typecheck` lets packages typecheck in parallel."
   - "Enforces `strict`, `noUncheckedIndexedAccess`, and `exactOptionalPropertyTypes` via `tsconfig.base.json` and replaces `ESLint + Prettier` with a single Rust-powered `biome.json`."
 ---
 
@@ -37,7 +37,7 @@ allowBuilds:
 
 | Monorepo Layer | Package | Responsibility |
 | :--- | :--- | :--- |
-| **Applications (`apps/*`)** | `@repo/web`, `@repo/api`, `@repo/telemetry-ms` | Next.js 16 frontend, NestJS 11 REST API, and live SSE telemetry microservice |
+| **Applications (`apps/*`)** | `@repo/web`, `@repo/api`, `@repo/telemetry-ms` | Next.js 16 frontend, NestJS 12 REST API, and live SSE telemetry microservice |
 | **Contracts (`packages/shared-schemas`)** | `@repo/shared-schemas` | Single source of truth for Zod schemas, DTOs, cookie/locale constants, and RBAC permissions |
 | **Design System (`packages/ui`)** | `@repo/ui` | `globals.css` token matrix, Tailwind `preset`, `Radix UI` primitives, and `Storybook` |
 
@@ -45,20 +45,28 @@ allowBuilds:
 
 ## 2. `Turborepo` Task Graph & Artifact Caching
 
-`turbo.json` orchestrates a deterministic pipeline: `"dependsOn": ["^build"]` ensures `@repo/shared-schemas` compiles its `dist/` output before `apps/web` or `apps/api` run typechecking or bundling:
+`turbo.json` orchestrates a deterministic pipeline: `"dependsOn": ["^build"]` on `build`, `build-storybook`, and `dev` compiles `@repo/shared-schemas` first, while `"dependsOn": ["^typecheck"]` lets workspace packages typecheck in parallel:
 
 ```json title="turbo.json"
 {
   "$schema": "https://turbo.build/schema.json",
+  "globalDependencies": ["tsconfig.base.json", "pnpm-workspace.yaml"],
+  "globalEnv": ["API_INTERNAL_URL"],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
-      "outputs": [".next/**", "!.next/cache/**", "dist/**"]
+      "outputs": [".next/**", "!.next/cache/**", "dist/**", "storybook-static/**"]
+    },
+    "build-storybook": {
+      "dependsOn": ["^build"],
+      "outputs": ["storybook-static/**"]
     },
     "typecheck": {
-      "dependsOn": ["^build"],
-      "outputs": []
+      "dependsOn": ["^typecheck"]
+    },
+    "lint": {
+      "dependsOn": ["^lint"]
     },
     "dev": {
       "dependsOn": ["^build"],
@@ -78,8 +86,8 @@ To eliminate runtime `Cannot read properties of undefined` bugs, every workspace
 ```json title="tsconfig.base.json"
 {
   "compilerOptions": {
-    "target": "ES2023",
-    "lib": ["ES2023"],
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "strict": true,
@@ -87,8 +95,11 @@ To eliminate runtime `Cannot read properties of undefined` bugs, every workspace
     "exactOptionalPropertyTypes": true,
     "noImplicitOverride": true,
     "noFallthroughCasesInSwitch": true,
+    "noImplicitReturns": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
     "isolatedModules": true,
-    "verbatimModuleSyntax": true,
+    "noEmit": true,
     "skipLibCheck": true
   }
 }
@@ -105,7 +116,7 @@ Instead of maintaining a fragile chain of `ESLint + Prettier` plugins, the entir
 
 ```json title="biome.json"
 {
-  "$schema": "https://biomejs.dev/schemas/2.4.7/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.6.4/schema.json",
   "assist": {
     "actions": {
       "source": { "organizeImports": "on" }
@@ -114,13 +125,16 @@ Instead of maintaining a fragile chain of `ESLint + Prettier` plugins, the entir
   "linter": {
     "enabled": true,
     "rules": {
-      "recommended": true,
+      "preset": "recommended",
       "correctness": {
         "noUnusedImports": "error",
-        "noUnusedVariables": "warn"
+        "noUnusedVariables": "error"
       },
       "suspicious": {
         "noExplicitAny": "error"
+      },
+      "style": {
+        "noNonNullAssertion": "error"
       }
     }
   },

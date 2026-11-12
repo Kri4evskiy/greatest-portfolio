@@ -11,7 +11,7 @@ order: 1
 tldr:
   - "Секции главной страницы (`WorkfolioHeroSection`, `WorkfolioProjectsSection`, `WorkfolioExperienceSection`, `WorkfolioFooter`) являются чистыми Server Components и вырезают только активную локаль на сервере."
   - "Вся интерактивность вынесена в минимальные клиентские микро-острова (`workfolio-client-islands.tsx`, `footer-sse-status.tsx`), получающие уже готовые строки через пропсы."
-  - "В `next.config.ts` активирован `reactCompiler: true`, а стейт разделён между локальным `useState` внутри D3-графов и глобальным `Zustand` с синхронизацией `sessionStorage`."
+  - "В `next.config.ts` активирован `reactCompiler` (`compilationMode: 'infer'`), а стейт разделён между локальным `useState` внутри D3-графов и глобальным `Zustand` с синхронизацией `sessionStorage`."
 ---
 
 ## 1. Серверная нарезка локалей (`Server Locale Slicing`)
@@ -23,20 +23,23 @@ tldr:
 ```tsx title="apps/web/src/components/workfolio/workfolio-sections.tsx"
 export async function WorkfolioExperienceSection({ locale }: { locale: SupportedLocale }) {
   const t = await getTranslations({ locale, namespace: 'Experience' })
-  const primaryRoles = COMMERCIAL_EXPERIENCE.filter((item) => item.tier === 'primary')
-  const earlierRoles = COMMERCIAL_EXPERIENCE.filter((item) => item.tier === 'earlier')
+  const featuredRoles = COMMERCIAL_EXPERIENCE.filter((role) => role.featured)
+  const earlierRoles = COMMERCIAL_EXPERIENCE.filter((role) => !role.featured)
 
   return (
-    <section id="experience" className="scroll-mt-20 py-10">
+    <section id="experience" className="scroll-mt-20 space-y-4">
       {/* Основной список рендерится в статический HTML на сервере (0 КБ JS) */}
-      {primaryRoles.map((role) => (
-        <ExperienceCard key={role.id} role={role} locale={locale} />
+      {featuredRoles.map((role) => (
+        <ExperienceCard key={role.id} item={role} locale={locale} projectsLabel={t('projectsLabel')} />
       ))}
 
       {/* В клиентский остров передаются только готовые HTML-узлы (ReactNode) */}
-      <EarlierRolesDisclosure label={t('showEarlier')} hideLabel={t('hideEarlier')}>
+      <EarlierRolesDisclosure
+        showLabel={t('showEarlierRoles', { count: earlierRoles.length })}
+        hideLabel={t('hideEarlierRoles')}
+      >
         {earlierRoles.map((role) => (
-          <ExperienceCard key={role.id} role={role} locale={locale} />
+          <ExperienceCard key={role.id} item={role} locale={locale} projectsLabel={t('projectsLabel')} />
         ))}
       </EarlierRolesDisclosure>
     </section>
@@ -70,7 +73,7 @@ window.addEventListener('pageshow', (event) => {
 
 ## 3. `React 19 Compiler` и гигиена состояния (`useState` против `Zustand`)
 
-В `apps/web/next.config.ts` включён `reactCompiler: true` (`babel-plugin-react-compiler`), который автоматически мемоизирует вычисления и JSX-узлы на этапе сборки без ручных обёрток `useMemo` и `useCallback`.
+В `apps/web/next.config.ts` включён `reactCompiler` (`babel-plugin-react-compiler` в режиме `compilationMode: 'infer'`), который автоматически мемоизирует вычисления и JSX-узлы на этапе сборки без ручных обёрток `useMemo` и `useCallback`.
 
 Для предсказуемой работы компилятора клиентское состояние разделено по области жизни:
 - **Локальный `useState`:** используется внутри интерактивных симуляций `D3.js` (`d3-architecture-flow.tsx`, `d3-react-render-graph.tsx`), чтобы переключение режимов графа не вызывало ререндер соседних компонентов страницы.

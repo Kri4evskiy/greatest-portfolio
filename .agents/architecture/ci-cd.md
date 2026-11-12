@@ -28,13 +28,13 @@
   [e2e] (Playwright) ──────────────────▶ Stage 2/3 с needs: [ lint, typecheck, build ]
 ```
 
-| Job         | Назначение                                         | Зависимости (`needs`) | `fetch-depth`        | Установка deps         | Ключевая логика (PR vs `main`)                                                        |
-| :---------- | :------------------------------------------------- | :-------------------- | :------------------- | :--------------------- | :------------------------------------------------------------------------------------ |
-| `lint`      | Форматирование и статанализ `Biome 2.6`            | —                     | `1`                  | Да                     | `pnpm run lint` (весь репозиторий за ~150 мс)                                         |
-| `security`  | `docker compose config -q` + `pnpm audit`          | —                     | `1`                  | **Нет**                | Валидация Compose и `pnpm audit --prod --audit-level=high` по `pnpm-lock.yaml`        |
-| `typecheck` | Строгий `tsc --noEmit` (с кодогенерацией)          | —                     | PR: `0`, `main`: `1` | Да + `prepare-codegen` | PR: `turbo run typecheck --affected`; `main`: `pnpm run typecheck`                    |
-| `build`     | Продакшен-сборка через `Turborepo`                 | `lint`, `typecheck`   | PR: `0`, `main`: `1` | Да                     | PR: `turbo run build --affected`; `main`: полный билд + кэши `.turbo` и `.next/cache` |
-| `storybook` | Сборка витрины UI-кита `@repo/ui` (`Storybook 10`) | `lint`, `typecheck`   | PR: `0`, `main`: `1` | Да                     | PR: `turbo run build-storybook --affected`; `main`: `turbo run build-storybook`       |
+| Job         | Назначение                                         | Зависимости (`needs`) | `fetch-depth`            | Установка deps         | Ключевая логика (PR vs `main`)                                                                |
+| :---------- | :------------------------------------------------- | :-------------------- | :----------------------- | :--------------------- | :-------------------------------------------------------------------------------------------- |
+| `lint`      | Форматирование и статанализ `Biome 2.6`            | —                     | `'1'`                    | Да                     | `pnpm run lint` (весь репозиторий за ~150 мс)                                                 |
+| `security`  | `docker compose config -q` + `pnpm audit`          | —                     | `'1'`                    | **Нет**                | Валидация Compose и `pnpm audit --prod --audit-level=high` по `pnpm-lock.yaml`                |
+| `typecheck` | Строгий `tsc --noEmit` (с кодогенерацией)          | —                     | PR: `'0'`, `main`: `'1'` | Да + `prepare-codegen` | PR: `TURBO_SCM_BASE=...base.sha` + `--affected`; `main`: `pnpm run typecheck`                 |
+| `build`     | Продакшен-сборка через `Turborepo`                 | `lint`, `typecheck`   | PR: `'0'`, `main`: `'1'` | Да                     | PR: `TURBO_SCM_BASE=...base.sha` + `--affected`; `main`: полный билд + `.turbo`/`.next/cache` |
+| `storybook` | Сборка витрины UI-кита `@repo/ui` (`Storybook 10`) | `lint`, `typecheck`   | PR: `'0'`, `main`: `'1'` | Да                     | PR: `TURBO_SCM_BASE=...base.sha` + `--affected`; `main`: `turbo run build-storybook`          |
 
 ### Почему выбран Multi-Job DAG, а не один объединённый «быстрый» job
 
@@ -60,15 +60,16 @@ concurrency:
 - **На `pull_request`:** группа строится по номеру PR (`CI-42`). Разные PR **никогда** не мешают друг другу, а новый коммит в том же PR отменяет устаревший прогон.
 - **На `main`:** используется уникальный `github.run_id` и `cancel-in-progress: false`. GitHub Actions в одной concurrency-группе держит максимум **1 активный + 1 ожидающий** прогон, поэтому статичная группа `main` при 3+ быстрых мерджах выбросила бы промежуточный коммит из очереди. С `run_id` каждый коммит в `main` гарантированно проходит аудит-прогон.
 
-### 3.2. `fetch-depth: 0` против `fetch-depth: 1` и граф `Turborepo --affected`
+### 3.2. Динамический `fetch-depth` и граф `Turborepo --affected`
 
 - **Почему не `paths:`-фильтры GitHub Actions:** пропуск job через `paths:` вешает обязательные проверки Branch Protection в состоянии _Waiting_ и рискует не перепроверить `apps/api` / `apps/web` при правке общего пакета `packages/shared-schemas`.
-- **Как работает `--affected` на PR (`fetch-depth: 0`):**
-  - Изменение только в `apps/api/**` → проверяется и собирается **только `@repo/api`** (`web` и `storybook` пропускаются с кодом `0`, честно отдавая `Success`).
+- **Как работает `--affected` на PR (`fetch-depth: '0'` + `TURBO_SCM_BASE`):**
+  - В GitHub Actions число `0` в выражении `cond && 0 || 1` считается `falsy`, поэтому обязательно передаются строки: `fetch-depth: ${{ github.event_name == 'pull_request' && '0' || '1' }}`.
+  - На `pull_request` `actions/checkout` забирает только `refs/pull/<n>/merge` в detached `HEAD` (без локального `main` и `origin/main`). Поэтому в PR-команды `typecheck`, `build` и `storybook` явно передаётся базовый SHA целевой ветки: `TURBO_SCM_BASE="${{ github.event.pull_request.base.sha }}"`.
+  - Изменение только в `apps/api/**` → проверяется и собирается **только `@repo/api`** (`web` и `storybook` пропускаются с кодом `0`).
   - Изменение в `packages/shared-schemas/**` → Turborepo автоматически перепроверяет `@repo/shared-schemas`, `@repo/api`, `@repo/telemetry-ms` и `@repo/web`.
   - Изменение в `packages/ui/**` → пересобираются `@repo/ui` (`build-storybook`) и `@repo/web`.
   - Изменение `tsconfig.base.json` или `pnpm-workspace.yaml` → `globalDependencies` в `turbo.json` помечает все пакеты затронутыми.
-- **Фикс `pull_request` в Detached HEAD (`TURBO_SCM_BASE`):** на раннерах GitHub Actions `actions/checkout` при `pull_request` забирает только merge-ветку `refs/pull/<n>/merge` в detached `HEAD` (без локальной ветки `main` и даже без ref `origin/main`). Чтобы Turborepo не падал в ошибку/предупреждение `Unable to resolve base branch`, в PR-команды `typecheck`, `build` и `storybook` явно передаётся базовый SHA коммита целевой ветки: `TURBO_SCM_BASE="${{ github.event.pull_request.base.sha }}"` (при `fetch-depth: 0` он гарантированно присутствует в истории).
 
 ### 3.3. Подготовка кодогенерации перед `typecheck` (`prepare-codegen: 'true'`)
 
@@ -82,12 +83,12 @@ concurrency:
 
 ### 3.4. `pnpm 12`, `allowBuilds`, кэши и `security`
 
-- Используются мажорные версии экшенов с поддержкой рантайма Node 24 (`actions/checkout@v6`, `actions/setup-node@v6`, `actions/cache@v5`, `pnpm/action-setup@v5`), чтобы исключить deprecation-предупреждения о Node 20.
+- Используются актуальные мажорные версии экшенов с нативным рантаймом Node 24 (`actions/checkout@v6`, `actions/setup-node@v6`, `actions/cache@v5`, `pnpm/action-setup@v5`).
 - `pnpm/action-setup@v5` ставится **до** `actions/setup-node@v6` (`cache: pnpm`) и считывает версию из `"packageManager": "pnpm@12.18.0"` в корневом `package.json`.
 - `pnpm install --frozen-lockfile` запускается **без** `--ignore-scripts`, чтобы срабатывал белый список `allowBuilds` из `pnpm-workspace.yaml`, а переменная `LEFTHOOK: 0` отключает установку git-хуков в CI.
 - **Слои кэша и защита от Cache Poisoning:** в `build` кэшируются `.turbo` и `apps/web/.next/cache` через `actions/cache@v5`. Благодаря политике изоляции кэшей GitHub Actions, PR могут _читать_ кэш `main` через `restore-keys`, но **не могут** перезаписывать кэш базовой ветки. (`storybook` пока не восстанавливает `.turbo` ради простоты конфига; при росте UI-кита туда легко добавить аналогичный шаг или перейти на Turborepo Remote Caching через `TURBO_TOKEN` + `TURBO_TEAM`.)
 - **Порядок шагов в `security`:** сначала офлайн-валидация `docker compose config --quiet`, затем `pnpm audit --prod --audit-level=high` (аудит прод-графа по `pnpm-lock.yaml` без `node_modules` с высоким соотношением сигнал/шум).
-- Если `security` сработает на уязвимость (как было с `GHSA-mrhx-c7xc-m3w5` в `zod < 4.6.6` до миграции на `zod@^4.6.7`), нужно обновить пакет в `pnpm-lock.yaml` или — только как временный документированный компромисс для ложных/недостижимых срабатываний — добавить GHSA в блок `audit:` (`audit.ignore` в `pnpm-workspace.yaml`, либо командой `pnpm audit --ignore <GHSA>`; старый ключ `auditConfig` в `pnpm 12` устарел).
+- При блокировке `security` новой уязвимостью нужно обновить пакет в `pnpm-lock.yaml`; только как временный документированный компромисс для ложных/недостижимых срабатываний используется блок `audit.ignore` в `pnpm-workspace.yaml` (или `pnpm audit --ignore <GHSA>`).
 
 ---
 

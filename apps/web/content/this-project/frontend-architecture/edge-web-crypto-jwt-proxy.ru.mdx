@@ -19,27 +19,17 @@ tldr:
 Чтобы фронтенд (`apps/web`) и бэкенд (`apps/api`) никогда не рассинхронизировались в названии `HttpOnly`-куки, времени её жизни или правилах чтения `JWT_SECRET`, эти примитивы экспортируются из общего пакета `@repo/shared-schemas`:
 
 ```typescript title="packages/shared-schemas/src/auth.schema.ts"
-export const KB_ACCESS_COOKIE_NAME = 'kb_access_token' as const
-export const KB_COOKIE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000 // 30 дней
+export const KB_ACCESS_COOKIE_NAME = 'kb_access_token'
+export const KB_COOKIE_MAX_AGE_MS = 1000 * 60 * 60 * 24 * 7 // 7 days
+export const DEFAULT_DEV_JWT_SECRET = 'workfolio-super-secret-jwt-key-2026'
 
-export function resolveJwtSecret(
-  envSecret: string | undefined,
-  nodeEnv: string | undefined,
-): string {
+export function resolveJwtSecret(envSecret?: string): string {
   const trimmed = envSecret?.trim()
-  if (trimmed && trimmed.length >= 16) {
-    return trimmed
-  }
-  if (nodeEnv === 'production') {
-    throw new Error(
-      '[Security] JWT_SECRET environment variable must be explicitly configured (min 16 chars) in production.',
-    )
-  }
-  return DEFAULT_DEV_JWT_SECRET
+  return trimmed && trimmed.length > 0 ? trimmed : DEFAULT_DEV_JWT_SECRET
 }
 ```
 
-В `development` оба сервиса автоматически подхватывают локальный дефолт без обязательной ручной настройки `.env`, а в `production` отсутствие секрета немедленно останавливает запуск (`fail-fast`).
+В локальной разработке оба сервиса подхватывают общий фолбек без обязательной ручной настройки `.env`, а в продакшене единая функция `resolveJwtSecret` гарантирует идентичное чтение `JWT_SECRET` для подписи в NestJS и проверки в Next.js.
 
 ---
 
@@ -80,19 +70,20 @@ function getHmacKey(secret: string): Promise<CryptoKey> {
 Вся криптографическая математика скрыта в `edge-jwt.ts`, поэтому сам `proxy.ts` отвечает исключительно за маршрутизацию:
 
 ```typescript title="apps/web/src/proxy.ts"
-export default async function proxy(request: NextRequest) {
+export async function proxy(request: NextRequest): Promise<NextResponse> {
   const { pathname } = request.nextUrl
+  const kbMatch = pathname.match(PROTECTED_KB_REGEX)
 
-  if (isProtectedKnowledgeRoute(pathname)) {
+  if (kbMatch) {
     const token = request.cookies.get(KB_ACCESS_COOKIE_NAME)?.value
-    const secret = resolveJwtSecret(process.env.JWT_SECRET, process.env.NODE_ENV)
-    const isValidToken = token ? await verifyEdgeJwtHs256(token, secret) : false
+    const isValid = await verifyEdgeJwtHs256(token)
 
-    if (!isValidToken) {
-      const locale = extractLocale(pathname)
-      const redirectUrl = new URL(`/${locale}`, request.url)
-      redirectUrl.searchParams.set('auth', 'required')
-      redirectUrl.searchParams.set('from', pathname)
+    if (!isValid) {
+      const matchedLocale = kbMatch[1]
+      const homePath = matchedLocale && matchedLocale !== routing.defaultLocale ? `/${matchedLocale}` : '/'
+      const redirectUrl = new URL(homePath, request.url)
+      redirectUrl.searchParams.set('unlock', 'knowledge-base')
+      redirectUrl.searchParams.set('redirect', pathname)
 
       const response = NextResponse.redirect(redirectUrl)
       if (token) {
@@ -102,6 +93,6 @@ export default async function proxy(request: NextRequest) {
     }
   }
 
-  return intlMiddleware(request)
+  return handleI18nRouting(request)
 }
 ```

@@ -9,7 +9,7 @@
 - **Структура в духе Notion-блоков и баз данных:**
   - Четкая колонка контента (`max-w-4xl` на главной CV, `max-w-7xl` с сайдбаром в Базе знаний).
   - Карточки проектов (Interactive Project Gallery), таймлайн опыта (Experience & Resume), callout-блоки с архитектурными заметками и интерактивная таблица стека в стиле базы данных Notion (`TanStack Table`).
-  - Мгновенно считываемые статусы: бейдж доступности (`Available for Senior / Full-Stack roles`), живой индикатор телеметрии (`SSE Live Stream`), номер сборки из `package.json`.
+  - Мгновенно считываемые статусы: бейдж доступности (`Available for Senior / Full-Stack roles`) и живой индикатор телеметрии (`SSE Live Stream`).
 
 ## 2. Архитектура пакета `packages/ui`
 

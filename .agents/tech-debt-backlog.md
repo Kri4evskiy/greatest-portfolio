@@ -40,7 +40,6 @@
 ### 5. Content & Workfolio Polish (`apps/web/content/*`)
 
 - [ ] **Новые инженерные статьи `.mdx`:** расширить раздел `NestJS` и смежные темы разборами `DI & Custom Providers`, `Guards / Pipes / Interceptors`, `NestJS Microservices + SSE`.
-- [ ] **Интерактивный фильтр в матрице ADR:** фильтрация по категориям (`Frontend`, `Backend`, `DevOps`, `Architecture`) и поиск в `TechRadarTable`, плюс поправить мелкие неточности в старых текстах (`15 ADR` → `16 ADR`, `NestJS 11` → `NestJS 12` в ранней статье `pnpm-turborepo-tsconfig-biome`).
 
 ### 6. Backend AI & Model Context Protocol (`apps/api` — Future Milestone)
 

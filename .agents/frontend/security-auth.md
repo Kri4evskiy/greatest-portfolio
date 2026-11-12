@@ -2,9 +2,9 @@
 
 Этот документ описывает защиту клиентских и серверных маршрутов в `apps/web` и UX получения гостевого доступа.
 
-## 1. Защита роутов на уровне Next.js Edge Middleware (`src/middleware.ts`)
+## 1. Защита роутов на уровне Next.js Edge Proxy (`src/proxy.ts`)
 
-- Middleware перехватывает все запросы к `/knowledge-base` и `/knowledge-base/:path*`.
+- Edge Proxy (`src/proxy.ts`) перехватывает все запросы к `/knowledge-base` и `/knowledge-base/:path*`.
 - Проверяет наличие и структуру куки `kb_access_token` (`HttpOnly` JWT, выписанный бэкендом `apps/api`).
 - Если куки нет или токен истек:
   - При прямом заходе по URL `/knowledge-base/...` делает безопасный редирект на `/?unlock=knowledge-base&redirect=/knowledge-base/...`.

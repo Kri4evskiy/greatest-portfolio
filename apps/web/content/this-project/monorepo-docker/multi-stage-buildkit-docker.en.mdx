@@ -9,39 +9,44 @@ readingTime: "6 min"
 publishedAt: "2026-11-10"
 order: 2
 tldr:
-  - "Isolates each service build (`web`, `api`, `telemetry-ms`) into `base -> deps -> builder -> runner` stages on top of `node:22-alpine`."
-  - "Shares a persistent `--mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store` cache across all Dockerfiles in the monorepo."
-  - "Strips ~180 MB of dev tooling (TypeScript, Biome, Turbo, Prisma CLI) via `pnpm prune --prod --ignore-scripts` while preserving the generated `.prisma/client` runtime."
+  - "Splits each service build (`web`, `api`, `telemetry-ms`) into 3 isolated stages `pruner -> builder -> runner` on top of `node:22-alpine`."
+  - "Uses `turbo prune @repo/<app> --docker` to strip unrelated workspace packages and shares `--mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store` across all containers."
+  - "Strips dev tooling (TypeScript, Biome, Turbo, Prisma CLI) via `pnpm prune --prod --ignore-scripts` while preserving the generated `.prisma/client` engine through `/tmp`."
 ---
 
-## 1. Multi-Stage Build Pipeline (`deps -> builder -> runner`)
+## 1. Multi-Stage Build Pipeline (`pruner -> builder -> runner`)
 
-To keep source files, compilers, and build caches out of production images, every Dockerfile in `docker/` separates container construction into four deterministic stages:
+To keep source files, compilers, and unrelated workspace packages out of production images, every Dockerfile in `docker/` separates container construction into three deterministic stages:
 
-1. **`base`:** activates `pnpm 12.18.0` via `corepack` and disables background telemetry (`DO_NOT_TRACK=1`, `TURBO_TELEMETRY_DISABLED=1`).
-2. **`deps`:** copies only `package.json`, `pnpm-lock.yaml`, and `pnpm-workspace.yaml` manifests so the dependency layer stays cached until lockfile changes occur.
-3. **`builder`:** generates the Prisma client, runs `pnpm turbo run build --filter=...`, and prunes `devDependencies`.
-4. **`runner`:** copies only compiled artifacts (`dist/` or `.next/standalone`) and runs the process under a non-root user (`UID 1001`).
+1. **`pruner`:** runs `turbo prune @repo/<app> --docker` to emit the minimal subgraph (`out/json/`, `out/full/`, `out/pnpm-lock.yaml`) needed by the target service.
+2. **`builder`:** activates `pnpm@12.18.0`, runs `pnpm install --frozen-lockfile --ignore-scripts` with a shared BuildKit cache mount, runs `pnpm turbo run build --filter=@repo/<app>...`, and prunes `devDependencies`.
+3. **`runner`:** copies only compiled artifacts (`dist/` or `.next/standalone`) and executes under a non-root user (`USER node` / `USER nextjs`).
 
 ---
 
-## 2. Shared BuildKit Cache Mount Across Services
+## 2. `turbo prune` & Shared BuildKit Cache Mount
 
-When building multiple containers from a single monorepo, mounting `/root/.local/share/pnpm/store` with BuildKit `type=cache,id=pnpm` downloads shared packages once and reuses them across all service builds:
+When building multiple containers from one monorepo, `out/json/` keeps the dependency installation layer cached across code changes, while mounting `/root/.local/share/pnpm/store` with BuildKit `type=cache,id=pnpm` downloads shared packages once and reuses them across all service builds:
 
 ```dockerfile title="docker/api.Dockerfile"
-FROM node:22-alpine AS base
-ENV PNPM_HOME="/pnpm"
-ENV PATH="$PNPM_HOME:$PATH"
+FROM node:22-alpine AS pruner
+RUN apk add --no-cache libc6-compat openssl
 ENV DO_NOT_TRACK=1
 ENV TURBO_TELEMETRY_DISABLED=1
-RUN corepack enable && corepack prepare pnpm@12.18.0 --activate
-
-FROM base AS deps
+RUN npm install -g turbo@^2
 WORKDIR /app
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json tsconfig.base.json ./
-COPY apps/api/package.json ./apps/api/
-COPY packages/shared-schemas/package.json ./packages/shared-schemas/
+COPY . .
+RUN turbo prune @repo/api --docker
+
+FROM node:22-alpine AS builder
+RUN apk add --no-cache libc6-compat openssl
+ENV DO_NOT_TRACK=1
+ENV TURBO_TELEMETRY_DISABLED=1
+RUN corepack enable && corepack prepare pnpm@12.18.0 --activate && pnpm --version
+WORKDIR /app
+
+COPY --from=pruner /app/out/json/ .
+COPY --from=pruner /app/out/pnpm-lock.yaml ./pnpm-lock.yaml
 RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
     pnpm install --frozen-lockfile --ignore-scripts
 ```
@@ -50,21 +55,26 @@ RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
 
 ## 3. Pruning `devDependencies` While Preserving `.prisma/client`
 
-In the `builder` stage, right after generating the Prisma client and compiling TypeScript, `pnpm prune --prod --ignore-scripts` is executed. Passing `--ignore-scripts` removes the heavy `prisma` CLI and dev packages without re-running lifecycle hooks that would wipe the generated `.prisma/client` engine inside `node_modules/.pnpm`:
+In the `builder` stage, `pnpm turbo run build --filter=@repo/api...` generates the Prisma client and compiles TypeScript. Before calling `pnpm prune --prod --ignore-scripts`, the generated `.prisma` and `@prisma/client` artifacts are staged in `/tmp` and restored afterward so the compiled query engine remains intact in production:
 
 ```dockerfile title="docker/api.Dockerfile"
-RUN pnpm --filter @repo/api exec prisma generate
-RUN pnpm turbo run build --filter=@repo/api...
-RUN pnpm prune --prod --ignore-scripts
+RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
+    pnpm turbo run build --filter=@repo/api... && \
+    cp -R /app/node_modules/.pnpm/@prisma+client*/node_modules/.prisma /tmp/.prisma && \
+    cp -R /app/node_modules/.pnpm/@prisma+client*/node_modules/@prisma/client /tmp/prisma-client && \
+    pnpm prune --prod --ignore-scripts && \
+    cp -R /tmp/.prisma /app/node_modules/.pnpm/@prisma+client*/node_modules/ && \
+    cp -R /tmp/prisma-client/* /app/node_modules/.pnpm/@prisma+client*/node_modules/@prisma/client/ && \
+    rm -rf /tmp/.prisma /tmp/prisma-client
 ```
 
-### Production Image Footprint
+### Production Image Profiles
 
-| Container | Base Image | Final Image Size | Runtime User |
+| Container | Base Image | Port Scope | Runtime User |
 | :--- | :---: | :---: | :---: |
-| `workfolio-telemetry-ms` | `node:22-alpine` | **64.3 MB** | `nestjs` (`UID 1001`) |
-| `workfolio-api` | `node:22-alpine` | **78.2 MB** | `nestjs` (`UID 1001`) |
-| `workfolio-web` (`standalone`) | `node:22-alpine` | **85.6 MB** | `nextjs` (`UID 1001`) |
+| `workfolio-telemetry-ms` | `node:22-alpine` | `4001` (internal network only) | `node` (non-root) |
+| `workfolio-api` | `node:22-alpine` | `4000` | `node` (non-root) |
+| `workfolio-web` (`standalone`) | `node:22-alpine` | `3000` | `nextjs` (`UID 1001`) |
 
 > [!TIP]
 > Because the production `api` image excludes `Prisma CLI`, database schema migrations (`prisma migrate deploy`) run as a dedicated CI/CD step before rolling out new containers.

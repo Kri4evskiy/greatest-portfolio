@@ -14,7 +14,7 @@
      - Для роли `GUEST`: иконка замка `🔒 Base of Knowledge` + бейдж `Protected`. Клик открывает микро-модалку получения `Guest Pass` в 1 клик.
      - Для ролей `USER` / `ADMIN`: иконка открытого замка `🔓 Base of Knowledge` + роль и прямой переход в `/knowledge-base`.
        1.1. **Боковой Навигатор Секций (`PageSectionNavigator` + `useSectionNavigation`):**
-   - Отслеживает текущую видимую секцию (`about`, `projects`, `experience`, `tech-radar`) через `IntersectionObserver` (`ScrollSpy`).
+   - Отслеживает текущую видимую секцию (`about`, `projects`, `experience`, `tech-radar`, `roadmap`) через пассивный `scroll`-слушатель с троттлингом на `requestAnimationFrame` (`ScrollSpy`).
    - Гарантирует плавный повторный скролл (`scrollIntoView`) даже если хэш в URL уже совпадает с выбранной секцией.
    - На десктопе (`xl:`) рендерится как минималистичный парящий outline-индикатор в духе Notion сбоку от контента; на мобильных и планшетах (`< xl`) — как компактная плавающая кнопка-таблетка в правом нижнем углу с всплывающим списком разделов.
 2. **Hero & Personal Intro (в стиле Workfolio):**
@@ -26,7 +26,7 @@
 5. **Интерактивная матрица навыков — Tech Radar (`TanStack Table` + ADR Inspector):**
    - Выглядит как нативная интерактивная база данных Notion, но работает на `TanStack Table`.
    - Поддерживает поиск, фильтрацию по доменам (`Frontend`, `Backend`, `Database & Storage`, `DevOps & DX`, `Architecture`) и сортировку по опыту.
-   - У каждой из 15 технологий есть кнопка **«Почему в стеке? (ADR)»**, открывающая структурное объяснение `Why / Where / How` из нашего ADR-каталога.
+   - У каждой из 16 технологий есть кнопка **«Почему в стеке? (ADR)»**, открывающая структурное объяснение `Why / Where / How` из нашего ADR-каталога.
 6. **Инженерный Footer:**
    - Бейджи репозитория и статуса `IndexedDB Offline-First`.
    - Живой индикатор `Server-Sent Events (SSE)` из микросервиса `telemetry-ms` (показывает пульс сервера и последние обезличенные события в реальном времени).
@@ -54,7 +54,7 @@
 
 ## 3. Оптимизация бандла: `React 19 Compiler` и RSC-острова
 
-- В `next.config.ts` активированы `reactCompiler: true` (`babel-plugin-react-compiler`), `@next/bundle-analyzer` (`ANALYZE=true`) и `optimizePackageImports`.
+- В `next.config.ts` активированы `reactCompiler: { compilationMode: 'infer', panicThreshold: 'none' }`, `@next/bundle-analyzer` (`ANALYZE=true`) и `optimizePackageImports`.
 - Поисковый индекс `Cmd+K` вынесен из `layout.tsx` в статический SSG-роут `/search-index/[locale]`, а мультиязычные словари нарезаются строго на сервере.
 
 ## 4. Стандарты Next.js AI Agents & Vercel React Best Practices

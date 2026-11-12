@@ -10,7 +10,7 @@ publishedAt: "2026-11-10"
 order: 1
 tldr:
   - "Воркспейс розділений на застосунки (`apps/web`, `apps/api`, `apps/telemetry-ms`) та спільні пакети (`packages/ui`, `packages/shared-schemas`) під керуванням `pnpm 12.18.0` із білим списком `allowBuilds`."
-  - "Граф `turbo.json` гарантує топологічну збірку залежностей (`^build`) перед запуском `typecheck`, `dev` або `build` у сервісах."
+  - "Граф `turbo.json` гарантує топологічну збірку залежностей (`^build`) перед запуском `build`, `build-storybook` і `dev`, а `^typecheck` дає змогу перевіряти типи паралельно."
   - "Єдиний `tsconfig.base.json` вмикає `strict`, `noUncheckedIndexedAccess` і `exactOptionalPropertyTypes`, а `biome.json` замінює зв'язку `ESLint + Prettier` одним швидким Rust-бінарником."
 ---
 
@@ -37,7 +37,7 @@ allowBuilds:
 
 | Шар монорепозиторію | Пакет | Призначення |
 | :--- | :--- | :--- |
-| **Застосунки (`apps/*`)** | `@repo/web`, `@repo/api`, `@repo/telemetry-ms` | Next.js 16 фронтенд, NestJS 11 REST API та мікросервіс живої SSE-телеметрії |
+| **Застосунки (`apps/*`)** | `@repo/web`, `@repo/api`, `@repo/telemetry-ms` | Next.js 16 фронтенд, NestJS 12 REST API та мікросервіс живої SSE-телеметрії |
 | **Контракти (`packages/shared-schemas`)** | `@repo/shared-schemas` | Єдине джерело Zod-схем, DTO, констант кук/локалей і RBAC-прав для фронту та беку |
 | **Дизайн-система (`packages/ui`)** | `@repo/ui` | Стилі `globals.css`, матриця токенів, Tailwind `preset`, примітиви `Radix UI` та `Storybook` |
 
@@ -45,20 +45,28 @@ allowBuilds:
 
 ## 2. Граф задач і кешування в `Turborepo`
 
-Конфігурація `turbo.json` вибудовує детермінований пайплайн: директива `"dependsOn": ["^build"]` змушує Turborepo спершу скомпілювати `@repo/shared-schemas` у `dist/`, і лише після цього запускати перевірку типів чи збірку `apps/web` та `apps/api`:
+Конфігурація `turbo.json` вибудовує детермінований пайплайн: директива `"dependsOn": ["^build"]` для `build`, `build-storybook` і `dev` змушує Turborepo спершу скомпілювати `@repo/shared-schemas` у `dist/`, а `"dependsOn": ["^typecheck"]` дає змогу перевіряти типи пакетів паралельно:
 
 ```json title="turbo.json"
 {
   "$schema": "https://turbo.build/schema.json",
+  "globalDependencies": ["tsconfig.base.json", "pnpm-workspace.yaml"],
+  "globalEnv": ["API_INTERNAL_URL"],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
-      "outputs": [".next/**", "!.next/cache/**", "dist/**"]
+      "outputs": [".next/**", "!.next/cache/**", "dist/**", "storybook-static/**"]
+    },
+    "build-storybook": {
+      "dependsOn": ["^build"],
+      "outputs": ["storybook-static/**"]
     },
     "typecheck": {
-      "dependsOn": ["^build"],
-      "outputs": []
+      "dependsOn": ["^typecheck"]
+    },
+    "lint": {
+      "dependsOn": ["^lint"]
     },
     "dev": {
       "dependsOn": ["^build"],
@@ -78,8 +86,8 @@ allowBuilds:
 ```json title="tsconfig.base.json"
 {
   "compilerOptions": {
-    "target": "ES2023",
-    "lib": ["ES2023"],
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "strict": true,
@@ -87,8 +95,11 @@ allowBuilds:
     "exactOptionalPropertyTypes": true,
     "noImplicitOverride": true,
     "noFallthroughCasesInSwitch": true,
+    "noImplicitReturns": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
     "isolatedModules": true,
-    "verbatimModuleSyntax": true,
+    "noEmit": true,
     "skipLibCheck": true
   }
 }
@@ -105,7 +116,7 @@ allowBuilds:
 
 ```json title="biome.json"
 {
-  "$schema": "https://biomejs.dev/schemas/2.4.7/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.6.4/schema.json",
   "assist": {
     "actions": {
       "source": { "organizeImports": "on" }
@@ -114,13 +125,16 @@ allowBuilds:
   "linter": {
     "enabled": true,
     "rules": {
-      "recommended": true,
+      "preset": "recommended",
       "correctness": {
         "noUnusedImports": "error",
-        "noUnusedVariables": "warn"
+        "noUnusedVariables": "error"
       },
       "suspicious": {
         "noExplicitAny": "error"
+      },
+      "style": {
+        "noNonNullAssertion": "error"
       }
     }
   },

@@ -11,7 +11,7 @@ order: 1
 tldr:
   - "Renders primary home page sections (`WorkfolioHeroSection`, `WorkfolioProjectsSection`, `WorkfolioExperienceSection`, `WorkfolioFooter`) as pure Server Components that slice only the active locale on the server."
   - "Isolates browser interactivity into tiny client micro-islands (`workfolio-client-islands.tsx`, `footer-sse-status.tsx`) receiving pre-resolved strings or `ReactNode` children."
-  - "Enables `reactCompiler: true` in `next.config.ts` and separates high-frequency local `D3.js` state from cross-page `Zustand` UI state."
+  - "Enables `reactCompiler` (`compilationMode: 'infer'`) in `next.config.ts` and separates high-frequency local `D3.js` state from cross-page `Zustand` UI state."
 ---
 
 ## 1. Server Locale Slicing in Multilingual Next.js Apps
@@ -23,20 +23,23 @@ To ensure the browser receives only the active locale, major page sections run a
 ```tsx title="apps/web/src/components/workfolio/workfolio-sections.tsx"
 export async function WorkfolioExperienceSection({ locale }: { locale: SupportedLocale }) {
   const t = await getTranslations({ locale, namespace: 'Experience' })
-  const primaryRoles = COMMERCIAL_EXPERIENCE.filter((item) => item.tier === 'primary')
-  const earlierRoles = COMMERCIAL_EXPERIENCE.filter((item) => item.tier === 'earlier')
+  const featuredRoles = COMMERCIAL_EXPERIENCE.filter((role) => role.featured)
+  const earlierRoles = COMMERCIAL_EXPERIENCE.filter((role) => !role.featured)
 
   return (
-    <section id="experience" className="scroll-mt-20 py-10">
-      {/* Primary roles render as pure static HTML on the server (0 KB JS) */}
-      {primaryRoles.map((role) => (
-        <ExperienceCard key={role.id} role={role} locale={locale} />
+    <section id="experience" className="scroll-mt-20 space-y-4">
+      {/* Featured roles render as pure static HTML on the server (0 KB JS) */}
+      {featuredRoles.map((role) => (
+        <ExperienceCard key={role.id} item={role} locale={locale} projectsLabel={t('projectsLabel')} />
       ))}
 
       {/* The client island receives pre-rendered server ReactNodes as children */}
-      <EarlierRolesDisclosure label={t('showEarlier')} hideLabel={t('hideEarlier')}>
+      <EarlierRolesDisclosure
+        showLabel={t('showEarlierRoles', { count: earlierRoles.length })}
+        hideLabel={t('hideEarlierRoles')}
+      >
         {earlierRoles.map((role) => (
-          <ExperienceCard key={role.id} role={role} locale={locale} />
+          <ExperienceCard key={role.id} item={role} locale={locale} projectsLabel={t('projectsLabel')} />
         ))}
       </EarlierRolesDisclosure>
     </section>
@@ -70,7 +73,7 @@ window.addEventListener('pageshow', (event) => {
 
 ## 3. `React 19 Compiler` & State Boundaries (`useState` vs `Zustand`)
 
-`apps/web/next.config.ts` enables `reactCompiler: true` (`babel-plugin-react-compiler`), which automatically memoizes derived values and JSX subtrees at build time without manual `useMemo` or `useCallback` wrappers.
+`apps/web/next.config.ts` enables `reactCompiler` (`babel-plugin-react-compiler` with `compilationMode: 'infer'`), which automatically memoizes derived values and JSX subtrees at build time without manual `useMemo` or `useCallback` wrappers.
 
 To keep rendering predictable, client state follows strict boundaries:
 - **Component-Local `useState`:** used inside interactive `D3.js` simulations (`d3-architecture-flow.tsx`, `d3-react-render-graph.tsx`) so toggling simulation modes never triggers re-renders outside the graph card.
