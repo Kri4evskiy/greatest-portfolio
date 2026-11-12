@@ -1,5 +1,4 @@
 import { Controller, Get, Inject, Module } from '@nestjs/common'
-import { APP_VERSION } from '@repo/shared-schemas'
 import { AuthModule } from './modules/auth/auth.module.js'
 import { KnowledgeModule } from './modules/knowledge/knowledge.module.js'
 import { TelemetryModule } from './modules/telemetry/telemetry.module.js'
@@ -14,7 +13,6 @@ export class HealthController {
   check() {
     return {
       status: 'ok',
-      version: APP_VERSION,
       databaseConnected: this.prisma.isDatabaseConnected(),
       timestamp: new Date().toISOString(),
     }

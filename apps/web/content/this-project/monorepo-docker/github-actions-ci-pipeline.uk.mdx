@@ -131,7 +131,7 @@ concurrency:
 1. **Блокування Branch Protection:** пропущена через `paths:` обов’язкова перевірка залишає PR у нескінченному стані _Waiting for status to be reported_.
 2. **Сліпі зони спільних контрактів:** зміна схеми у `packages/shared-schemas` може зламати `apps/api`, `apps/telemetry-ms` або `apps/web`, якщо покладатися на ручні шляхи.
 
-Натомість усі джоби стартують завжди, а `typecheck`, `build` і `storybook` використовують граф `Turborepo --affected` на PR у парі з динамічним `fetch-depth: ${{ github.event_name == 'pull_request' && 0 || 1 }}`:
+Натомість усі джоби стартують завжди, а `typecheck`, `build` і `storybook` використовують граф `Turborepo --affected` на PR у парі з динамічним `fetch-depth: ${{ github.event_name == 'pull_request' && '0' || '1' }}` (рядок `'0'` обов’язковий, бо число `0` у виразах GitHub Actions є `falsy`):
 
 - **Зміни лише в `apps/api/**`:** перевіряється і збирається **виключно `@repo/api`**; `web` та `storybook` пропускаються за ~1 секунду з чесним кодом `0` (`Success`).
 - **Зміни в `packages/shared-schemas/**`:** Turborepo автоматично обчислює споживачів і перевіряє `@repo/shared-schemas`, `@repo/api`, `@repo/telemetry-ms` та `@repo/web`.
@@ -139,7 +139,7 @@ concurrency:
 - **Кореневі конфіги (`tsconfig.base.json`, `pnpm-workspace.yaml`):** оголошені в `globalDependencies` у `turbo.json`, тож при їх редагуванні перевіряється весь монорепозиторій.
 
 > [!IMPORTANT]
-> **Нюанс PR у стані Detached HEAD (`TURBO_SCM_BASE`):** На `pull_request` екшен `actions/checkout` створює detached `HEAD` (merge-коміт PR), де присутній `origin/main` (завдяки `fetch-depth: 0`), але локальна гілка `main` може бути відсутня. Якщо в логах першого PR з’явиться попередження `Unable to resolve base branch` і збереться весь граф цілком — достатньо явно передати `TURBO_SCM_BASE: origin/${{ github.base_ref }}` для PR-подій.
+> **Фікс Detached HEAD на PR (`TURBO_SCM_BASE`):** На `pull_request` екшен `actions/checkout` забирає лише `refs/pull/<n>/merge` у detached `HEAD` — на раннері немає ні локального `main`, ні ref `origin/main`. Передача `TURBO_SCM_BASE="${{ github.event.pull_request.base.sha }}"` (при `fetch-depth: 0` цей коміт гарантовано є в історії) точно прив’язує `--affected` до базового коміту цільової гілки без зайвих мережевих запитів.
 
 ---
 

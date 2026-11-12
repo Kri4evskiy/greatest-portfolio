@@ -68,7 +68,7 @@ concurrency:
   - Изменение в `packages/shared-schemas/**` → Turborepo автоматически перепроверяет `@repo/shared-schemas`, `@repo/api`, `@repo/telemetry-ms` и `@repo/web`.
   - Изменение в `packages/ui/**` → пересобираются `@repo/ui` (`build-storybook`) и `@repo/web`.
   - Изменение `tsconfig.base.json` или `pnpm-workspace.yaml` → `globalDependencies` в `turbo.json` помечает все пакеты затронутыми.
-- **Важный нюанс `pull_request` (Detached HEAD и `TURBO_SCM_BASE`):** на раннерах GitHub Actions PR чекаутится в detached `HEAD` без локальной ветки `main`. Если по логам первого PR окажется, что Turborepo пишет `WARNING unable to detect git range ... Unable to resolve base branch` и прогоняет все пакеты целиком вместо подграфа — нужно передавать в PR-запуски `TURBO_SCM_BASE: origin/${{ github.base_ref }}` (при `fetch-depth: 0` ветка `origin/main` уже присутствует локально).
+- **Фикс `pull_request` в Detached HEAD (`TURBO_SCM_BASE`):** на раннерах GitHub Actions `actions/checkout` при `pull_request` забирает только merge-ветку `refs/pull/<n>/merge` в detached `HEAD` (без локальной ветки `main` и даже без ref `origin/main`). Чтобы Turborepo не падал в ошибку/предупреждение `Unable to resolve base branch`, в PR-команды `typecheck`, `build` и `storybook` явно передаётся базовый SHA коммита целевой ветки: `TURBO_SCM_BASE="${{ github.event.pull_request.base.sha }}"` (при `fetch-depth: 0` он гарантированно присутствует в истории).
 
 ### 3.3. Подготовка кодогенерации перед `typecheck` (`prepare-codegen: 'true'`)
 
@@ -93,7 +93,7 @@ concurrency:
 
 ## 4. Расширение под тесты (`Vitest`, `Playwright`), hardening и CD
 
-- **`unit-tests` (`Vitest`):** добавить job в Stage 1 (параллельно с `lint`, `security` и `typecheck`) с `uses: ./.github/actions/setup-workspace`, `prepare-codegen: "true"` (при необходимости импорта из `@repo/shared-schemas` / Prisma) и `fetch-depth: ${{ github.event_name == 'pull_request' && 0 || 1 }}` для `turbo run test --affected`.
+- **`unit-tests` (`Vitest`):** добавить job в Stage 1 (параллельно с `lint`, `security` и `typecheck`) с `uses: ./.github/actions/setup-workspace`, `prepare-codegen: "true"` (при необходимости импорта из `@repo/shared-schemas` / Prisma) и `fetch-depth: ${{ github.event_name == 'pull_request' && '0' || '1' }}` (именно строкой `'0'`, так как число `0` в выражениях GitHub Actions считается falsy!) для `turbo run test --affected`.
 - **`e2e` (`Playwright`):** добавить job после `build` (`needs: [ lint, typecheck, build ]`) с кэшем браузеров Playwright, сборкой или поднятием тестируемого контура (`web` + `api` / тестовый Postgres service container или In-Memory fallback), прогоном RBAC/MDX-сценариев (`GuestPassModal` -> `HttpOnly` cookie -> `<Redact />`) и загрузкой отчёта/трейсов (`actions/upload-artifact`) только при `failure()`.
 - **Харденинг CI и гигиена безопасности (следующие улучшения):**
   1. **Регулярный скан CVE (`schedule` + Dependabot):** добавить еженедельный `schedule: - cron: ...` для триггера `security` и `.github/dependabot.yml` (для экосистем `npm` и `github-actions`), чтобы новые уязвимости ловились даже в недели без коммитов.

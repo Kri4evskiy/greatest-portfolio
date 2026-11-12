@@ -19,11 +19,6 @@
 
 ### 1. CI/CD, Turborepo Cache & DX Optimization
 
-- [ ] **Отвязать `APP_VERSION` от `@repo/shared-schemas`, чтобы заработали `FULL TURBO` и узкий `--affected` (напоминание):** сейчас `lefthook` (`scripts/bump-patch-version.mjs`) на каждый коммит обновляет `packages/shared-schemas/src/version.ts`. Так как `@repo/shared-schemas` стоит в корне `^build`:
-  1. На `main` каждый коммит (даже только в `.md`/доки) инвалидирует кэш всех 4 сборок (`Cached: 0/4`), из-за чего `FULL TURBO` не срабатывает, а архив `.turbo` в GitHub Actions растёт с каждым коммитом.
-  2. На PR изменение `version.ts` заставляет `turbo --affected` пересобирать сразу `shared-schemas`, `api`, `telemetry-ms` и `web` даже при правке одного сервиса.
-     _Решение на будущее:_ перенести чтение версии на уровень `apps/web` (`next.config.ts` / build-time env из корневого `package.json`), убрав частые мутации из `packages/shared-schemas`.
-- [ ] **Проверить `--affected` на первом реальном PR (`TURBO_SCM_BASE`):** по логам первого PR убедиться, что в detached `HEAD` Turborepo корректно видит базу сравнения (`origin/main`) без предупреждения `Unable to resolve base branch`; при необходимости добавить `TURBO_SCM_BASE: origin/${{ github.base_ref }}` в `typecheck` / `build` / `storybook`.
 - [ ] **CI Security & Workflow Hardening:** добавить еженедельный `schedule:` крон для `pnpm audit --prod --audit-level=high` + `.github/dependabot.yml` (`npm` и `github-actions`), выставить `persist-credentials: false` на `actions/checkout@v6`, добавить `actionlint` в `lint` и при росте UI-кита подключить кэш `.turbo` в джобу `storybook`.
 
 ### 2. Security & Production Hardening (`apps/web`, `apps/api`)

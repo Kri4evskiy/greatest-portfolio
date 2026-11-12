@@ -24,7 +24,7 @@
 - **Где применяется (Where):** Глобально во всех пакетах и приложениях монорепозитория на этапе `git commit` и в CI.
 - **Как реализовано (How):**
   - В `tsconfig.base.json` включены `strict: true`, `noUncheckedIndexedAccess: true`, `exactOptionalPropertyTypes: true`, `noImplicitOverride: true`.
-  - В `lefthook.yml` на `pre-commit` настроены 3 шага: `biome check --write` -> `pnpm turbo typecheck` -> `node scripts/bump-patch-version.mjs` (автоматический инкремент патч-версии `0.0.1` -> `0.0.2` в `package.json` с пробросом версии в футер сайта).
+  - В `lefthook.yml` на `pre-commit` настроены 2 быстрых гейта: `biome check --write` -> `pnpm turbo typecheck` (версионирование в корневом `package.json` оставлено под осознанный ручной релиз без мутации пакетов и с сохранением кэшей `FULL TURBO` / `--affected`).
 
 ---
 

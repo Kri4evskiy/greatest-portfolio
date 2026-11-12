@@ -131,7 +131,7 @@ Using GitHub Actions `paths:` filters to skip frontend or backend jobs causes tw
 1. **Branch Protection Deadlock:** If `build` or `storybook` is configured as a required check and skipped by `paths:`, GitHub leaves the PR stuck in _Waiting for status to be reported_ indefinitely.
 2. **Shared-Contract Blind Spots:** An edit to `packages/shared-schemas` can silently break `apps/api`, `apps/telemetry-ms`, or `apps/web` if downstream workflows don't re-run.
 
-Instead, every job always runs, while `typecheck`, `build`, and `storybook` leverage Turborepo's package dependency graph via `--affected` on PRs paired with dynamic Git clone depth (`fetch-depth: ${{ github.event_name == 'pull_request' && 0 || 1 }}`):
+Instead, every job always runs, while `typecheck`, `build`, and `storybook` leverage Turborepo's package dependency graph via `--affected` on PRs paired with dynamic Git clone depth (`fetch-depth: ${{ github.event_name == 'pull_request' && '0' || '1' }}` — quoted `'0'` because numeric `0` is falsy in GitHub Actions ternary expressions):
 
 - **`apps/api/**` changed on PR:** Turborepo checks & builds **only `@repo/api`**; `@repo/web` and `@repo/ui` (`build-storybook`) skip in ~1s and still report clean exit `0` (`Success`) to Branch Protection.
 - **`packages/shared-schemas/**` changed on PR:** Turborepo traverses the reverse dependency graph and validates `@repo/shared-schemas`, `@repo/api`, `@repo/telemetry-ms`, and `@repo/web`.
@@ -139,7 +139,7 @@ Instead, every job always runs, while `typecheck`, `build`, and `storybook` leve
 - **Root configs (`tsconfig.base.json`, `pnpm-workspace.yaml`):** Declared under `globalDependencies` in `turbo.json`, forcing full monorepo verification on workspace-wide compiler or dependency changes.
 
 > [!IMPORTANT]
-> **GitHub Actions PR Detached-HEAD Nuance (`TURBO_SCM_BASE`):** On `pull_request` triggers, `actions/checkout` lands on a detached `HEAD` merge commit where remote `origin/main` exists (thanks to `fetch-depth: 0`), while a local `main` branch ref may be absent. If `--affected` logs ever warn `Unable to resolve base branch` and fall back to building all packages, explicitly exporting `TURBO_SCM_BASE: origin/${{ github.base_ref }}` for PR runs locks comparisons onto `origin/main`.
+> **GitHub Actions PR Detached-HEAD Fix (`TURBO_SCM_BASE`):** On `pull_request` triggers, `actions/checkout` fetches only `refs/pull/<n>/merge` in detached `HEAD` — neither a local `main` branch nor `origin/main` ref exists on the runner. Passing `TURBO_SCM_BASE="${{ github.event.pull_request.base.sha }}"` (present locally thanks to `fetch-depth: 0`) locks `--affected` cleanly onto the exact target base commit without extra network fetches.
 
 ---
 

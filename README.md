@@ -105,7 +105,7 @@ docker compose up --build -d
 ## 🏛️ Архитектурный стек (16 ключевых решений — ADR)
 
 1. **Монорепозиторий:** `pnpm` Workspaces + `Turborepo`
-2. **DX и качество кода:** `TypeScript (Strict)` + `Biome.js` + `Lefthook` (с авто-инкрементом патч-версии в корневом `package.json` при каждом коммите)
+2. **DX и качество кода:** `TypeScript (Strict)` + `Biome.js` + `Lefthook` (быстрый `pre-commit` гейт без лишних мутаций кэша)
 3. **Frontend-платформа:** `Next.js 16 (App Router)` — гибрид SSG + SSR + RSC + Edge Proxy (`src/proxy.ts`)
 4. **Разделение стейта:** `TanStack Query v5` (серверный кэш) + `Zustand` (клиентский UI-стейт)
 5. **Offline-First БД в браузере:** `IndexedDB` (`idb-keyval` + TanStack Query Persister с TTL 24 часа)
@@ -141,11 +141,11 @@ greatest-portfolio/
 │   ├── shared-schemas/         # Единые Zod-схемы и TS-типы для фронта и бэка (ESM)
 │   └── ui/                     # UI-кит в эстетике Notion Workfolio (Tailwind + Radix + Storybook)
 ├── docker/                     # Оптимизированные 3-stage Dockerfiles (turbo prune)
-├── scripts/                    # Скрипты автоматизации (bootstrap-env.mjs, bump-patch-version.mjs)
+├── scripts/                    # Скрипты автоматизации (bootstrap-env.mjs, dev-runner.mjs)
 ├── AGENTS.md                   # Корневой роутер контекста для ИИ
 ├── biome.json                  # Единый линтер и форматтер (Rust)
 ├── docker-compose.yml          # Оркестрация postgres + telemetry-ms + api + web
-├── lefthook.yml                # Git-хуки (Biome + Typecheck + Semver bump)
+├── lefthook.yml                # Git-хуки (Biome + Typecheck)
 ├── pnpm-workspace.yaml         # Конфигурация пакетов монорепозитория
 ├── tsconfig.base.json          # Строгий базовый конфиг TypeScript
 └── turbo.json                  # Пайплайны сборки и кэширования Turborepo

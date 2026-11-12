@@ -18,7 +18,6 @@
     "format": "biome format --write .",
     "typecheck": "turbo run typecheck",
     "typecheck:pnpm": "pnpm -r typecheck",
-    "bump:version": "node scripts/bump-patch-version.mjs",
     "setup": "node scripts/bootstrap-env.mjs",
     "prepare": "lefthook install"
   },

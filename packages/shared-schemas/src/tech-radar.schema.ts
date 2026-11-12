@@ -44,12 +44,12 @@ export const TECH_RADAR_ITEMS_RU: readonly TechRadarItem[] = [
     category: 'DevOps & DX',
     experienceYears: 5,
     level: 'Core',
-    summary: 'Линтинг и форматирование на Rust за ~50 мс + авто-версионирование на pre-commit.',
+    summary: 'Линтинг и форматирование на Rust за ~50 мс + строгий pre-commit гейт без лишних мутаций кэша.',
     adrWhy:
       'Связка ESLint + Prettier медленная. Biome.js на Rust заменяет оба инструмента одним бинарником, а Lefthook физически не пропускает сломанный код в git.',
     adrWhere: 'Глобально во всех пакетах и приложениях монорепозитория на этапе git commit и в CI.',
     adrHow:
-      'В tsconfig.base.json включены strict, noUncheckedIndexedAccess, exactOptionalPropertyTypes. В lefthook.yml: biome check -> turbo typecheck -> авто-инкремент патч-версии.',
+      'В tsconfig.base.json включены strict, noUncheckedIndexedAccess, exactOptionalPropertyTypes. В lefthook.yml: biome check -> turbo typecheck (кэши FULL TURBO и --affected не сбрасываются).',
   },
   {
     id: 'nextjs-app-router',
@@ -269,12 +269,12 @@ export const TECH_RADAR_ITEMS_EN: readonly TechRadarItem[] = [
     category: 'DevOps & DX',
     experienceYears: 5,
     level: 'Core',
-    summary: 'Rust-powered linting and formatting in ~50ms + automated SemVer bump on pre-commit.',
+    summary: 'Rust-powered linting and formatting in ~50ms + cache-friendly pre-commit quality gates.',
     adrWhy:
       'ESLint + Prettier is slow and heavy. Biome.js (written in Rust) replaces both with a single binary, while Lefthook blocks broken code from entering Git.',
     adrWhere: 'Globally across all packages and applications during git commit and CI.',
     adrHow:
-      'tsconfig.base.json enables strict, noUncheckedIndexedAccess, exactOptionalPropertyTypes. lefthook.yml runs biome check -> turbo typecheck -> patch version bump.',
+      'tsconfig.base.json enables strict, noUncheckedIndexedAccess, exactOptionalPropertyTypes. lefthook.yml runs biome check -> turbo typecheck without busting FULL TURBO or --affected caches.',
   },
   {
     id: 'nextjs-app-router',
@@ -495,12 +495,12 @@ export const TECH_RADAR_ITEMS_UK: readonly TechRadarItem[] = [
     category: 'DevOps & DX',
     experienceYears: 5,
     level: 'Core',
-    summary: 'Лінтинг і форматування на Rust за ~50 мс + авто-версіонування на pre-commit.',
+    summary: 'Лінтинг і форматування на Rust за ~50 мс + суворий pre-commit гейт без зайвих мутацій кешу.',
     adrWhy:
       'Зв’язка ESLint + Prettier повільна. Biome.js на Rust замінює обидва інструменти одним бінарником, а Lefthook фізично не пропускає зламаний код у git.',
     adrWhere: 'Глобально в усіх пакетах і застосунках монорепозиторію на етапі git commit та в CI.',
     adrHow:
-      'У tsconfig.base.json увімкнено strict, noUncheckedIndexedAccess, exactOptionalPropertyTypes. У lefthook.yml: biome check -> turbo typecheck -> авто-інкремент патч-версії.',
+      'У tsconfig.base.json увімкнено strict, noUncheckedIndexedAccess, exactOptionalPropertyTypes. У lefthook.yml: biome check -> turbo typecheck (кеші FULL TURBO та --affected не скидаються).',
   },
   {
     id: 'nextjs-app-router',

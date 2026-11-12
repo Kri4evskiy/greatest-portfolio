@@ -1,4 +1,4 @@
-import { APP_VERSION, type SupportedLocale } from '@repo/shared-schemas'
+import type { SupportedLocale } from '@repo/shared-schemas'
 import { Badge } from '@repo/ui'
 import { Database, ExternalLink, FileDown, Github, Linkedin, Mail, MapPin, Send } from 'lucide-react'
 import { getTranslations } from 'next-intl/server'
@@ -92,9 +92,6 @@ export async function WorkfolioFooter({ locale }: { locale: SupportedLocale }) {
               >
                 Kri4evskiy/greatest-portfolio
               </a>
-              <Badge variant="outline" className="font-mono text-[11px]">
-                v{APP_VERSION} (Lefthook Auto-Bump)
-              </Badge>
               <Badge variant="secondary" className="font-mono text-[11px]">
                 <Database className="mr-1 h-3 w-3" />
                 IndexedDB Offline-First

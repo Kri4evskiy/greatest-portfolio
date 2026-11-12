@@ -12,7 +12,7 @@ order: 2
 tldr:
   - "Єдиний воркспейс **pnpm 12** + **Turborepo** повністю прибирає розсинхронізацію контрактів між клієнтом і API."
   - "Єдиний Rust-бінарник **Biome.js** замінює 120+ пакетів `ESLint + Prettier` (~50 мс на перевірку всього проєкту)."
-  - "Хук **Lefthook** перед кожним комітом перевіряє форматування, суворі типи та оновлює версію збірки."
+  - "Хук **Lefthook** перед кожним комітом перевіряє форматування та суворі типи без інвалідації кешу Turborepo."
 ---
 
 ## 1. Проблема класичних Full-Stack репозиторіїв
@@ -46,5 +46,4 @@ export type GuestPassFormInput = z.infer<typeof GuestPassFormSchema>
 Ми повністю відмовилися від повільної зв’язки `ESLint + Prettier` (120+ пакетів у `node_modules`) на користь єдиного бінарника **Biome.js** на Rust, який перевіряє та форматує весь монорепозиторій за **~50 мс**.
 
 1. Запускає `biome check --write` на індексованих файлах.
-2. Перевіряє суворі типи `pnpm turbo typecheck` (`noUncheckedIndexedAccess: true`, `exactOptionalPropertyTypes: true`).
-3. Інкрементує патч-версію в кореневому `package.json` та синхронізує константу `APP_VERSION` для відображення у футері сайту.
+2. Перевіряє суворі типи `pnpm turbo typecheck` (`noUncheckedIndexedAccess: true`, `exactOptionalPropertyTypes: true`), не мутуючи маніфести на кожному коміті й зберігаючи кеші `FULL TURBO` та `--affected`.
