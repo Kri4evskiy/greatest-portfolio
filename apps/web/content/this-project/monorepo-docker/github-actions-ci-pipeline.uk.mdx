@@ -139,7 +139,7 @@ concurrency:
 - **Кореневі конфіги (`tsconfig.base.json`, `pnpm-workspace.yaml`):** оголошені в `globalDependencies` у `turbo.json`, тож при їх редагуванні перевіряється весь монорепозиторій.
 
 > [!IMPORTANT]
-> **Нюанс PR у стані Detached HEAD (`TURBO_SCM_BASE`):** На `pull_request` екшен `actions/checkout` створює detached `HEAD` (merge-коміт PR), де присутній `origin/main` (завдяки `fetch-depth: 0`), але локальна гілка `main` може бути відсутня. Якщо в логах першого PR з’явиться попередження `Unable to resolve base branch` і збереться весь граф цілком — достатньо явно передати `TURBO_SCM_BASE: origin/${{ github.base_ref }}` для PR-подій.
+> **Фікс Detached HEAD на PR (`TURBO_SCM_BASE`):** На `pull_request` екшен `actions/checkout` створює detached `HEAD` (merge-коміт PR), де присутній `origin/main` (завдяки `fetch-depth: 0`), але локальна гілка `main` відсутня. Без явної бази Turborepo попереджає `Unable to resolve base branch` і перезбирає весь монорепозиторій — тому PR-запуски в `ci.yml` явно передають `TURBO_SCM_BASE="origin/${{ github.base_ref }}"`.
 
 ---
 

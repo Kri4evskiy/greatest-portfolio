@@ -7,5 +7,3 @@ pre-commit:
       stage_fixed: true
     2-typecheck:
       run: pnpm turbo typecheck
-    3-bump-version:
-      run: node scripts/bump-patch-version.mjs --stage

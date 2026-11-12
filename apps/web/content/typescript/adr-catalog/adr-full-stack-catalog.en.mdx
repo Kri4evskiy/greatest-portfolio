@@ -12,7 +12,7 @@ order: 2
 tldr:
   - "Monorepo orchestration via **pnpm 12 Workspaces** + **Turborepo** with zero cross-repo DTO drift."
   - "Single Rust binary **Biome.js** replaces 120+ `ESLint + Prettier` packages (~50ms full check)."
-  - "**Lefthook** pre-commit pipeline enforces formatting, strict typechecking, and automatic patch versioning."
+  - "**Lefthook** pre-commit pipeline enforces Biome formatting and strict monorepo typechecking without busting Turborepo caches."
 ---
 
 ## 1. The Problem with Split Full-Stack Repositories
@@ -46,5 +46,4 @@ export type GuestPassFormInput = z.infer<typeof GuestPassFormSchema>
 We replaced the slow `ESLint + Prettier` toolchain (120+ packages in `node_modules`) with a single Rust binary — **Biome.js**, which lints and formats the entire monorepo in **~50ms**.
 
 1. Runs `biome check --write` on staged files.
-2. Verifies strict types via `pnpm turbo typecheck` (`noUncheckedIndexedAccess: true`, `exactOptionalPropertyTypes: true`).
-3. Increments the patch version in root `package.json` and syncs the `APP_VERSION` constant displayed in the site footer.
+2. Verifies strict types via `pnpm turbo typecheck` (`noUncheckedIndexedAccess: true`, `exactOptionalPropertyTypes: true`), preserving `FULL TURBO` and `--affected` caches without mutating package manifests per commit.

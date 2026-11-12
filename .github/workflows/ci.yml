@@ -77,7 +77,7 @@ jobs:
       - name: Run Turborepo typecheck
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            pnpm exec turbo run typecheck --affected
+            TURBO_SCM_BASE="origin/${{ github.base_ref }}" pnpm exec turbo run typecheck --affected
           else
             pnpm run typecheck
           fi
@@ -115,7 +115,7 @@ jobs:
       - name: Run Turborepo build
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            pnpm exec turbo run build --affected
+            TURBO_SCM_BASE="origin/${{ github.base_ref }}" pnpm exec turbo run build --affected
           else
             pnpm run build
           fi
@@ -136,7 +136,7 @@ jobs:
       - name: Build @repo/ui Storybook
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            pnpm exec turbo run build-storybook --affected
+            TURBO_SCM_BASE="origin/${{ github.base_ref }}" pnpm exec turbo run build-storybook --affected
           else
             pnpm exec turbo run build-storybook
           fi
