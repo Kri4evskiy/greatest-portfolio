@@ -1,0 +1,48 @@
+name: "📚 Knowledge Base Article Proposal"
+description: "Propose a new engineering deep dive or case study for the 3-Tier MDX Knowledge Base"
+title: "docs(kb): [Article Topic / Architectural Case Study]"
+labels: [ "documentation", "knowledge-base" ]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Our portfolio features a **Living Engineering Knowledge Base** (`apps/web/content/`) with interactive D3 graphs, code walkthroughs, and ADRs.
+        Use this template to propose a new technical article or architectural retrospective!
+  - type: dropdown
+    id: category
+    attributes:
+      label: "Knowledge Base Category"
+      description: "Which category does this article belong to?"
+      options:
+        - "this-project (Internal Monorepo Architecture)"
+        - "frontend-architecture (Next.js 16, React 19, Tailwind v4)"
+        - "backend-architecture (NestJS 12, Microservices, SSE)"
+        - "database-prisma (PostgreSQL, Neon, Indexing, Transactions)"
+        - "devops-ci-cd (GitHub Actions, Docker, Biome, Turborepo)"
+    validations:
+      required: true
+  - type: textarea
+    id: overview
+    attributes:
+      label: "Article Synopsis & Key Takeaways"
+      description: "What engineering problem does this article solve? What will the reader learn?"
+      placeholder: "Explaining how we achieved zero cold-start JWT verification on Cloudflare/Vercel Edge using Web Crypto API..."
+    validations:
+      required: true
+  - type: textarea
+    id: key_concepts
+    attributes:
+      label: "Core Architectural Concepts Covered"
+      description: "Mention specific design patterns, algorithms, or benchmarks."
+      placeholder: "HMAC-SHA256, Zero-Node-runtime dependency, Sub-millisecond latency, RBAC guest token"
+    validations:
+      required: true
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: "Quality Commitment"
+      options:
+        - label: "Article will be provided in trilingual format (EN, UK, RU) or translated."
+          required: false
+        - label: "Code snippets will match the actual monorepo implementations."
+          required: true
