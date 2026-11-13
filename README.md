@@ -11,52 +11,84 @@
 ![Biome](https://img.shields.io/badge/Biome-2.6-60A5FA?style=flat-square&logo=biome&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-Multi--Stage-2496ED?style=flat-square&logo=docker&logoColor=white)
 
-Production-grade Full-Stack монорепозиторий персонального портфолио (в эстетике **Notion Workfolio**) и закрытой интерактивной **Инженерной Базы Знаний** с демонстрацией современной Enterprise-архитектуры (`Next.js 16`, `NestJS 12 Native ESM`, `Prisma ORM`, `Microservices TCP + SSE`, `TanStack Query v5 + IndexedDB`, `D3.js`).
+Production-grade Full-Stack monorepo featuring a personal portfolio (styled in **Notion Workfolio** aesthetics) and a protected interactive **Engineering Knowledge Base**, showcasing modern enterprise architecture (`Next.js 16`, `NestJS 12 Native ESM`, `Prisma ORM`, `Microservices TCP + SSE`, `TanStack Query v5 + IndexedDB`, `D3.js`).
 
 ---
 
-## ⚡ Быстрый старт (Onboarding в 3 команды)
+## 🏗️ Architecture Topology
 
-Проект построен как единый монорепозиторий на базе **`pnpm workspaces`** ([`pnpm-workspace.yaml`](./pnpm-workspace.yaml)) и **`Turborepo`** ([`turbo.json`](./turbo.json)).
-**Вам НЕ нужно заходить во вложенные папки (`apps/*`, `packages/*`) и устанавливать зависимости вручную** — одна команда в корне подготовит сразу все 6 пакетов монорепозитория.
+```mermaid
+flowchart LR
+    subgraph Client["Client Tier"]
+        Browser["Next.js 16 Web (RSC / SSG)"]
+    end
 
-### Предварительные требования
+    subgraph Edge["Edge Security & Gateway"]
+        Proxy["Edge Proxy (src/proxy.ts)"]
+    end
+
+    subgraph Services["Core Backend Services"]
+        API["NestJS 12 API (apps/api)"]
+        Telemetry["Telemetry Microservice (TCP :4001)"]
+    end
+
+    subgraph Data["Persistence & Contracts"]
+        DB[("PostgreSQL (Neon / Docker)")]
+        Schemas["@repo/shared-schemas (Zod v4)"]
+    end
+
+    Browser -->|HTTP / SSE| Proxy
+    Proxy -->|Validated JWT| API
+    API -->|Prisma ORM| DB
+    API <-->|TCP Events| Telemetry
+    Telemetry -.->|Live SSE Stream| Browser
+    Schemas -.->|Shared DTOs & Types| Browser & API & Telemetry
+```
+
+---
+
+## ⚡ Quick Start (Onboarding in 3 Commands)
+
+The project is built as a unified monorepo powered by **`pnpm workspaces`** ([`pnpm-workspace.yaml`](./pnpm-workspace.yaml)) and **`Turborepo`** ([`turbo.json`](./turbo.json)).
+**You do NOT need to navigate into nested directories (`apps/*`, `packages/*`) or install dependencies manually** — a single root command bootstraps all packages across the workspace.
+
+### Prerequisites
 
 - **Node.js:** `>= 22.0.0`
-- **pnpm:** `>= 12.x` (`pnpm@12.18.0`, можно активировать через `corepack enable` или `npm install -g pnpm@latest`)
+- **pnpm:** `>= 12.x` (`pnpm@12.18.0`, activate via `corepack enable` or `npm install -g pnpm@latest`)
 
-### Вариант 1: Мгновенный локальный запуск (без настройки БД и Docker)
+### Option 1: Instant Local Run (Zero Database or Docker Setup Required)
 
-Бэкенд оснащен отказоустойчивым слоем `PrismaService`: если локальный PostgreSQL не запущен, API автоматически переключается на in-memory стор с сохранением всех контрактов `Prisma`, `JWT HttpOnly Cookies` и `SSE`-стриминга.
+The backend features a resilient `PrismaService` fallback layer: if a local PostgreSQL instance is unavailable, the API automatically falls back to an in-memory store while preserving all `Prisma` contracts, `JWT HttpOnly Cookies`, and real-time `SSE` streaming.
 
 ```bash
-# 1. Клонировать репозиторий
+# 1. Clone the repository
 git clone https://github.com/Kri4evskiy/greatest-portfolio.git
 cd greatest-portfolio
 
-# 2. Установить зависимости всех пакетов монорепозитория одной командой
+# 2. Install workspace dependencies in a single step
 pnpm install
 
-# (Опционально) Принудительно запустить setup-скрипт (создаст .env, соберет @repo/shared-schemas и Prisma Client):
+# (Optional) Explicitly run the setup script (creates .env, builds @repo/shared-schemas, and generates Prisma Client):
 # pnpm run setup
 
-# 3. Запустить все сервисы параллельно (Next.js 16 + NestJS 12 API + Telemetry Microservice)
+# 3. Start all services in parallel (Next.js 16 + NestJS 12 API + Telemetry Microservice)
 pnpm run dev
-# (Адаптивный раннер scripts/dev-runner.mjs запускает Turborepo, а в случае блокировки
-# нативных бинарников, например Windows Smart App Control, бесшовно переключается на pnpm workspaces)
+# (The adaptive runner scripts/dev-runner.mjs runs Turborepo, and seamlessly falls back
+# to pnpm workspaces if native binaries are blocked, e.g. by Windows Smart App Control)
 ```
 
-После запуска откройте в браузере:
+Once running, open in your browser:
 - 🌐 **Frontend (Workfolio CV & Knowledge Base):** [http://localhost:3000](http://localhost:3000)
 - ⚙️ **Backend API Healthcheck:** [http://localhost:4000/api/health](http://localhost:4000/api/health)
 - 📡 **Live SSE Telemetry Stream:** [http://localhost:4000/api/telemetry/stream](http://localhost:4000/api/telemetry/stream)
-- 🎨 **UI-Kit Storybook (отдельной командой при необходимости):** `pnpm --filter @repo/ui storybook` ([http://localhost:6006](http://localhost:6006))
+- 🎨 **UI Kit Storybook (optional standalone command):** `pnpm --filter @repo/ui storybook` ([http://localhost:6006](http://localhost:6006))
 
 ---
 
-### Вариант 2: Полный запуск в Docker (PostgreSQL 16 + Microservice + API + Web)
+### Option 2: Full Docker Stack (PostgreSQL 16 + Microservice + API + Web)
 
-Если вы хотите поднять весь стек включая контейнер `postgres:16-alpine` и протестировать multi-stage сборку (`turbo prune --docker`):
+To spin up the entire containerized topology including `postgres:16-alpine` and test multi-stage builds (`turbo prune --docker`):
 
 ```bash
 docker compose up --build -d
@@ -64,95 +96,95 @@ docker compose up --build -d
 
 ---
 
-## 🔑 Как протестировать закрытую Базу Знаний и RBAC (для Team Lead / Recruiter)
+## 🔑 How to Test the Protected Knowledge Base & RBAC (for Team Leads / Recruiters)
 
-1. На главной странице [http://localhost:3000](http://localhost:3000) нажмите в верхней шапке на кнопку **`🔒 Base of Knowledge (Protected • 1-Click)`**.
-2. Откроется модальное окно **1-Click Guest Pass** (`React Hook Form` + `Zod` из `@repo/shared-schemas`):
-   - Нажмите на любой из быстрых пресетов (**`⚡ Alex (Team Lead)`**, **`🎯 Maria (Tech Recruiter)`** или **`🚀 David (CTO)`**) для входа в 1 клик с ролью `USER`.
-   - Либо откройте спойлер _«Я владелец портфолио (Admin Passcode)»_ и введите демо-ключ: `workfolio-admin-2026`, чтобы получить роль `ADMIN`.
-3. Бэкенд `NestJS` подпишет JWT, установит защищенную куку `Set-Cookie: kb_access_token=...; HttpOnly; SameSite=Lax`, отправит событие в TCP-микросервис телеметрии (`:4001`), обновит статус в футере по `SSE` и откроет доступ к разделу `/knowledge-base` (защищенному на уровне `src/proxy.ts` в Next.js 16 и `JwtRolesGuard` в NestJS 12).
-
----
-
-## 🛠️ Основные команды монорепозитория (из корневой папки)
-
-| Команда                            | Описание                                                                                          |
-| :--------------------------------- | :------------------------------------------------------------------------------------------------ |
-| `pnpm install`                     | Устанавливает зависимости всех `apps/*` и `packages/*` + запускает `setup`                        |
-| `pnpm run setup`                   | Принудительно синхронизирует `.env`, собирает `@repo/shared-schemas` и генерирует `Prisma Client` |
-| `pnpm run dev`                     | **Адаптивный запуск:** Turborepo с автоматическим graceful fallback на `pnpm workspaces`          |
-| `pnpm run dev:pnpm`                | Принудительный прямой запуск всех сервисов через `pnpm --parallel` (без вызова `turbo.exe`)       |
-| `pnpm run dev:turbo`               | Принудительный запуск через `Turborepo` (`turbo run dev`)                                         |
-| `pnpm run build`                   | Продакшен-сборка всех пакетов и приложений через `Turborepo`                                      |
-| `pnpm run build:pnpm`              | Сборка монорепозитория напрямую через `pnpm -r build` (топологический порядок)                    |
-| `pnpm run typecheck`               | Строгая проверка типов TypeScript (`tsc --noEmit`) во всех пакетах через `Turborepo`              |
-| `pnpm run typecheck:pnpm`          | Проверка типов TypeScript напрямую через `pnpm -r typecheck`                                      |
-| `pnpm run lint`                    | Молниеносная проверка кода и форматирования через `Biome.js` (Rust)                               |
-| `pnpm run lint:fix`                | Авто-исправление линтинга и форматирования через `Biome.js`                                       |
-| `pnpm --filter @repo/ui storybook` | Запуск интерактивной витрины UI-компонентов `Storybook` на порту `6006`                           |
-
-### 🛡️ Отказоустойчивость DX и Windows Smart App Control (SAC)
-
-В современных версиях Windows 11 включена политика ядра **Smart App Control (SAC)**, которая может блокировать неподписанные бинарные файлы экосистемы (например, `turbo.exe` из `@turbo/windows-64`, генерируя ошибку `spawn UNKNOWN / 0x800711C7`).
-
-Архитектура проекта спроектирована по стандарту **Zero-Friction Onboarding**:
-- Скрипт `scripts/dev-runner.mjs` выполняет префлайт-проверку доступности Turborepo.
-- Если система блокирует бинарник, раннер выводит понятное предупреждение и **прозрачно подхватывает запуск через нативный `pnpm workspaces`**, гарантируя, что любой тимлид или ревьюер сможет поднять проект в 1 команду на любой машине.
-- В CI/CD и Docker (Linux) всегда на 100% задействуются нативный `Turborepo`, `turbo prune` и удаленное кэширование Vercel.
+1. On the home page [http://localhost:3000](http://localhost:3000), click the **`🔒 Base of Knowledge (Protected • 1-Click)`** button in the header.
+2. The **1-Click Guest Pass** modal appears (`React Hook Form` + `Zod` from `@repo/shared-schemas`):
+   - Click any fast preset (**`⚡ Alex (Team Lead)`**, **`🎯 Maria (Tech Recruiter)`**, or **`🚀 David (CTO)`**) for instant 1-click access with the `USER` role.
+   - Alternatively, expand the _"I am the owner (Admin Passcode)"_ section and enter the demo key: `workfolio-admin-2026` to unlock the `ADMIN` role.
+3. The `NestJS` backend signs an HS256 JWT, sets an `HttpOnly, Secure, SameSite=Lax` cookie (`kb_access_token`), publishes a telemetry event to the TCP microservice (`:4001`), updates the footer status over `SSE`, and grants seamless access to `/knowledge-base` (enforced at the Edge via Next.js 16 `src/proxy.ts` and NestJS 12 `JwtRolesGuard`).
 
 ---
 
-## 🏛️ Архитектурный стек (16 ключевых решений — ADR)
+## 🛠️ Monorepo Commands (Root Directory)
 
-1. **Монорепозиторий:** `pnpm` Workspaces + `Turborepo`
-2. **DX и качество кода:** `TypeScript (Strict)` + `Biome.js` + `Lefthook` (быстрый `pre-commit` гейт без лишних мутаций кэша)
-3. **Frontend-платформа:** `Next.js 16 (App Router)` — гибрид SSG + SSR + RSC + Edge Proxy (`src/proxy.ts`)
-4. **Разделение стейта:** `TanStack Query v5` (серверный кэш) + `Zustand` (клиентский UI-стейт)
-5. **Offline-First БД в браузере:** `IndexedDB` (`idb-keyval` + TanStack Query Persister с TTL 24 часа)
-6. **Формы и сквозная валидация:** `React Hook Form` + `Zod` (`packages/shared-schemas`)
-7. **UI-система и документация:** `Tailwind CSS` + `shadcn/ui` (Radix UI) + `Storybook`
-8. **Таблицы и экспериментальный рантайм:** `TanStack Table` (Tech Radar + ADR) & `TanStack Redact`
-9. **Контент и визуализация:** `MDX` + `WebP` (`<ArticleImageGrid />`) + интерактивные графы `D3.js`
-10. **Основной Backend:** `NestJS 12` (Native ESM, модульная DI-архитектура)
-11. **Безопасность:** `JWT` в `HttpOnly Cookies` (`kb_access_token`) + `RBAC` (`GUEST` / `USER` / `ADMIN`)
-12. **База данных и ORM:** `PostgreSQL` (`Neon.tech` / Docker Postgres) + `Prisma ORM`
-13. **Микросервисы и Real-Time:** `@nestjs/microservices` (`apps/telemetry-ms`, TCP `:4001`) + `Server-Sent Events (@Sse)`
-14. **Инфраструктура:** `Docker` (Multi-stage builds с `turbo prune`) + `Docker Compose`
-15. **Наблюдаемость:** `Sentry` (Error Tracking) + `PostHog` (Product Analytics)
-16. **Мультиязычность (i18n):** `next-intl` (App Router RSC, `EN` default + `UA` / `RU`) + локализованные статьи `*.{en,uk,ru}.mdx`
+| Command                            | Description                                                                          |
+| :--------------------------------- | :----------------------------------------------------------------------------------- |
+| `pnpm install`                     | Installs all `apps/*` and `packages/*` dependencies + triggers `setup`               |
+| `pnpm run setup`                   | Syncs `.env`, builds `@repo/shared-schemas`, and generates `Prisma Client`           |
+| `pnpm run dev`                     | **Adaptive runner:** Turborepo with automatic graceful fallback to `pnpm workspaces` |
+| `pnpm run dev:pnpm`                | Force runs all services via `pnpm --parallel` (bypassing `turbo.exe`)                |
+| `pnpm run dev:turbo`               | Explicitly runs via `Turborepo` (`turbo run dev`)                                    |
+| `pnpm run build`                   | Production build across all packages and apps via `Turborepo`                        |
+| `pnpm run build:pnpm`              | Builds the monorepo directly via `pnpm -r build` in topological dependency order     |
+| `pnpm run typecheck`               | Strict TypeScript validation (`tsc --noEmit`) across all packages via `Turborepo`    |
+| `pnpm run typecheck:pnpm`          | Typechecks packages directly via `pnpm -r typecheck`                                 |
+| `pnpm run lint`                    | Blazing fast linting and formatting verification via `Biome.js` (Rust)               |
+| `pnpm run lint:fix`                | Automatically fixes linting and formatting issues via `Biome.js`                     |
+| `pnpm --filter @repo/ui storybook` | Starts the interactive `Storybook` component showcase on port `6006`                 |
+
+### 🛡️ DX Resilience & Windows Smart App Control (SAC)
+
+Modern Windows 11 installations enforce **Smart App Control (SAC)**, which may block unsigned ecosystem binaries (such as `turbo.exe` inside `@turbo/windows-64`, raising error `spawn UNKNOWN / 0x800711C7`).
+
+The repository is engineered according to the **Zero-Friction Onboarding** principle:
+- The `scripts/dev-runner.mjs` script performs a pre-flight probe on Turborepo availability.
+- If the system blocks the binary, the runner logs a clear warning and **transparently falls back to native `pnpm workspaces`**, guaranteeing any reviewer or engineer can run the project in a single command on any machine.
+- In CI/CD and Docker (Linux), native `Turborepo`, `turbo prune`, and Vercel remote caching operate unconditionally at 100% speed.
 
 ---
 
-## 📂 Структура монорепозитория
+## 🏛️ Architectural Stack (16 Architecture Decision Records — ADRs)
+
+1. **Monorepo Orchestration:** `pnpm` Workspaces + `Turborepo`
+2. **DX & Code Quality:** `TypeScript (Strict)` + `Biome.js` + `Lefthook` (lean `pre-commit` gate preserving caching)
+3. **Frontend Platform:** `Next.js 16 (App Router)` — hybrid SSG + SSR + RSC + Edge Proxy (`src/proxy.ts`)
+4. **State Separation:** `TanStack Query v5` (server cache) + `Zustand` (client UI state)
+5. **Browser Database:** `IndexedDB` (`idb-keyval` + TanStack Query Persister with 24h TTL)
+6. **Forms & End-to-End Validation:** `React Hook Form` + `Zod` (`packages/shared-schemas`)
+7. **UI System & Documentation:** `Tailwind CSS` + `shadcn/ui` (Radix UI) + `Storybook 10`
+8. **Tables & Auto-Memoization:** `TanStack Table` (Tech Radar + ADR) & `React 19 Compiler` (boundary isolation `'use no memo'`)
+9. **Content & Visualization:** `MDX` + `WebP` (`<ArticleImageGrid />`) + interactive `D3.js` graphs
+10. **Core Backend:** `NestJS 12` (Native ESM, modular DI architecture)
+11. **Security:** `JWT` in `HttpOnly Cookies` (`kb_access_token`) + `RBAC` (`GUEST` / `USER` / `ADMIN`)
+12. **Database & ORM:** `PostgreSQL` (`Neon.tech` / Docker Postgres) + `Prisma ORM`
+13. **Microservices & Real-Time:** `@nestjs/microservices` (`apps/telemetry-ms`, TCP `:4001`) + `Server-Sent Events (@Sse)`
+14. **Infrastructure:** `Docker` (Multi-stage builds with `turbo prune`) + `Docker Compose`
+15. **Observability:** `Sentry` (Error Tracking) + `PostHog` (Product Analytics)
+16. **Localization (i18n):** `next-intl` (App Router RSC, `EN` default + `UA` / `RU`) + colocated `*.{en,uk,ru}.mdx` articles
+
+---
+
+## 📂 Monorepo Structure
 
 ```text
 greatest-portfolio/
-├── .agents/                    # Каскадная система контекста и ADR для ИИ-агентов
-│   ├── tech-debt-backlog.md    # Бэклог, Tech Debt и Post-MVP план развития
-│   ├── architecture/           # ADR-каталог, CI/CD, общие контракты, Docker & Observability
-│   ├── frontend/               # Правила Next.js, Workfolio UI, Storybook, State, Auth
-│   └── backend/                # Правила NestJS, JWT Security, Prisma, Microservices & SSE
-├── .github/                    # GitHub Actions CI/CD (ci.yml + setup-workspace action)
+├── .agents/                    # Hierarchical AI context and ADR documentation system
+│   ├── tech-debt-backlog.md    # Product backlog, tech debt, and Post-MVP roadmap
+│   ├── architecture/           # ADR catalog, CI/CD, shared contracts, Docker & Observability
+│   ├── frontend/               # Next.js rules, Workfolio UI, Storybook, State, Auth
+│   └── backend/                # NestJS standards, JWT Security, Prisma, Microservices & SSE
+├── .github/                    # GitHub Actions CI/CD (ci.yml + setup-workspace composite action)
 ├── apps/
-│   ├── web/                    # Next.js 16 App Router (Workfolio CV + закрытая Knowledge Base)
-│   ├── api/                    # Основной бэкенд NestJS 12 (ESM) + Prisma + SSE Stream
-│   └── telemetry-ms/           # Микросервис телеметрии и аналитики (@nestjs/microservices)
+│   ├── web/                    # Next.js 16 App Router (Workfolio CV + protected Knowledge Base)
+│   ├── api/                    # Core NestJS 12 backend (ESM) + Prisma + SSE Stream
+│   └── telemetry-ms/           # Telemetry & analytics microservice (@nestjs/microservices)
 ├── packages/
-│   ├── shared-schemas/         # Единые Zod-схемы и TS-типы для фронта и бэка (ESM)
-│   └── ui/                     # UI-кит в эстетике Notion Workfolio (Tailwind + Radix + Storybook)
-├── docker/                     # Оптимизированные 3-stage Dockerfiles (turbo prune)
-├── scripts/                    # Скрипты автоматизации (bootstrap-env.mjs, dev-runner.mjs)
-├── AGENTS.md                   # Корневой роутер контекста для ИИ
-├── biome.json                  # Единый линтер и форматтер (Rust)
-├── docker-compose.yml          # Оркестрация postgres + telemetry-ms + api + web
-├── lefthook.yml                # Git-хуки (Biome + Typecheck)
-├── pnpm-workspace.yaml         # Конфигурация пакетов монорепозитория
-├── tsconfig.base.json          # Строгий базовый конфиг TypeScript
-└── turbo.json                  # Пайплайны сборки и кэширования Turborepo
+│   ├── shared-schemas/         # Shared Zod schemas and TypeScript types for web and API (ESM)
+│   └── ui/                     # Notion Workfolio UI kit (Tailwind + Radix + Storybook 10)
+├── docker/                     # Optimized 3-stage Dockerfiles (turbo prune --docker)
+├── scripts/                    # Automation scripts (bootstrap-env.mjs, dev-runner.mjs)
+├── AGENTS.md                   # Root AI context router
+├── biome.json                  # Unified Rust-based linter and formatter
+├── docker-compose.yml          # Container orchestration (postgres + telemetry-ms + api + web)
+├── lefthook.yml                # Pre-commit Git hooks (Biome check + Typecheck)
+├── pnpm-workspace.yaml         # Monorepo package boundaries and allowBuilds security list
+├── tsconfig.base.json          # Root strict TypeScript configuration
+└── turbo.json                  # Turborepo task pipeline and caching rules
 ```
 
-## 🧭 Навигация по архитектурной документации
+## 🧭 Architecture Documentation Navigation
 
-- [Корневой роутер контекста ИИ (`AGENTS.md`)](./AGENTS.md)
-- [Бэклог, Tech Debt и Post-MVP план развития (`.agents/tech-debt-backlog.md`)](./.agents/tech-debt-backlog.md)
-- [Полный каталог 16 ADR: Почему, Где и Как (`.agents/architecture/adr-stack.md`)](./.agents/architecture/adr-stack.md)
+- [Root AI Context Router (`AGENTS.md`)](./AGENTS.md)
+- [Tech Debt & Post-MVP Roadmap (`.agents/tech-debt-backlog.md`)](./.agents/tech-debt-backlog.md)
+- [Full Catalog of 16 ADRs: Why, Where & How (`.agents/architecture/adr-stack.md`)](./.agents/architecture/adr-stack.md)
