@@ -37,11 +37,11 @@ flowchart LR
         Schemas["@repo/shared-schemas (Zod v4)"]
     end
 
-    Browser -->|HTTP / SSE| Proxy
+    Browser -->|HTTP Requests| Proxy
     Proxy -->|Validated JWT| API
     API -->|Prisma ORM| DB
-    API <-->|TCP Events| Telemetry
-    Telemetry -.->|Live SSE Stream| Browser
+    API <-->|TCP Events & Stats| Telemetry
+    API -.->|Live SSE Stream| Browser
     Schemas -.->|Shared DTOs & Types| Browser & API & Telemetry
 ```
 
