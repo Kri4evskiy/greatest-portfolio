@@ -1,0 +1,19 @@
+# Global repository maintainer & code owner
+* @Kri4evskiy
+
+# CI/CD Workflows & GitHub Governance
+/.github/ @Kri4evskiy
+
+# Shared Zod v4 Contracts & Schemas
+/packages/shared-schemas/ @Kri4evskiy
+
+# Database Schema, Migrations & Prisma Client
+/apps/api/prisma/ @Kri4evskiy
+
+# Edge Security & Authentication Boundary
+/apps/web/src/proxy.ts @Kri4evskiy
+/apps/web/src/lib/edge-jwt.ts @Kri4evskiy
+
+# Docker Infrastructure & Compose
+/docker/ @Kri4evskiy
+/docker-compose.yml @Kri4evskiy
