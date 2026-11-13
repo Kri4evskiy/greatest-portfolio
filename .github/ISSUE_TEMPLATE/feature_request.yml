@@ -1,0 +1,47 @@
+name: "💡 Feature Request"
+description: "Propose a new feature, architecture improvement, or tool integration"
+title: "feat: [Short summary of proposed feature]"
+labels: [ "enhancement" ]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Have an idea to improve the monorepo, DX, or architecture? Fill out the details below.
+  - type: dropdown
+    id: workspace
+    attributes:
+      label: "Target Workspace"
+      description: "Where will this feature live?"
+      multiple: true
+      options:
+        - "apps/web (Next.js 16)"
+        - "apps/api (NestJS 12)"
+        - "apps/telemetry-ms (TCP Microservice)"
+        - "packages/shared-schemas (Zod v4)"
+        - "packages/ui (Design System)"
+        - "Infrastructure / CI/CD / Docker"
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: "Problem or Motivation"
+      description: "Is your feature request related to a problem or limitation? Please describe."
+      placeholder: "I'm always frustrated when..."
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: "Proposed Solution / Architecture"
+      description: "Describe the solution you'd like to see implemented."
+      placeholder: "Implement WebAuthn/Passkeys support in apps/api and apps/web..."
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: "Alternatives Considered"
+      description: "Any alternative solutions or features you've considered?"
+    validations:
+      required: false
