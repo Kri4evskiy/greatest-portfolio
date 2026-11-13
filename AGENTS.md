@@ -41,3 +41,10 @@
 3. Никогда не храни серверные данные API в `Zustand` (для этого есть `TanStack Query` + `IndexedDB Persister`).
 4. Никогда не храни JWT-токены в `LocalStorage` (только `HttpOnly, Secure, SameSite=Lax Cookies`).
 5. Никогда не добавляй секцию `"pnpm"` (например, `onlyBuiltDependencies`) в `package.json` — в `pnpm 12+` все настройки воркспейса и `allowBuilds` живут строго в `pnpm-workspace.yaml`.
+
+## 🔄 Правило синхронизации системной документации (Root Docs Sync)
+
+При внесении архитектурных изменений агент обязан поддерживать актуальность корневых документов:
+1. **`SECURITY.md`:** обновлять, если меняется модель аутентификации (JWT, Cookies), Edge Web Crypto, изоляция портов микросервисов, `allowBuilds` в `pnpm-workspace.yaml` или мажорные версии стека.
+2. **`CONTRIBUTING.md` и `README.md`:** обновлять, если меняются воркспейсы (добавлен/удалён пакет в `packages/*` или `apps/*`), базовые команды монорепозитория (`dev`, `build`, `lint`, `typecheck`) или pre-commit хуки Lefthook.
+3. **`CODE_OF_CONDUCT.md`:** статичный стандарт (Contributor Covenant v2.1), обновляется только при смене контактов мейнтейнера.
