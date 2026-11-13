@@ -1,6 +1,6 @@
 {
   "name": "greatest-portfolio",
-  "version": "0.5.4",
+  "version": "0.5.5",
   "private": true,
   "description": "Senior Full-Stack Portfolio & Protected Engineering Knowledge Base",
   "packageManager": "pnpm@12.18.0",
