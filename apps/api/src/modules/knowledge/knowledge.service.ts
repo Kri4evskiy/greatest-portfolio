@@ -1,7 +1,16 @@
 import { Inject, Injectable } from '@nestjs/common'
-import type { ArticleMeta, KnowledgeCategory, SessionProfile } from '@repo/shared-schemas'
+import {
+  type ArticleMeta,
+  type KnowledgeCategory,
+  type SessionProfile,
+  VISITOR_ROLE_LABELS,
+} from '@repo/shared-schemas'
 import { PrismaService } from '../../prisma/prisma.service.js'
 import { TelemetryService } from '../telemetry/telemetry.service.js'
+
+function resolvePublicActorLabel(actor?: SessionProfile | undefined): string {
+  return actor?.visitorType ? VISITOR_ROLE_LABELS[actor.visitorType] : 'Reader'
+}
 
 @Injectable()
 export class KnowledgeService {
@@ -23,8 +32,7 @@ export class KnowledgeService {
 
     await this.telemetry.publishEvent({
       type: 'ARTICLE_VIEWED',
-      message: `${actor?.displayName ?? 'Reader'} opened article "${slug}" (${updated.viewsCount} views)`,
-      actorName: actor?.displayName ?? undefined,
+      message: `${resolvePublicActorLabel(actor)} opened article "${slug}" (${updated.viewsCount} views)`,
       actorRole: actor?.visitorType ?? undefined,
       slug,
     })
@@ -41,8 +49,7 @@ export class KnowledgeService {
 
     await this.telemetry.publishEvent({
       type: 'ARTICLE_HELPFUL',
-      message: `${actor?.displayName ?? 'Reader'} marked "${slug}" as Helpful (${updated.helpfulCount} reactions)`,
-      actorName: actor?.displayName ?? undefined,
+      message: `${resolvePublicActorLabel(actor)} marked "${slug}" as Helpful (${updated.helpfulCount} reactions)`,
       actorRole: actor?.visitorType ?? undefined,
       slug,
     })

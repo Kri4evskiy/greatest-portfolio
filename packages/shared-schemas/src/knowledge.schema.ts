@@ -176,8 +176,18 @@ export const ArticleMetaSchema = z.object({
 })
 export type ArticleMeta = z.infer<typeof ArticleMetaSchema>
 
+export const ArticleReactionBodySchema = z.object({
+  category: KnowledgeCategoryEnum.optional().default('typescript'),
+})
+export type ArticleReactionBody = z.infer<typeof ArticleReactionBodySchema>
+
 export const ArticleReactionInputSchema = z.object({
-  slug: z.string().min(1),
+  slug: z
+    .string()
+    .trim()
+    .min(1)
+    .max(180)
+    .regex(/^[a-z0-9-]+$/i, 'Invalid article slug format'),
   category: KnowledgeCategoryEnum,
 })
 export type ArticleReactionInput = z.infer<typeof ArticleReactionInputSchema>

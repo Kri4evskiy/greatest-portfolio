@@ -21,7 +21,6 @@ export class TelemetryService {
   async publishEvent(input: {
     type: TelemetryEventType
     message: string
-    actorName?: string | undefined
     actorRole?: VisitorRoleType | undefined
     slug?: string | undefined
   }): Promise<TelemetryEvent> {
@@ -29,7 +28,6 @@ export class TelemetryService {
       id: randomUUID(),
       type: input.type,
       message: input.message,
-      ...(input.actorName ? { actorName: input.actorName } : {}),
       ...(input.actorRole ? { actorRole: input.actorRole } : {}),
       ...(input.slug ? { slug: input.slug } : {}),
       timestamp: new Date().toISOString(),

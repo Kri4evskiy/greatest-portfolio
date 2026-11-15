@@ -15,7 +15,7 @@ import { trackEvent } from '@/lib/analytics'
 export function ArticleMetricsBar({ slug, category }: { slug: string; category: KnowledgeCategory }) {
   const t = useTranslations('KnowledgeBase')
   const { data: metricsList } = useKnowledgeMetrics(true)
-  const incrementView = useIncrementViewMutation()
+  const { mutate: recordArticleView } = useIncrementViewMutation()
   const incrementHelpful = useIncrementHelpfulMutation()
   const viewRecordedRef = useRef<string | null>(null)
 
@@ -24,13 +24,13 @@ export function ArticleMetricsBar({ slug, category }: { slug: string; category: 
       return
     }
     viewRecordedRef.current = slug
-    incrementView.mutate({ slug, category })
+    recordArticleView({ slug, category })
     trackEvent('article_read', { slug, category })
-  }, [slug, category, incrementView])
+  }, [slug, category, recordArticleView])
 
   const currentMetric = metricsList?.find((m) => m.slug === slug)
-  const viewsCount = currentMetric?.viewsCount ?? 145
-  const helpfulCount = currentMetric?.helpfulCount ?? 42
+  const viewsCount = currentMetric?.viewsCount ?? 100
+  const helpfulCount = currentMetric?.helpfulCount ?? 25
 
   return (
     <div className="my-6 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-muted/30 px-4 py-3">

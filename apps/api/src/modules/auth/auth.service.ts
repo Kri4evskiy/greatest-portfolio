@@ -69,8 +69,7 @@ export class AuthService {
 
     await this.telemetry.publishEvent({
       type: 'GUEST_PASS_ISSUED',
-      message: `${session.displayName} (${VISITOR_ROLE_LABELS[session.visitorType]}) unlocked Knowledge Base as ${session.role}`,
-      actorName: session.displayName,
+      message: `Guest Pass activated (${VISITOR_ROLE_LABELS[session.visitorType]})`,
       actorRole: session.visitorType,
     })
 

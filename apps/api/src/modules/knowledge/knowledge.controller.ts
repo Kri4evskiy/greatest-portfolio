@@ -1,22 +1,20 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Inject, Param, Post, Req, UseGuards } from '@nestjs/common'
 import {
   type ArticleMeta,
+  type ArticleReactionBody,
+  ArticleReactionBodySchema,
+  ArticleReactionInputSchema,
   type KnowledgeCategory,
-  KnowledgeCategoryEnum,
   type SessionProfile,
 } from '@repo/shared-schemas'
 import type { Request } from 'express'
-import { z } from 'zod'
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe.js'
 import { JwtRolesGuard } from '../auth/jwt-roles.guard.js'
 import { Roles } from '../auth/roles.decorator.js'
 import { KnowledgeService } from './knowledge.service.js'
 
-const CategoryBodySchema = z.object({
-  category: KnowledgeCategoryEnum.optional().default('typescript'),
-})
-
-type CategoryBody = z.infer<typeof CategoryBodySchema>
+const ArticleSlugPipe = new ZodValidationPipe(ArticleReactionInputSchema.shape.slug)
+const ArticleReactionBodyPipe = new ZodValidationPipe(ArticleReactionBodySchema)
 
 @Controller('knowledge')
 @UseGuards(JwtRolesGuard)
@@ -36,8 +34,8 @@ export class KnowledgeController {
   @Roles('USER', 'ADMIN')
   @HttpCode(HttpStatus.OK)
   async incrementView(
-    @Param('slug') slug: string,
-    @Body(new ZodValidationPipe(CategoryBodySchema)) body: CategoryBody,
+    @Param('slug', ArticleSlugPipe) slug: string,
+    @Body(ArticleReactionBodyPipe) body: ArticleReactionBody,
     @Req() req: Request & { sessionProfile?: SessionProfile },
   ): Promise<ArticleMeta> {
     const category: KnowledgeCategory = body.category
@@ -48,8 +46,8 @@ export class KnowledgeController {
   @Roles('USER', 'ADMIN')
   @HttpCode(HttpStatus.OK)
   async incrementHelpful(
-    @Param('slug') slug: string,
-    @Body(new ZodValidationPipe(CategoryBodySchema)) body: CategoryBody,
+    @Param('slug', ArticleSlugPipe) slug: string,
+    @Body(ArticleReactionBodyPipe) body: ArticleReactionBody,
     @Req() req: Request & { sessionProfile?: SessionProfile },
   ): Promise<ArticleMeta> {
     const category: KnowledgeCategory = body.category
