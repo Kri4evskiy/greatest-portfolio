@@ -1,4 +1,5 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Inject, Post, Req, Res } from '@nestjs/common'
+import { Throttle } from '@nestjs/throttler'
 import { type GuestPassFormInput, GuestPassFormSchema, type SessionProfile } from '@repo/shared-schemas'
 import type { Request, Response } from 'express'
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe.js'
@@ -8,6 +9,7 @@ import { AuthService, KB_ACCESS_COOKIE_NAME, KB_COOKIE_MAX_AGE_MS } from './auth
 export class AuthController {
   constructor(@Inject(AuthService) private readonly authService: AuthService) {}
 
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post('guest-pass')
   @HttpCode(HttpStatus.OK)
   async issueGuestPass(
@@ -27,6 +29,17 @@ export class AuthController {
     })
 
     return profile
+  }
+
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @Post('login')
+  @HttpCode(HttpStatus.OK)
+  async login(
+    @Body(new ZodValidationPipe(GuestPassFormSchema)) body: GuestPassFormInput,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<SessionProfile> {
+    return this.issueGuestPass(body, req, res)
   }
 
   @Get('me')
