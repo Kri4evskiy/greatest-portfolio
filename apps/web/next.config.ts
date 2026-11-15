@@ -25,10 +25,30 @@ const nextConfig: NextConfig = {
     optimizePackageImports: ['lucide-react', 'd3', '@repo/ui'],
   },
   async headers() {
+    const cvPageHeaders = getSecurityHeaders(undefined, undefined, {
+      allowSelfObjectAndFrame: true,
+    })
+    const cvPdfAssetHeaders = getSecurityHeaders(undefined, undefined, {
+      allowSelfObjectAndFrame: true,
+      allowSameOriginFraming: true,
+    })
+
     return [
       {
         source: '/(.*)',
         headers: getSecurityHeaders(),
+      },
+      {
+        source: '/cv',
+        headers: cvPageHeaders,
+      },
+      {
+        source: '/:locale(en|ua|uk|ru)/cv',
+        headers: cvPageHeaders,
+      },
+      {
+        source: '/cv/:path*',
+        headers: cvPdfAssetHeaders,
       },
     ]
   },

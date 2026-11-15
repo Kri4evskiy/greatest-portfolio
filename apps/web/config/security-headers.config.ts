@@ -3,15 +3,33 @@ export interface SecurityHeaderEntry {
   value: string
 }
 
+export interface ContentSecurityPolicyOptions {
+  /**
+   * Allows same-origin `<object>` / `<iframe>` PDF rendering exclusively on `/cv` routes.
+   * Remains `false` (`'none'`) on all other application routes.
+   */
+  allowSelfObjectAndFrame?: boolean
+  /**
+   * Relaxes `frame-ancestors` from `'none'` to `'self'` exclusively for `/cv/*.pdf` assets
+   * so the portfolio's own `/cv` page can render the PDF inline while blocking external sites.
+   */
+  allowSameOriginFraming?: boolean
+}
+
 /**
  * Builds the Content-Security-Policy (CSP) string tailored for Next.js 16, React 19,
- * theme hydration, and Server-Sent Events.
+ * theme hydration, Server-Sent Events, and scoped same-origin CV PDF rendering.
  *
  * Security Principle:
  * - Production: Strict zero-trust policy without internal ports or localhost leaks.
  * - Development: Permissive localhost and evaluation policies required for React Fast Refresh and HMR.
  */
-export function buildContentSecurityPolicy(isProduction: boolean, publicApiUrl = ''): string {
+export function buildContentSecurityPolicy(
+  isProduction: boolean,
+  publicApiUrl = '',
+  options: ContentSecurityPolicyOptions = {},
+): string {
+  const { allowSelfObjectAndFrame = false, allowSameOriginFraming = false } = options
   const normalizedPublicApi = publicApiUrl.trim() ? ` ${publicApiUrl.trim()}` : ''
 
   // In production, internal ports must NEVER be leaked in HTTP response headers.
@@ -24,6 +42,9 @@ export function buildContentSecurityPolicy(isProduction: boolean, publicApiUrl =
   // without dynamic eval/new Function, closing XSS eval gadgets.
   // In development, 'unsafe-eval' is required for Next.js Fast Refresh / HMR.
   const scriptSrc = isProduction ? "'self' 'unsafe-inline'" : "'self' 'unsafe-inline' 'unsafe-eval'"
+  const objectSrc = allowSelfObjectAndFrame ? "'self'" : "'none'"
+  const frameSrc = allowSelfObjectAndFrame ? "'self'" : "'none'"
+  const frameAncestors = allowSameOriginFraming ? "'self'" : "'none'"
 
   const directives: string[] = [
     // Default fallback: Restrict all resources to current origin unless explicitly allowed
@@ -44,8 +65,11 @@ export function buildContentSecurityPolicy(isProduction: boolean, publicApiUrl =
     // Network Connections: REST API, SSE telemetry stream, and cloud observability (Sentry / PostHog)
     `connect-src ${connectSrc}`,
 
-    // Clickjacking Defense: Completely block embedding of this application inside any iframe
-    "frame-ancestors 'none'",
+    // Embedded subframes: Blocked globally ('none'), scoped to 'self' only on CV PDF viewer routes
+    `frame-src ${frameSrc}`,
+
+    // Clickjacking Defense: Block all framing globally; allow same-origin only for static /cv/*.pdf assets
+    `frame-ancestors ${frameAncestors}`,
 
     // Form Submissions: Restrict HTML form targets to self origin
     "form-action 'self'",
@@ -53,8 +77,8 @@ export function buildContentSecurityPolicy(isProduction: boolean, publicApiUrl =
     // Base URI: Prevent DOM injection of malicious <base href="..."> tags
     "base-uri 'self'",
 
-    // Plugins: Strictly block legacy insecure plugins (Flash, Java Applets, ActiveX)
-    "object-src 'none'",
+    // Plugins / Objects: Blocked globally ('none'); scoped to 'self' only on CV routes for inline PDF <object>
+    `object-src ${objectSrc}`,
 
     // Enforce HTTPS upgrade exclusively in production (do not break local http://localhost)
     ...(isProduction ? ['upgrade-insecure-requests'] : []),
@@ -77,11 +101,12 @@ export function buildContentSecurityPolicy(isProduction: boolean, publicApiUrl =
 export function getSecurityHeaders(
   isProduction = process.env.NODE_ENV === 'production',
   publicApiUrl = process.env.NEXT_PUBLIC_API_URL ?? '',
+  options: ContentSecurityPolicyOptions = {},
 ): SecurityHeaderEntry[] {
   return [
     {
       key: 'Content-Security-Policy',
-      value: buildContentSecurityPolicy(isProduction, publicApiUrl),
+      value: buildContentSecurityPolicy(isProduction, publicApiUrl, options),
     },
     ...(isProduction
       ? [
@@ -101,7 +126,7 @@ export function getSecurityHeaders(
     },
     {
       key: 'X-Frame-Options',
-      value: 'DENY',
+      value: options.allowSameOriginFraming ? 'SAMEORIGIN' : 'DENY',
     },
     {
       key: 'Referrer-Policy',
