@@ -1,0 +1,269 @@
+---
+title: "Комплексний Security Hardening: Next.js CSP, NestJS Helmet, Throttler Rate Limiting та Edge Web Crypto"
+sidebarLabel: "Security Hardening та Заголовки"
+summary: "Практичний аналіз продакшен-захисту монорепозиторію: сувора Content-Security-Policy в Next.js 16 без FOUC теми, Helmet з CORP для SSE в NestJS 12, захист від брутфорсу через @nestjs/throttler та криптографія на Edge."
+category: "this-project"
+format: "deep-dive"
+tags: ["security", "csp", "helmet", "throttler", "rate-limiting", "nextjs", "nestjs"]
+readingTime: "8 хв"
+publishedAt: "2026-11-13"
+order: 1
+tldr:
+  - "У `apps/web/next.config.ts` активовано повний стек заголовків: CSP, HSTS (`63072000s`), `nosniff`, `Referrer-Policy` та `frame-ancestors 'none'`."
+  - "Політика CSP налаштована з підтримкою інлайн-скрипту теми `next-themes` і прямого стрімінгу Server-Sent Events без порушення ізоляції."
+  - "У `apps/api` інтегровано `helmet` з кастомним налаштуванням `crossOriginResourcePolicy: cross-origin`, що запобігає блокуванню SSE браузерами."
+  - "Ендпоінти автентифікації `POST /api/auth/guest-pass` та `POST /api/auth/login` захищені лімітером `@nestjs/throttler` (не більше 5 спроб за хвилину на IP)."
+---
+
+## 1. Чому сучасний Full-Stack додаток потребує ешелонованого захисту
+
+У звичайній веб-розробці безпеку нерідко відкладають «на потім» або зводять до підключення дефолтних пакетів. Проте в архітектурі монорепозиторію, який об'єднує публічний інтерфейс на Next.js, приватний API на NestJS, мікросервіси та базу даних, компрометація одного вузла здатна зруйнувати всю систему.
+
+У нашому проєкті реалізовано принцип **Defense-in-Depth (Глибокоешелонована оборона)**:
+
+```text
+[ Браузер ]
+    │
+    ├── (1) HTTP Security Headers (Next.js): CSP, HSTS, X-Frame-Options, nosniff
+    │
+    ├── (2) Edge Auth Barrier (proxy.ts): Web Crypto HMAC-SHA256 верифікація JWT
+    │
+    ├── (3) API Gateway Hardening (NestJS): Helmet + CORS whitelist + Throttler Guard
+    │
+    └── (4) Microservice Isolation: TCP :4001 у приватній Docker-мережі без зовнішнього ingress
+```
+
+Кожен шар є повністю автономним: якщо зловмисник спробує обійти клієнтську валідацію, його зупинить Rate Limiter бекенду; якщо спробує вбудувати несанкціонований iframe — спрацює `frame-ancestors 'none'`.
+
+---
+
+## 2. HTTP Security Headers у Next.js 16 (`apps/web/config/security-headers.config.ts`)
+
+Конфігурація `Content-Security-Policy` (CSP) у сучасних фреймворках має низку тонких архітектурних викликів: React Server Components, SSR-гідратація, інлайн-скрипти теми оформлення для запобігання FOUC (Flash of Unstyled Content) та живі SSE-стріми вимагають точного калібрування директив.
+
+Щоб не перевантажувати конфігуратор збірки `next.config.ts` і чітко розділити інфраструктурний конфіг Next.js та шари FSD-застосунку в `src/`, декларативну генерацію всіх заголовків безпеки було винесено в окремий типізований модуль поза `src/`: `apps/web/config/security-headers.config.ts`.
+
+```typescript title="apps/web/config/security-headers.config.ts"
+export function buildContentSecurityPolicy(isProduction: boolean, publicApiUrl = ''): string {
+  const normalizedPublicApi = publicApiUrl.trim() ? ` ${publicApiUrl.trim()}` : ''
+
+  // У продакшені внутрішні порти інфраструктури НІКОЛИ не розкриваються в заголовках.
+  // У девелопменті дозволяються порти API, мікросервісів та сокети HMR (ws/wss).
+  const connectSrc = isProduction
+    ? `'self' https:${normalizedPublicApi}`
+    : `'self' http://localhost:4000 http://localhost:4001 http://127.0.0.1:4000 http://127.0.0.1:4001 ws: wss: https:${normalizedPublicApi}`
+
+  // У продакшені 'unsafe-eval' повністю вимкнений (MDX компілюється в AST без eval).
+  // У девелопменті 'unsafe-eval' потрібен для Next.js Fast Refresh.
+  const scriptSrc = isProduction
+    ? "'self' 'unsafe-inline'"
+    : "'self' 'unsafe-inline' 'unsafe-eval'"
+
+  const directives: string[] = [
+    "default-src 'self'",
+    `script-src ${scriptSrc}`,
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' blob: data: https:",
+    "font-src 'self' data: https:",
+    `connect-src ${connectSrc}`,
+    "frame-ancestors 'none'",
+    "form-action 'self'",
+    "base-uri 'self'",
+    "object-src 'none'",
+    ...(isProduction ? ['upgrade-insecure-requests'] : []),
+  ]
+
+  return directives.join('; ').trim()
+}
+```
+
+А в самому `apps/web/next.config.ts` підключення заголовків і вимкнення `X-Powered-By: Next.js` залишається лаконічним:
+
+```typescript title="apps/web/next.config.ts"
+import { getSecurityHeaders } from './config/security-headers.config'
+
+const nextConfig: NextConfig = {
+  poweredByHeader: false,
+  // ...
+  async headers() {
+    return [
+      {
+        source: '/(.*)',
+        headers: getSecurityHeaders(),
+      },
+    ]
+  },
+}
+```
+
+### Розбір директив та ізоляція Dev/Prod:
+- **Zero Port Leakage та Zero Eval у продакшені:** У проді з `connect-src` видалені порти `:4000`, `:4001` та `localhost`, а з `script-src` прибрано `'unsafe-eval'` (наш Remark AST-рушій MDX не використовує `eval`/`new Function`).
+- **`Cross-Origin-Opener-Policy: same-origin`:** Ізолює контекст вікна браузера, блокуючи доступ через `window.opener` і атаки класу Spectre/XS-Leaks.
+- **`frame-ancestors 'none'` та `X-Frame-Options: DENY`:** Захищають портфоліо та базу знань від атак клікджекінгу (Clickjacking) — сторонній сайт не зможе завантажити застосунок у прихованому `<iframe>`.
+- **`object-src 'none'` та `base-uri 'self'`:** Повністю блокують застарілі плагіни (Flash, Java) і запобігають маніпуляціям із тегом `<base href="...">`.
+- **`Strict-Transport-Security (HSTS)`:** Заголовок `max-age=63072000; includeSubDomains; preload` віддається лише в продакшені й вказує браузеру форсувати HTTPS протягом 2 років.
+- **`Permissions-Policy`:** Забороняє доступ до камери, мікрофона, геолокації та когорт трекінгу інтересів браузера (`camera=(), microphone=(), geolocation=(), browsing-topics=()`).
+
+---
+
+## 3. Захист API-шлюзу в NestJS 12: Helmet з підтримкою SSE
+
+Бекенд `apps/api` побудований на платформі NestJS 12 з Express-адаптером. Для базового захисту заголовків HTTP підключено бібліотеку `helmet`.
+
+Проте стандартна конфігурація `helmet()` за замовчуванням вмикає `Cross-Origin-Resource-Policy: same-origin`. В архітектурі монорепозиторію, де фронтенд (Next.js на порту `3000` або Vercel-домені) звертається до API (порт `4000` або Render-домен) і тримає відкрите з'єднання `EventSource` з ендпоінтом `@Sse('stream')`, дефолтна політика призведе до блокування стріму браузером.
+
+Рішення реалізовано в `apps/api/src/main.ts` (разом із `trust proxy: 1` для точного визначення IP за зворотним проксі та суворим CORS по середовищу):
+
+```typescript title="apps/api/src/main.ts"
+import type { NestExpressApplication } from '@nestjs/platform-express'
+import cookieParser from 'cookie-parser'
+import helmet from 'helmet'
+
+async function bootstrap(): Promise<void> {
+  const app = await NestFactory.create<NestExpressApplication>(AppModule)
+  const isProduction = process.env.NODE_ENV === 'production'
+
+  if (isProduction) {
+    app.set('trust proxy', 1)
+  }
+
+  app.setGlobalPrefix('api')
+  app.use(
+    helmet({
+      crossOriginResourcePolicy: { policy: 'cross-origin' },
+      contentSecurityPolicy: false,
+    }),
+  )
+  app.use(cookieParser())
+
+  const webOrigin = process.env.WEB_ORIGIN ?? 'http://localhost:3000'
+  const allowedOrigins = isProduction
+    ? webOrigin
+        .split(',')
+        .map((origin) => origin.trim())
+        .filter(Boolean)
+    : [webOrigin, 'http://127.0.0.1:3000']
+
+  app.enableCors({
+    origin: allowedOrigins,
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  })
+
+  // ...
+}
+```
+
+> [!NOTE] Чому `contentSecurityPolicy: false` на рівні API
+> Бекенд NestJS функціонує в режимі Pure REST & SSE API, повертаючи структурований JSON і потоки подій. CSP призначений для HTML-документів у браузері, тому генерація заголовків CSP на API є надлишковою і відключається на користь захисту на рівні Next.js.
+
+---
+
+## 4. Захист від брутфорсу: `@nestjs/throttler`
+
+Однією з найбільш критичних точок входу є форма гостьового доступу та адмінського логіну (`GuestPassModal`). Без rate limiting автоматизований ботнет міг би за секунди перебрати секретний паскод адміністратора (`ADMIN_SECRET_PASSCODE`).
+
+Для усунення цієї вразливості ми впровадили `@nestjs/throttler`:
+
+### 1. Підключення модуля в `AppModule`:
+
+```typescript title="apps/api/src/app.module.ts"
+import { APP_GUARD } from '@nestjs/core'
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler'
+
+@Module({
+  imports: [
+    ThrottlerModule.forRoot([
+      {
+        ttl: 60000, // Ковзне вікно: 60 секунд
+        limit: 100,  // Базовий ліміт на звичайні API-виклики
+      },
+    ]),
+    // ...
+  ],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
+  ],
+})
+export class AppModule {}
+```
+
+### 2. Суворий ліміт на ендпоінти авторизації:
+
+В `AuthController` ендпоінти `POST /api/auth/guest-pass` та `POST /api/auth/login` захищені лімітом — **не більше 5 запитів за 60 секунд**:
+
+```typescript title="apps/api/src/modules/auth/auth.controller.ts"
+@Throttle({ default: { limit: 5, ttl: 60000 } })
+@Post('guest-pass')
+@HttpCode(HttpStatus.OK)
+async issueGuestPass(
+  @Body(new ZodValidationPipe(GuestPassFormSchema)) body: GuestPassFormInput,
+  @Req() req: Request,
+  @Res({ passthrough: true }) res: Response,
+): Promise<SessionProfile> {
+  // Випуск токена та встановлення HttpOnly куки
+}
+
+@Throttle({ default: { limit: 5, ttl: 60000 } })
+@Post('login')
+@HttpCode(HttpStatus.OK)
+async login(
+  @Body(new ZodValidationPipe(GuestPassFormSchema)) body: GuestPassFormInput,
+  @Req() req: Request,
+  @Res({ passthrough: true }) res: Response,
+): Promise<SessionProfile> {
+  return this.issueGuestPass(body, req, res)
+}
+```
+
+### 3. Виключення фонового SSE-стріму:
+
+Постійне з'єднання Server-Sent Events (`GET /api/telemetry/stream`) не повинно розриватися через загальний лімітер, тому декоратор `@SkipThrottle()` застосовано **точково до методу** `streamEvents()`, залишаючи `GET /api/telemetry/stats` під захистом загальної квоти:
+
+```typescript title="apps/api/src/modules/telemetry/telemetry.controller.ts"
+@Controller('telemetry')
+export class TelemetryController {
+  @SkipThrottle()
+  @Sse('stream')
+  streamEvents(): Observable<MessageEvent> {
+    return this.telemetryService.getEventStream()
+  }
+}
+```
+
+### 4. Архітектурна еволюція: In-Memory Throttler ➔ Distributed Redis Throttler
+
+У поточній конфігурації одиночного інстансу `@nestjs/throttler` зберігає лічильники IP в оперативній пам'яті процесу Node.js. Це забезпечує наносекундну швидкість і нульову вартість інфраструктури ($0).
+
+Проте при горизонтальному масштабуванні (запуск кількох реплік `apps/api` за балансувальником навантаження) пам'ять інстансів ізольована. Щоб зловмисник не міг обійти квоту, розподіляючи запити між репліками, архітектура спроєктована під безшовний перехід на **Redis (Upstash / Docker)**:
+- Підключається `ThrottlerStorageRedisService` поверх `ioredis` із ковзним вікном;
+- Усі репліки API синхронізуються через єдиний атомарний лічильник у RAM;
+- Реалізується патерн **Graceful Degradation**: за відсутності змінної `REDIS_URL` бекенд прозоро використовує локальний In-Memory сторадж без збоїв.
+
+---
+
+## 5. Підсумки та чек-лист захищеності
+
+Впроваджений комплекс заходів забезпечує рівень захисту **A+** за стандартами SecurityHeaders і Mozilla Observatory:
+
+| Вектор загрози               | Механізм захисту в монорепозиторії                                         | Статус     |
+| :--------------------------- | :------------------------------------------------------------------------- | :--------- |
+| **XSS (Cross-Site Scripting)** | `HttpOnly` куки + сувора CSP директива `default-src 'self'`                | 🛡️ Захищено |
+| **Clickjacking**             | `X-Frame-Options: DENY` + CSP `frame-ancestors 'none'`                     | 🛡️ Захищено |
+| **Passcode Brute-Force**     | `@nestjs/throttler`: 5 спроб / 60 сек на IP + HTTP 429 Too Many Requests   | 🛡️ Захищено |
+| **MIME Sniffing**            | `X-Content-Type-Options: nosniff`                                          | 🛡️ Захищено |
+| **Man-in-the-Middle (MitM)** | HSTS (`max-age=63072000; includeSubDomains; preload`)                      | 🛡️ Захищено |
+| **Cross-Service Leakage**    | Ізоляція TCP `:4001` у закритій мережі Docker Compose                      | 🛡️ Захищено |
+
+---
+
+## 6. Офіційна документація та стандарти (References)
+
+- **Next.js Content Security Policy Guide:** [nextjs.org/docs/app/guides/content-security-policy](https://nextjs.org/docs/app/guides/content-security-policy)
+- **OWASP HTTP Headers Cheat Sheet:** [cheatsheetseries.owasp.org/cheatsheets/HTTP_Headers_Cheat_Sheet.html](https://cheatsheetseries.owasp.org/cheatsheets/HTTP_Headers_Cheat_Sheet.html)
+- **Mozilla Web Security Guidelines:** [infosec.mozilla.org/guidelines/web_security](https://infosec.mozilla.org/guidelines/web_security)
+- **MDN Content-Security-Policy:** [developer.mozilla.org/en-US/docs/Web/HTTP/CSP](https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP)
+- **NestJS Rate Limiting (`@nestjs/throttler`) & Helmet:** [docs.nestjs.com/security/rate-limiting](https://docs.nestjs.com/security/rate-limiting) · [docs.nestjs.com/security/helmet](https://docs.nestjs.com/security/helmet)

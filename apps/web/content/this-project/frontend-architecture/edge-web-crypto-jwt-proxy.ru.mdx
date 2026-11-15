@@ -96,3 +96,9 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
   return handleI18nRouting(request)
 }
 ```
+
+---
+
+## 4. Интеграция в комплексный контур безопасности
+
+Edge-валидация не работает изолированно: она является вторым рубежом в эшелонированной обороне монорепозитория. Подробнее о полной связке заголовков `Content-Security-Policy`, `Strict-Transport-Security`, `Helmet` и защите эндпоинтов от брутфорса через `@nestjs/throttler` читайте в архитектурном разборе [Production Security Hardening](../security/production-security-hardening-csp-helmet-throttler) и манифесте [Zero-Trust безопасность в эпоху ИИ](../security/zero-trust-web-security-in-ai-agent-era).
