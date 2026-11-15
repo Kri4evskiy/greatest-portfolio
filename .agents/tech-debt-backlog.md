@@ -101,9 +101,24 @@
 - [ ] **Unit & Integration Tests (`Vitest`):** тесты Zod v4 схем (`@repo/shared-schemas`), Zustand-сторов и NestJS-сервисов + интеграция джобы `unit-tests` в Stage 1 CI (`turbo run test --affected`).
 - [ ] **E2E Playwright Suite:** проверка RBAC-флоу (`GuestPassModal` → `HttpOnly` кука → чтение `.mdx` → маскирование `<Redact />`) + джоба `e2e` после `build` в CI (и обновить карточку `playwright-vitest-ci` в `engineering-roadmap.ts`).
 
-### 5. Content & Workfolio Polish (`apps/web/content/*`)
+### 5. Content, MDX Engine Evolution & Interactive Sandboxes (`apps/web/content/*`)
 
-- [ ] **Interactive Tech Sandboxes in Knowledge Base:** добавление интерактивных полигонов прямо в статьи (Zod Live JSON Validator, JWT WebCrypto Signature Tester, SSE Live Trigger Button для телеметрии, Redis Latency Visualizer), позволяющих читателям «пощупать технологию руками».
+- [ ] **Декомпозиция MDX-движка на FSD-подкатегории (в рамках Приоритета №1 — `FSD-Modular`):**
+  - **Текущий диагноз:** связка `unified` + `remark-parse` + `remark-gfm` (`mdx-content.ts`, ~954 строки) и `MdxArticleRenderer` (~530 строк) уже построена правильно с точки зрения безопасности и SSG (`0 KB` клиентского парсера, серверный `Shiki`, отсутствие `eval`/`'unsafe-eval'` в CSP, поддержка `.{en,uk,ru}.mdx` с fallback), но страдает от двух проблем:
+    1. Двойная конвертация AST (`mdast` → самописный `MdxBlock[]`/`MdxInlineNode[]` → ручной перебор массивами в JSX), из-за которой любую новую Markdown-конструкцию приходится дописывать в двух местах.
+    2. Монолитность (смешаны чтение ФС, парсинг AST, поисковый индекс, санитизация URL, Shiki-подсветка и UI-блоки).
+  - **Сравнение подходов (почему мы пришли к текущему решению и дальнейшей эволюции):**
+    - `@next/mdx`: неудобен для динамического catch-all дерева `[...slug]` с локалями `.{en,uk,ru}.mdx` и fallback на `.en.mdx`.
+    - `next-mdx-remote/rsc`: тяжелее на 137+ SSG-страницах, требует JSX-компиляции и усложняет Zero-Eval CSP, авто-TOC и сборку статического индекса `Cmd+K`.
+    - **Выбор (Фаза A — сейчас при FSD-рефакторинге):** оставить быстрый и проверенный data-driven AST-движок без `eval`, но разбить его на чёткие FSD-подкатегории:
+      - `entities/knowledge-content/lib/mdx-fs-loader.ts` — чтение дерева файлов и локальных fallback'ов;
+      - `entities/knowledge-content/lib/mdx-ast-parser.ts` — `remark-parse` / `remark-gfm` и парсинг блоков/TOC;
+      - `entities/knowledge-content/lib/mdx-search-index.ts` — лёгкая проекция для `/search-index/[locale]` и `Cmd+K`;
+      - `entities/knowledge-content/lib/link-sanitizer.ts` — проверка безопасных схем URL (`http/https/mailto/#/`, запрет `javascript:`/`data:`);
+      - `entities/knowledge-article/ui/` — декомпозированный `MdxArticleRenderer` (`inline-ast.tsx`, `code-block.tsx`, `markdown-table.tsx`, `callout-config.tsx`, `article-blocks.tsx`);
+      - `features/kb-sandboxes/ui/` — ленивые интерактивные полигоны (`next/dynamic(..., { ssr: false })` через `MdxInteractiveWidget`).
+    - **Эволюция (Фаза B — при необходимости сложного Markdown / контейнерных песочниц):** заменить промежуточный слой `MdxBlock` на стандартный конвейер **`unified` + `remark-parse` + `remark-gfm` + `remark-directive` (`:::sandbox{...}`) → `remark-rehype` + `@shikijs/rehype` + `rehype-sanitize` → `hast-util-to-jsx-runtime`**. Это полностью уберёт ~500 строк ручных AST-свитчей, позволит передавать в интерактивные виджеты вложенный контент/JSON прямо из `.mdx` и при этом сохранит **Zero-Eval CSP**, React 19 RSC и `0 KB` клиентского парсера.
+- [ ] **Interactive Tech Sandboxes in Knowledge Base:** добавление интерактивных полигонов прямо в статьи (Zod Live JSON Validator, JWT WebCrypto Signature Tester, SSE Live Trigger Button для телеметрии, Redis Latency Visualizer), подключаемых как ленивые `next/dynamic` клиентские острова (одна строка `<Widget />` или `:::sandbox` в `.mdx`) без утяжеления других страниц.
 - [ ] **Новые инженерные статьи `.mdx`:** расширить раздел `NestJS` и смежные темы разборами `DI & Custom Providers`, `Guards / Pipes / Interceptors`, `NestJS Microservices + SSE`.
 
 ### 6. Backend AI & Model Context Protocol (`apps/api` — Future Milestone)

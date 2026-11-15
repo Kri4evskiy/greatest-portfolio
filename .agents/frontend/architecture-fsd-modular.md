@@ -48,12 +48,15 @@ apps/web/src/
 │   │                           # Интерактивные фичи с действиями пользователя
 │   ├── auth/                   # GuestPassModal, useVisitorProfile, issueGuestPassMutation
 │   ├── search/                 # CommandPaletteModal, useSearchIndex, search-client
-│   └── telemetry-stream/       # FooterSseStatus, useTelemetryStream hook
+│   ├── telemetry-stream/       # FooterSseStatus, useTelemetryStream hook
+│   └── kb-sandboxes/           # Интерактивные песочницы в статьях (Zod, JWT, SSE, Redis)
 │
 ├── entities/                   # [Слой 4: Business Data Representation]
 │   │                           # Отображение данных предметной области (без глобальных сайд-эффектов)
-│   ├── knowledge-article/      # MdxArticleRenderer, ArticleToc, MetricsBar, DirectoryExplorer
-│   ├── knowledge-content/      # mdx-content.ts, mdx-client-widgets, shiki-highlighter
+│   ├── knowledge-article/      # Декомпозированный рендер: inline-ast, code-block, markdown-table,
+│   │                           # callout-config, ArticleToc, MetricsBar, DirectoryExplorer
+│   ├── knowledge-content/      # mdx-fs-loader, mdx-ast-parser (remark/rehype), mdx-search-index,
+│   │                           # link-sanitizer, mdx-client-widgets (next/dynamic), shiki-highlighter
 │   ├── workfolio-profile/      # author-profile.ts, cv-file.ts, CvDocumentShowcase
 │   └── engineering-roadmap/    # engineering-roadmap.ts, EngineeringRoadmapBoard, TechRadarTable
 │
