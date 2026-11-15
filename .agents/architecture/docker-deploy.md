@@ -14,6 +14,7 @@
 Стек поднимается одной командой `docker compose up --build -d` с разделением на две изолированные bridge-сети:
 - **`backend-network` (полностью закрытый контур):**
   - `postgres`: `postgres:16-alpine` с healthcheck (`pg_isready`) и volume. Порт `127.0.0.1:5432:5432` привязан строго к loopback-интерфейсу хоста (для DBeaver/DataGrip), защищая базу от внешнего доступа из локальной сети.
+  - `redis`: быстрый in-memory кэш и distributed rate limiter (`redis:7-alpine`) с healthcheck (`redis-cli ping`). Привязан к `127.0.0.1:6379:6379` локально для Redis Insight, в продакшене изолирован строго внутри `backend-network`.
   - `telemetry-ms`: микросервис телеметрии (TCP `:4001`). Порт **не экспонируется наружу** на хост и доступен только для `api` внутри docker-сети.
 - **`frontend-network` (демилитаризованный контур):**
   - `api`: основной бэкенд NestJS 12. Подключен к **обеим сетям**, выступает защищенным шлюзом. Оснащен встроенным healthcheck (`wget http://127.0.0.1:4000/api/health`).
@@ -28,3 +29,8 @@
 - **PostHog:**
   - Легковесный провайдер в `apps/web` для продуктовой аналитики: отслеживает события `guest_pass_modal_opened`, `guest_pass_unlocked`, `adr_popover_inspected`, `article_read`.
   - Если `NEXT_PUBLIC_POSTHOG_KEY` пуст — переходит в no-op режим разработки.
+
+## 4. Nginx Reverse Proxy, Load Balancer и Dual-Mode (Офлайн vs Облако)
+
+Подробная архитектурная спецификация Nginx, пакета `@repo/redis`, интеграции с Cloudflare R2 / AWS S3 и работы системы в автономном режиме («The Big Toggle») задокументирована в:
+👉 **[enterprise-infrastructure-roadmap.md](./enterprise-infrastructure-roadmap.md)**.

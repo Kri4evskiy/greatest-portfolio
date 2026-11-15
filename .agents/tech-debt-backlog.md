@@ -17,6 +17,62 @@
 
 ## 🔧 Активный технический бэклог (Open Tech Debt)
 
+### 🔥 Ближайший приоритет №1: Архитектурный рефакторинг файловой структуры (FSD-Modular Next.js 16 + NestJS 12 Enterprise Modules)
+
+- [ ] **Архитектурное построение папок и файлов во фронтенде по принципам Feature-Sliced Design (FSD) с учетом специфики Next.js 16 (App Router):**
+  - **Контекст и цели:** Ликвидация структурного «mess» в `apps/web/src` (где компоненты, хуки, данные и утилиты разбросаны между плоскими папками `components/`, `data/`, `features/` с единственным файлом, `hooks/` и `lib/`).
+  - **Архитектурное решение (FSD-Modular):** Адаптация принципов FSD с учетом архитектуры Next.js App Router (RSC, layouts, Server Actions, colocation):
+    1. `app/` — **Routing & Composition Layer:** исключительно тонкие Server Components (`layout.tsx`, `page.tsx`, `route.ts`), отвечающие только за маршрутизацию `[locale]`, `generateStaticParams`, `generateMetadata` и сборку страниц из виджетов.
+    2. `widgets/` — **Composite UI Layer:** самостоятельные композиционные блоки интерфейса (`header/`, `footer/`, `section-nav/`).
+    3. `features/` — **User Scenarios Layer:** законченные интерактивные сценарии пользователя с бизнес-действиями (`features/auth` — модалка входа и хук профиля, `features/search` — поисковая палитра `Cmd+K` и клиентский индекс, `features/telemetry-status` — индикатор SSE).
+    4. `entities/` — **Business Data Representation Layer:** компоненты отображения бизнес-сущностей (`entities/knowledge-article` — рендерер статьи, TOC, метрики, сайдбар; `entities/knowledge-content` — парсер MDX, AST-виджеты; `entities/workfolio-profile` — данные резюме и showcase; `entities/engineering-roadmap` — доска роадмапа и техрадар).
+    5. `shared/` — **Infrastructure Foundation Layer:** переиспользуемые модули, абстрагированные от бизнес-логики (`shared/lib` — crypto, analytics; `shared/providers` — theme, query; `shared/store` — UI store; `shared/i18n` — routing, navigation, request).
+  - **Правило зависимостей:** Строгий однонаправленный поток сверху вниз (`app` ➔ `widgets` ➔ `features` ➔ `entities` ➔ `shared`) без циклических импортов.
+  - **Документ спецификации:** `.agents/frontend/architecture-fsd-modular.md`.
+
+- [ ] **Реструктуризация бэкенда NestJS 12 по Enterprise-стандарту (по аналогии с проектом `coffee-app`):**
+  - **Контекст и цели:** Переход от плоской структуры в `apps/api/src` к четкому 4-компонентному разделению приложения на **modules**, **migrations**, **config** и **common**:
+    1. `common/` — **Общие компоненты фреймворка (Cross-Cutting Concerns):**
+       - `decorators/` — кастомные декораторы (`@Protocol`, `@Public`, `@Roles`);
+       - `dto/` — общие DTO (пагинация, сортировка, мета-ответы);
+       - `filters/` — централизованные обработчики ошибок (`sentry-exception.filter.ts`, `http-exception.filter.ts`);
+       - `guards/` — глобальные и межмодульные гарды (`throttler.guard.ts`, `api-key.guard.ts`);
+       - `interceptors/` — сквозные перехватчики (`logging.interceptor.ts`, `transform.interceptor.ts`, `timeout.interceptor.ts`);
+       - `middleware/` — промежуточные слои логирования и контекста запроса;
+       - `pipes/` — строгие валидаторы входных данных (`zod-validation.pipe.ts`).
+    2. `config/` — **Централизованная типизированная конфигурация:** `app.config.ts`, `database.config.ts` с Zod-валидацией env-переменных при старте процесса.
+    3. `migrations/` — **Слой управления миграциями и схемой БД:** выделенные скрипты версионирования, наката и сидирования схемы базы данных.
+    4. `modules/` — **Изолированные доменные модули (Domain Modules):**
+       - `modules/auth/` — разделение на `guards/` (`jwt-roles.guard.ts`), `decorators/` (`roles.decorator.ts`), `dto/`, `auth.controller.ts`, `auth.service.ts`, `auth.module.ts`;
+       - `modules/knowledge/` — `dto/`, `knowledge.controller.ts`, `knowledge.service.ts`, `knowledge.module.ts`;
+       - `modules/telemetry/` — `telemetry.controller.ts`, `telemetry.service.ts`, `telemetry.module.ts`.
+  - **Документ спецификации:** `.agents/frontend/architecture-fsd-modular.md` (Секция 3).
+
+### ⏳ Ближайший приоритет №2: Внедрение Redis (Distributed Rate Limiting & Response Cache)
+
+- [ ] **Архитектурное внедрение Redis (`apps/api`, `docker-compose.yml`):**
+  - **Зачем:**
+    1. _Distributed Rate Limiting:_ масштабирование защиты от брутфорса (`POST /api/auth/login`, `POST /api/auth/guest-pass`) при работе нескольких реплик API (защита от распределенного перебора, когда запросы балансируются между инстансами).
+    2. _Response Caching (Cache-Aside):_ кэширование высоконагруженных аналитических эндпоинтов (`GET /api/knowledge/stats`) с TTL 60 сек, снижающее нагрузку на PostgreSQL (Neon.tech) на 95%.
+    3. _Session Revocation:_ фундамент для мгновенного отзыва скомпрометированных сессий и Refresh-токенов (`VisitorSession`).
+  - **Паттерн Graceful In-Memory Fallback:** если переменная `REDIS_URL` отсутствует в `.env`, система автоматически и без ошибок откатывается на встроенный `In-Memory Throttler` и прямое чтение из БД.
+  - **Инфраструктура и Пакетная модель монорепозитория:**
+    - _Инфраструктурный уровень (Docker):_ Redis запускается как нативный легковесный сервис на C (`redis:7-alpine`, ~30 МБ) в `backend-network`. Ему не требуется собственный Node.js образ или компиляция.
+    - _Пакетный уровень (Архитектурная развилка):_
+      - _Вариант 1 (Прямой):_ Подключение `ioredis` и кэш-интерцепторов напрямую в `apps/api`.
+      - _Вариант 2 (Модульный Enterprise):_ Выделение общего пакета `packages/redis` (или `@repo/cache`) со своим изолированным `package.json`, строгой Zod-типизацией ключей/TTL и готовыми хелперами для повторного использования в `apps/api` и микросервисе `apps/telemetry-ms`.
+  - **Какие файлы затронет задача:**
+    - `docker-compose.yml`: добавление сервиса `redis` (`image: redis:7-alpine`, порт `127.0.0.1:6379:6379`, сеть `backend-network`, healthcheck `redis-cli ping`).
+    - `.env.example`: добавление `REDIS_URL=redis://localhost:6379` (или `rediss://...` от Upstash).
+    - `apps/api/package.json`: установка `ioredis`, `@nest-lab/throttler-storage-redis`, `@nestjs/cache-manager`, `cache-manager-redis-yet`.
+    - `apps/api/src/app.module.ts`: переключение `ThrottlerModule.forRootAsync` на фабрику с `ThrottlerStorageRedisService` при наличии `REDIS_URL` + подключение `CacheModule`.
+    - `apps/api/src/modules/knowledge/knowledge.controller.ts` и `knowledge.service.ts`: кэширование агрегированных счетчиков `stats` (`viewsCount`, `helpfulCount`).
+  - **Где читать контекст перед реализацией:**
+    - `.agents/backend/security-jwt.md` (Секция 4: Спецификация Redis Throttling & Caching).
+    - Статья `apps/web/content/this-project/security/production-security-hardening-csp-helmet-throttler.mdx`.
+    - NestJS Docs: `docs.nestjs.com/security/rate-limiting#proxies-and-distributed-storage`.
+    - Upstash Docs: `upstash.com/docs/redis/overall/getstarted`.
+
 ### 1. CI/CD, Turborepo Cache & DX Optimization
 
 - [ ] **CI Security & Workflow Hardening:** добавить еженедельный `schedule:` крон для `pnpm audit --prod --audit-level=high` + `.github/dependabot.yml` (`npm` и `github-actions`), выставить `persist-credentials: false` на `actions/checkout@v6`, добавить `actionlint` в `lint` и при росте UI-кита подключить кэш `.turbo` в джобу `storybook`.
@@ -24,13 +80,21 @@
 ### 2. Security & Production Hardening (`apps/web`, `apps/api`)
 
 - [ ] **Access + Refresh JWT Rotation:** дополнить Edge HS256-верификацию парой короткоживущего `Access` (`15m`) + ротируемого `HttpOnly Refresh` (`7d`) токенов с хранением и отзывом сессий в `VisitorSession` (`PostgreSQL`).
-- [ ] **HTTP Security Headers (CSP & HSTS):** настроить `Content-Security-Policy`, `Strict-Transport-Security`, `X-Content-Type-Options: nosniff` и `Referrer-Policy` в `apps/web/next.config.ts` + `helmet` в `apps/api`.
-- [ ] **Rate Limiting:** подключить `@nestjs/throttler` на `POST /api/auth/login` в `apps/api` против перебора пасскодов (`ADMIN` / `GUEST`).
+- [x] **HTTP Security Headers (CSP & HSTS):** настроить `Content-Security-Policy`, `Strict-Transport-Security`, `X-Content-Type-Options: nosniff` и `Referrer-Policy` в `apps/web/config/security-headers.config.ts` + `helmet` в `apps/api`.
+- [x] **Rate Limiting:** подключить `@nestjs/throttler` на `POST /api/auth/login` и `POST /api/auth/guest-pass` в `apps/api` против перебора пасскодов (`ADMIN` / `GUEST`).
+- [ ] **Throttler ESM Upgrade Cleanup (`apps/api`):**
+  - Периодически проверять обновления `@nestjs/throttler`: как только пакет перейдёт на нативный ESM (`"type": "module"`), удалить временный CJS/ESM мост для `Reflector` из `apps/api/src/app.module.ts` (настройка `trust proxy: 1` для продакшена за прокси уже добавлена в `apps/api/src/main.ts`).
 
 ### 3. Observability & Real Cloud Integrations
 
 - [ ] **Live Sentry & PostHog SDK:** заменить обёртки-заглушки на реальные транспорты `@sentry/nextjs`, `@sentry/nestjs` и `posthog-js`, включаемые при наличии ключей в `.env`.
 - [ ] **Neon.tech Cloud Database Migration:** подключить боевой `DATABASE_URL` от Neon.tech PostgreSQL, прогнать `prisma migrate deploy` и сид (`prisma/seed.ts`).
+- [ ] **Nginx Reverse Proxy для VPS-деплоя (`docker-compose.prod.yml`):** легковесный Nginx как единая точка входа (порты 80/443, SSL Let's Encrypt, сквозное проксирование на `web:3000` и `api:4000`) без избыточного балансировщика нагрузки.
+- [ ] **Dual-Mode Air-Gapped Local Environment («Тумблер офлайна»):** гарантировать запуск 100% функционала монорепозитория (база знаний, MDX, поиск, локальная телеметрия TCP :4001) при полном отсутствии интернета и внешних облачных сервисов (In-Memory Prisma + In-Memory Throttler).
+- [ ] **S3-compatible Object Storage (Cloudflare R2 vs AWS S3):** интеграция `@aws-sdk/client-s3` с эндпоинтом Cloudflare R2 ($0 за трафик, 10 ГБ навсегда бесплатно) для сгенерированных PDF-резюме и ассетов + локальный MinIO в Docker.
+- [ ] **Cross-Domain API Deployment (`NEXT_PUBLIC_API_URL`):** при выносе `apps/api` на отдельный домен (например, `https://api.yourdomain.com` на Render/VPS, чтобы прямые SSE-стримы не обрывались таймаутами Next.js `rewrites`):
+  - Добавить `NEXT_PUBLIC_API_URL` в `.env`, `.env.example`, `turbo.json` (`globalEnv`) и переменные среды хостинга (`Vercel`).
+  - Перевести клиентские `fetch` / `EventSource` (`apps/web`) на использование `NEXT_PUBLIC_API_URL` с фолбэком на `''` (same-origin), а также настроить `WEB_ORIGIN` на бэкенде и убедиться, что `getSecurityHeaders()` в `apps/web/config/security-headers.config.ts` подхватывает этот домен в CSP `connect-src`.
 
 ### 4. Testing (`packages/*`, `apps/*`)
 
@@ -39,6 +103,7 @@
 
 ### 5. Content & Workfolio Polish (`apps/web/content/*`)
 
+- [ ] **Interactive Tech Sandboxes in Knowledge Base:** добавление интерактивных полигонов прямо в статьи (Zod Live JSON Validator, JWT WebCrypto Signature Tester, SSE Live Trigger Button для телеметрии, Redis Latency Visualizer), позволяющих читателям «пощупать технологию руками».
 - [ ] **Новые инженерные статьи `.mdx`:** расширить раздел `NestJS` и смежные темы разборами `DI & Custom Providers`, `Guards / Pipes / Interceptors`, `NestJS Microservices + SSE`.
 
 ### 6. Backend AI & Model Context Protocol (`apps/api` — Future Milestone)
@@ -56,6 +121,7 @@
 | **`apps/api`**          | `NestJS 12`               | Несовместимо (долгоживущий процесс, SSE `@Sse('stream')`)         | **Render.com** / **Koyeb** / **Fly.io** (Docker, $0) |
 | **`apps/telemetry-ms`** | `NestJS Microservice`     | Несовместимо (постоянный TCP `:4001`)                             | Docker Compose / фоновый воркер рядом с API ($0)     |
 | **БД**                  | `PostgreSQL 16`           | Нет встроенной БД                                                 | **Neon.tech** (Serverless Postgres, 0.5 GB)          |
+| **Кэш / Rate Limiter**  | `Redis` (Upstash)         | Совместимо (Serverless REST / TCP)                                | **Upstash Redis** (Free tier, 10k req/day)           |
 
 ```text
 [ Браузер ] ──(1) HTML / RSC────────────────────────► [ Vercel: apps/web ] (NEXT_PUBLIC_API_URL)
