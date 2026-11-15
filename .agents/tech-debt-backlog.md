@@ -30,6 +30,11 @@
   - **Правило зависимостей:** Строгий однонаправленный поток сверху вниз (`app` ➔ `widgets` ➔ `features` ➔ `entities` ➔ `shared`) без циклических импортов.
   - **Документ спецификации:** `.agents/frontend/architecture-fsd-modular.md`.
 
+- [ ] **Разделение браузерных UI-хуков и слоя серверного стейта (`hooks/` ➔ `queries/` / FSD `queries`):**
+  - **Контекст:** Сейчас в `apps/web/src/hooks/` смешаны клиентский DOM/ScrollSpy-хук (`use-section-navigation.ts`) и модули серверного стейта TanStack Query (`use-visitor-profile.ts`, `use-knowledge-metrics.ts`).
+  - **Выбор нейминга (`queries/` vs `requests/`):** Выбираем **`queries/`** (или доменные подпапки `features/*/queries`, `entities/*/queries` в FSD), а не `requests/`, так как эти модули инкапсулируют `QUERY_KEY`, `useQuery`, `useMutation` и optimistic updates поверх IndexedDB-персистера, а не только транспортный HTTP-клиент (`fetch`).
+  - **Целевая разбивка:** `use-section-navigation.ts` остаётся в `hooks/` (или переезжает в `widgets/section-nav/`), а серверные хуки уходят в `queries/` (`features/auth/queries/`, `entities/knowledge-article/queries/`).
+
 - [ ] **Реструктуризация бэкенда NestJS 12 по Enterprise-стандарту (по аналогии с проектом `coffee-app`):**
   - **Контекст и цели:** Переход от плоской структуры в `apps/api/src` к четкому 4-компонентному разделению приложения на **modules**, **migrations**, **config** и **common**:
     1. `common/` — **Общие компоненты фреймворка (Cross-Cutting Concerns):**

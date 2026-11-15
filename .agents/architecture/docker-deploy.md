@@ -14,7 +14,7 @@
 Стек поднимается одной командой `docker compose up --build -d` с разделением на две изолированные bridge-сети:
 - **`backend-network` (полностью закрытый контур):**
   - `postgres`: `postgres:16-alpine` с healthcheck (`pg_isready`) и volume. Порт `127.0.0.1:5432:5432` привязан строго к loopback-интерфейсу хоста (для DBeaver/DataGrip), защищая базу от внешнего доступа из локальной сети.
-  - `redis`: быстрый in-memory кэш и distributed rate limiter (`redis:7-alpine`) с healthcheck (`redis-cli ping`). Привязан к `127.0.0.1:6379:6379` локально для Redis Insight, в продакшене изолирован строго внутри `backend-network`.
+  - `redis` **[Planned — Приоритет №2, ещё не добавлен в `docker-compose.yml`]:** планируемый in-memory кэш и distributed rate limiter (`redis:7-alpine`) с healthcheck (`redis-cli ping`). Будет привязан к `127.0.0.1:6379:6379` локально для Redis Insight и изолирован строго внутри `backend-network` в продакшене (с graceful in-memory fallback без `REDIS_URL`).
   - `telemetry-ms`: микросервис телеметрии (TCP `:4001`). Порт **не экспонируется наружу** на хост и доступен только для `api` внутри docker-сети.
 - **`frontend-network` (демилитаризованный контур):**
   - `api`: основной бэкенд NestJS 12. Подключен к **обеим сетям**, выступает защищенным шлюзом. Оснащен встроенным healthcheck (`wget http://127.0.0.1:4000/api/health`).

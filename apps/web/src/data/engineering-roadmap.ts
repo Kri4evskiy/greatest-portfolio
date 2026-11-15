@@ -97,7 +97,7 @@ export const ENGINEERING_ROADMAP_ITEMS: readonly EngineeringRoadmapItem[] = [
   },
   {
     id: 'security-csp-rate-limit',
-    status: 'planned',
+    status: 'shipped',
     kind: 'tech-debt',
     priority: 'P1',
     effort: 'S',
@@ -107,28 +107,41 @@ export const ENGINEERING_ROADMAP_ITEMS: readonly EngineeringRoadmapItem[] = [
       ru: 'Строгие HTTP Security Headers (CSP / HSTS) и Rate Limiting авторизации',
     },
     summary: {
-      en: 'Add Content-Security-Policy and HSTS in Next.js + Helmet and @nestjs/throttler on POST /api/auth/login before public cloud rollout.',
-      uk: 'Додати Content-Security-Policy та HSTS у Next.js + Helmet і @nestjs/throttler на POST /api/auth/login перед публічним деплоєм.',
-      ru: 'Настроить Content-Security-Policy и HSTS в Next.js + Helmet и @nestjs/throttler на POST /api/auth/login перед публичным облачным деплоем.',
+      en: 'Configured scoped Content-Security-Policy & HSTS in Next.js + Helmet (CORP: cross-origin), trust proxy: 1, and @nestjs/throttler on auth endpoints.',
+      uk: 'Налаштовано scoped Content-Security-Policy та HSTS у Next.js + Helmet (CORP: cross-origin), trust proxy: 1 і @nestjs/throttler на ендпоінтах авторизації.',
+      ru: 'Настроены scoped Content-Security-Policy и HSTS в Next.js + Helmet (CORP: cross-origin), trust proxy: 1 и @nestjs/throttler на эндпоинтах авторизации.',
     },
     rationale: {
-      en: 'HttpOnly SameSite=Lax JWT cookies already block XSS token theft, but strict CSP and brute-force throttling on the Admin Passcode endpoint are mandatory before exposing the API publicly.',
-      uk: 'HttpOnly куки вже захищають JWT від крадіжки через XSS, але перед виходом у публічний інтернет потрібні CSP та захист від перебору Admin Passcode.',
-      ru: 'HttpOnly куки уже защищают JWT от кражи через XSS, но перед публикацией API на внешнем домене обязательны CSP и защита Admin Passcode от брутфорса.',
+      en: 'HttpOnly SameSite=Lax JWT cookies block XSS token theft, while strict CSP headers and 5 req/min brute-force throttling protect auth endpoints and inline CV PDF rendering.',
+      uk: 'HttpOnly куки захищають JWT від крадіжки через XSS, а суворі CSP-заголовки та ліміт 5 req/min захищають авторизацію й безпечний вбудований рендер CV PDF.',
+      ru: 'HttpOnly куки защищают JWT от кражи через XSS, а строгие CSP-заголовки и лимит 5 req/min защищают авторизацию и безопасный встроенный рендер CV PDF.',
     },
     pros: {
       en: [
-        'A+ Mozilla Observatory security posture',
-        'Protects NestJS login endpoint against automated credential stuffing',
+        'A+ HTTP security header posture with scoped self-only CV PDF embedding',
+        'Protects POST /api/auth/login & /guest-pass against brute-force with real proxy IP resolution',
       ],
-      uk: ['Оцінка A+ у Mozilla Observatory', 'Захищає NestJS ендпоінт логіну від автоматизованого брутфорсу'],
-      ru: ['Оценка A+ по безопасности заголовков', 'Защищает эндпоинт входа NestJS от автоматического перебора ключей'],
+      uk: [
+        'Посилений захист HTTP-заголовків зі скоупінгом для вбудованого CV PDF',
+        'Захист POST /api/auth/login та /guest-pass від брутфорсу з коректним IP за проксі',
+      ],
+      ru: [
+        'Усиленная политика HTTP-заголовков со строгим скоупингом для встроенного CV PDF',
+        'Защита POST /api/auth/login и /guest-pass от брутфорса с корректным IP за прокси',
+      ],
     },
     constraints: {
-      en: ['CSP nonces in Next.js App Router require testing alongside inline theme-hydration scripts and PostHog'],
-      uk: ['CSP nonce в Next.js App Router потребує перевірки сумісності зі скриптом теми без мерехтіння'],
+      en: [
+        'Strict per-request CSP nonces remain optional future work for replacing unsafe-inline theme/hydration scripts',
+        'Temporary CJS/ESM Reflector bridge in AppModule stays until @nestjs/throttler ships native ESM',
+      ],
+      uk: [
+        'Перехід на per-request CSP nonces для заміни unsafe-inline лишається подальшим покращенням',
+        'Тимчасовий CJS/ESM міст Reflector в AppModule потрібен до релізу нативного ESM у @nestjs/throttler',
+      ],
       ru: [
-        'Настройка CSP nonce в Next.js App Router требует аккуратной связки со скриптом инициализации темы (ThemeProvider)',
+        'Переход на per-request CSP nonces вместо unsafe-inline остаётся опциональным шагом',
+        'Временный CJS/ESM мост Reflector в AppModule нужен до выхода нативного ESM в @nestjs/throttler',
       ],
     },
   },

@@ -42,11 +42,11 @@ apps/web/src/
 │   │                           # Крупные композиционные блоки, собирающие несколько сущностей
 │   ├── header/                 # WorkfolioHeader, LanguageSwitcher, ThemeToggle
 │   ├── footer/                 # WorkfolioFooter, FooterSseStatus
-│   └── section-nav/            # PageSectionNavigator
+│   └── section-nav/            # PageSectionNavigator, UI-хук use-section-navigation
 │
 ├── features/                   # [Слой 3: User Scenarios & Interactions]
 │   │                           # Интерактивные фичи с действиями пользователя
-│   ├── auth/                   # GuestPassModal, useVisitorProfile, issueGuestPassMutation
+│   ├── auth/                   # GuestPassModal + queries/use-visitor-profile
 │   ├── search/                 # CommandPaletteModal, useSearchIndex, search-client
 │   ├── telemetry-stream/       # FooterSseStatus, useTelemetryStream hook
 │   └── kb-sandboxes/           # Интерактивные песочницы в статьях (Zod, JWT, SSE, Redis)
@@ -54,7 +54,8 @@ apps/web/src/
 ├── entities/                   # [Слой 4: Business Data Representation]
 │   │                           # Отображение данных предметной области (без глобальных сайд-эффектов)
 │   ├── knowledge-article/      # Декомпозированный рендер: inline-ast, code-block, markdown-table,
-│   │                           # callout-config, ArticleToc, MetricsBar, DirectoryExplorer
+│   │                           # callout-config, ArticleToc, MetricsBar, DirectoryExplorer,
+│   │                           # queries/use-knowledge-metrics
 │   ├── knowledge-content/      # mdx-fs-loader, mdx-ast-parser (remark/rehype), mdx-search-index,
 │   │                           # link-sanitizer, mdx-client-widgets (next/dynamic), shiki-highlighter
 │   ├── workfolio-profile/      # author-profile.ts, cv-file.ts, CvDocumentShowcase
@@ -141,8 +142,9 @@ apps/api/src/
 2. **Фаза 2 (Фронтенд `apps/web` — создание слоев):**
    - Создание папок `widgets/`, `entities/`, `shared/`;
    - Перемещение `providers/`, `store/`, `i18n/` внутрь `shared/` (с сохранением `@/` алиасов в `tsconfig.json`);
-   - Перенос компонентов статьи из `components/knowledge/` в `entities/knowledge-article/`;
-   - Перенос `guest-pass-modal` и `use-visitor-profile` в единый фиче-модуль `features/auth/`;
+   - Перенос компонентов статьи из `components/knowledge/` в `entities/knowledge-article/` и `use-knowledge-metrics` в `entities/knowledge-article/queries/`;
+   - Перенос `guest-pass-modal` и `use-visitor-profile` в единый фиче-модуль `features/auth/` (серверные хуки в `features/auth/queries/`, отдельно от UI-хуков);
+   - Перенос `use-section-navigation` в `widgets/section-nav/` (или `hooks/`);
    - Перенос `command-palette-modal` и поискового клиента в `features/search/`.
 3. **Фаза 3 (Верификация):**
    - Проверка путей импорта в `apps/web/src/app/[locale]/...`;

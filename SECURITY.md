@@ -25,7 +25,7 @@ This repository implements a multi-tier, zero-trust security architecture design
 ### 4. Zero-Trust Backend & Microservice Isolation
 
 - **Private Docker Network:** The `apps/telemetry-ms` microservice runs within an isolated internal Docker bridge (`backend-network`) communicating exclusively over TCP (`:4001`). No host ports are exposed to the public internet.
-- **Controlled Ingress:** All external HTTP and SSE traffic enters through the public gateway (`apps/web` rewrites or `apps/api`), preventing direct probing of internal microservices.
+- **Controlled Ingress & Anonymized Telemetry:** All external HTTP and SSE traffic enters through the public gateway (`apps/web` rewrites or `apps/api`), preventing direct probing of internal microservices. Public SSE telemetry (`GET /api/telemetry/stream`) strips personal `actorName` values and internal privilege roles (`ADMIN`).
 
 ### 5. Contract Validation & Input Sanitization
 
@@ -49,7 +49,7 @@ Only the latest `main` branch is actively supported with security patches:
 | `apps/web`                | Next.js 16 (React 19)      | ✅ Yes    |
 | `apps/api`                | NestJS 12                  | ✅ Yes    |
 | `apps/telemetry-ms`       | NestJS Microservices (TCP) | ✅ Yes    |
-| `packages/shared-schemas` | Zod v4 Preview             | ✅ Yes    |
+| `packages/shared-schemas` | Zod v4 (`^4.6.7`)          | ✅ Yes    |
 
 ---
 

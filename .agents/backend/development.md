@@ -19,4 +19,4 @@
 
 - Глобальный префикс API: `/api`.
 - Включен `cookie-parser` и строгий `CORS` с `credentials: true`, разрешающий обмен `HttpOnly` куками с `apps/web`.
-- Все 5xx исключения проходят через `GlobalExceptionFilter` (с интеграцией в `Sentry`).
+- Все 5xx исключения проходят через `SentryExceptionFilter` (с интеграцией в `Sentry`).

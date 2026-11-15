@@ -228,7 +228,7 @@ export const TECH_RADAR_ITEMS_RU: readonly TechRadarItem[] = [
       'Продакшен без мониторинга — слепой полет. Sentry ловит ошибки со стектрейсом, а PostHog показывает воронку открытий Guest Pass и чтения статей.',
     adrWhere: 'В приложениях apps/web и apps/api.',
     adrHow:
-      'Error Boundaries в Next.js + GlobalExceptionFilter в NestJS для Sentry и клиентский провайдер аналитики PostHog.',
+      'Error Boundaries в Next.js + SentryExceptionFilter в NestJS для Sentry и клиентский провайдер аналитики PostHog.',
   },
   {
     id: 'next-intl-mdx-i18n',
@@ -344,7 +344,7 @@ export const TECH_RADAR_ITEMS_EN: readonly TechRadarItem[] = [
       'Unlike heavy runtime component libraries (MUI/AntD), shadcn/ui gives full source ownership and WAI-ARIA accessibility out of the box, while Storybook enables isolated visual testing.',
     adrWhere: 'Shared package packages/ui (@repo/ui) consumed by apps/web.',
     adrHow:
-      'Atomic components (Button, Input, Badge, Card, Dialog, Tabs, Callout) covered by .stories.tsx in Storybook 8.',
+      'Atomic components (Button, Input, Badge, Card, Dialog, Tabs, Callout) covered by .stories.tsx in Storybook 10.',
   },
   {
     id: 'tanstack-table-redact',
@@ -454,7 +454,7 @@ export const TECH_RADAR_ITEMS_EN: readonly TechRadarItem[] = [
       'Running production without observability is flying blind. Sentry captures stack traces while PostHog tracks the Guest Pass and article engagement funnel.',
     adrWhere: 'Integrated in apps/web and apps/api.',
     adrHow:
-      'Next.js Error Boundaries + NestJS GlobalExceptionFilter for Sentry and client-side PostHog event tracking.',
+      'Next.js Error Boundaries + NestJS SentryExceptionFilter for Sentry and client-side PostHog event tracking.',
   },
   {
     id: 'next-intl-mdx-i18n',
@@ -680,7 +680,7 @@ export const TECH_RADAR_ITEMS_UK: readonly TechRadarItem[] = [
       'Продакшен без моніторингу — сліпий політ. Sentry ловить помилки зі стектрейсом, а PostHog показує воронку відкриттів Guest Pass та читання статей.',
     adrWhere: 'У застосунках apps/web та apps/api.',
     adrHow:
-      'Error Boundaries у Next.js + GlobalExceptionFilter у NestJS для Sentry та клієнтський провайдер аналітики PostHog.',
+      'Error Boundaries у Next.js + SentryExceptionFilter у NestJS для Sentry та клієнтський провайдер аналітики PostHog.',
   },
   {
     id: 'next-intl-mdx-i18n',
