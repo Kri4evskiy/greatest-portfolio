@@ -7,6 +7,47 @@ import { highlightCodeServer } from '@/lib/shiki-highlighter'
 import { CodeCopyButton } from './code-copy-button'
 import { MdxInteractiveWidget } from './mdx-client-widgets'
 
+function classifySafeMarkdownLink(rawUrl: string): {
+  href: string | null
+  kind: 'internal' | 'hash' | 'external'
+} {
+  const trimmed = rawUrl.trim()
+  if (!trimmed) {
+    return { href: null, kind: 'external' }
+  }
+  if (trimmed.startsWith('#')) {
+    return { href: trimmed, kind: 'hash' }
+  }
+  if ((trimmed.startsWith('/') && !trimmed.startsWith('//')) || trimmed.startsWith('./') || trimmed.startsWith('../')) {
+    return { href: trimmed, kind: 'internal' }
+  }
+  try {
+    const parsed = new URL(trimmed)
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:' || parsed.protocol === 'mailto:') {
+      return { href: trimmed, kind: 'external' }
+    }
+  } catch {
+    // Reject unknown schemes or malformed URIs
+  }
+  return { href: null, kind: 'external' }
+}
+
+function isSafeMarkdownImageSrc(rawUrl: string): boolean {
+  const trimmed = rawUrl.trim()
+  if (!trimmed) {
+    return false
+  }
+  if (trimmed.startsWith('/') && !trimmed.startsWith('//')) {
+    return true
+  }
+  try {
+    const parsed = new URL(trimmed)
+    return parsed.protocol === 'https:' || parsed.protocol === 'http:'
+  } catch {
+    return false
+  }
+}
+
 export function renderInlineAst(nodes: readonly MdxInlineNode[], keyPrefix = 'inl'): ReactNode[] {
   return nodes.map((node, idx) => {
     const key = `${keyPrefix}-${idx}`
@@ -50,6 +91,9 @@ export function renderInlineAst(nodes: readonly MdxInlineNode[], keyPrefix = 'in
         return <br key={key} />
 
       case 'image':
+        if (!isSafeMarkdownImageSrc(node.url)) {
+          return null
+        }
         return (
           // biome-ignore lint/performance/noImgElement: Arbitrary Markdown inline image URLs inside .mdx content
           <img
@@ -63,8 +107,16 @@ export function renderInlineAst(nodes: readonly MdxInlineNode[], keyPrefix = 'in
         )
 
       case 'link': {
-        const href = node.url.trim()
-        if (href.startsWith('/')) {
+        const { href, kind } = classifySafeMarkdownLink(node.url)
+        if (!href) {
+          return (
+            <span key={key} title={node.title} className="font-medium text-muted-foreground">
+              {renderInlineAst(node.children, `${key}-span`)}
+            </span>
+          )
+        }
+
+        if (kind === 'internal') {
           return (
             <Link
               key={key}
@@ -77,7 +129,7 @@ export function renderInlineAst(nodes: readonly MdxInlineNode[], keyPrefix = 'in
           )
         }
 
-        const isHash = href.startsWith('#')
+        const isHash = kind === 'hash'
         return (
           <a
             key={key}

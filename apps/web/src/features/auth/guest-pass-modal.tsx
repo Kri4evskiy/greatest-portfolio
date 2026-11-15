@@ -53,6 +53,16 @@ const ONE_CLICK_PRESETS: ReadonlyArray<{
 
 const VISITOR_ROLES: readonly VisitorRoleType[] = ['TEAM_LEAD', 'RECRUITER', 'DEVELOPER', 'FOUNDER', 'OTHER']
 
+function normalizeKbRedirectPath(rawPath: string | null | undefined): string {
+  const trimmed = rawPath?.trim()
+  if (!trimmed?.startsWith('/') || trimmed.startsWith('//')) {
+    return '/knowledge-base'
+  }
+
+  const withoutLocale = trimmed.replace(/^\/(en|ua|uk|ru)(?=\/|$)/, '')
+  return withoutLocale.startsWith('/knowledge-base') ? withoutLocale : '/knowledge-base'
+}
+
 export function GuestPassModal() {
   const t = useTranslations('GuestPassModal')
   const router = useRouter()
@@ -89,8 +99,7 @@ export function GuestPassModal() {
     const unlockParam = searchParams.get('unlock')
     const redirectParam = searchParams.get('redirect')
     if (unlockParam === 'knowledge-base') {
-      const normalizedRedirect = redirectParam?.replace(/^\/(en|uk|ru)(?=\/|$)/, '') || '/knowledge-base'
-      openModal(normalizedRedirect)
+      openModal(normalizeKbRedirectPath(redirectParam))
       trackEvent('guest_pass_modal_opened', { source: 'middleware_redirect' })
     }
   }, [searchParams, openModal])
@@ -102,8 +111,7 @@ export function GuestPassModal() {
       role: profile.role,
     })
     closeModal()
-    const targetPath = pendingRedirectPath?.replace(/^\/(en|uk|ru)(?=\/|$)/, '') || '/knowledge-base'
-    router.push(targetPath)
+    router.push(normalizeKbRedirectPath(pendingRedirectPath))
     router.refresh()
   }
 
