@@ -44,7 +44,17 @@ tldr:
 Чтобы не перегружать конфигуратор сборки `next.config.ts` и чётко разделить инфраструктурный конфиг Next.js и слои FSD-приложения в `src/`, декларативная генерация всех заголовков безопасности была вынесена в отдельный типизированный модуль вне `src/`: `apps/web/config/security-headers.config.ts`.
 
 ```typescript title="apps/web/config/security-headers.config.ts"
-export function buildContentSecurityPolicy(isProduction: boolean, publicApiUrl = ''): string {
+export interface ContentSecurityPolicyOptions {
+  allowSelfObjectAndFrame?: boolean
+  allowSameOriginFraming?: boolean
+}
+
+export function buildContentSecurityPolicy(
+  isProduction: boolean,
+  publicApiUrl = '',
+  options: ContentSecurityPolicyOptions = {},
+): string {
+  const { allowSelfObjectAndFrame = false, allowSameOriginFraming = false } = options
   const normalizedPublicApi = publicApiUrl.trim() ? ` ${publicApiUrl.trim()}` : ''
 
   // В продакшене внутренние порты инфраструктуры НИКОГДА не раскрываются в заголовках.
@@ -66,10 +76,11 @@ export function buildContentSecurityPolicy(isProduction: boolean, publicApiUrl =
     "img-src 'self' blob: data: https:",
     "font-src 'self' data: https:",
     `connect-src ${connectSrc}`,
-    "frame-ancestors 'none'",
+    `frame-src ${allowSelfObjectAndFrame ? "'self'" : "'none'"}`,
+    `frame-ancestors ${allowSameOriginFraming ? "'self'" : "'none'"}`,
     "form-action 'self'",
     "base-uri 'self'",
-    "object-src 'none'",
+    `object-src ${allowSelfObjectAndFrame ? "'self'" : "'none'"}`,
     ...(isProduction ? ['upgrade-insecure-requests'] : []),
   ]
 
@@ -77,7 +88,7 @@ export function buildContentSecurityPolicy(isProduction: boolean, publicApiUrl =
 }
 ```
 
-А в самом `apps/web/next.config.ts` подключение заголовков и отключение `X-Powered-By: Next.js` остаётся предельно лаконичным:
+А в самом `apps/web/next.config.ts` подключение заголовков, точечный scoping для встроенного PDF-резюме на `/cv` и отключение `X-Powered-By: Next.js` выглядят так:
 
 ```typescript title="apps/web/next.config.ts"
 import { getSecurityHeaders } from './config/security-headers.config'
@@ -86,11 +97,19 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   // ...
   async headers() {
+    const cvPageHeaders = getSecurityHeaders(undefined, undefined, {
+      allowSelfObjectAndFrame: true,
+    })
+    const cvPdfAssetHeaders = getSecurityHeaders(undefined, undefined, {
+      allowSelfObjectAndFrame: true,
+      allowSameOriginFraming: true,
+    })
+
     return [
-      {
-        source: '/(.*)',
-        headers: getSecurityHeaders(),
-      },
+      { source: '/(.*)', headers: getSecurityHeaders() },
+      { source: '/cv', headers: cvPageHeaders },
+      { source: '/:locale(en|ua|uk|ru)/cv', headers: cvPageHeaders },
+      { source: '/cv/:path*', headers: cvPdfAssetHeaders },
     ]
   },
 }
@@ -100,7 +119,8 @@ const nextConfig: NextConfig = {
 - **Zero Port Leakage & Zero Eval в продакшене:** В проде из `connect-src` убраны порты `:4000`, `:4001` и `localhost`, а из `script-src` удалён `'unsafe-eval'` (наш Remark AST-движок MDX не использует `eval`/`new Function`).
 - **`Cross-Origin-Opener-Policy: same-origin`:** Изолирует контекст окна браузера, блокируя доступ через `window.opener` и атаки класса Spectre/XS-Leaks.
 - **`frame-ancestors 'none'` и `X-Frame-Options: DENY`:** Защищают страницы портфолио и базы знаний от атак кликджекинга (Clickjacking) — никакой сторонний сайт не сможет загрузить приложение внутри скрытого `<iframe>`.
-- **`object-src 'none'` и `base-uri 'self'`:** Полностью блокируют устаревшие плагины (Flash, Java) и предотвращают манипуляции с тегом `<base href="...">`, которые часто эксплуатируются для кражи сессий.
+- **`object-src 'none'`, `frame-src 'none'` и Scoped CV PDF:** На всём сайте устаревшие плагины и фреймы полностью заблокированы (`'none'`). Исключение сделано точечно по маршрутам: страницы `/cv` сохраняют `X-Frame-Options: DENY` и `frame-ancestors 'none'`, но разрешают `object-src 'self'` и `frame-src 'self'`, а сами статические файлы `/cv/:path*` отдаются с `X-Frame-Options: SAMEORIGIN` и `frame-ancestors 'self'`, чтобы встроенный `<object type="application/pdf">` рендерился нативно без риска встраивания сторонними доменами.
+- **`base-uri 'self'`:** Предотвращает инъекцию тега `<base href="...">`, эксплуатируемую для перехвата относительных ссылок.
 - **`Strict-Transport-Security (HSTS)`:** Заголовок `max-age=63072000; includeSubDomains; preload` отдаётся только в продакшене и указывает браузеру форсировать HTTPS на протяжении 2 лет.
 - **`Permissions-Policy`:** Запрещает доступ к камере, микрофону, геолокации и алгоритмам трекинга интересов браузера (`camera=(), microphone=(), geolocation=(), browsing-topics=()`).
 

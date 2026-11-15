@@ -44,7 +44,17 @@ Configuring `Content-Security-Policy` (CSP) in modern frameworks poses intricate
 To keep the build configuration in `next.config.ts` lean and preserve clean boundaries between Next.js infrastructure config and FSD application source (`src/`), declarative generation of all security headers was extracted into a dedicated, strictly typed module outside `src/`: `apps/web/config/security-headers.config.ts`.
 
 ```typescript title="apps/web/config/security-headers.config.ts"
-export function buildContentSecurityPolicy(isProduction: boolean, publicApiUrl = ''): string {
+export interface ContentSecurityPolicyOptions {
+  allowSelfObjectAndFrame?: boolean
+  allowSameOriginFraming?: boolean
+}
+
+export function buildContentSecurityPolicy(
+  isProduction: boolean,
+  publicApiUrl = '',
+  options: ContentSecurityPolicyOptions = {},
+): string {
+  const { allowSelfObjectAndFrame = false, allowSameOriginFraming = false } = options
   const normalizedPublicApi = publicApiUrl.trim() ? ` ${publicApiUrl.trim()}` : ''
 
   // In production, internal infrastructure ports are NEVER exposed in headers.
@@ -66,10 +76,11 @@ export function buildContentSecurityPolicy(isProduction: boolean, publicApiUrl =
     "img-src 'self' blob: data: https:",
     "font-src 'self' data: https:",
     `connect-src ${connectSrc}`,
-    "frame-ancestors 'none'",
+    `frame-src ${allowSelfObjectAndFrame ? "'self'" : "'none'"}`,
+    `frame-ancestors ${allowSameOriginFraming ? "'self'" : "'none'"}`,
     "form-action 'self'",
     "base-uri 'self'",
-    "object-src 'none'",
+    `object-src ${allowSelfObjectAndFrame ? "'self'" : "'none'"}`,
     ...(isProduction ? ['upgrade-insecure-requests'] : []),
   ]
 
@@ -77,7 +88,7 @@ export function buildContentSecurityPolicy(isProduction: boolean, publicApiUrl =
 }
 ```
 
-In `apps/web/next.config.ts`, attaching headers and stripping `X-Powered-By: Next.js` remains clean and minimal:
+In `apps/web/next.config.ts`, attaching headers, scoping inline PDF permissions strictly to `/cv`, and stripping `X-Powered-By: Next.js` stays concise:
 
 ```typescript title="apps/web/next.config.ts"
 import { getSecurityHeaders } from './config/security-headers.config'
@@ -86,11 +97,19 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   // ...
   async headers() {
+    const cvPageHeaders = getSecurityHeaders(undefined, undefined, {
+      allowSelfObjectAndFrame: true,
+    })
+    const cvPdfAssetHeaders = getSecurityHeaders(undefined, undefined, {
+      allowSelfObjectAndFrame: true,
+      allowSameOriginFraming: true,
+    })
+
     return [
-      {
-        source: '/(.*)',
-        headers: getSecurityHeaders(),
-      },
+      { source: '/(.*)', headers: getSecurityHeaders() },
+      { source: '/cv', headers: cvPageHeaders },
+      { source: '/:locale(en|ua|uk|ru)/cv', headers: cvPageHeaders },
+      { source: '/cv/:path*', headers: cvPdfAssetHeaders },
     ]
   },
 }
@@ -100,7 +119,8 @@ const nextConfig: NextConfig = {
 - **Zero Port Leakage & Zero Eval in Production:** Production strips internal ports (`:4000`, `:4001`, `localhost`) from `connect-src` and disables `'unsafe-eval'` in `script-src` (our Remark AST MDX engine never relies on `eval` or `new Function`).
 - **`Cross-Origin-Opener-Policy: same-origin`:** Isolates the top-level browsing context, preventing Spectre / XS-Leaks and `window.opener` attacks.
 - **`frame-ancestors 'none'` and `X-Frame-Options: DENY`:** Protect the portfolio and knowledge base from Clickjacking attacks—preventing unauthorized third-party sites from framing the application.
-- **`object-src 'none'` and `base-uri 'self'`:** Completely disables legacy plugins (Flash, Java) and prevents unauthorized manipulation of `<base href="...">` tags.
+- **`object-src 'none'`, `frame-src 'none'`, and Scoped CV PDF:** Plugins and embedded frames are disabled globally (`'none'`). Only `/cv` pages unlock `object-src 'self'` and `frame-src 'self'` (keeping `frame-ancestors 'none'` and `X-Frame-Options: DENY`), while static `/cv/:path*` PDF files use `frame-ancestors 'self'` and `X-Frame-Options: SAMEORIGIN` so `<object type="application/pdf">` renders inline without exposing external embeds.
+- **`base-uri 'self'`:** Prevents unauthorized manipulation of `<base href="...">` tags.
 - **`Strict-Transport-Security (HSTS)`:** The `max-age=63072000; includeSubDomains; preload` header is sent strictly in production and mandates HTTPS for 2 continuous years.
 - **`Permissions-Policy`:** Explicitly disables browser sensors and interest cohort tracking (`camera=(), microphone=(), geolocation=(), browsing-topics=()`).
 
