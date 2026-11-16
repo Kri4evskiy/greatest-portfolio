@@ -20,7 +20,7 @@ tldr:
 
 Чтобы навигация по секциям работала безотказно, хук `useSectionNavigation` разделяет межстраничный переход (`router.push`) и внутристраничный программный скролл:
 
-```typescript title="apps/web/src/hooks/use-section-navigation.ts"
+```typescript title="apps/web/src/shared/hooks/use-section-navigation.ts"
 const scrollToSection = useCallback(
   (sectionId: WorkfolioSectionId) => {
     if (pathname !== '/') {
@@ -46,7 +46,7 @@ const scrollToSection = useCallback(
 
 Для отслеживания текущей читаемой секции на длинных страницах используется пассивный слушатель прокрутки, синхронизированный с частотой обновления экрана через `requestAnimationFrame`:
 
-```typescript title="apps/web/src/hooks/use-section-navigation.ts"
+```typescript title="apps/web/src/shared/hooks/use-section-navigation.ts"
 useEffect(() => {
   let rafId: number | null = null
 

@@ -20,7 +20,7 @@ tldr:
 
 Чтобы клиент получал только одну активную локаль, крупные секции рендерятся как **Server Components**, выбирают нужный язык через `pickLocalized(field, locale)` на сервере и передают готовые строки в точечные клиентские острова:
 
-```tsx title="apps/web/src/components/workfolio/workfolio-sections.tsx"
+```tsx title="apps/web/src/entities/workfolio-profile/workfolio-sections.tsx"
 export async function WorkfolioExperienceSection({ locale }: { locale: SupportedLocale }) {
   const t = await getTranslations({ locale, namespace: 'Experience' })
   const featuredRoles = COMMERCIAL_EXPERIENCE.filter((role) => role.featured)
@@ -62,7 +62,7 @@ export async function WorkfolioExperienceSection({ locale }: { locale: Supported
 
 Чтобы открытое соединение `EventSource` в `FooterSseStatus` не блокировало мгновенный возврат по кнопке «Назад» (**Back/Forward Cache — `bfcache`**) в мобильных браузерах, компонент закрывает поток на событии `pagehide` и переподключает его на `pageshow`:
 
-```typescript title="apps/web/src/components/layout/footer-sse-status.tsx"
+```typescript title="apps/web/src/features/telemetry-stream/footer-sse-status.tsx"
 window.addEventListener('pagehide', closeStream)
 window.addEventListener('pageshow', (event) => {
   if (event.persisted) connectStream()

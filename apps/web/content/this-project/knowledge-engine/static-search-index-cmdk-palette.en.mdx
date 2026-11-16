@@ -24,12 +24,12 @@ To keep initial document payloads tiny as the Knowledge Base scales past `100+` 
 
 ## 2. Static SSG Route Handler (`/search-index/[locale]`)
 
-The route handler `apps/web/src/app/search-index/[locale]/route.ts` declares `export const dynamic = 'force-static'` alongside `generateStaticParams()`. During `next build`, it extracts a lightweight projection of all localized notes (stripping AST content blocks) plus top tags:
+The route handler `apps/web/src/app/search-index/[locale]/route.ts` declares `export const dynamic = 'force-static'` alongside `generateStaticParams()`. During `next build`, it extracts a lightweight projection of all localized notes (without serializing HAST content trees) plus top tags:
 
 ```typescript title="apps/web/src/app/search-index/[locale]/route.ts"
 import { DEFAULT_LOCALE, SUPPORTED_LOCALES, SupportedLocaleEnum } from '@repo/shared-schemas'
 import { NextResponse } from 'next/server'
-import { getKnowledgeSearchIndex, getPopularTags } from '@/lib/mdx-content'
+import { getKnowledgeSearchIndex, getPopularTags } from '@/entities/knowledge-content'
 
 export const dynamic = 'force-static'
 
@@ -55,9 +55,9 @@ Each `KnowledgeSearchItem` contains the article route, localized topic and subto
 
 ## 3. Deduplicated In-Memory Client Loader & Hover Prefetch
 
-In `apps/web/src/lib/search-index-client.ts`, two `Map` instances cache resolved payloads and in-flight promises so rapid triggers never fire duplicate network requests:
+In `apps/web/src/features/search/search-index-client.ts`, two `Map` instances cache resolved payloads and in-flight promises so rapid triggers never fire duplicate network requests:
 
-```typescript title="apps/web/src/lib/search-index-client.ts"
+```typescript title="apps/web/src/features/search/search-index-client.ts"
 const resolvedCache = new Map<SupportedLocale, SearchIndexPayload>()
 const inflightRequests = new Map<SupportedLocale, Promise<SearchIndexPayload>>()
 

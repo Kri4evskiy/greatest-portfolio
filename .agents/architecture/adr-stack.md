@@ -149,8 +149,8 @@
 ## 16. Мультиязычность и локализация контента: `next-intl` + `Colocated MDX` (`EN` / `UA` / `RU`)
 
 - **Почему выбрали (Why):** Портфолио уровня Senior и Инженерная База Знаний должны одинаково комфортно читаться международными рекрутерами (`EN` по умолчанию) и локальными командами (`UA` / `RU`) без потери 100% SSG-генерации, SEO и общих метрик просмотров/лайков статей. В отличие от макросов `LinguiJS` (требующих SWC-плагинов, привязанных к версиям ядра Next.js), `next-intl` нативно работает с React 19 Server Components (`0 KB` на клиенте для серверных переводов).
-- **Где применяется (Where):** Глобально на всех страницах `apps/web` (`src/i18n/*`, `src/app/[locale]/*`, `messages/{en,uk,ru}.json`, `content/*/*.{en,uk,ru}.mdx`) и в общих схемах `packages/shared-schemas/src/locale.schema.ts`.
+- **Где применяется (Where):** Глобально на всех страницах `apps/web` (`src/shared/i18n/*`, `src/app/[locale]/*`, `messages/{en,uk,ru}.json`, `content/*/*.{en,uk,ru}.mdx`) и в общих схемах `packages/shared-schemas/src/locale.schema.ts`.
 - **Как реализовано (How):**
-  - В `src/i18n/routing.ts` настроены `defaultLocale: 'en'`, `localePrefix: { mode: 'as-needed', prefixes: { uk: '/ua' } }` и `localeDetection: false`: чистый URL `/` всегда гарантированно открывает английскую версию, а `/ua` и `/ru` — украинскую и русскую.
+  - В `src/shared/i18n/routing.ts` настроены `defaultLocale: 'en'`, `localePrefix: { mode: 'as-needed', prefixes: { uk: '/ua' } }` и `localeDetection: false`: чистый URL `/` всегда гарантированно открывает английскую версию, а `/ua` и `/ru` — украинскую и русскую.
   - В `src/proxy.ts` объединены маршрутизация `next-intl` и проверка `HttpOnly` JWT куки `kb_access_token`.
   - Инженерные статьи хранятся по паттерну **Colocated Locale Suffix** (`<slug>.en.mdx`, `<slug>.uk.mdx`, `<slug>.ru.mdx`) с единым каноническим `slug` и автоматическим fallback на `.en.mdx`.

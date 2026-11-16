@@ -32,7 +32,7 @@ const nextConfig: NextConfig = {
 
 | Параметр | Значение | Инженерное обоснование |
 | :--- | :---: | :--- |
-| **`compilationMode`** | `'infer'` | Next.js применяет собственные быстрые эвристики на Rust/SWC до вызова `babel-plugin-react-compiler`: компилятор запускается только для файлов с PascalCase-компонентами (JSX) и хуками `use*`, не тратя время сборки на утилиты (`mdx-content.ts`, `edge-jwt.ts`) |
+| **`compilationMode`** | `'infer'` | Next.js применяет собственные быстрые эвристики на Rust/SWC до вызова `babel-plugin-react-compiler`: компилятор запускается только для файлов с PascalCase-компонентами (JSX) и хуками `use*`, не тратя время сборки на утилиты (`mdx-ast-parser.ts`, `edge-jwt.ts`) |
 | **`panicThreshold`** | `'none'` | При встрече со сложным мутабельным SDK компилятор безопасно пропускает оптимизацию конкретной функции вместо аварийной остановки `next build` в CI/CD |
 
 ---
@@ -48,11 +48,11 @@ const nextConfig: NextConfig = {
 
 ## 3. Паттерн граничной изоляции `'use no memo'` в `TechRadarTable`
 
-Компонент `TechRadarTable` (`apps/web/src/components/workfolio/tech-radar-table.tsx`) объединяет поиск, фильтр категорий, мобильный стек карточек (`< md`), десктопную таблицу (`>= md`) и модальное окно инспектора `ADR`.
+Компонент `TechRadarTable` (`apps/web/src/entities/engineering-roadmap/tech-radar-table.tsx`) объединяет поиск, фильтр категорий, мобильный стек карточек (`< md`), десктопную таблицу (`>= md`) и модальное окно инспектора `ADR`.
 
 Если вызывать `useReactTable` прямо в теле `TechRadarTable`, компилятор пропустит весь 360-строчный компонент. Чтобы сохранить автоматическую мемоизацию (`Memo ✨`) для фильтров, мобильных карточек и `Dialog`, сам `useReactTable` вынесен в узкий дочерний компонент с явной директивой `'use no memo'`:
 
-```tsx title="apps/web/src/components/workfolio/tech-radar-table.tsx"
+```tsx title="apps/web/src/entities/engineering-roadmap/tech-radar-table.tsx"
 function DesktopTechRadarDataTable({ data, columns, emptyResultLabel }: DesktopTechRadarDataTableProps) {
   'use no memo'
 

@@ -1,7 +1,7 @@
 ---
-title: "Server MDX Engine: [locale]/[...slug] Routing, remark AST & Dual-Theme Shiki (0 KB JS)"
-sidebarLabel: "MDX Engine, Routing & Shiki"
-summary: "Architectural blueprint for a multilingual Knowledge Base in Next.js App Router: recursive catch-all [locale]/knowledge-base/[...slug] routing, server-side gray-matter + remark AST compilation, and CSS-variable Shiki v4 syntax highlighting."
+title: "Server MDX Engine: [locale]/[...slug] Routing, Zero-Eval HAST & Dual-Theme Shiki (0 KB JS)"
+sidebarLabel: "MDX Engine, HAST & Shiki"
+summary: "Architectural blueprint for a multilingual Knowledge Base in Next.js App Router: recursive catch-all [locale]/knowledge-base/[...slug] routing, server-side remark/rehype HAST compilation via hast-util-to-jsx-runtime, and CSS-variable Shiki v4 syntax highlighting."
 category: "this-project"
 format: "deep-dive"
 tags: ["mdx", "nextjs", "remark", "shiki", "routing", "ssg"]
@@ -10,7 +10,7 @@ publishedAt: "2026-11-10"
 order: 1
 tldr:
   - "A single catch-all route `/[locale]/knowledge-base/[...slug]` serves topic hubs, subtopic hubs, and leaf articles, statically pre-rendered via `generateStaticParams`."
-  - "Compiles `.mdx` files on the server using `gray-matter` + `unified` (`remark-parse` + `remark-gfm`) into a recursive typed `MdxBlock` tree with `0 KB` of client parser JS."
+  - "Compiles `.mdx` files on the server using `gray-matter` + `unified` (`remark-parse` + `remark-gfm` + `remark-directive` ➔ `remark-rehype` `HastRoot`) and renders React elements via `hast-util-to-jsx-runtime` (`toJsxRuntime`) with `0 KB` of client parser JS and `mtimeMs`-validated caching."
   - "Uses `Shiki v4` with dual-theme CSS variables (`github-light-default` + `github-dark-default`, `defaultColor: false`) for instant zero-JS theme switching."
 ---
 
@@ -38,44 +38,65 @@ export function generateStaticParams() {
 }
 ```
 
-When rendering a request, `page.tsx` checks `getArticleByPathSegments` first and falls back to `getFolderByPathSegments` against the recursive `buildKnowledgeTree(locale)` tree, while locale-aware links use `createNavigation(routing)` from `next-intl/navigation`.
+When rendering a request, `page.tsx` resolves `getArticleByPathSegments` (which parses HAST on-demand only for the requested article) or falls back to `getFolderByPathSegments` against the lightweight `getKnowledgeTree(locale)` frontmatter tree, while locale-aware links use `Link` from `@/shared/i18n/navigation`.
 
 ---
 
-## 2. Server-Side AST Pipeline (`gray-matter` + `unified` + `remark-gfm`)
+## 2. Zero-Eval HAST Pipeline (`remark-directive` ➔ `remark-rehype` ➔ `toJsxRuntime`)
 
-All `.mdx` parsing executes strictly on the server inside `apps/web/src/lib/mdx-content.ts`:
+All `.mdx` parsing executes strictly on the server inside `apps/web/src/entities/knowledge-content/lib/mdx-ast-parser.ts` and `mdx-fs-loader.ts`:
 
-1. **`gray-matter`** extracts typed YAML frontmatter (`title`, `sidebarLabel`, `summary`, `category`, `format`, `tags`, `readingTime`, `order`, `tldr`).
-2. **`unified().use(remarkParse).use(remarkGfm).parse(content)`** constructs a standard `mdast` syntax tree.
-3. A recursive AST transformer maps `mdast` nodes into serializable `MdxBlock` containers and `MdxInlineNode` trees:
+1. **`parseFrontmatterOnly` (`gray-matter`)** extracts typed YAML frontmatter (`title`, `sidebarLabel`, `summary`, `category`, `format`, `tags`, `readingTime`, `order`, `tldr`) with cross-request `mtimeMs` caching so sidebar trees and hub pages never parse Markdown bodies.
+2. **`unified().use(remarkParse).use(remarkGfm).use(remarkDirective)`** constructs an `mdast` syntax tree, decorates `h2–h4` headings, GitHub-style callouts, and code blocks, and converts both `<Widget />` tags and `::sandbox{name="..."}` / `:::sandbox{name="..."}` directives into typed `div[data-mdx-widget]` nodes while stripping arbitrary raw HTML (Zero-Eval CSP).
+3. **`unified().use(remarkRehype)`** converts `mdast` into a standard `HastRoot` tree, which is rendered directly to React Server Component elements via `toJsxRuntime` from `hast-util-to-jsx-runtime`:
 
-```typescript title="apps/web/src/lib/mdx-content.ts"
-function parseMdxAstBlocks(content: string): {
-  blocks: MdxBlock[]
-  toc: MdxTocHeading[]
-} {
-  const tree = unified().use(remarkParse).use(remarkGfm).parse(content)
-  const toc: MdxTocHeading[] = []
-  const blocks = transformMdastChildren(tree.children, toc, true)
-  return { blocks, toc }
+```typescript title="apps/web/src/entities/knowledge-content/lib/mdx-ast-parser.ts"
+const markdownParser = unified().use(remarkParse).use(remarkGfm).use(remarkDirective)
+const mdastToHastProcessor = unified().use(remarkRehype)
+
+export function parseRawMdx(
+  raw: string,
+  fallbackCategory: KnowledgeCategory,
+  leafSlug: string,
+  relativeSubSegments: readonly string[],
+  locale: SupportedLocale,
+  isFallback: boolean,
+): MdxArticleDocument {
+  const { frontmatter, content } = parseFrontmatterOnly(
+    raw,
+    fallbackCategory,
+    leafSlug,
+    relativeSubSegments,
+    locale,
+    isFallback,
+  )
+
+  const mdastRoot = markdownParser.parse(content) as MdastRoot
+  const toc: ArticleTocEntry[] = []
+  const codeBlocks: MdxCodeBlockMeta[] = []
+  const usedHeadingIds = new Map<string, number>()
+
+  transformMdastChildren(mdastRoot.children, usedHeadingIds, toc, codeBlocks, false)
+  const hast = mdastToHastProcessor.runSync(mdastRoot) as HastRoot
+
+  return { ...frontmatter, toc, hast, codeBlocks }
 }
 ```
 
-Because transformation is recursive, the engine natively supports:
-- Nested code blocks and lists inside GitHub-style `> [!TIP]`, `> [!IMPORTANT]`, and `> [!WARNING]` callouts.
-- Arbitrarily nested inline formatting (`**bold text with `inline code` inside links**`) and Markdown images `![Caption](/path.webp)`.
-- Embedded interactive client widgets (`<D3ReactRenderGraph />`, `<D3ArchitectureFlow />`, `<NestAiMcpDiagram />`) with parsed JSX props.
+Because transformation operates over standard `mdast` ➔ `HAST` trees, the engine natively supports:
+- Nested code blocks and task lists inside GitHub-style `> [!TIP]`, `> [!IMPORTANT]`, and `> [!WARNING]` callouts.
+- Arbitrarily nested inline formatting (`**bold text with `inline code` inside links**`) and Markdown figures `![Caption](/path.webp)`.
+- Declarative interactive client islands (`::sandbox{name="NestAiMcpDiagram" defaultMode="ai"}` or `<ReactRenderGraphD3 />`) mapped via `MDX_WIDGET_REGISTRY` in `apps/web/src/features/kb-sandboxes/ui/mdx-client-widgets.tsx`.
 
 ---
 
 ## 3. Dual-Theme `Shiki v4` Syntax Highlighting (`0 KB` Client JS)
 
-The Server Component `MdxArticleRenderer` collects all code blocks in an article (including nested callout/list blocks) and highlights them concurrently via `Promise.all` and `Shiki v4` `codeToHtml`:
+The Server Component `MdxArticleRenderer` (`apps/web/src/entities/knowledge-article/ui/mdx-article-renderer.tsx`) highlights all `codeBlocks` in parallel via `Promise.all` and `highlightCodeServer` (`apps/web/src/entities/knowledge-content/lib/shiki-highlighter.ts`) before running `toJsxRuntime(hast, { Fragment, jsx, jsxs, components })`:
 
-```typescript title="apps/web/src/components/knowledge/mdx-article-renderer.tsx"
-const html = await codeToHtml(code, {
-  lang: normalizedLang,
+```typescript title="apps/web/src/entities/knowledge-content/lib/shiki-highlighter.ts"
+const html = await highlighter.codeToHtml(trimmed, {
+  lang: safeLang,
   themes: {
     light: 'github-light-default',
     dark: 'github-dark-default',

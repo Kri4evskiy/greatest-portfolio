@@ -32,7 +32,7 @@ const nextConfig: NextConfig = {
 
 | Параметр | Значення | Інженерне обґрунтування |
 | :--- | :---: | :--- |
-| **`compilationMode`** | `'infer'` | Next.js застосовує власні швидкі евристики на Rust/SWC до виклику `babel-plugin-react-compiler`: компілятор запускається лише для файлів із PascalCase-компонентами (JSX) та хуками `use*`, не витрачаючи час збірки на утиліти (`mdx-content.ts`, `edge-jwt.ts`) |
+| **`compilationMode`** | `'infer'` | Next.js застосовує власні швидкі евристики на Rust/SWC до виклику `babel-plugin-react-compiler`: компілятор запускається лише для файлів із PascalCase-компонентами (JSX) та хуками `use*`, не витрачаючи час збірки на утиліти (`mdx-ast-parser.ts`, `edge-jwt.ts`) |
 | **`panicThreshold`** | `'none'` | При зустрічі зі складним мутабельним SDK компілятор безпечно пропускає оптимізацію конкретної функції замість аварійної зупинки `next build` у CI/CD |
 
 ---
@@ -48,11 +48,11 @@ const nextConfig: NextConfig = {
 
 ## 3. Патерн граничної ізоляції `'use no memo'` в `TechRadarTable`
 
-Компонент `TechRadarTable` (`apps/web/src/components/workfolio/tech-radar-table.tsx`) поєднує пошук, фільтр категорій, мобільний стек карток (`< md`), десктопну таблицю (`>= md`) та модальне вікно інспектора `ADR`.
+Компонент `TechRadarTable` (`apps/web/src/entities/engineering-roadmap/tech-radar-table.tsx`) поєднує пошук, фільтр категорій, мобільний стек карток (`< md`), десктопну таблицю (`>= md`) та модальне вікно інспектора `ADR`.
 
 Якщо викликати `useReactTable` просто в тілі `TechRadarTable`, компілятор пропустить увесь 360-рядковий компонент. Щоб зберегти автоматичну мемоїзацію (`Memo ✨`) для фільтрів, мобільних карток і `Dialog`, сам `useReactTable` винесений у вузький дочірній компонент із явною директивою `'use no memo'`:
 
-```tsx title="apps/web/src/components/workfolio/tech-radar-table.tsx"
+```tsx title="apps/web/src/entities/engineering-roadmap/tech-radar-table.tsx"
 function DesktopTechRadarDataTable({ data, columns, emptyResultLabel }: DesktopTechRadarDataTableProps) {
   'use no memo'
 

@@ -32,7 +32,7 @@ const nextConfig: NextConfig = {
 
 | Option | Value | Engineering Rationale |
 | :--- | :---: | :--- |
-| **`compilationMode`** | `'infer'` | Next.js runs its own Rust/SWC heuristics before invoking `babel-plugin-react-compiler`, compiling only files that define PascalCase JSX components or `use*` hooks and skipping pure server/utility modules (`mdx-content.ts`, `edge-jwt.ts`) |
+| **`compilationMode`** | `'infer'` | Next.js runs its own Rust/SWC heuristics before invoking `babel-plugin-react-compiler`, compiling only files that define PascalCase JSX components or `use*` hooks and skipping pure server/utility modules (`mdx-ast-parser.ts`, `edge-jwt.ts`) |
 | **`panicThreshold`** | `'none'` | Guarantees resilient CI/CD builds: if the compiler encounters a third-party hook with interior mutability, it safely skips optimizing that function instead of failing `next build` |
 
 ---
@@ -48,11 +48,11 @@ Inside `babel-plugin-react-compiler` (`DefaultModuleTypeProvider`), the compiler
 
 ## 3. `'use no memo'` Boundary Isolation in `TechRadarTable`
 
-`TechRadarTable` (`apps/web/src/components/workfolio/tech-radar-table.tsx`) renders the search bar, category filters, mobile card stack (`< md`), desktop table (`>= md`), and the ADR inspector `Dialog`.
+`TechRadarTable` (`apps/web/src/entities/engineering-roadmap/tech-radar-table.tsx`) renders the search bar, category filters, mobile card stack (`< md`), desktop table (`>= md`), and the ADR inspector `Dialog`.
 
 Calling `useReactTable` directly at the top of `TechRadarTable` would cause the compiler to skip the entire 360-line component. By extracting the desktop `<table />` into a dedicated child component with `'use no memo'`, only the thin table wrapper opts out:
 
-```tsx title="apps/web/src/components/workfolio/tech-radar-table.tsx"
+```tsx title="apps/web/src/entities/engineering-roadmap/tech-radar-table.tsx"
 function DesktopTechRadarDataTable({ data, columns, emptyResultLabel }: DesktopTechRadarDataTableProps) {
   'use no memo'
 

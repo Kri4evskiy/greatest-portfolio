@@ -10,7 +10,7 @@ publishedAt: "2026-11-10"
 order: 2
 tldr:
   - "Centralizes `KB_ACCESS_COOKIE_NAME`, `KB_COOKIE_MAX_AGE_MS`, and `resolveJwtSecret` inside `@repo/shared-schemas` as a single contract shared by Next.js and NestJS."
-  - "Verifies `HMAC-SHA256` signatures and `exp` claims in `apps/web/src/lib/edge-jwt.ts` using the native Edge Runtime `crypto.subtle` API (`0 KB` external npm packages) with `CryptoKey` caching."
+  - "Verifies `HMAC-SHA256` signatures and `exp` claims in `apps/web/src/shared/lib/edge-jwt.ts` using the native Edge Runtime `crypto.subtle` API (`0 KB` external npm packages) with `CryptoKey` caching."
   - "Keeps `apps/web/src/proxy.ts` concise (~40 lines), composing `next-intl` locale routing, `/knowledge-base` access control, and automatic invalid cookie cleanup."
 ---
 
@@ -35,9 +35,9 @@ In local development both services fall back cleanly without mandatory `.env` se
 
 ## 2. Zero-Dependency `HS256` Verification via Web Crypto API (`crypto.subtle`)
 
-Because Knowledge Base articles are statically pre-rendered (`SSG`), access checks must run at the Edge before serving cached HTML. Rather than bundling third-party JWT libraries, `apps/web/src/lib/edge-jwt.ts` uses the native **Web Crypto API**:
+Because Knowledge Base articles are statically pre-rendered (`SSG`), access checks must run at the Edge before serving cached HTML. Rather than bundling third-party JWT libraries, `apps/web/src/shared/lib/edge-jwt.ts` uses the native **Web Crypto API**:
 
-```typescript title="apps/web/src/lib/edge-jwt.ts"
+```typescript title="apps/web/src/shared/lib/edge-jwt.ts"
 let cachedSecretString: string | null = null
 let cachedHmacKeyPromise: Promise<CryptoKey> | null = null
 

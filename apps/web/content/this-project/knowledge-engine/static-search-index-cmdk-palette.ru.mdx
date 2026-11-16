@@ -24,12 +24,12 @@ tldr:
 
 ## 2. Статический SSG Route Handler (`/search-index/[locale]`)
 
-Маршрут `apps/web/src/app/search-index/[locale]/route.ts` помечен директивой `export const dynamic = 'force-static'` и использует `generateStaticParams()`. Во время сборки он извлекает облегчённую проекцию статей (без AST-блоков контента) и список популярных тегов:
+Маршрут `apps/web/src/app/search-index/[locale]/route.ts` помечен директивой `export const dynamic = 'force-static'` и использует `generateStaticParams()`. Во время сборки он извлекает облегчённую проекцию статей (без HAST-деревьев контента) и список популярных тегов:
 
 ```typescript title="apps/web/src/app/search-index/[locale]/route.ts"
 import { DEFAULT_LOCALE, SUPPORTED_LOCALES, SupportedLocaleEnum } from '@repo/shared-schemas'
 import { NextResponse } from 'next/server'
-import { getKnowledgeSearchIndex, getPopularTags } from '@/lib/mdx-content'
+import { getKnowledgeSearchIndex, getPopularTags } from '@/entities/knowledge-content'
 
 export const dynamic = 'force-static'
 
@@ -55,9 +55,9 @@ export async function GET(_request: Request, context: { params: Promise<{ locale
 
 ## 3. Клиентский загрузчик с дедупликацией промиса и предзагрузкой
 
-В `apps/web/src/lib/search-index-client.ts` две `Map`-таблицы хранят уже полученный ответ и активный in-flight промис, предотвращая повторные сетевые запросы при быстрых переключениях:
+В `apps/web/src/features/search/search-index-client.ts` две `Map`-таблицы хранят уже полученный ответ и активный in-flight промис, предотвращая повторные сетевые запросы при быстрых переключениях:
 
-```typescript title="apps/web/src/lib/search-index-client.ts"
+```typescript title="apps/web/src/features/search/search-index-client.ts"
 const resolvedCache = new Map<SupportedLocale, SearchIndexPayload>()
 const inflightRequests = new Map<SupportedLocale, Promise<SearchIndexPayload>>()
 

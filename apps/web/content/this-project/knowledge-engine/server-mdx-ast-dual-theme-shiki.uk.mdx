@@ -1,7 +1,7 @@
 ---
-title: "Серверний рушій MDX: роутинг [locale]/[...slug], remark AST та Dual-Theme Shiki (0 КБ JS)"
-sidebarLabel: "Рушій MDX, роутинг та Shiki"
-summary: "Архітектурний шаблон побудови багатомовної бази знань у Next.js App Router: рекурсивний catch-all маршрут [locale]/knowledge-base/[...slug], серверний парсер gray-matter + remark AST та підсвічування Shiki v4 на CSS-змінних."
+title: "Серверний рушій MDX: роутинг [locale]/[...slug], Zero-Eval HAST та Dual-Theme Shiki (0 КБ JS)"
+sidebarLabel: "Рушій MDX, HAST та Shiki"
+summary: "Архітектурний шаблон побудови багатомовної бази знань у Next.js App Router: рекурсивний catch-all маршрут [locale]/knowledge-base/[...slug], серверний конвеєр remark/rehype HAST через hast-util-to-jsx-runtime та підсвічування Shiki v4 на CSS-змінних."
 category: "this-project"
 format: "deep-dive"
 tags: ["mdx", "nextjs", "remark", "shiki", "routing", "ssg"]
@@ -10,7 +10,7 @@ publishedAt: "2026-11-10"
 order: 1
 tldr:
   - "Один універсальний catch-all маршрут `/[locale]/knowledge-base/[...slug]` обслуговує і оглядові хаби розділів/підрозділів, і кінцеві статті, повністю збираючись у статику через `generateStaticParams`."
-  - "Конвеєр `gray-matter` + `unified` (`remark-parse` + `remark-gfm`) розбирає `.mdx` на сервері в рекурсивне типізоване дерево `MdxBlock`, відправляючи в браузер `0 КБ` парсерів."
+  - "Конвеєр `gray-matter` + `unified` (`remark-parse` + `remark-gfm` + `remark-directive` ➔ `remark-rehype` `HastRoot`) розбирає `.mdx` на сервері та рендерить React-вузли через `hast-util-to-jsx-runtime` (`toJsxRuntime`) з `0 КБ` клієнтських парсерів і `mtimeMs`-кешуванням."
   - "Підсвічування синтаксису `Shiki v4` генерує парні CSS-змінні (`github-light-default` + `github-dark-default`, `defaultColor: false`), перемикаючи тему миттєво без клієнтського JS."
 ---
 
@@ -38,44 +38,65 @@ export function generateStaticParams() {
 }
 ```
 
-При запиті сторінки сервер спершу перевіряє, чи є шлях кінцевою статтею (`getArticleByPathSegments`), а якщо ні — шукає вузол директорії (`getFolderByPathSegments`) у рекурсивному дереві `buildKnowledgeTree(locale)`. Для типобезпечних переходів між локалями використовується обгортка `createNavigation(routing)` з `next-intl/navigation`.
+При запиті сторінки сервер спершу перевіряє, чи є шлях кінцевою статтею (`getArticleByPathSegments`, який запускає парсинг HAST точково лише для однієї запитаної статті), а якщо ні — шукає вузол директорії (`getFolderByPathSegments`) у полегшеному фронтматер-дереві `getKnowledgeTree(locale)`. Для типобезпечних переходів між локалями використовується `Link` із `@/shared/i18n/navigation`.
 
 ---
 
-## 2. Серверний AST-конвеєр (`gray-matter` + `unified` + `remark-gfm`)
+## 2. Серверний Zero-Eval HAST-конвеєр (`remark-directive` ➔ `remark-rehype` ➔ `toJsxRuntime`)
 
-Парсинг `.mdx`-файлів виконується виключно на сервері в `apps/web/src/lib/mdx-content.ts`:
+Парсинг `.mdx`-файлів виконується виключно на сервері в модулях `apps/web/src/entities/knowledge-content/lib/mdx-ast-parser.ts` та `mdx-fs-loader.ts`:
 
-1. **`gray-matter`** витягує YAML-фронтматер (`title`, `sidebarLabel`, `summary`, `category`, `format`, `tags`, `readingTime`, `order`, `tldr`).
-2. **`unified().use(remarkParse).use(remarkGfm).parse(content)`** будує стандартне синтаксичне дерево `mdast`.
-3. Рекурсивний трансформер перетворює вузли `mdast` на серіалізовані блоки `MdxBlock` і дерево інлайн-форматування `MdxInlineNode`:
+1. **`parseFrontmatterOnly` (`gray-matter`)** витягує YAML-фронтматер (`title`, `sidebarLabel`, `summary`, `category`, `format`, `tags`, `readingTime`, `order`, `tldr`) із міжзапитним кешуванням за `mtimeMs`, тому для побудови дерева сайдбару та хабів розділів парсинг тіла статей узагалі не запускається.
+2. **`unified().use(remarkParse).use(remarkGfm).use(remarkDirective)`** будує синтаксичне дерево `mdast`, розмічає заголовки `h2–h4`, GitHub Alerts і блоки коду, а також перетворює теги `<Widget />` і директиви `::sandbox{name="..."}` / `:::sandbox{name="..."}` на типізовані вузли `div[data-mdx-widget]`, вирізаючи будь-який довільний сирий HTML (`Zero-Eval CSP`).
+3. **`unified().use(remarkRehype)`** переводить `mdast` у стандартне дерево `HastRoot`, яке в серверному компоненті напряму конвертується в React-елементи через `toJsxRuntime` із `hast-util-to-jsx-runtime`:
 
-```typescript title="apps/web/src/lib/mdx-content.ts"
-function parseMdxAstBlocks(content: string): {
-  blocks: MdxBlock[]
-  toc: MdxTocHeading[]
-} {
-  const tree = unified().use(remarkParse).use(remarkGfm).parse(content)
-  const toc: MdxTocHeading[] = []
-  const blocks = transformMdastChildren(tree.children, toc, true)
-  return { blocks, toc }
+```typescript title="apps/web/src/entities/knowledge-content/lib/mdx-ast-parser.ts"
+const markdownParser = unified().use(remarkParse).use(remarkGfm).use(remarkDirective)
+const mdastToHastProcessor = unified().use(remarkRehype)
+
+export function parseRawMdx(
+  raw: string,
+  fallbackCategory: KnowledgeCategory,
+  leafSlug: string,
+  relativeSubSegments: readonly string[],
+  locale: SupportedLocale,
+  isFallback: boolean,
+): MdxArticleDocument {
+  const { frontmatter, content } = parseFrontmatterOnly(
+    raw,
+    fallbackCategory,
+    leafSlug,
+    relativeSubSegments,
+    locale,
+    isFallback,
+  )
+
+  const mdastRoot = markdownParser.parse(content) as MdastRoot
+  const toc: ArticleTocEntry[] = []
+  const codeBlocks: MdxCodeBlockMeta[] = []
+  const usedHeadingIds = new Map<string, number>()
+
+  transformMdastChildren(mdastRoot.children, usedHeadingIds, toc, codeBlocks, false)
+  const hast = mdastToHastProcessor.runSync(mdastRoot) as HastRoot
+
+  return { ...frontmatter, toc, hast, codeBlocks }
 }
 ```
 
-Завдяки рекурсивному обходу AST рушій нативно підтримує:
-- Вкладені блоки коду та списки всередині GitHub-style плашок `> [!TIP]`, `> [!IMPORTANT]`, `> [!WARNING]`.
-- Вкладене інлайн-форматування (`**жирний текст із `кодом` усередині посилання**`) та зображення `![Підпис](/path.webp)`.
-- Вбудовування інтерактивних клієнтських компонентів (`<D3ReactRenderGraph />`, `<D3ArchitectureFlow />`, `<NestAiMcpDiagram />`) із парсингом атрибутів.
+Завдяки стандартному конвеєру `mdast` ➔ `HAST` рушій нативно підтримує:
+- Вкладені блоки коду та чеклісти всередині GitHub-style плашок `> [!TIP]`, `> [!IMPORTANT]`, `> [!WARNING]`.
+- Вкладене інлайн-форматування (`**жирний текст із `кодом` усередині посилання**`) та фігури зображень `![Підпис](/path.webp)`.
+- Декларативне вбудовування інтерактивних клієнтських островів (`::sandbox{name="NestAiMcpDiagram" defaultMode="ai"}` або `<ReactRenderGraphD3 />`) через реєстр `MDX_WIDGET_REGISTRY` в `apps/web/src/features/kb-sandboxes/ui/mdx-client-widgets.tsx`.
 
 ---
 
 ## 3. Dual-Theme підсвічування коду `Shiki v4` (`0 КБ` клієнтського JS)
 
-Серверний компонент `MdxArticleRenderer` збирає всі блоки коду статті (включно з вкладеними у callout-плашки та списки) і підсвічує їх паралельно через `Promise.all` та `codeToHtml` із `Shiki v4`:
+Серверний компонент `MdxArticleRenderer` (`apps/web/src/entities/knowledge-article/ui/mdx-article-renderer.tsx`) підсвічує всі блоки коду статті паралельно через `Promise.all` та `highlightCodeServer` (`apps/web/src/entities/knowledge-content/lib/shiki-highlighter.ts`) перед викликом `toJsxRuntime(hast, { Fragment, jsx, jsxs, components })`:
 
-```typescript title="apps/web/src/components/knowledge/mdx-article-renderer.tsx"
-const html = await codeToHtml(code, {
-  lang: normalizedLang,
+```typescript title="apps/web/src/entities/knowledge-content/lib/shiki-highlighter.ts"
+const html = await highlighter.codeToHtml(trimmed, {
+  lang: safeLang,
   themes: {
     light: 'github-light-default',
     dark: 'github-dark-default',

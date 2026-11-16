@@ -20,7 +20,7 @@ Standard Next.js `<Link href="/#projects">` navigation skips scrolling if `windo
 
 To make section jumps deterministic, `useSectionNavigation` separates cross-route transitions (`router.push`) from in-page programmatic scrolling:
 
-```typescript title="apps/web/src/hooks/use-section-navigation.ts"
+```typescript title="apps/web/src/shared/hooks/use-section-navigation.ts"
 const scrollToSection = useCallback(
   (sectionId: WorkfolioSectionId) => {
     if (pathname !== '/') {
@@ -46,7 +46,7 @@ Every target `<section id="...">` includes `scroll-mt-20` so the sticky top head
 
 To highlight the currently visible section without blocking the main thread, `useActiveWorkfolioSection` combines a `{ passive: true }` scroll listener with `requestAnimationFrame` throttling:
 
-```typescript title="apps/web/src/hooks/use-section-navigation.ts"
+```typescript title="apps/web/src/shared/hooks/use-section-navigation.ts"
 useEffect(() => {
   let rafId: number | null = null
 

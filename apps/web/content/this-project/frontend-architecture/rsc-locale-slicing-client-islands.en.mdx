@@ -20,7 +20,7 @@ In multilingual applications (`EN / UK / RU`), importing typed content dictionar
 
 To ensure the browser receives only the active locale, major page sections run as **Server Components**, slice localized fields via `pickLocalized(field, locale)` on the server, and pass plain strings or pre-rendered `ReactNode` trees to small client islands:
 
-```tsx title="apps/web/src/components/workfolio/workfolio-sections.tsx"
+```tsx title="apps/web/src/entities/workfolio-profile/workfolio-sections.tsx"
 export async function WorkfolioExperienceSection({ locale }: { locale: SupportedLocale }) {
   const t = await getTranslations({ locale, namespace: 'Experience' })
   const featuredRoles = COMMERCIAL_EXPERIENCE.filter((role) => role.featured)
@@ -62,7 +62,7 @@ Every interactive control is isolated into a dedicated micro-island:
 
 To prevent an open `EventSource` connection in `FooterSseStatus` from disqualifying pages from the browser's **Back/Forward Cache (`bfcache`)** on mobile Safari/Chrome, the island closes the stream on `pagehide` and reconnects when restored from `bfcache` on `pageshow`:
 
-```typescript title="apps/web/src/components/layout/footer-sse-status.tsx"
+```typescript title="apps/web/src/features/telemetry-stream/footer-sse-status.tsx"
 window.addEventListener('pagehide', closeStream)
 window.addEventListener('pageshow', (event) => {
   if (event.persisted) connectStream()

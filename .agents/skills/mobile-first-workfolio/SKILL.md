@@ -1,7 +1,7 @@
 ---
 
 name: mobile-first-workfolio
-description: Architectural and UX guidelines for maintaining and extending the Mobile-First Workfolio CV, 3-Tier Multi-Slug MDX 2.0 Knowledge Base, Cmd+K search, and Living Engineering Backlog.
+description: Architectural and UX guidelines for maintaining and extending the Mobile-First Workfolio CV, 3-Tier Multi-Slug MDX Knowledge Base, Cmd+K search, and Living Engineering Backlog.
 ---
 
 # Mobile-First Workfolio & 3-Tier Second Brain Skill
@@ -31,7 +31,7 @@ Use this skill whenever adding UI sections, Knowledge Base topics/articles, navi
 - Register human-readable localized subtopic titles in `LOCALIZED_SUBTOPIC_LABELS` inside `packages/shared-schemas/src/knowledge.schema.ts` (and run `pnpm --filter @repo/shared-schemas build`).
 - Every `.mdx` frontmatter must include:
   - `title`, `sidebarLabel` (concise 2–4 words for single-line sidebar rendering), `summary`, `category`, `format` (`"cheat-sheet" | "deep-dive" | "adr"`), `tags: [...]`, `readingTime`, `publishedAt`, `order`, and `tldr` (2–4 actionable bullets).
-- **RSC Payload Discipline:** Never pass full `article.blocks` AST arrays to Client Components (`CommandPaletteModal`, `KnowledgeDirectoryExplorer`). Strip AST blocks on the server and serialize lightweight frontmatter/TOC projections only.
+- **RSC Payload Discipline:** Never pass full `article.hast` AST trees to Client Components (`CommandPaletteModal`, `KnowledgeDirectoryExplorer`). Use `getAllKnowledgeFrontmatters` on the server and serialize lightweight frontmatter/TOC projections only.
 
 ## 4. Living Engineering Backlog & Trade-offs (`engineering-roadmap.ts`)
 

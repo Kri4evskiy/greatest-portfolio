@@ -10,7 +10,7 @@ publishedAt: "2026-11-10"
 order: 2
 tldr:
   - "Имя куки (`KB_ACCESS_COOKIE_NAME`), срок жизни (`KB_COOKIE_MAX_AGE_MS`) и резолвер секрета (`resolveJwtSecret`) вынесены в `@repo/shared-schemas` как единый контракт между Next.js и NestJS."
-  - "Модуль `apps/web/src/lib/edge-jwt.ts` проверяет подпись `HMAC-SHA256` и `exp` через встроенный в Edge Runtime `crypto.subtle` (`0 КБ` внешних npm-зависимостей) с кэшированием `CryptoKey`."
+  - "Модуль `apps/web/src/shared/lib/edge-jwt.ts` проверяет подпись `HMAC-SHA256` и `exp` через встроенный в Edge Runtime `crypto.subtle` (`0 КБ` внешних npm-зависимостей) с кэшированием `CryptoKey`."
   - "Файл `apps/web/src/proxy.ts` остаётся лаконичным (~40 строк), объединяя `next-intl` роутинг, проверку доступа к `/knowledge-base` и автоочистку невалидных кук."
 ---
 
@@ -35,9 +35,9 @@ export function resolveJwtSecret(envSecret?: string): string {
 
 ## 2. Верификация `HS256` через нативный Web Crypto API (`crypto.subtle`)
 
-Так как страницы Базы Знаний предгенерируются в статику (`SSG`), проверка доступа должна выполняться прямо на границе сети в Edge Runtime до отдачи HTML. Вместо подключения сторонних библиотек модуль `apps/web/src/lib/edge-jwt.ts` использует встроенный стандарт **Web Crypto API**:
+Так как страницы Базы Знаний предгенерируются в статику (`SSG`), проверка доступа должна выполняться прямо на границе сети в Edge Runtime до отдачи HTML. Вместо подключения сторонних библиотек модуль `apps/web/src/shared/lib/edge-jwt.ts` использует встроенный стандарт **Web Crypto API**:
 
-```typescript title="apps/web/src/lib/edge-jwt.ts"
+```typescript title="apps/web/src/shared/lib/edge-jwt.ts"
 let cachedSecretString: string | null = null
 let cachedHmacKeyPromise: Promise<CryptoKey> | null = null
 

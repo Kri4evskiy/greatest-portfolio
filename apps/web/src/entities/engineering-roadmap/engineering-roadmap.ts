@@ -417,7 +417,7 @@ export const ENGINEERING_ROADMAP_ITEMS: readonly EngineeringRoadmapItem[] = [
     },
   },
   {
-    id: 'foundation-mdx2-cmdk-mobile-shipped',
+    id: 'foundation-mdx-cmdk-mobile-shipped',
     status: 'shipped',
     kind: 'architecture',
     priority: 'P1',
@@ -446,9 +446,9 @@ export const ENGINEERING_ROADMAP_ITEMS: readonly EngineeringRoadmapItem[] = [
       ru: ['Мгновенная отдача статических страниц', 'Чистое разделение контента (.mdx), Zod-контрактов и слоёв UI'],
     },
     constraints: {
-      en: ['Adding a new locale or frontmatter field requires updating mdx-content.ts parser once'],
-      uk: ['Нові поля фронтматтера додаються централізовано через парсер mdx-content.ts'],
-      ru: ['Новые поля фронтматтера централизованно типизируются через парсер mdx-content.ts'],
+      en: ['Adding a new locale or frontmatter field requires updating mdx-ast-parser.ts once'],
+      uk: ['Нові поля фронтматтера додаються централізовано через парсер mdx-ast-parser.ts'],
+      ru: ['Новые поля фронтматтера централизованно типизируются через парсер mdx-ast-parser.ts'],
     },
   },
   {

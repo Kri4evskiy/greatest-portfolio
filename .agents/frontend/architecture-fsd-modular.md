@@ -53,11 +53,11 @@ apps/web/src/
 │
 ├── entities/                   # [Слой 4: Business Data Representation]
 │   │                           # Отображение данных предметной области (без глобальных сайд-эффектов)
-│   ├── knowledge-article/      # Декомпозированный рендер: inline-ast, code-block, markdown-table,
-│   │                           # callout-config, ArticleToc, MetricsBar, DirectoryExplorer,
+│   ├── knowledge-article/      # HAST RSC-рендер (mdx-article-renderer, code-block, callout-config),
+│   │                           # ArticleToc, MetricsBar, DirectoryExplorer, KnowledgeSidebar,
 │   │                           # queries/use-knowledge-metrics
-│   ├── knowledge-content/      # mdx-fs-loader, mdx-ast-parser (remark/rehype), mdx-search-index,
-│   │                           # link-sanitizer, mdx-client-widgets (next/dynamic), shiki-highlighter
+│   ├── knowledge-content/      # mdx-fs-loader, mdx-ast-parser (remark/rehype HAST), mdx-search-index,
+│   │                           # link-sanitizer, shiki-highlighter, mdx-types
 │   ├── workfolio-profile/      # author-profile.ts, cv-file.ts, CvDocumentShowcase
 │   └── engineering-roadmap/    # engineering-roadmap.ts, EngineeringRoadmapBoard, TechRadarTable
 │
@@ -132,21 +132,12 @@ apps/api/src/
 
 ---
 
-## 4. Пошаговый план безопасной миграции (Zero Breaking Changes)
+## 4. Чеклист при добавлении новых модулей
 
-Рефакторинг файловой структуры проводится по шагам с обязательным прогоном `pnpm biome check` и `pnpm turbo build` на каждом этапе:
-
-1. **Фаза 1 (Бэкенд `apps/api`):**
-   - Перенос `jwt-roles.guard.ts` в `modules/auth/guards/`;
-   - Перенос `roles.decorator.ts` в `modules/auth/decorators/`;
-   - Создание папки `common/guards/` и `common/interceptors/`.
-2. **Фаза 2 (Фронтенд `apps/web` — создание слоев):**
-   - Создание папок `widgets/`, `entities/`, `shared/`;
-   - Перемещение `providers/`, `store/`, `i18n/` внутрь `shared/` (с сохранением `@/` алиасов в `tsconfig.json`);
-   - Перенос компонентов статьи из `components/knowledge/` в `entities/knowledge-article/` и `use-knowledge-metrics` в `entities/knowledge-article/queries/`;
-   - Перенос `guest-pass-modal` и `use-visitor-profile` в единый фиче-модуль `features/auth/` (серверные хуки в `features/auth/queries/`, отдельно от UI-хуков);
-   - Перенос `use-section-navigation` в `widgets/section-nav/` (или `hooks/`);
-   - Перенос `command-palette-modal` и поискового клиента в `features/search/`.
-3. **Фаза 3 (Верификация):**
-   - Проверка путей импорта в `apps/web/src/app/[locale]/...`;
-   - Запуск `pnpm turbo typecheck` и `pnpm turbo build`.
+1. **Фронтенд (`apps/web/src`):**
+   - Размещай новый модуль строго в его слое (`widgets/`, `features/`, `entities/`, `shared/`).
+   - Серверные хуки `TanStack Query` размещай в подпапке `queries/` соответствующей фичи или сущности (`features/auth/queries/`, `entities/knowledge-article/queries/`), а чистые браузерные DOM-хуки — в `shared/hooks/`.
+2. **Бэкенд (`apps/api/src`):**
+   - Размещай доменную логику в `modules/<domain>/`, а сквозные гарды, интерцепторы, пайпы и фильтры — в `common/`.
+3. **Верификация:**
+   - Прогоняй `pnpm biome check --write .`, `pnpm turbo typecheck` и `pnpm turbo build`.
