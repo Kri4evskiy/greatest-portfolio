@@ -11,11 +11,11 @@ import { ArrowRight, Calendar, ChevronRight, Clock, FolderOpen, Globe, Sparkles,
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { getTranslations } from 'next-intl/server'
-import { ArticleFooterNav } from '@/components/knowledge/article-footer-nav'
-import { ArticleMetricsBar } from '@/components/knowledge/article-metrics-bar'
-import { DesktopArticleToc, MobileArticleToc } from '@/components/knowledge/article-toc'
-import { MdxArticleRenderer, renderInlineMarkdown } from '@/components/knowledge/mdx-article-renderer'
-import { TopicSubtopicTabs } from '@/components/knowledge/topic-subtopic-tabs'
+import { ArticleFooterNav } from '@/entities/knowledge-article/ui/article-footer-nav'
+import { ArticleMetricsBar } from '@/entities/knowledge-article/ui/article-metrics-bar'
+import { DesktopArticleToc, MobileArticleToc } from '@/entities/knowledge-article/ui/article-toc'
+import { MdxArticleRenderer, renderInlineMarkdown } from '@/entities/knowledge-article/ui/mdx-article-renderer'
+import { TopicSubtopicTabs } from '@/entities/knowledge-article/ui/topic-subtopic-tabs'
 import {
   buildKnowledgeBreadcrumbs,
   getAdjacentAndRelatedArticles,
@@ -26,7 +26,7 @@ import {
   type KnowledgeTreeArticleNode,
   type KnowledgeTreeFolderNode,
   type MdxArticleFrontmatter,
-} from '@/lib/mdx-content'
+} from '@/entities/knowledge-content'
 import { Link } from '@/shared/i18n/navigation'
 
 interface CatchAllKnowledgePageProps {

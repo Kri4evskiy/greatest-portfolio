@@ -1,6 +1,6 @@
 import { DEFAULT_LOCALE, SUPPORTED_LOCALES, SupportedLocaleEnum } from '@repo/shared-schemas'
 import { NextResponse } from 'next/server'
-import { getAllKnowledgeTags, getKnowledgeSearchIndex } from '@/lib/mdx-content'
+import { getAllKnowledgeTags, getKnowledgeSearchIndex } from '@/entities/knowledge-content'
 
 export const dynamic = 'force-static'
 

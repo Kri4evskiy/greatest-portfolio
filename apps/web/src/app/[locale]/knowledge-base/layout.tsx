@@ -1,7 +1,7 @@
 import { DEFAULT_LOCALE, SupportedLocaleEnum } from '@repo/shared-schemas'
 import type { ReactNode } from 'react'
-import { KnowledgeSidebar } from '@/components/knowledge/knowledge-sidebar'
-import { getKnowledgeTree } from '@/lib/mdx-content'
+import { KnowledgeSidebar } from '@/entities/knowledge-article/ui/knowledge-sidebar'
+import { getKnowledgeTree } from '@/entities/knowledge-content'
 
 export default async function KnowledgeBaseLayout({
   children,

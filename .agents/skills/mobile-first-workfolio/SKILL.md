@@ -16,9 +16,9 @@ Use this skill whenever adding UI sections, Knowledge Base topics/articles, navi
   3. Theme & compact `< sm` Language triggers
   4. `Base of Knowledge` RBAC button + single contextual quick jump (`ADR` on CV, `CV` inside Knowledge Base)
 - **Use `PageSectionNavigator` + `useSectionNavigation` for in-page sections:**
-  - Whenever adding a new home-page `<section id="...">` (with `scroll-mt-20`), register its ID in `WORKFOLIO_SECTION_IDS` (`apps/web/src/hooks/use-section-navigation.ts`) and `PageSectionNavigator`.
+  - Whenever adding a new home-page `<section id="...">` (with `scroll-mt-20`), register its ID in `WORKFOLIO_SECTION_IDS` (`apps/web/src/shared/hooks/use-section-navigation.ts`) and `PageSectionNavigator` (`apps/web/src/widgets/section-nav/page-section-navigator.tsx`).
   - Always trigger in-page jumps via `scrollToSection(id)` (programmatic `element.scrollIntoView` + `history.replaceState`) so repeated clicks on the same `#hash` never stall in Next.js App Router.
-  - Keep `pb-20 xl:pb-10` on `WorkfolioFooter` so the mobile thumb-zone floating pill (`bottom-4 right-4`) never overlaps footer links or telemetry.
+  - Keep `pb-20 xl:pb-10` on `WorkfolioFooter` (`apps/web/src/widgets/footer/workfolio-footer.tsx`) so the mobile thumb-zone floating pill (`bottom-4 right-4`) never overlaps footer links or telemetry.
 
 ## 2. Responsive Data Views (`< md` Cards vs `>= md` Tables / Canvases)
 
@@ -35,7 +35,7 @@ Use this skill whenever adding UI sections, Knowledge Base topics/articles, navi
 
 ## 4. Living Engineering Backlog & Trade-offs (`engineering-roadmap.ts`)
 
-- Whenever the author proposes a new feature idea, identifies tech debt, or decides to defer an over-engineered solution, record it in `apps/web/src/data/engineering-roadmap.ts` with:
+- Whenever the author proposes a new feature idea, identifies tech debt, or decides to defer an over-engineered solution, record it in `apps/web/src/entities/engineering-roadmap/engineering-roadmap.ts` with:
   - `status` (`'planned' | 'evaluating' | 'deferred' | 'shipped'`)
   - `rationale` (why prioritized next or why deferred)
   - `pros` (concrete engineering/product value) and `constraints` (bundle size, maintenance cost, security, or UX trade-offs).

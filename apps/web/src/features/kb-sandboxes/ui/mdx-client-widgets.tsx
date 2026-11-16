@@ -2,7 +2,7 @@
 
 import { Skeleton } from '@repo/ui'
 import dynamic from 'next/dynamic'
-import type { MdxWidgetName } from '@/lib/mdx-content'
+import type { MdxWidgetName } from '@/entities/knowledge-content'
 import { ArticleImageGrid } from './article-image-grid'
 import { NestAiMcpDiagram } from './nest-ai-mcp-diagram'
 

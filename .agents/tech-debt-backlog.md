@@ -17,21 +17,10 @@
 
 ## 🔧 Активный технический бэклог (Open Tech Debt)
 
-### 🔥 Ближайший приоритет №1: Архитектурный рефакторинг файловой структуры (FSD-Modular Next.js 16 + NestJS 12 Enterprise Modules)
-
-- [ ] **Этап 3 FSD-Modular: Декомпозиция MDX-движка (`entities/knowledge-content` + `entities/knowledge-article` + `features/kb-sandboxes`), чистовой слой `app/` и синхронизация документации:**
-  - **Фаза A (Декомпозиция при FSD-рефакторинге):** разбить монолитные `mdx-content.ts` (~954 строки) и `MdxArticleRenderer` (~530 строк) на изолированные модули с сохранением Zero-Eval CSP и `0 KB` клиентского парсера:
-    - `entities/knowledge-content/lib/mdx-fs-loader.ts` — чтение дерева `.{en,uk,ru}.mdx` и локальных fallback'ов;
-    - `entities/knowledge-content/lib/mdx-ast-parser.ts` — `remark-parse` / `remark-gfm`, парсинг блоков и TOC;
-    - `entities/knowledge-content/lib/mdx-search-index.ts` — лёгкая проекция для `/search-index/[locale]` и `Cmd+K`;
-    - `entities/knowledge-content/lib/link-sanitizer.ts` — проверка безопасных схем URL (`http/https/mailto/#/`);
-    - `entities/knowledge-article/ui/` — декомпозированный рендер (`inline-ast.tsx`, `code-block.tsx`, `markdown-table.tsx`, `callout-config.tsx`, `article-blocks.tsx`, `article-toc.tsx`, `metrics-bar.tsx`, `directory-explorer.tsx`);
-    - `features/kb-sandboxes/ui/` — ленивые интерактивные полигоны (`next/dynamic(..., { ssr: false })`).
-  - **Фаза B (Zero-Eval HAST Pipeline + Кастомные виджеты):** заменить промежуточный слой `MdxBlock[]` на конвейер **`unified` + `remark-parse` + `remark-gfm` + `remark-directive` (`:::sandbox{...}`) → `remark-rehype` + `@shikijs/rehype` + `rehype-sanitize` → `hast-util-to-jsx-runtime`**, позволяющий декларативно встраивать интерактивные виджеты и JSON-пропсы прямо из `.mdx` при строгом соблюдении **Zero-Eval CSP** (`0 KB` клиентского парсера, React 19 RSC).
-  - **Документ спецификации:** `.agents/frontend/architecture-fsd-modular.md`.
+### 🔥 Ближайший приоритет №1: Реструктуризация бэкенда NestJS 12 по Enterprise-стандарту и эволюция MDX HAST (Фаза B)
 
 - [ ] **Этап 4: Реструктуризация бэкенда NestJS 12 по Enterprise-стандарту (по аналогии с проектом `coffee-app`):**
-  - **Контекст и цели:** Переход от плоской структуры в `apps/api/src` к четкому 4-компонентному разделению приложения на **modules**, **migrations**, **config** и **common**:
+  - **Контекст и цели:** Фронтенд `apps/web/src` полностью переведён на `FSD-Modular` (`app` ➔ `widgets` ➔ `features` ➔ `entities` ➔ `shared`) с декомпозированным MDX-движком (Фаза A). Следующий шаг — переход от плоской структуры в `apps/api/src` к четкому 4-компонентному разделению приложения на **modules**, **migrations**, **config** и **common**:
     1. `common/` — **Общие компоненты фреймворка (Cross-Cutting Concerns):**
        - `decorators/` — кастомные декораторы (`@Protocol`, `@Public`, `@Roles`);
        - `dto/` — общие DTO (пагинация, сортировка, мета-ответы);
@@ -47,6 +36,9 @@
        - `modules/knowledge/` — `dto/`, `knowledge.controller.ts`, `knowledge.service.ts`, `knowledge.module.ts`;
        - `modules/telemetry/` — `telemetry.controller.ts`, `telemetry.service.ts`, `telemetry.module.ts`.
   - **Документ спецификации:** `.agents/frontend/architecture-fsd-modular.md` (Секция 3).
+
+- [ ] **Этап 5 (MDX Engine Фаза B — Zero-Eval HAST Pipeline + Кастомные виджеты):**
+  - Заменить промежуточный слой `MdxBlock[]` в `entities/knowledge-content` на стандартный конвейер **`unified` + `remark-parse` + `remark-gfm` + `remark-directive` (`:::sandbox{...}`) → `remark-rehype` + `@shikijs/rehype` + `rehype-sanitize` → `hast-util-to-jsx-runtime`**, позволяющий декларативно встраивать интерактивные клиентские острова (`features/kb-sandboxes/ui/*`) и JSON-пропсы прямо из `.mdx` при строгом соблюдении **Zero-Eval CSP** (`0 KB` клиентского парсера, React 19 RSC).
 
 ### ⏳ Ближайший приоритет №2: Внедрение Redis (Distributed Rate Limiting & Response Cache)
 

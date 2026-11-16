@@ -166,7 +166,7 @@ greatest-portfolio/
 │   └── backend/                # NestJS standards, JWT Security, Prisma, Microservices & SSE
 ├── .github/                    # GitHub Actions CI/CD (ci.yml + setup-workspace composite action)
 ├── apps/
-│   ├── web/                    # Next.js 16 App Router (Workfolio CV + protected Knowledge Base)
+│   ├── web/                    # Next.js 16 App Router (FSD-Modular: app ➔ widgets ➔ features ➔ entities ➔ shared)
 │   ├── api/                    # Core NestJS 12 backend (ESM) + Prisma + SSE Stream
 │   └── telemetry-ms/           # Telemetry & analytics microservice (@nestjs/microservices)
 ├── packages/
@@ -186,5 +186,6 @@ greatest-portfolio/
 ## 🧭 Architecture Documentation Navigation
 
 - [Root AI Context Router (`AGENTS.md`)](./AGENTS.md)
+- [FSD-Modular & NestJS Enterprise Architecture (`.agents/frontend/architecture-fsd-modular.md`)](./.agents/frontend/architecture-fsd-modular.md)
 - [Tech Debt & Post-MVP Roadmap (`.agents/tech-debt-backlog.md`)](./.agents/tech-debt-backlog.md)
 - [Full Catalog of 16 ADRs: Why, Where & How (`.agents/architecture/adr-stack.md`)](./.agents/architecture/adr-stack.md)

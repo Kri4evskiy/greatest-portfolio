@@ -3,13 +3,13 @@ import { Badge, Callout } from '@repo/ui'
 import { Database, ShieldCheck } from 'lucide-react'
 import { getTranslations } from 'next-intl/server'
 import { Suspense } from 'react'
-import { KnowledgeDirectoryExplorer } from '@/components/knowledge/knowledge-directory-explorer'
+import { KnowledgeDirectoryExplorer } from '@/entities/knowledge-article/ui/knowledge-directory-explorer'
 import {
   getAllKnowledgeArticles,
   getAllKnowledgeTags,
   getKnowledgeTree,
   type MdxArticleFrontmatter,
-} from '@/lib/mdx-content'
+} from '@/entities/knowledge-content'
 
 export default async function KnowledgeBaseIndexPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params

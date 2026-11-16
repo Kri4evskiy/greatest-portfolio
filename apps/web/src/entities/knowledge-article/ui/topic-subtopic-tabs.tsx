@@ -1,6 +1,6 @@
 import { Badge } from '@repo/ui'
 import { FolderTree, Layers, Sparkles } from 'lucide-react'
-import type { KnowledgeTreeFolderNode } from '@/lib/mdx-content'
+import type { KnowledgeTreeFolderNode } from '@/entities/knowledge-content'
 import { Link } from '@/shared/i18n/navigation'
 
 interface TopicSubtopicTabsProps {

@@ -14,6 +14,13 @@ description: Official Vercel Engineering React & Next.js Best Practices (vercel-
 
 1. **Локальная документация под точную версию (`Version-Matched Docs`):** При любых сомнениях в API Next.js (например, асинхронные `params`, `searchParams`, `cookies()`, `headers()`, `next.config.ts`) агент обязан сверяться с локальной документацией установленной версии внутри `apps/web/node_modules/next/dist/docs/`, а не полагаться на устаревшие знания.
 2. **Next.js DevTools & MCP (`/_next/mcp`):** При запущенном `next dev` использовать диагностику маршрутов, ошибок компиляции и гидратации напрямую из рантайма Next.js.
+3. **Нативный `next/root-params` и `src/proxy.ts` (Next.js 16.3+ & `next-intl`):**
+   - Локаль резолвится нативно через `await rootParams.locale()` в `apps/web/src/shared/i18n/request.ts` — **ЗАПРЕЩЕНО** использовать устаревший `setRequestLocale()`.
+   - Edge-перехват запросов живёт в `apps/web/src/proxy.ts` — **ЗАПРЕЩЕНО** создавать депрекейтнутый `src/middleware.ts`.
+   - Для навигации всегда импортировать `Link`, `useRouter`, `usePathname` из `@/shared/i18n/navigation`.
+4. **Строгие границы слоёв `FSD-Modular` (`apps/web/src`):**
+   - Однонаправленный поток зависимостей: `app` ➔ `widgets` ➔ `features` ➔ `entities` ➔ `shared`.
+   - Серверные хуки `TanStack Query` размещаются строго в доменных подпапках `queries/` (`features/*/queries/`, `entities/*/queries/`), а браузерные DOM-хуки — в `shared/hooks/`.
 
 ## 2. Матрица приоритетов оптимизации (Vercel `react-best-practices` — 8 категорий)
 

@@ -1,5 +1,5 @@
 import type { SupportedLocale } from '@repo/shared-schemas'
-import type { KnowledgeSearchItem } from '@/lib/mdx-content'
+import type { KnowledgeSearchItem } from '@/entities/knowledge-content'
 
 export interface KnowledgeSearchPayload {
   items: readonly KnowledgeSearchItem[]

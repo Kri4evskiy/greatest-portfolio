@@ -1,0 +1,356 @@
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import {
+  DEFAULT_LOCALE,
+  formatKnowledgeSegmentLabel,
+  KNOWLEDGE_CATEGORY_LABELS,
+  type KnowledgeCategory,
+  type SupportedLocale,
+  SupportedLocaleEnum,
+} from '@repo/shared-schemas'
+import { cache } from 'react'
+import { parseRawMdx } from './mdx-ast-parser'
+import type {
+  KnowledgeBreadcrumbItem,
+  KnowledgeTreeFolderNode,
+  KnowledgeTreeNode,
+  MdxArticleDocument,
+  MdxArticleFrontmatter,
+} from './mdx-types'
+
+function resolveContentRoot(): string {
+  const candidates = [join(process.cwd(), 'content'), join(process.cwd(), 'apps', 'web', 'content')]
+  for (const dir of candidates) {
+    if (existsSync(dir)) {
+      return dir
+    }
+  }
+  return join(process.cwd(), 'content')
+}
+
+function extractBaseSlug(filename: string): string {
+  return filename.replace(/\.(en|uk|ru)\.mdx$/, '').replace(/\.mdx$/, '')
+}
+
+export function normalizeLocale(localeInput?: string): SupportedLocale {
+  const parsed = SupportedLocaleEnum.safeParse(localeInput)
+  return parsed.success ? parsed.data : DEFAULT_LOCALE
+}
+
+export function toFrontmatter(doc: MdxArticleDocument): MdxArticleFrontmatter {
+  return {
+    slug: doc.slug,
+    leafSlug: doc.leafSlug,
+    category: doc.category,
+    pathSegments: doc.pathSegments,
+    routePath: doc.routePath,
+    locale: doc.locale,
+    isFallback: doc.isFallback,
+    title: doc.title,
+    sidebarLabel: doc.sidebarLabel,
+    summary: doc.summary,
+    readingTime: doc.readingTime,
+    publishedAt: doc.publishedAt,
+    order: doc.order,
+    format: doc.format,
+    tags: doc.tags,
+    tldr: doc.tldr,
+  }
+}
+
+function scanCategoryDirectoryRecursively(
+  dirPath: string,
+  category: KnowledgeCategory,
+  relativeSubSegments: readonly string[],
+  requestedLocale: SupportedLocale,
+  outArticles: MdxArticleDocument[],
+): void {
+  if (!existsSync(dirPath)) return
+
+  const entries = readdirSync(dirPath, { withFileTypes: true })
+  const mdxFiles = entries.filter((e) => e.isFile() && e.name.endsWith('.mdx')).map((e) => e.name)
+  const uniqueLeafSlugs = Array.from(new Set(mdxFiles.map(extractBaseSlug))).sort()
+
+  for (const leafSlug of uniqueLeafSlugs) {
+    const exactCandidate = join(dirPath, `${leafSlug}.${requestedLocale}.mdx`)
+    const defaultLocaleCandidate = join(dirPath, `${leafSlug}.${DEFAULT_LOCALE}.mdx`)
+    const legacyCandidate = join(dirPath, `${leafSlug}.mdx`)
+
+    let targetPath = ''
+    let resolvedLocale: SupportedLocale = requestedLocale
+    let isFallback = false
+
+    if (existsSync(exactCandidate)) {
+      targetPath = exactCandidate
+      resolvedLocale = requestedLocale
+      isFallback = false
+    } else if (existsSync(defaultLocaleCandidate)) {
+      targetPath = defaultLocaleCandidate
+      resolvedLocale = DEFAULT_LOCALE
+      isFallback = requestedLocale !== DEFAULT_LOCALE
+    } else if (existsSync(legacyCandidate)) {
+      targetPath = legacyCandidate
+      resolvedLocale = DEFAULT_LOCALE
+      isFallback = requestedLocale !== DEFAULT_LOCALE
+    }
+
+    if (targetPath) {
+      const raw = readFileSync(targetPath, 'utf-8')
+      outArticles.push(parseRawMdx(raw, category, leafSlug, relativeSubSegments, resolvedLocale, isFallback))
+    }
+  }
+
+  const subDirs = entries
+    .filter((e) => e.isDirectory() && !e.name.startsWith('.'))
+    .map((e) => e.name)
+    .sort()
+
+  for (const subDir of subDirs) {
+    scanCategoryDirectoryRecursively(
+      join(dirPath, subDir),
+      category,
+      [...relativeSubSegments, subDir],
+      requestedLocale,
+      outArticles,
+    )
+  }
+}
+
+export const getAllKnowledgeArticles = cache((localeInput?: string): MdxArticleDocument[] => {
+  const requestedLocale = normalizeLocale(localeInput)
+  const root = resolveContentRoot()
+  const categories = Object.keys(KNOWLEDGE_CATEGORY_LABELS) as KnowledgeCategory[]
+  const articles: MdxArticleDocument[] = []
+
+  for (const category of categories) {
+    const categoryDir = join(root, category)
+    scanCategoryDirectoryRecursively(categoryDir, category, [], requestedLocale, articles)
+  }
+
+  return articles.sort((a, b) => a.order - b.order || a.routePath.localeCompare(b.routePath))
+})
+
+function insertArticleIntoFolder(
+  folder: KnowledgeTreeFolderNode,
+  remainingSegments: readonly string[],
+  article: MdxArticleFrontmatter,
+  locale: SupportedLocale,
+): void {
+  folder.articleCount += 1
+  folder.minOrder = Math.min(folder.minOrder, article.order)
+
+  if (remainingSegments.length <= 1) {
+    folder.children.push({
+      type: 'article',
+      pathKey: article.routePath,
+      article,
+    })
+    return
+  }
+
+  const nextSegment = remainingSegments[0]
+  if (!nextSegment) return
+
+  const nextPathSegments = [...folder.pathSegments, nextSegment]
+  const nextPathKey = nextPathSegments.join('/')
+
+  let childFolder = folder.children.find(
+    (child): child is KnowledgeTreeFolderNode => child.type === 'folder' && child.pathKey === nextPathKey,
+  )
+
+  if (!childFolder) {
+    childFolder = {
+      type: 'folder',
+      pathKey: nextPathKey,
+      segment: nextSegment,
+      label: formatKnowledgeSegmentLabel(nextSegment, locale),
+      pathSegments: nextPathSegments,
+      articleCount: 0,
+      minOrder: article.order,
+      children: [],
+    }
+    folder.children.push(childFolder)
+  }
+
+  insertArticleIntoFolder(childFolder, remainingSegments.slice(1), article, locale)
+}
+
+function sortTreeNodesRecursively(nodes: KnowledgeTreeNode[]): void {
+  nodes.sort((a, b) => {
+    if (a.type !== b.type) {
+      return a.type === 'folder' ? -1 : 1
+    }
+    if (a.type === 'folder' && b.type === 'folder') {
+      return a.minOrder - b.minOrder || a.label.localeCompare(b.label)
+    }
+    if (a.type === 'article' && b.type === 'article') {
+      return a.article.order - b.article.order || a.article.sidebarLabel.localeCompare(b.article.sidebarLabel)
+    }
+    return 0
+  })
+
+  for (const node of nodes) {
+    if (node.type === 'folder') {
+      sortTreeNodesRecursively(node.children)
+    }
+  }
+}
+
+export const getKnowledgeTree = cache((localeInput?: string): KnowledgeTreeFolderNode[] => {
+  const locale = normalizeLocale(localeInput)
+  const articles = getAllKnowledgeArticles(locale)
+  const categories = Object.keys(KNOWLEDGE_CATEGORY_LABELS) as KnowledgeCategory[]
+  const rootFolders: KnowledgeTreeFolderNode[] = []
+
+  for (const category of categories) {
+    const categoryArticles = articles.filter((a) => a.category === category)
+    if (categoryArticles.length === 0) continue
+
+    const rootFolder: KnowledgeTreeFolderNode = {
+      type: 'folder',
+      pathKey: category,
+      segment: category,
+      label: formatKnowledgeSegmentLabel(category, locale),
+      pathSegments: [category],
+      articleCount: 0,
+      minOrder: 999,
+      children: [],
+    }
+
+    for (const doc of categoryArticles) {
+      insertArticleIntoFolder(rootFolder, doc.pathSegments.slice(1), toFrontmatter(doc), locale)
+    }
+
+    sortTreeNodesRecursively(rootFolder.children)
+    rootFolders.push(rootFolder)
+  }
+
+  return rootFolders
+})
+
+export const getArticleByPathSegments = cache(
+  (segments: readonly string[], localeInput?: string): MdxArticleDocument | null => {
+    const targetRoute = segments.join('/')
+    const all = getAllKnowledgeArticles(localeInput)
+    return all.find((a) => a.routePath === targetRoute) ?? null
+  },
+)
+
+export const getFolderByPathSegments = cache(
+  (segments: readonly string[], localeInput?: string): KnowledgeTreeFolderNode | null => {
+    if (segments.length === 0) return null
+    const tree = getKnowledgeTree(localeInput)
+    const rootSegment = segments[0]
+    let current: KnowledgeTreeFolderNode | undefined = tree.find((node) => node.segment === rootSegment)
+
+    for (let i = 1; i < segments.length; i += 1) {
+      if (!current) return null
+      const seg = segments[i]
+      current = current.children.find(
+        (child): child is KnowledgeTreeFolderNode => child.type === 'folder' && child.segment === seg,
+      )
+    }
+
+    return current ?? null
+  },
+)
+
+export function buildKnowledgeBreadcrumbs(
+  segments: readonly string[],
+  localeInput?: string,
+  leafOverrideTitle?: string,
+): KnowledgeBreadcrumbItem[] {
+  const locale = normalizeLocale(localeInput)
+  const crumbs: KnowledgeBreadcrumbItem[] = []
+
+  for (let i = 0; i < segments.length; i += 1) {
+    const seg = segments[i]
+    if (!seg) continue
+    const isLast = i === segments.length - 1
+    const href = `/knowledge-base/${segments.slice(0, i + 1).join('/')}`
+    const label = isLast && leafOverrideTitle ? leafOverrideTitle : formatKnowledgeSegmentLabel(seg, locale)
+    crumbs.push({ label, href })
+  }
+
+  return crumbs
+}
+
+export function getAllStaticKnowledgeSlugArrays(): string[][] {
+  const tree = getKnowledgeTree(DEFAULT_LOCALE)
+  const paths: string[][] = []
+
+  const walk = (node: KnowledgeTreeNode) => {
+    if (node.type === 'folder') {
+      paths.push(node.pathSegments)
+      for (const child of node.children) {
+        walk(child)
+      }
+    } else {
+      paths.push(node.article.pathSegments)
+    }
+  }
+
+  for (const root of tree) {
+    walk(root)
+  }
+
+  return paths
+}
+
+export function getAdjacentAndRelatedArticles(
+  currentRoutePath: string,
+  localeInput?: string,
+): {
+  prev: MdxArticleFrontmatter | null
+  next: MdxArticleFrontmatter | null
+  related: MdxArticleFrontmatter[]
+} {
+  const locale = normalizeLocale(localeInput)
+  const tree = getKnowledgeTree(locale)
+  const orderedFrontmatters: MdxArticleFrontmatter[] = []
+
+  const flattenArticles = (nodes: readonly KnowledgeTreeNode[]) => {
+    for (const node of nodes) {
+      if (node.type === 'article') {
+        orderedFrontmatters.push(node.article)
+      } else {
+        flattenArticles(node.children)
+      }
+    }
+  }
+
+  flattenArticles(tree)
+
+  const currentIdx = orderedFrontmatters.findIndex((a) => a.routePath === currentRoutePath)
+  const current = currentIdx !== -1 ? orderedFrontmatters[currentIdx] : undefined
+  const prev = currentIdx > 0 ? (orderedFrontmatters[currentIdx - 1] ?? null) : null
+  const next =
+    currentIdx !== -1 && currentIdx < orderedFrontmatters.length - 1
+      ? (orderedFrontmatters[currentIdx + 1] ?? null)
+      : null
+
+  if (!current) {
+    return { prev, next, related: [] }
+  }
+
+  const currentTagSet = new Set(current.tags)
+  const related = orderedFrontmatters
+    .filter((candidate) => candidate.routePath !== current.routePath)
+    .map((candidate) => {
+      let sharedTags = 0
+      for (const tag of candidate.tags) {
+        if (currentTagSet.has(tag)) sharedTags += 1
+      }
+      const sameCategoryBonus = candidate.category === current.category ? 0.5 : 0
+      return {
+        candidate,
+        score: sharedTags + sameCategoryBonus,
+      }
+    })
+    .filter((entry) => entry.score > 0)
+    .sort((a, b) => b.score - a.score || a.candidate.order - b.candidate.order)
+    .slice(0, 3)
+    .map((entry) => entry.candidate)
+
+  return { prev, next, related }
+}
