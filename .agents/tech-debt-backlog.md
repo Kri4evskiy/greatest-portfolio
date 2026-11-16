@@ -99,6 +99,10 @@
 ### 5. Content & Interactive Sandboxes (`apps/web/content/*`)
 
 - [ ] **Interactive Tech Sandboxes in Knowledge Base:** добавление интерактивных полигонов прямо в статьи (Zod Live JSON Validator, JWT WebCrypto Signature Tester, SSE Live Trigger Button для телеметрии, Redis Latency Visualizer), подключаемых как ленивые `next/dynamic` клиентские острова (`<Widget />` или `:::sandbox` в `.mdx`) без утяжеления других страниц.
+- [ ] **Цикл из 3 профильных статей по безопасности в `others/security/` (в дополнение к обзорному манифесту Zero-Trust):**
+  1. `frontend-browser-security-playbook.{en,ru,uk}.mdx` — **Frontend & Browser Defense:** углублённый разбор CSP (`nonce` vs `SSG`, `Trusted Types`, `SRI`), `HttpOnly`/`__Host-` кук, DOM/AST-санитизации, защиты от Open Redirect, Clickjacking и методов борьбы с мультимодальными AI-ботами (WebAuthn Passkeys, Turnstile, PAT вместо визуальных CAPTCHA).
+  2. `backend-api-gateway-security-playbook.{en,ru,uk}.mdx` — **Backend & API Defense:** защита от распределённого AI-фаззинга (Sliding-Window Redis Rate Limiting + Tarpitting), ротация и отзыв `Access/Refresh` токенов, защита от BOLA/IDOR и Race Conditions (`SELECT FOR UPDATE`), Zod-схемы против Prototype Pollution/Mass Assignment и песочницы для MCP/AI-инструментов.
+  3. `devops-supply-chain-container-security.{en,ru,uk}.mdx` — **DevOps, Docker & Supply Chain Defense:** изоляция внутренних сетей Docker (`backend-network`, zero host ports), `non-root` Alpine-образы, защита от вредоносных npm `postinstall`-скриптов через `allowBuilds` и `--ignore-scripts`, харденинг GitHub Actions (`persist-credentials: false`, SHA-пиннинг) и управление секретами.
 - [ ] **Новые инженерные статьи `.mdx`:** расширить раздел `NestJS` и смежные темы разборами `DI & Custom Providers`, `Guards / Pipes / Interceptors`, `NestJS Microservices + SSE`.
 
 ### 6. Backend AI & Model Context Protocol (`apps/api` — Future Milestone)

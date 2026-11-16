@@ -10,6 +10,7 @@ export const KnowledgeCategoryEnum = z.enum([
   'architecture-devops',
   'databases-sql',
   'system-design',
+  'others',
 ])
 export type KnowledgeCategory = z.infer<typeof KnowledgeCategoryEnum>
 
@@ -22,6 +23,7 @@ export const KNOWLEDGE_CATEGORY_LABELS: Record<KnowledgeCategory, string> = {
   'architecture-devops': 'Architecture & Docker',
   'databases-sql': 'PostgreSQL & SQL',
   'system-design': 'System Design',
+  others: 'Others',
 }
 
 const LOCALIZED_CATEGORY_LABELS: Record<SupportedLocale, Record<KnowledgeCategory, string>> = {
@@ -34,6 +36,7 @@ const LOCALIZED_CATEGORY_LABELS: Record<SupportedLocale, Record<KnowledgeCategor
     'architecture-devops': 'Architecture & Docker',
     'databases-sql': 'PostgreSQL & SQL',
     'system-design': 'System Design',
+    others: 'Others',
   },
   uk: {
     'this-project': 'Цей проєкт',
@@ -44,6 +47,7 @@ const LOCALIZED_CATEGORY_LABELS: Record<SupportedLocale, Record<KnowledgeCategor
     'architecture-devops': 'Архітектура та Docker',
     'databases-sql': 'PostgreSQL та SQL',
     'system-design': 'System Design',
+    others: 'Інше',
   },
   ru: {
     'this-project': 'Этот проект',
@@ -54,6 +58,7 @@ const LOCALIZED_CATEGORY_LABELS: Record<SupportedLocale, Record<KnowledgeCategor
     'architecture-devops': 'Архитектура и Docker',
     'databases-sql': 'PostgreSQL и SQL',
     'system-design': 'System Design',
+    others: 'Другое',
   },
 }
 
@@ -71,7 +76,7 @@ const LOCALIZED_SUBTOPIC_LABELS: Record<SupportedLocale, Record<string, string>>
     'zod-contracts': 'Strict TS & Zod',
     'adr-catalog': 'ADR Catalog',
     'state-management': 'State & Offline Cache',
-    security: 'Zero-Trust Security & Hardening',
+    security: 'Security & Zero-Trust',
     microservices: 'Microservices & SSE',
     'offline-bundle': 'IndexedDB & Bundle',
     'ai-mcp': 'NestJS AI & MCP',
@@ -91,7 +96,7 @@ const LOCALIZED_SUBTOPIC_LABELS: Record<SupportedLocale, Record<string, string>>
     'zod-contracts': 'Суворий TS та Zod',
     'adr-catalog': 'Каталог ADR',
     'state-management': 'Стейт та Offline-кеш',
-    security: 'Zero-Trust Безпека та Hardening',
+    security: 'Безпека та Zero-Trust',
     microservices: 'Мікросервіси та SSE',
     'offline-bundle': 'IndexedDB та Бандл',
     'ai-mcp': 'NestJS AI та MCP',
@@ -111,7 +116,7 @@ const LOCALIZED_SUBTOPIC_LABELS: Record<SupportedLocale, Record<string, string>>
     'zod-contracts': 'Строгий TS и Zod',
     'adr-catalog': 'Каталог ADR',
     'state-management': 'Стейт и Offline-кэш',
-    security: 'Zero-Trust Безопасность и Hardening',
+    security: 'Безопасность и Zero-Trust',
     microservices: 'Микросервисы и SSE',
     'offline-bundle': 'IndexedDB и Бандл',
     'ai-mcp': 'NestJS AI и MCP',
