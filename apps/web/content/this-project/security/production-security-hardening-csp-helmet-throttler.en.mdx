@@ -45,7 +45,6 @@ To keep the build configuration in `next.config.ts` lean and preserve clean boun
 
 ```typescript title="apps/web/config/security-headers.config.ts"
 export interface ContentSecurityPolicyOptions {
-  allowSelfObjectAndFrame?: boolean
   allowSameOriginFraming?: boolean
 }
 
@@ -54,7 +53,7 @@ export function buildContentSecurityPolicy(
   publicApiUrl = '',
   options: ContentSecurityPolicyOptions = {},
 ): string {
-  const { allowSelfObjectAndFrame = false, allowSameOriginFraming = false } = options
+  const { allowSameOriginFraming = false } = options
   const normalizedPublicApi = publicApiUrl.trim() ? ` ${publicApiUrl.trim()}` : ''
 
   // In production, internal infrastructure ports are NEVER exposed in headers.
@@ -63,7 +62,7 @@ export function buildContentSecurityPolicy(
     ? `'self' https:${normalizedPublicApi}`
     : `'self' http://localhost:4000 http://localhost:4001 http://127.0.0.1:4000 http://127.0.0.1:4001 ws: wss: https:${normalizedPublicApi}`
 
-  // In production, 'unsafe-eval' is strictly disabled (MDX compiles to React AST without eval).
+  // In production, 'unsafe-eval' is strictly disabled (MDX compiles to HAST without eval).
   // In development, 'unsafe-eval' is required for Next.js Fast Refresh.
   const scriptSrc = isProduction
     ? "'self' 'unsafe-inline'"
@@ -76,11 +75,11 @@ export function buildContentSecurityPolicy(
     "img-src 'self' blob: data: https:",
     "font-src 'self' data: https:",
     `connect-src ${connectSrc}`,
-    `frame-src ${allowSelfObjectAndFrame ? "'self'" : "'none'"}`,
+    "frame-src 'self'",
     `frame-ancestors ${allowSameOriginFraming ? "'self'" : "'none'"}`,
     "form-action 'self'",
     "base-uri 'self'",
-    `object-src ${allowSelfObjectAndFrame ? "'self'" : "'none'"}`,
+    "object-src 'self'",
     ...(isProduction ? ['upgrade-insecure-requests'] : []),
   ]
 
@@ -88,7 +87,7 @@ export function buildContentSecurityPolicy(
 }
 ```
 
-In `apps/web/next.config.ts`, attaching headers, scoping inline PDF permissions strictly to `/cv`, and stripping `X-Powered-By: Next.js` stays concise:
+In `apps/web/next.config.ts`, attaching headers, scoping inline PDF framing strictly to `/cv/:path+`, and stripping `X-Powered-By: Next.js` stays concise:
 
 ```typescript title="apps/web/next.config.ts"
 import { getSecurityHeaders } from './config/security-headers.config'
@@ -97,29 +96,23 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   // ...
   async headers() {
-    const cvPageHeaders = getSecurityHeaders(undefined, undefined, {
-      allowSelfObjectAndFrame: true,
-    })
     const cvPdfAssetHeaders = getSecurityHeaders(undefined, undefined, {
-      allowSelfObjectAndFrame: true,
       allowSameOriginFraming: true,
     })
 
     return [
       { source: '/(.*)', headers: getSecurityHeaders() },
-      { source: '/cv', headers: cvPageHeaders },
-      { source: '/:locale(en|ua|uk|ru)/cv', headers: cvPageHeaders },
-      { source: '/cv/:path*', headers: cvPdfAssetHeaders },
+      { source: '/cv/:path+', headers: cvPdfAssetHeaders },
     ]
   },
 }
 ```
 
 ### Directive Breakdown and Dev/Prod Isolation:
-- **Zero Port Leakage & Zero Eval in Production:** Production strips internal ports (`:4000`, `:4001`, `localhost`) from `connect-src` and disables `'unsafe-eval'` in `script-src` (our Remark AST MDX engine never relies on `eval` or `new Function`).
+- **Zero Port Leakage & Zero Eval in Production:** Production strips internal ports (`:4000`, `:4001`, `localhost`) from `connect-src` and disables `'unsafe-eval'` in `script-src` (our HAST MDX engine never relies on `eval` or `new Function`).
 - **`Cross-Origin-Opener-Policy: same-origin`:** Isolates the top-level browsing context, preventing Spectre / XS-Leaks and `window.opener` attacks.
 - **`frame-ancestors 'none'` and `X-Frame-Options: DENY`:** Protect the portfolio and knowledge base from Clickjacking attacks—preventing unauthorized third-party sites from framing the application.
-- **`object-src 'none'`, `frame-src 'none'`, and Scoped CV PDF:** Plugins and embedded frames are disabled globally (`'none'`). Only `/cv` pages unlock `object-src 'self'` and `frame-src 'self'` (keeping `frame-ancestors 'none'` and `X-Frame-Options: DENY`), while static `/cv/:path*` PDF files use `frame-ancestors 'self'` and `X-Frame-Options: SAMEORIGIN` so `<object type="application/pdf">` renders inline without exposing external embeds.
+- **SPA-Safe `object-src 'self'`, `frame-src 'self'`, and Scoped `/cv/:path+` PDFs:** Because Next.js `<Link href="/cv">` performs soft client-side SPA navigation without reloading the initial document's CSP header, `object-src 'self'` and `frame-src 'self'` are set on document responses while `frame-ancestors 'none'` (`X-Frame-Options: DENY`) blocks framing on all routes except `/cv/:path+` (`frame-ancestors 'self'`, `X-Frame-Options: SAMEORIGIN`). This guarantees that `<object type="application/pdf">` always renders after client-side transitions while ensuring only internal `/cv/*.pdf` files can ever be embedded.
 - **`base-uri 'self'`:** Prevents unauthorized manipulation of `<base href="...">` tags.
 - **`Strict-Transport-Security (HSTS)`:** The `max-age=63072000; includeSubDomains; preload` header is sent strictly in production and mandates HTTPS for 2 continuous years.
 - **`Permissions-Policy`:** Explicitly disables browser sensors and interest cohort tracking (`camera=(), microphone=(), geolocation=(), browsing-topics=()`).

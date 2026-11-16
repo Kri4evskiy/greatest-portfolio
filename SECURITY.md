@@ -11,9 +11,9 @@ This repository implements a multi-tier, zero-trust security architecture design
 
 ### 2. HTTP Security Headers & Web Hardening (`apps/web`)
 
-- **Strict CSP ([`security-headers.config.ts`](./apps/web/config/security-headers.config.ts)):** Custom Content-Security-Policy isolating scripts, styles, fonts, and images (`'unsafe-eval'` stripped in production; internal ports omitted in production `connect-src`; `object-src 'none'` and `frame-src 'none'` globally, scoped to `'self'` solely on `/cv` routes for inline PDF rendering) while supporting theme hydration and Server-Sent Events.
+- **Strict CSP ([`security-headers.config.ts`](./apps/web/config/security-headers.config.ts)):** Custom Content-Security-Policy isolating scripts, styles, fonts, and images (`'unsafe-eval'` stripped in production; internal ports omitted in production `connect-src`; `object-src 'self'` and `frame-src 'self'` restricted strictly to same-origin while `frame-ancestors 'none'` blocks framing on all routes except `/cv/:path+` static PDFs) while supporting theme hydration, SPA `<Link href="/cv">` transitions, and Server-Sent Events.
 - **Stealth & Isolation:** `poweredByHeader: false` in `next.config.ts` strips `X-Powered-By: Next.js`; `Cross-Origin-Opener-Policy: same-origin` isolates browsing contexts.
-- **Clickjacking & MIME Defense:** Hardened globally with `X-Frame-Options: DENY`, `frame-ancestors 'none'`, and `X-Content-Type-Options: nosniff` (with `SAMEORIGIN` / `frame-ancestors 'self'` scoped exclusively to `/cv/*.pdf` assets for same-origin `<object>` embedding).
+- **Clickjacking & MIME Defense:** Hardened globally with `X-Frame-Options: DENY`, `frame-ancestors 'none'`, and `X-Content-Type-Options: nosniff` (with `SAMEORIGIN` / `frame-ancestors 'self'` scoped exclusively to `/cv/:path+` PDF assets so only internal CV PDFs can ever be embedded inside `<object>`).
 - **HSTS:** Strict-Transport-Security enforced in production with `max-age=63072000; includeSubDomains; preload` (2 years).
 - **Permissions-Policy:** Explicitly disabling `camera`, `microphone`, `geolocation`, and `browsing-topics`.
 

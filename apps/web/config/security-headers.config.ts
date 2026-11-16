@@ -5,31 +5,32 @@ export interface SecurityHeaderEntry {
 
 export interface ContentSecurityPolicyOptions {
   /**
-   * Allows same-origin `<object>` / `<iframe>` PDF rendering exclusively on `/cv` routes.
-   * Remains `false` (`'none'`) on all other application routes.
-   */
-  allowSelfObjectAndFrame?: boolean
-  /**
-   * Relaxes `frame-ancestors` from `'none'` to `'self'` exclusively for `/cv/*.pdf` assets
-   * so the portfolio's own `/cv` page can render the PDF inline while blocking external sites.
+   * Relaxes `frame-ancestors` from `'none'` to `'self'` (and `X-Frame-Options` to `SAMEORIGIN`)
+   * exclusively for `/cv/:path+` static PDF assets so the portfolio's own `/cv` page can render
+   * the PDF inline (including after client-side SPA `<Link href="/cv">` transitions) while
+   * blocking external sites and all other internal routes from being framed.
    */
   allowSameOriginFraming?: boolean
 }
 
 /**
  * Builds the Content-Security-Policy (CSP) string tailored for Next.js 16, React 19,
- * theme hydration, Server-Sent Events, and scoped same-origin CV PDF rendering.
+ * theme hydration, Server-Sent Events, and SPA-safe same-origin CV PDF rendering.
  *
  * Security Principle:
  * - Production: Strict zero-trust policy without internal ports or localhost leaks.
  * - Development: Permissive localhost and evaluation policies required for React Fast Refresh and HMR.
+ * - SPA Navigation & CV PDF Isolation: `object-src 'self'` and `frame-src 'self'` are set on document
+ *   responses so client-side `<Link href="/cv">` transitions from `/` or `/knowledge-base` never block
+ *   `<object type="application/pdf">`, while `frame-ancestors 'none'` (`X-Frame-Options: DENY`) on all
+ *   routes except `/cv/:path+` guarantees that ONLY internal `/cv/*.pdf` assets can ever be framed.
  */
 export function buildContentSecurityPolicy(
   isProduction: boolean,
   publicApiUrl = '',
   options: ContentSecurityPolicyOptions = {},
 ): string {
-  const { allowSelfObjectAndFrame = false, allowSameOriginFraming = false } = options
+  const { allowSameOriginFraming = false } = options
   const normalizedPublicApi = publicApiUrl.trim() ? ` ${publicApiUrl.trim()}` : ''
 
   // In production, internal ports must NEVER be leaked in HTTP response headers.
@@ -38,12 +39,10 @@ export function buildContentSecurityPolicy(
     ? `'self' https:${normalizedPublicApi}`
     : `'self' http://localhost:4000 http://localhost:4001 http://127.0.0.1:4000 http://127.0.0.1:4001 ws: wss: https:${normalizedPublicApi}`
 
-  // In production, 'unsafe-eval' MUST NOT be enabled — our MDX pipeline compiles to React AST
+  // In production, 'unsafe-eval' MUST NOT be enabled — our MDX pipeline compiles to HAST
   // without dynamic eval/new Function, closing XSS eval gadgets.
   // In development, 'unsafe-eval' is required for Next.js Fast Refresh / HMR.
   const scriptSrc = isProduction ? "'self' 'unsafe-inline'" : "'self' 'unsafe-inline' 'unsafe-eval'"
-  const objectSrc = allowSelfObjectAndFrame ? "'self'" : "'none'"
-  const frameSrc = allowSelfObjectAndFrame ? "'self'" : "'none'"
   const frameAncestors = allowSameOriginFraming ? "'self'" : "'none'"
 
   const directives: string[] = [
@@ -65,10 +64,10 @@ export function buildContentSecurityPolicy(
     // Network Connections: REST API, SSE telemetry stream, and cloud observability (Sentry / PostHog)
     `connect-src ${connectSrc}`,
 
-    // Embedded subframes: Blocked globally ('none'), scoped to 'self' only on CV PDF viewer routes
-    `frame-src ${frameSrc}`,
+    // Embedded subframes: Restricted strictly to same-origin ('self'); only /cv/:path+ permits framing via frame-ancestors
+    "frame-src 'self'",
 
-    // Clickjacking Defense: Block all framing globally; allow same-origin only for static /cv/*.pdf assets
+    // Clickjacking Defense: Block all framing globally ('none'); allow 'self' only on static /cv/:path+ PDF assets
     `frame-ancestors ${frameAncestors}`,
 
     // Form Submissions: Restrict HTML form targets to self origin
@@ -77,8 +76,8 @@ export function buildContentSecurityPolicy(
     // Base URI: Prevent DOM injection of malicious <base href="..."> tags
     "base-uri 'self'",
 
-    // Plugins / Objects: Blocked globally ('none'); scoped to 'self' only on CV routes for inline PDF <object>
-    `object-src ${objectSrc}`,
+    // Plugins / Objects: Restricted strictly to same-origin ('self') so SPA <Link href="/cv"> navigation renders /cv/*.pdf
+    "object-src 'self'",
 
     // Enforce HTTPS upgrade exclusively in production (do not break local http://localhost)
     ...(isProduction ? ['upgrade-insecure-requests'] : []),

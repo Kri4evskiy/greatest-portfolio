@@ -45,7 +45,6 @@ tldr:
 
 ```typescript title="apps/web/config/security-headers.config.ts"
 export interface ContentSecurityPolicyOptions {
-  allowSelfObjectAndFrame?: boolean
   allowSameOriginFraming?: boolean
 }
 
@@ -54,7 +53,7 @@ export function buildContentSecurityPolicy(
   publicApiUrl = '',
   options: ContentSecurityPolicyOptions = {},
 ): string {
-  const { allowSelfObjectAndFrame = false, allowSameOriginFraming = false } = options
+  const { allowSameOriginFraming = false } = options
   const normalizedPublicApi = publicApiUrl.trim() ? ` ${publicApiUrl.trim()}` : ''
 
   // У продакшені внутрішні порти інфраструктури НІКОЛИ не розкриваються в заголовках.
@@ -63,7 +62,7 @@ export function buildContentSecurityPolicy(
     ? `'self' https:${normalizedPublicApi}`
     : `'self' http://localhost:4000 http://localhost:4001 http://127.0.0.1:4000 http://127.0.0.1:4001 ws: wss: https:${normalizedPublicApi}`
 
-  // У продакшені 'unsafe-eval' повністю вимкнений (MDX компілюється в AST без eval).
+  // У продакшені 'unsafe-eval' повністю вимкнений (MDX компілюється в HAST без eval).
   // У девелопменті 'unsafe-eval' потрібен для Next.js Fast Refresh.
   const scriptSrc = isProduction
     ? "'self' 'unsafe-inline'"
@@ -76,11 +75,11 @@ export function buildContentSecurityPolicy(
     "img-src 'self' blob: data: https:",
     "font-src 'self' data: https:",
     `connect-src ${connectSrc}`,
-    `frame-src ${allowSelfObjectAndFrame ? "'self'" : "'none'"}`,
+    "frame-src 'self'",
     `frame-ancestors ${allowSameOriginFraming ? "'self'" : "'none'"}`,
     "form-action 'self'",
     "base-uri 'self'",
-    `object-src ${allowSelfObjectAndFrame ? "'self'" : "'none'"}`,
+    "object-src 'self'",
     ...(isProduction ? ['upgrade-insecure-requests'] : []),
   ]
 
@@ -88,7 +87,7 @@ export function buildContentSecurityPolicy(
 }
 ```
 
-А в самому `apps/web/next.config.ts` підключення заголовків, точковий scoping для вбудованого PDF-резюме на `/cv` та вимкнення `X-Powered-By: Next.js` виглядають так:
+А в самому `apps/web/next.config.ts` підключення заголовків, точковий scoping для вбудованого PDF-резюме `/cv/:path+` та вимкнення `X-Powered-By: Next.js` виглядають так:
 
 ```typescript title="apps/web/next.config.ts"
 import { getSecurityHeaders } from './config/security-headers.config'
@@ -97,29 +96,23 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   // ...
   async headers() {
-    const cvPageHeaders = getSecurityHeaders(undefined, undefined, {
-      allowSelfObjectAndFrame: true,
-    })
     const cvPdfAssetHeaders = getSecurityHeaders(undefined, undefined, {
-      allowSelfObjectAndFrame: true,
       allowSameOriginFraming: true,
     })
 
     return [
       { source: '/(.*)', headers: getSecurityHeaders() },
-      { source: '/cv', headers: cvPageHeaders },
-      { source: '/:locale(en|ua|uk|ru)/cv', headers: cvPageHeaders },
-      { source: '/cv/:path*', headers: cvPdfAssetHeaders },
+      { source: '/cv/:path+', headers: cvPdfAssetHeaders },
     ]
   },
 }
 ```
 
 ### Розбір директив та ізоляція Dev/Prod:
-- **Zero Port Leakage та Zero Eval у продакшені:** У проді з `connect-src` видалені порти `:4000`, `:4001` та `localhost`, а з `script-src` прибрано `'unsafe-eval'` (наш Remark AST-рушій MDX не використовує `eval`/`new Function`).
+- **Zero Port Leakage та Zero Eval у продакшені:** У проді з `connect-src` видалені порти `:4000`, `:4001` та `localhost`, а з `script-src` прибрано `'unsafe-eval'` (наш HAST-рушій MDX не використовує `eval`/`new Function`).
 - **`Cross-Origin-Opener-Policy: same-origin`:** Ізолює контекст вікна браузера, блокуючи доступ через `window.opener` і атаки класу Spectre/XS-Leaks.
 - **`frame-ancestors 'none'` та `X-Frame-Options: DENY`:** Захищають портфоліо та базу знань від атак клікджекінгу (Clickjacking) — сторонній сайт не зможе завантажити застосунок у прихованому `<iframe>`.
-- **`object-src 'none'`, `frame-src 'none'` та Scoped CV PDF:** На всьому сайті плагіни та фрейми повністю вимкнено (`'none'`). Виняток зроблено точково за маршрутами: сторінки `/cv` зберігають `X-Frame-Options: DENY` і `frame-ancestors 'none'`, але дозволяють `object-src 'self'` і `frame-src 'self'`, а статичні файли `/cv/:path*` віддаються з `X-Frame-Options: SAMEORIGIN` і `frame-ancestors 'self'`, щоб вбудований `<object type="application/pdf">` рендерився нативно без ризику вбудовування сторонніми доменами.
+- **SPA-безпечні `object-src 'self'`, `frame-src 'self'` та Scoped `/cv/:path+` PDF:** Оскільки при клієнтському переході `<Link href="/cv">` із `/` або `/knowledge-base` у Next.js App Router браузер не перезавантажує HTML-документ і зберігає CSP стартової сторінки, директиви `object-src 'self'` і `frame-src 'self'` увімкнено на рівні документа, але на всіх маршрутах сайту (`/(.*)`) стоять `frame-ancestors 'none'` та `X-Frame-Options: DENY`, і **лише** для статичних PDF-файлів `/cv/:path+` дозволені `frame-ancestors 'self'` та `X-Frame-Options: SAMEORIGIN`. Завдяки цьому вбудований `<object type="application/pdf">` безвідмовно відкривається при SPA-переходах, але жоден зовнішній об'єкт чи інший внутрішній роут не може бути вбудований.
 - **`base-uri 'self'`:** Запобігає маніпуляціям із тегом `<base href="...">`.
 - **`Strict-Transport-Security (HSTS)`:** Заголовок `max-age=63072000; includeSubDomains; preload` віддається лише в продакшені й вказує браузеру форсувати HTTPS протягом 2 років.
 - **`Permissions-Policy`:** Забороняє доступ до камери, мікрофона, геолокації та когорт трекінгу інтересів браузера (`camera=(), microphone=(), geolocation=(), browsing-topics=()`).
