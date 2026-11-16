@@ -3,7 +3,7 @@
 import { Moon, Sun } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useTheme } from 'next-themes'
-import { trackEvent } from '@/lib/analytics'
+import { trackEvent } from '@/shared/lib/analytics'
 
 export function ThemeToggle() {
   const { resolvedTheme, setTheme } = useTheme()

@@ -12,9 +12,9 @@ import { ArrowRight, Clock, FolderOpen, Hash, Layers, RotateCcw, Search, Sparkle
 import { useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from '@/i18n/navigation'
 import type { KnowledgeTreeFolderNode, MdxArticleFrontmatter } from '@/lib/mdx-content'
-import { useUIStore } from '@/store/use-ui-store'
+import { Link } from '@/shared/i18n/navigation'
+import { useUIStore } from '@/shared/store/use-ui-store'
 
 const NOTE_FORMATS: readonly KnowledgeNoteFormat[] = ['cheat-sheet', 'deep-dive', 'adr']
 

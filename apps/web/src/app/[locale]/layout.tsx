@@ -6,11 +6,11 @@ import { NextIntlClientProvider } from 'next-intl'
 import { getMessages, getTranslations } from 'next-intl/server'
 import { type ReactNode, Suspense } from 'react'
 import { CommandPaletteModal } from '@/components/knowledge/command-palette-modal'
-import { WorkfolioFooter } from '@/components/layout/workfolio-footer'
-import { WorkfolioHeader } from '@/components/layout/workfolio-header'
 import { GuestPassModal } from '@/features/auth/guest-pass-modal'
-import { QueryProvider } from '@/providers/query-provider'
-import { ThemeProvider } from '@/providers/theme-provider'
+import { QueryProvider } from '@/shared/providers/query-provider'
+import { ThemeProvider } from '@/shared/providers/theme-provider'
+import { WorkfolioFooter } from '@/widgets/footer/workfolio-footer'
+import { WorkfolioHeader } from '@/widgets/header/workfolio-header'
 
 export function generateStaticParams() {
   return SUPPORTED_LOCALES.map((locale) => ({ locale }))

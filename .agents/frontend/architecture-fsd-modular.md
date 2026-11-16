@@ -42,7 +42,7 @@ apps/web/src/
 │   │                           # Крупные композиционные блоки, собирающие несколько сущностей
 │   ├── header/                 # WorkfolioHeader, LanguageSwitcher, ThemeToggle
 │   ├── footer/                 # WorkfolioFooter, FooterSseStatus
-│   └── section-nav/            # PageSectionNavigator, UI-хук use-section-navigation
+│   └── section-nav/            # PageSectionNavigator
 │
 ├── features/                   # [Слой 3: User Scenarios & Interactions]
 │   │                           # Интерактивные фичи с действиями пользователя
@@ -63,6 +63,7 @@ apps/web/src/
 │
 └── shared/                     # [Слой 5: Infrastructure & Common Tools]
     │                           # Фундамент, не знающий о специфике бизнес-фичей
+    ├── hooks/                  # Браузерные DOM/ScrollSpy UI-хуки (use-section-navigation.ts)
     ├── i18n/                   # navigation.ts, routing.ts, request.ts
     ├── lib/                    # edge-jwt.ts, analytics.ts
     ├── providers/              # ThemeProvider, QueryProvider

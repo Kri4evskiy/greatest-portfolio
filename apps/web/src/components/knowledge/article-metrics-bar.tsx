@@ -10,7 +10,7 @@ import {
   useIncrementViewMutation,
   useKnowledgeMetrics,
 } from '@/hooks/use-knowledge-metrics'
-import { trackEvent } from '@/lib/analytics'
+import { trackEvent } from '@/shared/lib/analytics'
 
 export function ArticleMetricsBar({ slug, category }: { slug: string; category: KnowledgeCategory }) {
   const t = useTranslations('KnowledgeBase')

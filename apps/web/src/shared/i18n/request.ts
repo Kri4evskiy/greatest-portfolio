@@ -7,7 +7,7 @@ export default getRequestConfig(async () => {
   const parsed = SupportedLocaleEnum.safeParse(paramValue)
   const locale: SupportedLocale = parsed.success ? parsed.data : DEFAULT_LOCALE
 
-  const messages = (await import(`../../messages/${locale}.json`)).default
+  const messages = (await import(`../../../messages/${locale}.json`)).default
 
   return {
     locale,

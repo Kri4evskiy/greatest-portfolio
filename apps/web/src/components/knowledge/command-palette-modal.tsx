@@ -19,17 +19,17 @@ import {
 } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useSectionNavigation } from '@/hooks/use-section-navigation'
 import { useVisitorProfile } from '@/hooks/use-visitor-profile'
-import { useRouter } from '@/i18n/navigation'
-import { trackEvent } from '@/lib/analytics'
 import type { KnowledgeSearchItem } from '@/lib/mdx-content'
 import {
   getCachedKnowledgeSearchIndex,
   type KnowledgeSearchPayload,
   loadKnowledgeSearchIndex,
 } from '@/lib/search-index-client'
-import { useUIStore } from '@/store/use-ui-store'
+import { useSectionNavigation } from '@/shared/hooks/use-section-navigation'
+import { useRouter } from '@/shared/i18n/navigation'
+import { trackEvent } from '@/shared/lib/analytics'
+import { useUIStore } from '@/shared/store/use-ui-store'
 
 interface CommandPaletteModalProps {
   locale: SupportedLocale

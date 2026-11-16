@@ -1,9 +1,9 @@
 import { Callout } from '@repo/ui'
 import { AlertTriangle, CheckSquare, Hash, Info, Lightbulb, Quote, ShieldAlert, Sparkles, Square } from 'lucide-react'
 import type { ReactNode } from 'react'
-import { Link } from '@/i18n/navigation'
 import { type MdxBlock, type MdxCalloutKind, type MdxInlineNode, parseInlineMarkdownToAst } from '@/lib/mdx-content'
 import { highlightCodeServer } from '@/lib/shiki-highlighter'
+import { Link } from '@/shared/i18n/navigation'
 import { CodeCopyButton } from './code-copy-button'
 import { MdxInteractiveWidget } from './mdx-client-widgets'
 

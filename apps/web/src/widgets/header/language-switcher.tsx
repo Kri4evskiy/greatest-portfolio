@@ -4,8 +4,8 @@ import { LOCALE_METADATA, SUPPORTED_LOCALES, type SupportedLocale } from '@repo/
 import { Check, Globe } from 'lucide-react'
 import { useLocale, useTranslations } from 'next-intl'
 import { useEffect, useRef, useState, useTransition } from 'react'
-import { usePathname, useRouter } from '@/i18n/navigation'
-import { trackEvent } from '@/lib/analytics'
+import { usePathname, useRouter } from '@/shared/i18n/navigation'
+import { trackEvent } from '@/shared/lib/analytics'
 
 export function LanguageSwitcher() {
   const locale = useLocale() as SupportedLocale

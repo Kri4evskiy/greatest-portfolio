@@ -25,9 +25,9 @@ import { useTranslations } from 'next-intl'
 import { useEffect, useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { useIssueGuestPassMutation } from '@/hooks/use-visitor-profile'
-import { useRouter } from '@/i18n/navigation'
-import { trackEvent } from '@/lib/analytics'
-import { useUIStore } from '@/store/use-ui-store'
+import { useRouter } from '@/shared/i18n/navigation'
+import { trackEvent } from '@/shared/lib/analytics'
+import { useUIStore } from '@/shared/store/use-ui-store'
 
 const ONE_CLICK_PRESETS: ReadonlyArray<{
   label: string

@@ -19,23 +19,25 @@
 
 ### 🔥 Ближайший приоритет №1: Архитектурный рефакторинг файловой структуры (FSD-Modular Next.js 16 + NestJS 12 Enterprise Modules)
 
-- [ ] **Архитектурное построение папок и файлов во фронтенде по принципам Feature-Sliced Design (FSD) с учетом специфики Next.js 16 (App Router):**
-  - **Контекст и цели:** Ликвидация структурного «mess» в `apps/web/src` (где компоненты, хуки, данные и утилиты разбросаны между плоскими папками `components/`, `data/`, `features/` с единственным файлом, `hooks/` и `lib/`).
-  - **Архитектурное решение (FSD-Modular):** Адаптация принципов FSD с учетом архитектуры Next.js App Router (RSC, layouts, Server Actions, colocation):
-    1. `app/` — **Routing & Composition Layer:** исключительно тонкие Server Components (`layout.tsx`, `page.tsx`, `route.ts`), отвечающие только за маршрутизацию `[locale]`, `generateStaticParams`, `generateMetadata` и сборку страниц из виджетов.
-    2. `widgets/` — **Composite UI Layer:** самостоятельные композиционные блоки интерфейса (`header/`, `footer/`, `section-nav/`).
-    3. `features/` — **User Scenarios Layer:** законченные интерактивные сценарии пользователя с бизнес-действиями (`features/auth` — модалка входа и хук профиля, `features/search` — поисковая палитра `Cmd+K` и клиентский индекс, `features/telemetry-status` — индикатор SSE).
-    4. `entities/` — **Business Data Representation Layer:** компоненты отображения бизнес-сущностей (`entities/knowledge-article` — рендерер статьи, TOC, метрики, сайдбар; `entities/knowledge-content` — парсер MDX, AST-виджеты; `entities/workfolio-profile` — данные резюме и showcase; `entities/engineering-roadmap` — доска роадмапа и техрадар).
-    5. `shared/` — **Infrastructure Foundation Layer:** переиспользуемые модули, абстрагированные от бизнес-логики (`shared/lib` — crypto, analytics; `shared/providers` — theme, query; `shared/store` — UI store; `shared/i18n` — routing, navigation, request).
+- [ ] **Этап 2 FSD-Modular (`entities/` + `features/` + вынос серверного стейта в `queries/`):**
+  - **Контекст:** Базовые слои `shared/` (`hooks`, `i18n`, `lib`, `providers`, `store`) и `widgets/` (`header`, `footer`, `section-nav`) выделены на Этапе 1.
+  - **Осталось перенести:**
+    1. `features/` — **User Scenarios Layer:** `features/auth` (`GuestPassModal` + `queries/use-visitor-profile.ts`), `features/search` (`CommandPaletteModal` + `search-index-client.ts`), `features/telemetry-stream` (индикатор и хук SSE).
+    2. `entities/` — **Business Data Representation Layer:** `entities/workfolio-profile` (`author-profile.ts`, `cv-file.ts`, `CvDocumentShowcase`, секции CV), `entities/engineering-roadmap` (`engineering-roadmap.ts`, `EngineeringRoadmapBoard`, `TechRadarTable`), `entities/knowledge-article/queries/use-knowledge-metrics.ts`.
   - **Правило зависимостей:** Строгий однонаправленный поток сверху вниз (`app` ➔ `widgets` ➔ `features` ➔ `entities` ➔ `shared`) без циклических импортов.
   - **Документ спецификации:** `.agents/frontend/architecture-fsd-modular.md`.
 
-- [ ] **Разделение браузерных UI-хуков и слоя серверного стейта (`hooks/` ➔ `queries/` / FSD `queries`):**
-  - **Контекст:** Сейчас в `apps/web/src/hooks/` смешаны клиентский DOM/ScrollSpy-хук (`use-section-navigation.ts`) и модули серверного стейта TanStack Query (`use-visitor-profile.ts`, `use-knowledge-metrics.ts`).
-  - **Выбор нейминга (`queries/` vs `requests/`):** Выбираем **`queries/`** (или доменные подпапки `features/*/queries`, `entities/*/queries` в FSD), а не `requests/`, так как эти модули инкапсулируют `QUERY_KEY`, `useQuery`, `useMutation` и optimistic updates поверх IndexedDB-персистера, а не только транспортный HTTP-клиент (`fetch`).
-  - **Целевая разбивка:** `use-section-navigation.ts` остаётся в `hooks/` (или переезжает в `widgets/section-nav/`), а серверные хуки уходят в `queries/` (`features/auth/queries/`, `entities/knowledge-article/queries/`).
+- [ ] **Этап 3 FSD-Modular: Декомпозиция MDX-движка (`entities/knowledge-content` + `entities/knowledge-article` + `features/kb-sandboxes`) и чистовой слой `app/`:**
+  - **Фаза A (Декомпозиция при FSD-рефакторинге):** разбить монолитные `mdx-content.ts` (~954 строки) и `MdxArticleRenderer` (~530 строк) на изолированные модули с сохранением Zero-Eval CSP и `0 KB` клиентского парсера:
+    - `entities/knowledge-content/lib/mdx-fs-loader.ts` — чтение дерева `.{en,uk,ru}.mdx` и локальных fallback'ов;
+    - `entities/knowledge-content/lib/mdx-ast-parser.ts` — `remark-parse` / `remark-gfm`, парсинг блоков и TOC;
+    - `entities/knowledge-content/lib/mdx-search-index.ts` — лёгкая проекция для `/search-index/[locale]` и `Cmd+K`;
+    - `entities/knowledge-content/lib/link-sanitizer.ts` — проверка безопасных схем URL (`http/https/mailto/#/`);
+    - `entities/knowledge-article/ui/` — декомпозированный рендер (`inline-ast.tsx`, `code-block.tsx`, `markdown-table.tsx`, `callout-config.tsx`, `article-blocks.tsx`, `article-toc.tsx`, `metrics-bar.tsx`, `directory-explorer.tsx`);
+    - `features/kb-sandboxes/ui/` — ленивые интерактивные полигоны (`next/dynamic(..., { ssr: false })`).
+  - **Фаза B (Zero-Eval HAST Pipeline + Кастомные виджеты):** заменить промежуточный слой `MdxBlock[]` на конвейер **`unified` + `remark-parse` + `remark-gfm` + `remark-directive` (`:::sandbox{...}`) → `remark-rehype` + `@shikijs/rehype` + `rehype-sanitize` → `hast-util-to-jsx-runtime`**, позволяющий декларативно встраивать интерактивные виджеты и JSON-пропсы прямо из `.mdx` при строгом соблюдении **Zero-Eval CSP** (`0 KB` клиентского парсера, React 19 RSC).
 
-- [ ] **Реструктуризация бэкенда NestJS 12 по Enterprise-стандарту (по аналогии с проектом `coffee-app`):**
+- [ ] **Этап 4: Реструктуризация бэкенда NestJS 12 по Enterprise-стандарту (по аналогии с проектом `coffee-app`):**
   - **Контекст и цели:** Переход от плоской структуры в `apps/api/src` к четкому 4-компонентному разделению приложения на **modules**, **migrations**, **config** и **common**:
     1. `common/` — **Общие компоненты фреймворка (Cross-Cutting Concerns):**
        - `decorators/` — кастомные декораторы (`@Protocol`, `@Public`, `@Roles`);
@@ -78,6 +80,13 @@
     - NestJS Docs: `docs.nestjs.com/security/rate-limiting#proxies-and-distributed-storage`.
     - Upstash Docs: `upstash.com/docs/redis/overall/getstarted`.
 
+### ⏳ Ближайший приоритет №3: Полноценный переход с Tailwind CSS v3 на Tailwind CSS v4 (`packages/ui`, `apps/web`)
+
+- [ ] **Многоуровневая миграция дизайн-системы на `Tailwind CSS v4` (Oxide / CSS-first Engine):**
+  - **Шаг 1 (`@repo/ui` + Storybook 10):** перевод `packages/ui/src/styles/globals.css` с `@tailwind base/components/utilities` на CSS-first конфигурацию `@import "tailwindcss";`, описание дизайн-токенов внутри директивы `@theme` поверх семантических HSL/OKLCH переменных, настройка `@custom-variant dark (&:where(.dark, .dark *));`, замена `tailwindcss-animate` на совместимые анимации v4 и проверка всех `*.stories.tsx` в Storybook 10.
+  - **Шаг 2 (`apps/web` PostCSS + `@source`):** переключение `apps/web/postcss.config.mjs` на `@tailwindcss/postcss`, подключение `@source` для сканирования компонентов `@repo/ui` и FSD-слоёв (`app`, `widgets`, `features`, `entities`, `shared`), удаление устаревших JS-конфигов `tailwind.config.ts`.
+  - **Шаг 3 (Utility & Visual Regression Audit):** ревизия переименованных и изменённых утилит Tailwind v4 (`shadow-sm` ➔ `shadow-xs`, дефолтная ширина `ring-1` вместо `3px`, `outline-none` ➔ `outline-hidden`, явный цвет границ `border-border`) во всех компонентах с сохранением Zero-FOUC переключения тем.
+
 ### 1. CI/CD, Turborepo Cache & DX Optimization
 
 - [ ] **CI Security & Workflow Hardening:** добавить еженедельный `schedule:` крон для `pnpm audit --prod --audit-level=high` + `.github/dependabot.yml` (`npm` и `github-actions`), выставить `persist-credentials: false` на `actions/checkout@v6`, добавить `actionlint` в `lint` и при росте UI-кита подключить кэш `.turbo` в джобу `storybook`.
@@ -85,10 +94,7 @@
 ### 2. Security & Production Hardening (`apps/web`, `apps/api`)
 
 - [ ] **Access + Refresh JWT Rotation:** дополнить Edge HS256-верификацию парой короткоживущего `Access` (`15m`) + ротируемого `HttpOnly Refresh` (`7d`) токенов с хранением и отзывом сессий в `VisitorSession` (`PostgreSQL`).
-- [x] **HTTP Security Headers (CSP & HSTS):** настроить `Content-Security-Policy`, `Strict-Transport-Security`, `X-Content-Type-Options: nosniff` и `Referrer-Policy` в `apps/web/config/security-headers.config.ts` + `helmet` в `apps/api`.
-- [x] **Rate Limiting:** подключить `@nestjs/throttler` на `POST /api/auth/login` и `POST /api/auth/guest-pass` в `apps/api` против перебора пасскодов (`ADMIN` / `GUEST`).
-- [ ] **Throttler ESM Upgrade Cleanup (`apps/api`):**
-  - Периодически проверять обновления `@nestjs/throttler`: как только пакет перейдёт на нативный ESM (`"type": "module"`), удалить временный CJS/ESM мост для `Reflector` из `apps/api/src/app.module.ts` (настройка `trust proxy: 1` для продакшена за прокси уже добавлена в `apps/api/src/main.ts`).
+- [ ] **Throttler ESM Upgrade Cleanup (`apps/api`):** периодически проверять обновления `@nestjs/throttler` и после перехода пакета на нативный ESM (`"type": "module"`) удалить временный CJS/ESM мост для `Reflector` из `apps/api/src/app.module.ts`.
 
 ### 3. Observability & Real Cloud Integrations
 
@@ -97,33 +103,16 @@
 - [ ] **Nginx Reverse Proxy для VPS-деплоя (`docker-compose.prod.yml`):** легковесный Nginx как единая точка входа (порты 80/443, SSL Let's Encrypt, сквозное проксирование на `web:3000` и `api:4000`) без избыточного балансировщика нагрузки.
 - [ ] **Dual-Mode Air-Gapped Local Environment («Тумблер офлайна»):** гарантировать запуск 100% функционала монорепозитория (база знаний, MDX, поиск, локальная телеметрия TCP :4001) при полном отсутствии интернета и внешних облачных сервисов (In-Memory Prisma + In-Memory Throttler).
 - [ ] **S3-compatible Object Storage (Cloudflare R2 vs AWS S3):** интеграция `@aws-sdk/client-s3` с эндпоинтом Cloudflare R2 ($0 за трафик, 10 ГБ навсегда бесплатно) для сгенерированных PDF-резюме и ассетов + локальный MinIO в Docker.
-- [ ] **Cross-Domain API Deployment (`NEXT_PUBLIC_API_URL`):** при выносе `apps/api` на отдельный домен (например, `https://api.yourdomain.com` на Render/VPS, чтобы прямые SSE-стримы не обрывались таймаутами Next.js `rewrites`):
-  - Добавить `NEXT_PUBLIC_API_URL` в `.env`, `.env.example`, `turbo.json` (`globalEnv`) и переменные среды хостинга (`Vercel`).
-  - Перевести клиентские `fetch` / `EventSource` (`apps/web`) на использование `NEXT_PUBLIC_API_URL` с фолбэком на `''` (same-origin), а также настроить `WEB_ORIGIN` на бэкенде и убедиться, что `getSecurityHeaders()` в `apps/web/config/security-headers.config.ts` подхватывает этот домен в CSP `connect-src`.
+- [ ] **Cross-Domain API Deployment (`NEXT_PUBLIC_API_URL`):** при выносе `apps/api` на отдельный домен добавить `NEXT_PUBLIC_API_URL` в `.env`, `.env.example`, `turbo.json` (`globalEnv`), перевести клиентские `fetch` / `EventSource` на `NEXT_PUBLIC_API_URL` с фолбэком на `''` и прокинуть домен в CSP `connect-src`.
 
 ### 4. Testing (`packages/*`, `apps/*`)
 
 - [ ] **Unit & Integration Tests (`Vitest`):** тесты Zod v4 схем (`@repo/shared-schemas`), Zustand-сторов и NestJS-сервисов + интеграция джобы `unit-tests` в Stage 1 CI (`turbo run test --affected`).
 - [ ] **E2E Playwright Suite:** проверка RBAC-флоу (`GuestPassModal` → `HttpOnly` кука → чтение `.mdx` → маскирование `<Redact />`) + джоба `e2e` после `build` в CI (и обновить карточку `playwright-vitest-ci` в `engineering-roadmap.ts`).
 
-### 5. Content, MDX Engine Evolution & Interactive Sandboxes (`apps/web/content/*`)
+### 5. Content & Interactive Sandboxes (`apps/web/content/*`)
 
-- [ ] **Декомпозиция MDX-движка на FSD-подкатегории (в рамках Приоритета №1 — `FSD-Modular`):**
-  - **Текущий диагноз:** связка `unified` + `remark-parse` + `remark-gfm` (`mdx-content.ts`, ~954 строки) и `MdxArticleRenderer` (~530 строк) уже построена правильно с точки зрения безопасности и SSG (`0 KB` клиентского парсера, серверный `Shiki`, отсутствие `eval`/`'unsafe-eval'` в CSP, поддержка `.{en,uk,ru}.mdx` с fallback), но страдает от двух проблем:
-    1. Двойная конвертация AST (`mdast` → самописный `MdxBlock[]`/`MdxInlineNode[]` → ручной перебор массивами в JSX), из-за которой любую новую Markdown-конструкцию приходится дописывать в двух местах.
-    2. Монолитность (смешаны чтение ФС, парсинг AST, поисковый индекс, санитизация URL, Shiki-подсветка и UI-блоки).
-  - **Сравнение подходов (почему мы пришли к текущему решению и дальнейшей эволюции):**
-    - `@next/mdx`: неудобен для динамического catch-all дерева `[...slug]` с локалями `.{en,uk,ru}.mdx` и fallback на `.en.mdx`.
-    - `next-mdx-remote/rsc`: тяжелее на 137+ SSG-страницах, требует JSX-компиляции и усложняет Zero-Eval CSP, авто-TOC и сборку статического индекса `Cmd+K`.
-    - **Выбор (Фаза A — сейчас при FSD-рефакторинге):** оставить быстрый и проверенный data-driven AST-движок без `eval`, но разбить его на чёткие FSD-подкатегории:
-      - `entities/knowledge-content/lib/mdx-fs-loader.ts` — чтение дерева файлов и локальных fallback'ов;
-      - `entities/knowledge-content/lib/mdx-ast-parser.ts` — `remark-parse` / `remark-gfm` и парсинг блоков/TOC;
-      - `entities/knowledge-content/lib/mdx-search-index.ts` — лёгкая проекция для `/search-index/[locale]` и `Cmd+K`;
-      - `entities/knowledge-content/lib/link-sanitizer.ts` — проверка безопасных схем URL (`http/https/mailto/#/`, запрет `javascript:`/`data:`);
-      - `entities/knowledge-article/ui/` — декомпозированный `MdxArticleRenderer` (`inline-ast.tsx`, `code-block.tsx`, `markdown-table.tsx`, `callout-config.tsx`, `article-blocks.tsx`);
-      - `features/kb-sandboxes/ui/` — ленивые интерактивные полигоны (`next/dynamic(..., { ssr: false })` через `MdxInteractiveWidget`).
-    - **Эволюция (Фаза B — при необходимости сложного Markdown / контейнерных песочниц):** заменить промежуточный слой `MdxBlock` на стандартный конвейер **`unified` + `remark-parse` + `remark-gfm` + `remark-directive` (`:::sandbox{...}`) → `remark-rehype` + `@shikijs/rehype` + `rehype-sanitize` → `hast-util-to-jsx-runtime`**. Это полностью уберёт ~500 строк ручных AST-свитчей, позволит передавать в интерактивные виджеты вложенный контент/JSON прямо из `.mdx` и при этом сохранит **Zero-Eval CSP**, React 19 RSC и `0 KB` клиентского парсера.
-- [ ] **Interactive Tech Sandboxes in Knowledge Base:** добавление интерактивных полигонов прямо в статьи (Zod Live JSON Validator, JWT WebCrypto Signature Tester, SSE Live Trigger Button для телеметрии, Redis Latency Visualizer), подключаемых как ленивые `next/dynamic` клиентские острова (одна строка `<Widget />` или `:::sandbox` в `.mdx`) без утяжеления других страниц.
+- [ ] **Interactive Tech Sandboxes in Knowledge Base:** добавление интерактивных полигонов прямо в статьи (Zod Live JSON Validator, JWT WebCrypto Signature Tester, SSE Live Trigger Button для телеметрии, Redis Latency Visualizer), подключаемых как ленивые `next/dynamic` клиентские острова (`<Widget />` или `:::sandbox` в `.mdx`) без утяжеления других страниц.
 - [ ] **Новые инженерные статьи `.mdx`:** расширить раздел `NestJS` и смежные темы разборами `DI & Custom Providers`, `Guards / Pipes / Interceptors`, `NestJS Microservices + SSE`.
 
 ### 6. Backend AI & Model Context Protocol (`apps/api` — Future Milestone)

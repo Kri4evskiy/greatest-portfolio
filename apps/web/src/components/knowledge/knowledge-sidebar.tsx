@@ -17,10 +17,10 @@ import {
 } from 'lucide-react'
 import { useLocale, useTranslations } from 'next-intl'
 import { useEffect, useMemo, useState } from 'react'
-import { Link, usePathname } from '@/i18n/navigation'
 import type { KnowledgeTreeFolderNode, KnowledgeTreeNode } from '@/lib/mdx-content'
 import { prefetchKnowledgeSearchIndex } from '@/lib/search-index-client'
-import { useUIStore } from '@/store/use-ui-store'
+import { Link, usePathname } from '@/shared/i18n/navigation'
+import { useUIStore } from '@/shared/store/use-ui-store'
 
 function collectAllFolderKeys(nodes: readonly KnowledgeTreeNode[]): string[] {
   const keys: string[] = []

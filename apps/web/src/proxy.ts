@@ -1,8 +1,8 @@
 import { KB_ACCESS_COOKIE_NAME } from '@repo/shared-schemas'
 import { type NextRequest, NextResponse } from 'next/server'
 import createMiddleware from 'next-intl/middleware'
-import { routing } from './i18n/routing'
-import { verifyEdgeJwtHs256 } from './lib/edge-jwt'
+import { routing } from './shared/i18n/routing'
+import { verifyEdgeJwtHs256 } from './shared/lib/edge-jwt'
 
 const handleI18nRouting = createMiddleware(routing)
 

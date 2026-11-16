@@ -22,9 +22,9 @@ import {
 import { useTranslations } from 'next-intl'
 import { useState } from 'react'
 import { AUTHOR_PROFILE, AUTHOR_SKILL_GROUPS, COMMERCIAL_EXPERIENCE, pickLocalized } from '@/data/author-profile'
-import { Link } from '@/i18n/navigation'
-import { trackEvent } from '@/lib/analytics'
 import type { CvFileMetadata } from '@/lib/cv-file'
+import { Link } from '@/shared/i18n/navigation'
+import { trackEvent } from '@/shared/lib/analytics'
 
 interface CvDocumentShowcaseProps {
   cvMeta: CvFileMetadata

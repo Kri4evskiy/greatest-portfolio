@@ -1,8 +1,8 @@
 import { formatKnowledgeSegmentLabel, getKnowledgeFormatLabel, type SupportedLocale } from '@repo/shared-schemas'
 import { Badge } from '@repo/ui'
 import { ArrowLeft, ArrowRight, Sparkles } from 'lucide-react'
-import { Link } from '@/i18n/navigation'
 import type { MdxArticleFrontmatter } from '@/lib/mdx-content'
+import { Link } from '@/shared/i18n/navigation'
 
 interface ArticleFooterNavProps {
   prev: MdxArticleFrontmatter | null

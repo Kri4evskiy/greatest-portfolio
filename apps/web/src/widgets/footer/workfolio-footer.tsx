@@ -3,7 +3,7 @@ import { Badge } from '@repo/ui'
 import { Database, ExternalLink, FileDown, Github, Linkedin, Mail, MapPin, Send } from 'lucide-react'
 import { getTranslations } from 'next-intl/server'
 import { AUTHOR_PROFILE, pickLocalized } from '@/data/author-profile'
-import { Link } from '@/i18n/navigation'
+import { Link } from '@/shared/i18n/navigation'
 import { FooterSseStatus } from './footer-sse-status'
 
 export async function WorkfolioFooter({ locale }: { locale: SupportedLocale }) {

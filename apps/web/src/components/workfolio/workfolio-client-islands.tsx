@@ -13,11 +13,11 @@ import {
   LockOpen,
 } from 'lucide-react'
 import { type ReactNode, useState } from 'react'
-import { useSectionNavigation } from '@/hooks/use-section-navigation'
 import { useVisitorProfile } from '@/hooks/use-visitor-profile'
-import { Link, useRouter } from '@/i18n/navigation'
-import { trackEvent } from '@/lib/analytics'
-import { useUIStore } from '@/store/use-ui-store'
+import { useSectionNavigation } from '@/shared/hooks/use-section-navigation'
+import { Link, useRouter } from '@/shared/i18n/navigation'
+import { trackEvent } from '@/shared/lib/analytics'
+import { useUIStore } from '@/shared/store/use-ui-store'
 
 interface HeroActionRowProps {
   ctaUnlocked: string

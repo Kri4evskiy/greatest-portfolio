@@ -13,8 +13,8 @@ import {
 import { ArrowUpDown, BookOpenCheck, Compass, Layers, Search, Sparkles } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useState } from 'react'
-import { trackEvent } from '@/lib/analytics'
-import { useUIStore } from '@/store/use-ui-store'
+import { trackEvent } from '@/shared/lib/analytics'
+import { useUIStore } from '@/shared/store/use-ui-store'
 
 const CATEGORIES: ReadonlyArray<TechCategory | 'ALL'> = [
   'ALL',

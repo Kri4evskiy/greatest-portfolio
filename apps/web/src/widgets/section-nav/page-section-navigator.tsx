@@ -8,7 +8,7 @@ import {
   useSectionNavigation,
   WORKFOLIO_SECTION_IDS,
   type WorkfolioSectionId,
-} from '@/hooks/use-section-navigation'
+} from '@/shared/hooks/use-section-navigation'
 
 const SECTION_TRANSLATION_KEYS: Record<
   WorkfolioSectionId,

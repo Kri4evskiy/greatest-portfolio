@@ -16,7 +16,6 @@ import { ArticleMetricsBar } from '@/components/knowledge/article-metrics-bar'
 import { DesktopArticleToc, MobileArticleToc } from '@/components/knowledge/article-toc'
 import { MdxArticleRenderer, renderInlineMarkdown } from '@/components/knowledge/mdx-article-renderer'
 import { TopicSubtopicTabs } from '@/components/knowledge/topic-subtopic-tabs'
-import { Link } from '@/i18n/navigation'
 import {
   buildKnowledgeBreadcrumbs,
   getAdjacentAndRelatedArticles,
@@ -28,6 +27,7 @@ import {
   type KnowledgeTreeFolderNode,
   type MdxArticleFrontmatter,
 } from '@/lib/mdx-content'
+import { Link } from '@/shared/i18n/navigation'
 
 interface CatchAllKnowledgePageProps {
   params: Promise<{

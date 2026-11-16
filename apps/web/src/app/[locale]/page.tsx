@@ -1,5 +1,4 @@
 import { DEFAULT_LOCALE, getTechRadarItems, SupportedLocaleEnum } from '@repo/shared-schemas'
-import { PageSectionNavigator } from '@/components/layout/page-section-navigator'
 import { EngineeringRoadmapBoard } from '@/components/workfolio/engineering-roadmap-board'
 import { TechRadarTable } from '@/components/workfolio/tech-radar-table'
 import {
@@ -8,6 +7,7 @@ import {
   WorkfolioProjectsSection,
 } from '@/components/workfolio/workfolio-sections'
 import { getLocalizedRoadmapItems } from '@/data/engineering-roadmap'
+import { PageSectionNavigator } from '@/widgets/section-nav/page-section-navigator'
 
 export default async function WorkfolioHomePage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params

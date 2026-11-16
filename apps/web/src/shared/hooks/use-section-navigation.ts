@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { usePathname, useRouter } from '@/i18n/navigation'
+import { usePathname, useRouter } from '@/shared/i18n/navigation'
 
 export const WORKFOLIO_SECTION_IDS = ['about', 'projects', 'experience', 'tech-radar', 'roadmap'] as const
 
