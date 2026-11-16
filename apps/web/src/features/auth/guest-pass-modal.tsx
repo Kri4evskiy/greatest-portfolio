@@ -24,10 +24,10 @@ import { useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useEffect, useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
-import { useIssueGuestPassMutation } from '@/hooks/use-visitor-profile'
 import { useRouter } from '@/shared/i18n/navigation'
 import { trackEvent } from '@/shared/lib/analytics'
 import { useUIStore } from '@/shared/store/use-ui-store'
+import { useIssueGuestPassMutation } from './queries/use-visitor-profile'
 
 const ONE_CLICK_PRESETS: ReadonlyArray<{
   label: string

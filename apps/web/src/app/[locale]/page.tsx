@@ -1,12 +1,12 @@
 import { DEFAULT_LOCALE, getTechRadarItems, SupportedLocaleEnum } from '@repo/shared-schemas'
-import { EngineeringRoadmapBoard } from '@/components/workfolio/engineering-roadmap-board'
-import { TechRadarTable } from '@/components/workfolio/tech-radar-table'
+import { getLocalizedRoadmapItems } from '@/entities/engineering-roadmap/engineering-roadmap'
+import { EngineeringRoadmapBoard } from '@/entities/engineering-roadmap/engineering-roadmap-board'
+import { TechRadarTable } from '@/entities/engineering-roadmap/tech-radar-table'
 import {
   WorkfolioExperienceSection,
   WorkfolioHeroSection,
   WorkfolioProjectsSection,
-} from '@/components/workfolio/workfolio-sections'
-import { getLocalizedRoadmapItems } from '@/data/engineering-roadmap'
+} from '@/entities/workfolio-profile/workfolio-sections'
 import { PageSectionNavigator } from '@/widgets/section-nav/page-section-navigator'
 
 export default async function WorkfolioHomePage({ params }: { params: Promise<{ locale: string }> }) {

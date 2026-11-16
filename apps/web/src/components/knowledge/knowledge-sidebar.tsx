@@ -17,8 +17,8 @@ import {
 } from 'lucide-react'
 import { useLocale, useTranslations } from 'next-intl'
 import { useEffect, useMemo, useState } from 'react'
+import { prefetchKnowledgeSearchIndex } from '@/features/search/search-index-client'
 import type { KnowledgeTreeFolderNode, KnowledgeTreeNode } from '@/lib/mdx-content'
-import { prefetchKnowledgeSearchIndex } from '@/lib/search-index-client'
 import { Link, usePathname } from '@/shared/i18n/navigation'
 import { useUIStore } from '@/shared/store/use-ui-store'
 

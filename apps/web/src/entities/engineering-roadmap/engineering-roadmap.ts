@@ -1,5 +1,5 @@
 import type { SupportedLocale } from '@repo/shared-schemas'
-import { type LocalizedText, pickLocalized } from './author-profile'
+import { type LocalizedText, pickLocalized } from '@/entities/workfolio-profile/author-profile'
 
 /**
  * 🛠️ ENGINEERING BACKLOG, TECH DEBT & ARCHITECTURAL TRADE-OFFS REGISTRY

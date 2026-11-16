@@ -2,9 +2,9 @@ import type { SupportedLocale } from '@repo/shared-schemas'
 import { Badge } from '@repo/ui'
 import { Database, ExternalLink, FileDown, Github, Linkedin, Mail, MapPin, Send } from 'lucide-react'
 import { getTranslations } from 'next-intl/server'
-import { AUTHOR_PROFILE, pickLocalized } from '@/data/author-profile'
+import { AUTHOR_PROFILE, pickLocalized } from '@/entities/workfolio-profile/author-profile'
+import { FooterSseStatus } from '@/features/telemetry-stream/footer-sse-status'
 import { Link } from '@/shared/i18n/navigation'
-import { FooterSseStatus } from './footer-sse-status'
 
 export async function WorkfolioFooter({ locale }: { locale: SupportedLocale }) {
   const t = await getTranslations({ locale, namespace: 'Footer' })

@@ -1,8 +1,8 @@
 import { DEFAULT_LOCALE, SUPPORTED_LOCALES, SupportedLocaleEnum } from '@repo/shared-schemas'
 import type { Metadata } from 'next'
 import { getTranslations } from 'next-intl/server'
-import { CvDocumentShowcase } from '@/components/workfolio/cv-document-showcase'
-import { getLatestCvFileMetadata } from '@/lib/cv-file'
+import { CvDocumentShowcase } from '@/entities/workfolio-profile/cv-document-showcase'
+import { getLatestCvFileMetadata } from '@/entities/workfolio-profile/cv-file'
 
 export function generateStaticParams() {
   return SUPPORTED_LOCALES.map((locale) => ({ locale }))

@@ -9,7 +9,7 @@ import {
   useIncrementHelpfulMutation,
   useIncrementViewMutation,
   useKnowledgeMetrics,
-} from '@/hooks/use-knowledge-metrics'
+} from '@/entities/knowledge-article/queries/use-knowledge-metrics'
 import { trackEvent } from '@/shared/lib/analytics'
 
 export function ArticleMetricsBar({ slug, category }: { slug: string; category: KnowledgeCategory }) {

@@ -22,7 +22,7 @@ import {
   COMMERCIAL_EXPERIENCE,
   type CommercialExperienceItem,
   pickLocalized,
-} from '@/data/author-profile'
+} from './author-profile'
 import { CaseStudyReadButton, EarlierRolesDisclosure, HeroActionRow } from './workfolio-client-islands'
 
 interface CaseStudyConfig {

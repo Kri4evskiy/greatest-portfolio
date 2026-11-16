@@ -15,7 +15,7 @@ import {
 } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useMemo, useState } from 'react'
-import type { LocalizedRoadmapItem, RoadmapItemKind, RoadmapItemStatus } from '@/data/engineering-roadmap'
+import type { LocalizedRoadmapItem, RoadmapItemKind, RoadmapItemStatus } from './engineering-roadmap'
 
 type FilterTab = 'all' | RoadmapItemStatus
 
@@ -249,7 +249,7 @@ export function EngineeringRoadmapBoard({ items }: { items: readonly LocalizedRo
           <span>{t('sourceNote')}</span>
         </div>
         <code className="rounded bg-background px-2 py-0.5 font-mono text-[11px] text-foreground">
-          apps/web/src/data/engineering-roadmap.ts
+          apps/web/src/entities/engineering-roadmap/engineering-roadmap.ts
         </code>
       </div>
     </section>

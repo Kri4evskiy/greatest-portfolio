@@ -13,7 +13,7 @@ import {
   LockOpen,
 } from 'lucide-react'
 import { type ReactNode, useState } from 'react'
-import { useVisitorProfile } from '@/hooks/use-visitor-profile'
+import { useVisitorProfile } from '@/features/auth/queries/use-visitor-profile'
 import { useSectionNavigation } from '@/shared/hooks/use-section-navigation'
 import { Link, useRouter } from '@/shared/i18n/navigation'
 import { trackEvent } from '@/shared/lib/analytics'
