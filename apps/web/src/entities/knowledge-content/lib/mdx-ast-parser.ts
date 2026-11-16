@@ -6,22 +6,33 @@ import {
   type SupportedLocale,
 } from '@repo/shared-schemas'
 import matter from 'gray-matter'
-import type { Blockquote, Code, Content, Heading, List, Paragraph, PhrasingContent, Root, Table } from 'mdast'
+import type { Root as HastRoot } from 'hast'
+import type { Blockquote, Code, Heading, List, Root as MdastRoot, Paragraph, PhrasingContent, RootContent } from 'mdast'
+import remarkDirective from 'remark-directive'
 import remarkGfm from 'remark-gfm'
 import remarkParse from 'remark-parse'
+import remarkRehype from 'remark-rehype'
 import { unified } from 'unified'
 import {
   type ArticleTocEntry,
   type MdxArticleDocument,
-  type MdxBlock,
+  type MdxArticleFrontmatter,
   type MdxCalloutKind,
-  type MdxInlineNode,
-  type MdxListItemNode,
+  type MdxCodeBlockMeta,
   type MdxWidgetName,
   SUPPORTED_MDX_WIDGETS,
 } from './mdx-types'
 
-const markdownProcessor = unified().use(remarkParse).use(remarkGfm)
+const markdownParser = unified().use(remarkParse).use(remarkGfm).use(remarkDirective)
+const mdastToHastProcessor = unified().use(remarkRehype)
+
+interface DirectiveMdastNode {
+  type: 'leafDirective' | 'containerDirective' | 'textDirective'
+  name?: string | undefined
+  attributes?: Record<string, string | null | undefined> | null | undefined
+  children?: RootContent[] | undefined
+  data?: Record<string, unknown> | undefined
+}
 
 function normalizeTag(rawTag: string): string {
   return rawTag
@@ -44,96 +55,23 @@ function createHeadingSlug(plainText: string, usedIds: Map<string, number>): str
   return seenCount === 0 ? base : `${base}-${seenCount + 1}`
 }
 
-function extractPlainTextFromInlines(nodes: readonly MdxInlineNode[]): string {
-  let out = ''
-  for (const node of nodes) {
-    switch (node.type) {
-      case 'text':
-      case 'inlineCode':
-        out += node.value
-        break
-      case 'image':
-        out += node.alt
-        break
-      case 'break':
-        out += ' '
-        break
-      case 'strong':
-      case 'emphasis':
-      case 'delete':
-      case 'link':
-        out += extractPlainTextFromInlines(node.children)
-        break
-    }
+function extractPlainTextFromMdast(node: unknown): string {
+  if (!node || typeof node !== 'object') return ''
+  const record = node as { type?: string; value?: string; alt?: string; children?: unknown[] }
+
+  if (record.type === 'text' || record.type === 'inlineCode' || record.type === 'code') {
+    return record.value ?? ''
   }
-  return out.trim()
-}
-
-function convertPhrasingNodes(nodes: readonly PhrasingContent[]): MdxInlineNode[] {
-  const result: MdxInlineNode[] = []
-
-  for (const node of nodes) {
-    switch (node.type) {
-      case 'text':
-        if (node.value) {
-          result.push({ type: 'text', value: node.value })
-        }
-        break
-      case 'inlineCode':
-        result.push({ type: 'inlineCode', value: node.value })
-        break
-      case 'strong':
-        result.push({ type: 'strong', children: convertPhrasingNodes(node.children) })
-        break
-      case 'emphasis':
-        result.push({ type: 'emphasis', children: convertPhrasingNodes(node.children) })
-        break
-      case 'delete':
-        result.push({ type: 'delete', children: convertPhrasingNodes(node.children) })
-        break
-      case 'link':
-        result.push({
-          type: 'link',
-          url: node.url,
-          title: node.title ?? undefined,
-          children: convertPhrasingNodes(node.children),
-        })
-        break
-      case 'image':
-        result.push({
-          type: 'image',
-          url: node.url,
-          alt: node.alt ?? '',
-          title: node.title ?? undefined,
-        })
-        break
-      case 'break':
-        result.push({ type: 'break' })
-        break
-      case 'html':
-        if (node.value.trim() === '<br>' || node.value.trim() === '<br/>' || node.value.trim() === '<br />') {
-          result.push({ type: 'break' })
-        } else if (node.value) {
-          result.push({ type: 'text', value: node.value })
-        }
-        break
-      default:
-        break
-    }
+  if (record.type === 'image') {
+    return record.alt ?? ''
   }
-
-  return result
-}
-
-export function parseInlineMarkdownToAst(raw: string): MdxInlineNode[] {
-  const trimmed = raw.trim()
-  if (!trimmed) return []
-  const tree = markdownProcessor.parse(trimmed) as Root
-  const firstChild = tree.children[0]
-  if (firstChild && firstChild.type === 'paragraph') {
-    return convertPhrasingNodes(firstChild.children)
+  if (record.type === 'break') {
+    return ' '
   }
-  return [{ type: 'text', value: trimmed }]
+  if (Array.isArray(record.children)) {
+    return record.children.map(extractPlainTextFromMdast).join('').trim()
+  }
+  return ''
 }
 
 function parseCustomWidgetTag(rawHtml: string): { name: MdxWidgetName; props: Record<string, string> } | null {
@@ -162,6 +100,41 @@ function parseCustomWidgetTag(rawHtml: string): { name: MdxWidgetName; props: Re
   return { name: candidateName, props }
 }
 
+function parseDirectiveWidget(
+  node: DirectiveMdastNode,
+): { name: MdxWidgetName; props: Record<string, string>; payload?: string | undefined } | null {
+  const rawDirectiveName = (node.name ?? '').trim()
+  if (!rawDirectiveName) return null
+
+  const attrs = node.attributes ?? {}
+  let candidateName: string | undefined
+
+  if (rawDirectiveName === 'sandbox' || rawDirectiveName === 'widget') {
+    candidateName = (attrs.name ?? attrs.widget ?? '')?.trim()
+  } else {
+    candidateName = rawDirectiveName
+  }
+
+  if (!candidateName || !SUPPORTED_MDX_WIDGETS.has(candidateName as MdxWidgetName)) {
+    return null
+  }
+
+  const props: Record<string, string> = {}
+  for (const [key, val] of Object.entries(attrs)) {
+    if (key === 'name' || key === 'widget') continue
+    if (typeof val === 'string') {
+      props[key] = val
+    }
+  }
+
+  const payload = Array.isArray(node.children) ? extractPlainTextFromMdast(node).trim() : ''
+  return {
+    name: candidateName as MdxWidgetName,
+    props,
+    ...(payload ? { payload } : {}),
+  }
+}
+
 function parseCodeMetaTitle(meta?: string | null): string | undefined {
   if (!meta) return undefined
   const trimmed = meta.trim()
@@ -175,97 +148,97 @@ function parseCodeMetaTitle(meta?: string | null): string | undefined {
   return trimmed.replace(/^["']|["']$/g, '') || undefined
 }
 
-function convertParagraphNode(node: Paragraph): MdxBlock | null {
-  // Promote standalone Markdown image `![alt](url "caption")` into a dedicated figure block
-  if (node.children.length === 1 && node.children[0]?.type === 'image') {
-    const img = node.children[0]
-    return {
-      type: 'image',
-      url: img.url,
-      alt: img.alt ?? '',
-      caption: img.title ?? (img.alt || undefined),
+function normalizeInlinePhrasingNodes(children: PhrasingContent[]): void {
+  for (let i = 0; i < children.length; i += 1) {
+    const child = children[i]
+    if (!child) continue
+
+    if (child.type === 'html') {
+      const trimmed = child.value.trim()
+      if (/^<br\s*\/?>$/i.test(trimmed)) {
+        children[i] = { type: 'break' }
+      } else {
+        children[i] = { type: 'text', value: child.value }
+      }
+      continue
+    }
+
+    if ('children' in child && Array.isArray(child.children)) {
+      normalizeInlinePhrasingNodes(child.children as PhrasingContent[])
     }
   }
-
-  const inlines = convertPhrasingNodes(node.children)
-  if (inlines.length === 0) return null
-  return { type: 'paragraph', inlines }
 }
 
-function convertHeadingNode(
-  node: Heading,
-  usedHeadingIds: Map<string, number>,
-  toc: ArticleTocEntry[] | null,
-): MdxBlock {
+function decorateHeadingNode(node: Heading, usedHeadingIds: Map<string, number>, toc: ArticleTocEntry[] | null): void {
   const level: 2 | 3 | 4 = node.depth <= 2 ? 2 : node.depth === 3 ? 3 : 4
-  const inlines = convertPhrasingNodes(node.children)
-  const plainText = extractPlainTextFromInlines(inlines)
+  node.depth = level
+  normalizeInlinePhrasingNodes(node.children)
+  const plainText = extractPlainTextFromMdast(node)
   const id = createHeadingSlug(plainText, usedHeadingIds)
 
   if (toc) {
     toc.push({ id, text: plainText, level })
   }
 
-  return {
-    type: 'heading',
-    level,
-    id,
-    inlines,
-    plainText,
+  node.data = {
+    ...node.data,
+    hProperties: {
+      id,
+      'data-heading-text': plainText,
+    },
   }
 }
 
-function convertCodeNode(node: Code): MdxBlock {
-  return {
-    type: 'code',
-    language: node.lang?.trim() || 'typescript',
-    title: parseCodeMetaTitle(node.meta),
+function decorateParagraphNode(node: Paragraph): void {
+  if (node.children.length === 1 && node.children[0]?.type === 'image') {
+    const img = node.children[0]
+    const caption = img.title ?? (img.alt || undefined)
+    node.data = {
+      hName: 'figure',
+      hProperties: {
+        'data-figure-src': img.url,
+        'data-figure-alt': img.alt ?? '',
+        ...(caption ? { 'data-figure-caption': caption } : {}),
+      },
+    }
+    node.children = []
+    return
+  }
+
+  normalizeInlinePhrasingNodes(node.children)
+}
+
+function decorateCodeNode(node: Code, codeBlocks: MdxCodeBlockMeta[]): void {
+  const codeId = `code-${codeBlocks.length}`
+  const language = node.lang?.trim() || 'typescript'
+  const title = parseCodeMetaTitle(node.meta)
+
+  codeBlocks.push({
+    id: codeId,
+    language,
+    title,
     code: node.value,
-  }
-}
-
-function convertTableNode(node: Table): MdxBlock {
-  const headerRow = node.children[0]
-  const bodyRows = node.children.slice(1)
-  const headers: MdxInlineNode[][] = headerRow
-    ? headerRow.children.map((cell) => convertPhrasingNodes(cell.children))
-    : []
-
-  const alignments: Array<'left' | 'center' | 'right'> = headers.map((_, idx) => {
-    const align = node.align?.[idx]
-    if (align === 'center' || align === 'right') return align
-    return 'left'
   })
 
-  const rows: MdxInlineNode[][][] = bodyRows.map((row) =>
-    row.children.map((cell) => convertPhrasingNodes(cell.children)),
-  )
-
-  return {
-    type: 'table',
-    headers,
-    alignments,
-    rows,
+  node.data = {
+    hName: 'pre',
+    hProperties: {
+      'data-code-id': codeId,
+      'data-language': language,
+      ...(title ? { 'data-title': title } : {}),
+    },
   }
 }
 
-function convertListNode(node: List, usedHeadingIds: Map<string, number>): MdxBlock {
-  const items: MdxListItemNode[] = node.children.map((listItem) => ({
-    checked: listItem.checked === null ? undefined : listItem.checked,
-    blocks: convertMdastChildren(listItem.children, usedHeadingIds, null),
-  }))
-
-  return {
-    type: 'list',
-    ordered: Boolean(node.ordered),
-    items,
-  }
-}
-
-function convertBlockquoteNode(node: Blockquote, usedHeadingIds: Map<string, number>): MdxBlock {
+function decorateBlockquoteNode(
+  node: Blockquote,
+  usedHeadingIds: Map<string, number>,
+  codeBlocks: MdxCodeBlockMeta[],
+): void {
   const firstChild = node.children[0]
+  let kind: MdxCalloutKind = 'quote'
+  let customTitle: string | undefined
 
-  // Check for GitHub Alert syntax: > [!NOTE] Optional Title
   if (firstChild && firstChild.type === 'paragraph' && firstChild.children[0]?.type === 'text') {
     const firstTextNode = firstChild.children[0]
     const rawValue = firstTextNode.value
@@ -274,8 +247,8 @@ function convertBlockquoteNode(node: Blockquote, usedHeadingIds: Map<string, num
     const alertMatch = firstLine.match(/^\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]\s*(.*)$/i)
 
     if (alertMatch) {
-      const kind = (alertMatch[1] ?? 'note').toLowerCase() as MdxCalloutKind
-      const customTitle = (alertMatch[2] ?? '').trim() || undefined
+      kind = (alertMatch[1] ?? 'note').toLowerCase() as MdxCalloutKind
+      customTitle = (alertMatch[2] ?? '').trim() || undefined
       const remainingSameText = newlineIdx === -1 ? '' : rawValue.slice(newlineIdx + 1).trimStart()
 
       const clonedParagraphChildren: PhrasingContent[] = []
@@ -283,14 +256,16 @@ function convertBlockquoteNode(node: Blockquote, usedHeadingIds: Map<string, num
         clonedParagraphChildren.push({ type: 'text', value: remainingSameText })
       }
       for (const sibling of firstChild.children.slice(1)) {
-        // Strip leading soft break right after [!ALERT] header line
-        if (clonedParagraphChildren.length === 0 && sibling.type === 'break') {
+        if (
+          clonedParagraphChildren.length === 0 &&
+          (sibling.type === 'break' || (sibling.type === 'html' && /^<br\s*\/?>$/i.test(sibling.value.trim())))
+        ) {
           continue
         }
         clonedParagraphChildren.push(sibling)
       }
 
-      const modifiedBlockChildren: Content[] = []
+      const modifiedBlockChildren: RootContent[] = []
       if (clonedParagraphChildren.length > 0) {
         modifiedBlockChildren.push({
           type: 'paragraph',
@@ -298,68 +273,167 @@ function convertBlockquoteNode(node: Blockquote, usedHeadingIds: Map<string, num
         })
       }
       modifiedBlockChildren.push(...node.children.slice(1))
-
-      return {
-        type: 'callout',
-        kind,
-        title: customTitle,
-        blocks: convertMdastChildren(modifiedBlockChildren, usedHeadingIds, null),
-      }
+      node.children = modifiedBlockChildren as Blockquote['children']
     }
   }
 
-  return {
-    type: 'callout',
-    kind: 'quote',
-    blocks: convertMdastChildren(node.children, usedHeadingIds, null),
+  transformMdastChildren(node.children, usedHeadingIds, null, codeBlocks, true)
+
+  node.data = {
+    hName: 'blockquote',
+    hProperties: {
+      'data-callout-kind': kind,
+      ...(customTitle ? { 'data-callout-title': customTitle } : {}),
+    },
   }
 }
 
-function convertMdastChildren(
-  children: readonly Content[],
+function decorateListNode(
+  node: List,
   usedHeadingIds: Map<string, number>,
-  toc: ArticleTocEntry[] | null,
-): MdxBlock[] {
-  const blocks: MdxBlock[] = []
-
-  for (const child of children) {
-    switch (child.type) {
-      case 'heading':
-        blocks.push(convertHeadingNode(child, usedHeadingIds, toc))
-        break
-      case 'paragraph': {
-        const converted = convertParagraphNode(child)
-        if (converted) blocks.push(converted)
-        break
-      }
-      case 'code':
-        blocks.push(convertCodeNode(child))
-        break
-      case 'table':
-        blocks.push(convertTableNode(child))
-        break
-      case 'list':
-        blocks.push(convertListNode(child, usedHeadingIds))
-        break
-      case 'blockquote':
-        blocks.push(convertBlockquoteNode(child, usedHeadingIds))
-        break
-      case 'thematicBreak':
-        blocks.push({ type: 'hr' })
-        break
-      case 'html': {
-        const widget = parseCustomWidgetTag(child.value)
-        if (widget) {
-          blocks.push({ type: 'component', name: widget.name, props: widget.props })
-        }
-        break
-      }
-      default:
-        break
+  codeBlocks: MdxCodeBlockMeta[],
+  isNested: boolean,
+): void {
+  if (isNested) {
+    node.data = {
+      ...node.data,
+      hProperties: {
+        'data-nested-list': 'true',
+      },
     }
   }
 
-  return blocks
+  for (const listItem of node.children) {
+    if (listItem.checked !== null && listItem.checked !== undefined) {
+      const isChecked = listItem.checked
+      listItem.checked = null
+      listItem.data = {
+        ...listItem.data,
+        hProperties: {
+          'data-task-checked': isChecked ? 'true' : 'false',
+        },
+      }
+    }
+
+    transformMdastChildren(listItem.children, usedHeadingIds, null, codeBlocks, true)
+  }
+}
+
+function transformMdastChildren(
+  children: RootContent[],
+  usedHeadingIds: Map<string, number>,
+  toc: ArticleTocEntry[] | null,
+  codeBlocks: MdxCodeBlockMeta[],
+  isNested = false,
+): void {
+  for (let i = 0; i < children.length; i += 1) {
+    const child = children[i]
+    if (!child) continue
+
+    switch (child.type) {
+      case 'heading':
+        decorateHeadingNode(child, usedHeadingIds, toc)
+        break
+
+      case 'paragraph':
+        decorateParagraphNode(child)
+        break
+
+      case 'code':
+        decorateCodeNode(child, codeBlocks)
+        break
+
+      case 'blockquote':
+        decorateBlockquoteNode(child, usedHeadingIds, codeBlocks)
+        break
+
+      case 'list':
+        decorateListNode(child, usedHeadingIds, codeBlocks, isNested)
+        break
+
+      case 'table':
+        for (const row of child.children) {
+          row.children.forEach((cell, colIdx) => {
+            const align = child.align?.[colIdx]
+            if (align) {
+              cell.data = {
+                ...cell.data,
+                hProperties: {
+                  'data-align': align,
+                },
+              }
+            }
+            normalizeInlinePhrasingNodes(cell.children)
+          })
+        }
+        break
+
+      case 'html': {
+        const widget = parseCustomWidgetTag(child.value)
+        if (widget) {
+          const replacement: Paragraph = {
+            type: 'paragraph',
+            children: [],
+            data: {
+              hName: 'div',
+              hProperties: {
+                'data-mdx-widget': widget.name,
+                'data-widget-props': JSON.stringify(widget.props),
+              },
+            },
+          }
+          children[i] = replacement
+        } else {
+          // Strip arbitrary raw HTML blocks that are not registered widgets (Zero-Eval / XSS defense)
+          children[i] = { type: 'paragraph', children: [] }
+        }
+        break
+      }
+
+      default: {
+        const maybeDirective = child as unknown as DirectiveMdastNode
+        if (maybeDirective.type === 'leafDirective' || maybeDirective.type === 'containerDirective') {
+          const widget = parseDirectiveWidget(maybeDirective)
+          if (widget) {
+            const replacement: Paragraph = {
+              type: 'paragraph',
+              children: [],
+              data: {
+                hName: 'div',
+                hProperties: {
+                  'data-mdx-widget': widget.name,
+                  'data-widget-props': JSON.stringify(widget.props),
+                  ...(widget.payload ? { 'data-widget-payload': widget.payload } : {}),
+                },
+              },
+            }
+            children[i] = replacement
+          }
+        }
+        break
+      }
+    }
+  }
+}
+
+export function parseInlineMarkdownToHast(raw: string): HastRoot {
+  const trimmed = raw.trim()
+  if (!trimmed) {
+    return { type: 'root', children: [] }
+  }
+
+  const mdastTree = markdownParser.parse(trimmed) as MdastRoot
+  const firstChild = mdastTree.children[0]
+  if (firstChild && firstChild.type === 'paragraph') {
+    normalizeInlinePhrasingNodes(firstChild.children)
+    const inlineRoot: MdastRoot = {
+      type: 'root',
+      children: firstChild.children as unknown as RootContent[],
+    }
+    return mdastToHastProcessor.runSync(inlineRoot) as HastRoot
+  }
+
+  return mdastToHastProcessor.runSync(mdastTree) as HastRoot
 }
 
 function extractStringArray(rawField: unknown): string[] {
@@ -387,14 +461,14 @@ function formatPublishedDate(rawDate: unknown): string {
   return '2026-10-15'
 }
 
-export function parseRawMdx(
+export function parseFrontmatterOnly(
   raw: string,
   fallbackCategory: KnowledgeCategory,
   leafSlug: string,
   relativeSubSegments: readonly string[],
   locale: SupportedLocale,
   isFallback: boolean,
-): MdxArticleDocument {
+): { frontmatter: MdxArticleFrontmatter; content: string } {
   const parsedMatter = matter(raw)
   const meta = parsedMatter.data as Record<string, unknown>
 
@@ -425,12 +499,6 @@ export function parseRawMdx(
   }
 
   const tldr = extractStringArray(meta.tldr)
-
-  const mdastRoot = markdownProcessor.parse(parsedMatter.content) as Root
-  const toc: ArticleTocEntry[] = []
-  const usedHeadingIds = new Map<string, number>()
-  const blocks = convertMdastChildren(mdastRoot.children, usedHeadingIds, toc)
-
   const resolvedTitle = typeof meta.title === 'string' && meta.title.trim() ? meta.title.trim() : leafSlug
   const sidebarLabel =
     typeof meta.sidebarLabel === 'string' && meta.sidebarLabel.trim() ? meta.sidebarLabel.trim() : resolvedTitle
@@ -443,23 +511,57 @@ export function parseRawMdx(
         : '5 min'
 
   return {
-    slug: metricSlug,
+    frontmatter: {
+      slug: metricSlug,
+      leafSlug,
+      category,
+      pathSegments,
+      routePath,
+      locale,
+      isFallback,
+      title: resolvedTitle,
+      sidebarLabel,
+      summary,
+      readingTime,
+      publishedAt: formatPublishedDate(meta.publishedAt),
+      order,
+      format,
+      tags,
+      tldr,
+    },
+    content: parsedMatter.content,
+  }
+}
+
+export function parseRawMdx(
+  raw: string,
+  fallbackCategory: KnowledgeCategory,
+  leafSlug: string,
+  relativeSubSegments: readonly string[],
+  locale: SupportedLocale,
+  isFallback: boolean,
+): MdxArticleDocument {
+  const { frontmatter, content } = parseFrontmatterOnly(
+    raw,
+    fallbackCategory,
     leafSlug,
-    category,
-    pathSegments,
-    routePath,
+    relativeSubSegments,
     locale,
     isFallback,
-    title: resolvedTitle,
-    sidebarLabel,
-    summary,
-    readingTime,
-    publishedAt: formatPublishedDate(meta.publishedAt),
-    order,
-    format,
-    tags,
-    tldr,
+  )
+
+  const mdastRoot = markdownParser.parse(content) as MdastRoot
+  const toc: ArticleTocEntry[] = []
+  const codeBlocks: MdxCodeBlockMeta[] = []
+  const usedHeadingIds = new Map<string, number>()
+
+  transformMdastChildren(mdastRoot.children, usedHeadingIds, toc, codeBlocks, false)
+  const hast = mdastToHastProcessor.runSync(mdastRoot) as HastRoot
+
+  return {
+    ...frontmatter,
     toc,
-    blocks,
+    hast,
+    codeBlocks,
   }
 }

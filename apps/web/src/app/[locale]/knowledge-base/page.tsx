@@ -5,7 +5,7 @@ import { getTranslations } from 'next-intl/server'
 import { Suspense } from 'react'
 import { KnowledgeDirectoryExplorer } from '@/entities/knowledge-article/ui/knowledge-directory-explorer'
 import {
-  getAllKnowledgeArticles,
+  getAllKnowledgeFrontmatters,
   getAllKnowledgeTags,
   getKnowledgeTree,
   type MdxArticleFrontmatter,
@@ -19,11 +19,7 @@ export default async function KnowledgeBaseIndexPage({ params }: { params: Promi
   const t = await getTranslations({ locale: resolvedLocale, namespace: 'KnowledgeBase' })
   const tree = getKnowledgeTree(resolvedLocale)
   const tags = getAllKnowledgeTags(resolvedLocale)
-
-  // Strip heavy MDX AST blocks before crossing the RSC -> Client boundary
-  const lightweightArticles: MdxArticleFrontmatter[] = getAllKnowledgeArticles(resolvedLocale).map(
-    ({ blocks: _blocks, toc: _toc, ...frontmatter }) => frontmatter,
-  )
+  const lightweightArticles: MdxArticleFrontmatter[] = [...getAllKnowledgeFrontmatters(resolvedLocale)]
 
   return (
     <div className="space-y-8">

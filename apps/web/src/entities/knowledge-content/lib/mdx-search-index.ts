@@ -1,6 +1,6 @@
 import { formatKnowledgeSegmentLabel } from '@repo/shared-schemas'
 import { cache } from 'react'
-import { getAllKnowledgeArticles, normalizeLocale } from './mdx-fs-loader'
+import { getAllKnowledgeArticles, getAllKnowledgeFrontmatters, normalizeLocale } from './mdx-fs-loader'
 import type { KnowledgeSearchItem } from './mdx-types'
 
 export const getKnowledgeSearchIndex = cache((localeInput?: string): KnowledgeSearchItem[] => {
@@ -28,10 +28,10 @@ export const getKnowledgeSearchIndex = cache((localeInput?: string): KnowledgeSe
 })
 
 export const getAllKnowledgeTags = cache((localeInput?: string): Array<{ tag: string; count: number }> => {
-  const docs = getAllKnowledgeArticles(localeInput)
+  const frontmatters = getAllKnowledgeFrontmatters(localeInput)
   const counts = new Map<string, number>()
 
-  for (const doc of docs) {
+  for (const doc of frontmatters) {
     for (const tag of doc.tags) {
       counts.set(tag, (counts.get(tag) ?? 0) + 1)
     }

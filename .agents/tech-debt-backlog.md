@@ -17,10 +17,10 @@
 
 ## 🔧 Активный технический бэклог (Open Tech Debt)
 
-### 🔥 Ближайший приоритет №1: Реструктуризация бэкенда NestJS 12 по Enterprise-стандарту и эволюция MDX HAST (Фаза B)
+### 🔥 Ближайший приоритет №1: Реструктуризация бэкенда NestJS 12 по Enterprise-стандарту
 
 - [ ] **Этап 4: Реструктуризация бэкенда NestJS 12 по Enterprise-стандарту (по аналогии с проектом `coffee-app`):**
-  - **Контекст и цели:** Фронтенд `apps/web/src` полностью переведён на `FSD-Modular` (`app` ➔ `widgets` ➔ `features` ➔ `entities` ➔ `shared`) с декомпозированным MDX-движком (Фаза A). Следующий шаг — переход от плоской структуры в `apps/api/src` к четкому 4-компонентному разделению приложения на **modules**, **migrations**, **config** и **common**:
+  - **Контекст и цели:** Фронтенд `apps/web/src` полностью переведён на `FSD-Modular` (`app` ➔ `widgets` ➔ `features` ➔ `entities` ➔ `shared`) с Zero-Eval HAST MDX-движком (Фазы A и B: `remark-directive` + `remark-rehype` + `hast-util-to-jsx-runtime` + `mtimeMs` кэш). Следующий шаг — переход от плоской структуры в `apps/api/src` к четкому 4-компонентному разделению приложения на **modules**, **migrations**, **config** и **common**:
     1. `common/` — **Общие компоненты фреймворка (Cross-Cutting Concerns):**
        - `decorators/` — кастомные декораторы (`@Protocol`, `@Public`, `@Roles`);
        - `dto/` — общие DTO (пагинация, сортировка, мета-ответы);
@@ -36,9 +36,6 @@
        - `modules/knowledge/` — `dto/`, `knowledge.controller.ts`, `knowledge.service.ts`, `knowledge.module.ts`;
        - `modules/telemetry/` — `telemetry.controller.ts`, `telemetry.service.ts`, `telemetry.module.ts`.
   - **Документ спецификации:** `.agents/frontend/architecture-fsd-modular.md` (Секция 3).
-
-- [ ] **Этап 5 (MDX Engine Фаза B — Zero-Eval HAST Pipeline + Кастомные виджеты):**
-  - Заменить промежуточный слой `MdxBlock[]` в `entities/knowledge-content` на стандартный конвейер **`unified` + `remark-parse` + `remark-gfm` + `remark-directive` (`:::sandbox{...}`) → `remark-rehype` + `@shikijs/rehype` + `rehype-sanitize` → `hast-util-to-jsx-runtime`**, позволяющий декларативно встраивать интерактивные клиентские острова (`features/kb-sandboxes/ui/*`) и JSON-пропсы прямо из `.mdx` при строгом соблюдении **Zero-Eval CSP** (`0 KB` клиентского парсера, React 19 RSC).
 
 ### ⏳ Ближайший приоритет №2: Внедрение Redis (Distributed Rate Limiting & Response Cache)
 

@@ -32,10 +32,14 @@ const SHIKI_THEMES = {
   dark: 'github-dark-default',
 } as const
 
-export async function highlightCodeServer(code: string, rawLanguage: string): Promise<string> {
-  const normalized = rawLanguage.trim().toLowerCase()
-  const lang = LANGUAGE_ALIASES[normalized] ?? (normalized || 'typescript')
+const globalForShiki = globalThis as unknown as {
+  __kbShikiCache?: Map<string, Promise<string>>
+}
 
+const shikiCache: Map<string, Promise<string>> = globalForShiki.__kbShikiCache ?? new Map<string, Promise<string>>()
+globalForShiki.__kbShikiCache = shikiCache
+
+async function renderHighlightedHtml(code: string, lang: string): Promise<string> {
   try {
     return await codeToHtml(code, {
       lang,
@@ -53,4 +57,22 @@ export async function highlightCodeServer(code: string, rawLanguage: string): Pr
       return `<pre class="shiki"><code>${escapeHtmlFallback(code)}</code></pre>`
     }
   }
+}
+
+export function highlightCodeServer(code: string, rawLanguage: string): Promise<string> {
+  const normalized = rawLanguage.trim().toLowerCase()
+  const lang = LANGUAGE_ALIASES[normalized] ?? (normalized || 'typescript')
+  const cacheKey = `${lang}\0${code}`
+
+  const existing = shikiCache.get(cacheKey)
+  if (existing) {
+    return existing
+  }
+
+  const promise = renderHighlightedHtml(code, lang)
+  if (shikiCache.size > 1000) {
+    shikiCache.clear()
+  }
+  shikiCache.set(cacheKey, promise)
+  return promise
 }

@@ -55,6 +55,7 @@ function KnowledgeTreeItem({ node, depth, pathname, closeOnSelect, onSelectLeaf 
     return (
       <Link
         href={href}
+        prefetch={false}
         title={node.article.title}
         onClick={() => {
           if (closeOnSelect) onSelectLeaf()
@@ -123,6 +124,7 @@ function KnowledgeTreeItem({ node, depth, pathname, closeOnSelect, onSelectLeaf 
         {/* Clicking the Topic or Subtopic name BOTH expands the branch AND opens its Topic/Subtopic hub with tabs */}
         <Link
           href={folderHref}
+          prefetch={false}
           onClick={() => {
             if (!isExpanded || isExactFolderActive) {
               toggleFolder(node.pathKey)

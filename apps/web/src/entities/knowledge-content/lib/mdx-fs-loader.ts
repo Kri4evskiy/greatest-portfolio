@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import {
   DEFAULT_LOCALE,
@@ -9,7 +9,7 @@ import {
   SupportedLocaleEnum,
 } from '@repo/shared-schemas'
 import { cache } from 'react'
-import { parseRawMdx } from './mdx-ast-parser'
+import { parseFrontmatterOnly, parseRawMdx } from './mdx-ast-parser'
 import type {
   KnowledgeBreadcrumbItem,
   KnowledgeTreeFolderNode,
@@ -17,6 +17,35 @@ import type {
   MdxArticleDocument,
   MdxArticleFrontmatter,
 } from './mdx-types'
+
+interface CachedFrontmatterEntry {
+  mtimeMs: number
+  frontmatter: MdxArticleFrontmatter
+  targetPath: string
+  category: KnowledgeCategory
+  leafSlug: string
+  relativeSubSegments: readonly string[]
+  resolvedLocale: SupportedLocale
+  isFallback: boolean
+}
+
+interface CachedDocumentEntry {
+  mtimeMs: number
+  doc: MdxArticleDocument
+}
+
+const globalForKbCache = globalThis as unknown as {
+  __kbFrontmatterCache?: Map<string, CachedFrontmatterEntry>
+  __kbDocumentCache?: Map<string, CachedDocumentEntry>
+}
+
+const frontmatterCache: Map<string, CachedFrontmatterEntry> =
+  globalForKbCache.__kbFrontmatterCache ?? new Map<string, CachedFrontmatterEntry>()
+globalForKbCache.__kbFrontmatterCache = frontmatterCache
+
+const documentCache: Map<string, CachedDocumentEntry> =
+  globalForKbCache.__kbDocumentCache ?? new Map<string, CachedDocumentEntry>()
+globalForKbCache.__kbDocumentCache = documentCache
 
 function resolveContentRoot(): string {
   const candidates = [join(process.cwd(), 'content'), join(process.cwd(), 'apps', 'web', 'content')]
@@ -58,12 +87,66 @@ export function toFrontmatter(doc: MdxArticleDocument): MdxArticleFrontmatter {
   }
 }
 
-function scanCategoryDirectoryRecursively(
+function loadCachedFrontmatterEntry(
+  targetPath: string,
+  category: KnowledgeCategory,
+  leafSlug: string,
+  relativeSubSegments: readonly string[],
+  resolvedLocale: SupportedLocale,
+  isFallback: boolean,
+): CachedFrontmatterEntry {
+  const mtimeMs = statSync(targetPath).mtimeMs
+  const cacheKey = `${targetPath}:${resolvedLocale}:${isFallback ? 'fb' : 'ex'}`
+  const cached = frontmatterCache.get(cacheKey)
+
+  if (cached && cached.mtimeMs === mtimeMs) {
+    return cached
+  }
+
+  const raw = readFileSync(targetPath, 'utf-8')
+  const { frontmatter } = parseFrontmatterOnly(raw, category, leafSlug, relativeSubSegments, resolvedLocale, isFallback)
+  const entry: CachedFrontmatterEntry = {
+    mtimeMs,
+    frontmatter,
+    targetPath,
+    category,
+    leafSlug,
+    relativeSubSegments,
+    resolvedLocale,
+    isFallback,
+  }
+  frontmatterCache.set(cacheKey, entry)
+  return entry
+}
+
+function loadCachedDocumentFromEntry(entry: CachedFrontmatterEntry): MdxArticleDocument {
+  const mtimeMs = statSync(entry.targetPath).mtimeMs
+  const cacheKey = `${entry.targetPath}:${entry.resolvedLocale}:${entry.isFallback ? 'fb' : 'ex'}`
+  const cached = documentCache.get(cacheKey)
+
+  if (cached && cached.mtimeMs === mtimeMs) {
+    return cached.doc
+  }
+
+  const raw = readFileSync(entry.targetPath, 'utf-8')
+  const doc = parseRawMdx(
+    raw,
+    entry.category,
+    entry.leafSlug,
+    entry.relativeSubSegments,
+    entry.resolvedLocale,
+    entry.isFallback,
+  )
+  documentCache.set(cacheKey, { mtimeMs, doc })
+  return doc
+}
+
+function scanCategoryEntriesRecursively(
   dirPath: string,
   category: KnowledgeCategory,
   relativeSubSegments: readonly string[],
   requestedLocale: SupportedLocale,
-  outArticles: MdxArticleDocument[],
+  outEntries: CachedFrontmatterEntry[],
 ): void {
   if (!existsSync(dirPath)) return
 
@@ -95,8 +178,9 @@ function scanCategoryDirectoryRecursively(
     }
 
     if (targetPath) {
-      const raw = readFileSync(targetPath, 'utf-8')
-      outArticles.push(parseRawMdx(raw, category, leafSlug, relativeSubSegments, resolvedLocale, isFallback))
+      outEntries.push(
+        loadCachedFrontmatterEntry(targetPath, category, leafSlug, relativeSubSegments, resolvedLocale, isFallback),
+      )
     }
   }
 
@@ -106,28 +190,43 @@ function scanCategoryDirectoryRecursively(
     .sort()
 
   for (const subDir of subDirs) {
-    scanCategoryDirectoryRecursively(
+    scanCategoryEntriesRecursively(
       join(dirPath, subDir),
       category,
       [...relativeSubSegments, subDir],
       requestedLocale,
-      outArticles,
+      outEntries,
     )
   }
 }
 
-export const getAllKnowledgeArticles = cache((localeInput?: string): MdxArticleDocument[] => {
+const getAllCachedFrontmatterEntries = cache((localeInput?: string): CachedFrontmatterEntry[] => {
   const requestedLocale = normalizeLocale(localeInput)
   const root = resolveContentRoot()
   const categories = Object.keys(KNOWLEDGE_CATEGORY_LABELS) as KnowledgeCategory[]
-  const articles: MdxArticleDocument[] = []
+  const entries: CachedFrontmatterEntry[] = []
 
   for (const category of categories) {
     const categoryDir = join(root, category)
-    scanCategoryDirectoryRecursively(categoryDir, category, [], requestedLocale, articles)
+    scanCategoryEntriesRecursively(categoryDir, category, [], requestedLocale, entries)
   }
 
-  return articles.sort((a, b) => a.order - b.order || a.routePath.localeCompare(b.routePath))
+  return entries.sort(
+    (a, b) =>
+      a.frontmatter.order - b.frontmatter.order || a.frontmatter.routePath.localeCompare(b.frontmatter.routePath),
+  )
+})
+
+/**
+ * Lightweight frontmatter-only list (0 Markdown/HAST body parsing).
+ * Used by KnowledgeSidebar, KnowledgeDirectoryExplorer, and tag counters for sub-millisecond response in dev & prod.
+ */
+export const getAllKnowledgeFrontmatters = cache((localeInput?: string): MdxArticleFrontmatter[] => {
+  return getAllCachedFrontmatterEntries(localeInput).map((entry) => entry.frontmatter)
+})
+
+export const getAllKnowledgeArticles = cache((localeInput?: string): MdxArticleDocument[] => {
+  return getAllCachedFrontmatterEntries(localeInput).map((entry) => loadCachedDocumentFromEntry(entry))
 })
 
 function insertArticleIntoFolder(
@@ -198,12 +297,12 @@ function sortTreeNodesRecursively(nodes: KnowledgeTreeNode[]): void {
 
 export const getKnowledgeTree = cache((localeInput?: string): KnowledgeTreeFolderNode[] => {
   const locale = normalizeLocale(localeInput)
-  const articles = getAllKnowledgeArticles(locale)
+  const frontmatters = getAllKnowledgeFrontmatters(locale)
   const categories = Object.keys(KNOWLEDGE_CATEGORY_LABELS) as KnowledgeCategory[]
   const rootFolders: KnowledgeTreeFolderNode[] = []
 
   for (const category of categories) {
-    const categoryArticles = articles.filter((a) => a.category === category)
+    const categoryArticles = frontmatters.filter((a) => a.category === category)
     if (categoryArticles.length === 0) continue
 
     const rootFolder: KnowledgeTreeFolderNode = {
@@ -217,8 +316,8 @@ export const getKnowledgeTree = cache((localeInput?: string): KnowledgeTreeFolde
       children: [],
     }
 
-    for (const doc of categoryArticles) {
-      insertArticleIntoFolder(rootFolder, doc.pathSegments.slice(1), toFrontmatter(doc), locale)
+    for (const frontmatter of categoryArticles) {
+      insertArticleIntoFolder(rootFolder, frontmatter.pathSegments.slice(1), frontmatter, locale)
     }
 
     sortTreeNodesRecursively(rootFolder.children)
@@ -228,11 +327,18 @@ export const getKnowledgeTree = cache((localeInput?: string): KnowledgeTreeFolde
   return rootFolders
 })
 
+/**
+ * On-demand single-article HAST loader: parses full Markdown/HAST only for the requested routePath!
+ */
 export const getArticleByPathSegments = cache(
   (segments: readonly string[], localeInput?: string): MdxArticleDocument | null => {
     const targetRoute = segments.join('/')
-    const all = getAllKnowledgeArticles(localeInput)
-    return all.find((a) => a.routePath === targetRoute) ?? null
+    const entries = getAllCachedFrontmatterEntries(localeInput)
+    const matchedEntry = entries.find((e) => e.frontmatter.routePath === targetRoute)
+    if (!matchedEntry) {
+      return null
+    }
+    return loadCachedDocumentFromEntry(matchedEntry)
   },
 )
 

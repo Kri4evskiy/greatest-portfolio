@@ -1,4 +1,7 @@
 import type { KnowledgeCategory, KnowledgeNoteFormat, SupportedLocale } from '@repo/shared-schemas'
+import type { Root as HastRoot } from 'hast'
+
+export type { HastRoot }
 
 export interface ArticleTocEntry {
   id: string
@@ -42,40 +45,17 @@ export const SUPPORTED_MDX_WIDGETS = new Set<MdxWidgetName>([
   'NestAiMcpDiagram',
 ])
 
-export type MdxInlineNode =
-  | { type: 'text'; value: string }
-  | { type: 'inlineCode'; value: string }
-  | { type: 'strong'; children: MdxInlineNode[] }
-  | { type: 'emphasis'; children: MdxInlineNode[] }
-  | { type: 'delete'; children: MdxInlineNode[] }
-  | { type: 'link'; url: string; title?: string | undefined; children: MdxInlineNode[] }
-  | { type: 'image'; url: string; alt: string; title?: string | undefined }
-  | { type: 'break' }
-
-export interface MdxListItemNode {
-  checked?: boolean | undefined
-  blocks: MdxBlock[]
+export interface MdxCodeBlockMeta {
+  id: string
+  language: string
+  title?: string | undefined
+  code: string
 }
-
-export type MdxBlock =
-  | { type: 'heading'; level: 2 | 3 | 4; id: string; inlines: MdxInlineNode[]; plainText: string }
-  | { type: 'paragraph'; inlines: MdxInlineNode[] }
-  | { type: 'image'; url: string; alt: string; caption?: string | undefined }
-  | { type: 'list'; ordered: boolean; items: MdxListItemNode[] }
-  | { type: 'code'; language: string; title?: string | undefined; code: string }
-  | {
-      type: 'table'
-      headers: MdxInlineNode[][]
-      alignments: Array<'left' | 'center' | 'right'>
-      rows: MdxInlineNode[][][]
-    }
-  | { type: 'callout'; kind: MdxCalloutKind; title?: string | undefined; blocks: MdxBlock[] }
-  | { type: 'hr' }
-  | { type: 'component'; name: MdxWidgetName; props: Record<string, string> }
 
 export interface MdxArticleDocument extends MdxArticleFrontmatter {
   toc: ArticleTocEntry[]
-  blocks: MdxBlock[]
+  hast: HastRoot
+  codeBlocks: MdxCodeBlockMeta[]
 }
 
 export interface KnowledgeTreeFolderNode {

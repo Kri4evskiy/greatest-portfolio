@@ -247,7 +247,7 @@ export default async function KnowledgeCatchAllPage({ params }: CatchAllKnowledg
 
           <ArticleMetricsBar slug={article.slug} category={article.category} />
 
-          <MdxArticleRenderer blocks={article.blocks} />
+          <MdxArticleRenderer hast={article.hast} codeBlocks={article.codeBlocks} />
 
           <ArticleFooterNav
             prev={prev}
