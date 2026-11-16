@@ -264,12 +264,26 @@ Our implemented defense stack achieves an **A+** grade on industry auditing stan
 
 | Threat Vector                | Monorepo Defense Implementation                                           | Status     |
 | :--------------------------- | :------------------------------------------------------------------------- | :--------- |
-| **XSS (Cross-Site Scripting)** | `HttpOnly` cookies + strict CSP `default-src 'self'`                      | 🛡️ Shielded |
-| **Clickjacking**             | `X-Frame-Options: DENY` + CSP `frame-ancestors 'none'`                     | 🛡️ Shielded |
+| **XSS Token Exfiltration**   | `HttpOnly` cookies + zero-eval HAST + `classifySafeMarkdownLink`           | 🛡️ Shielded |
+| **Clickjacking**             | `X-Frame-Options: DENY` + CSP `frame-ancestors 'none'` (scoped `/cv/:path+`) | 🛡️ Shielded |
 | **Passcode Brute-Force**     | `@nestjs/throttler`: 5 attempts / 60 sec per IP + HTTP 429 Too Many Requests | 🛡️ Shielded |
 | **MIME Sniffing**            | `X-Content-Type-Options: nosniff`                                          | 🛡️ Shielded |
 | **Man-in-the-Middle (MitM)** | HSTS (`max-age=63072000; includeSubDomains; preload`)                      | 🛡️ Shielded |
 | **Cross-Service Leakage**    | Private TCP `:4001` within internal Docker bridge networks                 | 🛡️ Shielded |
+
+### Conscious Architectural Trade-offs
+
+No production architecture is free of trade-offs. Below are the three conscious engineering decisions made in the current baseline and how their residual risks are mitigated:
+
+1. **Static `SSG` (`'unsafe-inline'`) vs. Per-Request `CSP Nonce`:**
+   - *Trade-off:* Eliminating `'unsafe-inline'` from `script-src` requires generating a cryptographic `nonce` on every HTTP request. In Next.js 16, reading per-request headers to inject a `nonce` forces all 137 routes out of **Static Site Generation (`SSG`)** into dynamic per-request `SSR`, sacrificing edge CDN caching and sub-20ms TTFB.
+   - *Mitigation:* Because the platform does not render untrusted user-generated HTML (all `.mdx` files are repository-controlled, compiled via our Zero-Eval HAST pipeline with raw HTML stripped, and URLs sanitized via `classifySafeMarkdownLink`), and session tokens live strictly in `HttpOnly` cookies (`document.cookie` is inaccessible), keeping `SSG` is the right pragmatic choice.
+2. **Public `Cmd+K` Discovery Index (`/search-index/[locale]`) vs. Protected Article Bodies:**
+   - *Trade-off:* In `apps/web/src/proxy.ts`, the matcher (`'/((?!api|search-index|_next|_vercel|.*\\..*).*)'`) intentionally leaves `/search-index/[locale]` public so recruiters and engineers can search topics via `Cmd+K` directly from the landing page before requesting a `Guest Pass`.
+   - *Mitigation:* The static JSON index exposes only lightweight discovery metadata (`title`, `summary`, `#tags`, and `h2/h3` section titles), while full `.mdx` article bodies under `/knowledge-base/*` remain gated behind Edge `HMAC-SHA256` JWT verification.
+3. **Stateless Edge Verification vs. Instant Token Revocation (Pre-Redis):**
+   - *Trade-off:* `verifyEdgeJwtHs256` validates signatures and `exp` claims at the Edge in `< 0.2 ms` without a database round-trip. Consequently, an issued 7-day token cannot be individually revoked before expiration without rotating `JWT_SECRET`.
+   - *Mitigation:* The Post-MVP roadmap pairs **Upstash/Docker Redis** with short-lived `Access` (`15m`) + rotating `HttpOnly Refresh` (`7d`) tokens backed by `VisitorSession` in PostgreSQL.
 
 ---
 
