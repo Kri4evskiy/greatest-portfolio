@@ -1,5 +1,6 @@
 import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus, Logger } from '@nestjs/common'
 import type { Request, Response } from 'express'
+import { appConfig } from '../../config/app.config.js'
 
 @Catch()
 export class SentryExceptionFilter implements ExceptionFilter {
@@ -16,9 +17,8 @@ export class SentryExceptionFilter implements ExceptionFilter {
       exception instanceof HttpException ? exception.getResponse() : { message: 'Internal server error' }
 
     if (status >= 500) {
-      const sentryDsn = process.env.SENTRY_DSN
       this.logger.error(
-        `[5xx Exception] ${request.method} ${request.url} (Sentry DSN: ${sentryDsn ? 'active' : 'noop'})`,
+        `[5xx Exception] ${request.method} ${request.url} (Sentry DSN: ${appConfig.sentryDsn ? 'active' : 'noop'})`,
         exception instanceof Error ? exception.stack : String(exception),
       )
     }

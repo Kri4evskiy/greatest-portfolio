@@ -1,15 +1,15 @@
 import { Global, Module } from '@nestjs/common'
 import { JwtModule } from '@nestjs/jwt'
-import { resolveJwtSecret } from '@repo/shared-schemas'
+import { appConfig } from '../../config/app.config.js'
 import { AuthController } from './auth.controller.js'
 import { AuthService } from './auth.service.js'
-import { JwtRolesGuard } from './jwt-roles.guard.js'
+import { JwtRolesGuard } from './guards/jwt-roles.guard.js'
 
 @Global()
 @Module({
   imports: [
     JwtModule.register({
-      secret: resolveJwtSecret(process.env.JWT_SECRET),
+      secret: appConfig.jwtSecret,
       signOptions: {
         expiresIn: '7d',
       },

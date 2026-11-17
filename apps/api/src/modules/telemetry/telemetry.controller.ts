@@ -1,6 +1,7 @@
 import { Controller, Get, Inject, MessageEvent, Sse } from '@nestjs/common'
 import { SkipThrottle } from '@nestjs/throttler'
 import { Observable } from 'rxjs'
+import { SkipTimeout } from '../../common/decorators/skip-timeout.decorator.js'
 import { TelemetryService } from './telemetry.service.js'
 
 @Controller('telemetry')
@@ -11,6 +12,7 @@ export class TelemetryController {
   ) {}
 
   @SkipThrottle()
+  @SkipTimeout()
   @Sse('stream')
   streamEvents(): Observable<MessageEvent> {
     return this.telemetryService.getEventStream()

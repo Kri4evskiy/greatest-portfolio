@@ -1,16 +1,16 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Inject, Param, Post, Req, UseGuards } from '@nestjs/common'
+import type { SessionProfile } from '@repo/shared-schemas'
+import type { Request } from 'express'
+import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe.js'
+import { Roles } from '../auth/decorators/roles.decorator.js'
+import { JwtRolesGuard } from '../auth/guards/jwt-roles.guard.js'
 import {
   type ArticleMeta,
   type ArticleReactionBody,
   ArticleReactionBodySchema,
   ArticleReactionInputSchema,
   type KnowledgeCategory,
-  type SessionProfile,
-} from '@repo/shared-schemas'
-import type { Request } from 'express'
-import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe.js'
-import { JwtRolesGuard } from '../auth/jwt-roles.guard.js'
-import { Roles } from '../auth/roles.decorator.js'
+} from './dto/knowledge.dto.js'
 import { KnowledgeService } from './knowledge.service.js'
 
 const ArticleSlugPipe = new ZodValidationPipe(ArticleReactionInputSchema.shape.slug)

@@ -1,9 +1,10 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Inject, Post, Req, Res } from '@nestjs/common'
 import { Throttle } from '@nestjs/throttler'
-import { type GuestPassFormInput, GuestPassFormSchema, type SessionProfile } from '@repo/shared-schemas'
 import type { Request, Response } from 'express'
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe.js'
+import { appConfig } from '../../config/app.config.js'
 import { AuthService, KB_ACCESS_COOKIE_NAME, KB_COOKIE_MAX_AGE_MS } from './auth.service.js'
+import { type GuestPassFormInput, GuestPassFormSchema, type SessionProfile } from './dto/auth.dto.js'
 
 @Controller('auth')
 export class AuthController {
@@ -22,7 +23,7 @@ export class AuthController {
 
     res.cookie(KB_ACCESS_COOKIE_NAME, accessToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: appConfig.isProduction,
       sameSite: 'lax',
       path: '/',
       maxAge: KB_COOKIE_MAX_AGE_MS,
@@ -53,7 +54,7 @@ export class AuthController {
   logout(@Res({ passthrough: true }) res: Response): SessionProfile {
     res.clearCookie(KB_ACCESS_COOKIE_NAME, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: appConfig.isProduction,
       sameSite: 'lax',
       path: '/',
     })

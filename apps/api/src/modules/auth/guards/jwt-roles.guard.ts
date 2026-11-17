@@ -1,9 +1,10 @@
-import { CanActivate, ExecutionContext, ForbiddenException, Inject, Injectable } from '@nestjs/common'
+import { type CanActivate, type ExecutionContext, ForbiddenException, Inject, Injectable } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
 import type { Role } from '@repo/shared-schemas'
 import type { Request } from 'express'
-import { AuthService, KB_ACCESS_COOKIE_NAME } from './auth.service.js'
-import { ROLES_KEY } from './roles.decorator.js'
+import { IS_PUBLIC_KEY } from '../../../common/decorators/public.decorator.js'
+import { AuthService, KB_ACCESS_COOKIE_NAME } from '../auth.service.js'
+import { ROLES_KEY } from '../decorators/roles.decorator.js'
 
 @Injectable()
 export class JwtRolesGuard implements CanActivate {
@@ -13,6 +14,14 @@ export class JwtRolesGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
+    const isPublic = this.reflector.getAllAndOverride<boolean | undefined>(IS_PUBLIC_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ])
+    if (isPublic) {
+      return true
+    }
+
     const requiredRoles = this.reflector.getAllAndOverride<Role[] | undefined>(ROLES_KEY, [
       context.getHandler(),
       context.getClass(),

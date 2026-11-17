@@ -11,7 +11,8 @@
     "lint": "biome check .",
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",
-    "prisma:migrate": "prisma migrate dev"
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:seed": "tsx src/migrations/scripts/seed.ts"
   },
   "dependencies": {
     "@nestjs/common": "^12.3.2",

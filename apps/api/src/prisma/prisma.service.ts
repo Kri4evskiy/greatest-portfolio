@@ -2,6 +2,8 @@ import { randomUUID } from 'node:crypto'
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common'
 import { PrismaClient } from '@prisma/client'
 import type { ArticleMeta, KnowledgeCategory, Role, VisitorRoleType } from '@repo/shared-schemas'
+import { databaseConfig } from '../config/database.config.js'
+import { INITIAL_ARTICLE_SEEDS } from '../migrations/scripts/seed-data.js'
 
 export interface StoredVisitorSession {
   id: string
@@ -12,38 +14,6 @@ export interface StoredVisitorSession {
   createdAt: Date
   expiresAt: Date
 }
-
-const INITIAL_ARTICLES: Array<{
-  slug: string
-  category: KnowledgeCategory
-  viewsCount: number
-  helpfulCount: number
-}> = [
-  {
-    slug: 'adr-full-stack-catalog',
-    category: 'typescript',
-    viewsCount: 142,
-    helpfulCount: 38,
-  },
-  {
-    slug: 'react-18-vs-19-compiler-d3',
-    category: 'react',
-    viewsCount: 198,
-    helpfulCount: 64,
-  },
-  {
-    slug: 'nestjs-jwt-httponly-prisma-sse',
-    category: 'nestjs-prisma',
-    viewsCount: 167,
-    helpfulCount: 51,
-  },
-  {
-    slug: 'indexeddb-bundle-diet-docker',
-    category: 'architecture-devops',
-    viewsCount: 129,
-    helpfulCount: 44,
-  },
-]
 
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
@@ -59,7 +29,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     })
 
     const now = new Date().toISOString()
-    for (const item of INITIAL_ARTICLES) {
+    for (const item of INITIAL_ARTICLE_SEEDS) {
       this.memoryMetrics.set(item.slug, {
         slug: item.slug,
         category: item.category,
@@ -71,7 +41,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   }
 
   async onModuleInit(): Promise<void> {
-    if (!process.env.DATABASE_URL) {
+    if (!databaseConfig.isConfigured) {
       this.logger.warn('DATABASE_URL not set — using resilient in-memory store with Prisma schema contract')
       return
     }

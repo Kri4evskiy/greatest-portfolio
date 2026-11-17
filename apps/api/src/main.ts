@@ -6,15 +6,16 @@ import cookieParser from 'cookie-parser'
 import helmet from 'helmet'
 import { AppModule } from './app.module.js'
 import { SentryExceptionFilter } from './common/filters/sentry-exception.filter.js'
+import { LoggingInterceptor } from './common/interceptors/logging.interceptor.js'
+import { appConfig } from './config/app.config.js'
 
 async function bootstrap(): Promise<void> {
   const logger = new Logger('NestAPI')
   const app = await NestFactory.create<NestExpressApplication>(AppModule)
-  const isProduction = process.env.NODE_ENV === 'production'
 
   // Behind Next.js rewrites or a single cloud/Nginx reverse proxy, trust exactly 1 proxy hop
   // so ThrottlerGuard reads the real client IP from X-Forwarded-For without allowing spoofing.
-  if (isProduction) {
+  if (appConfig.isProduction) {
     app.set('trust proxy', 1)
   }
 
@@ -27,24 +28,16 @@ async function bootstrap(): Promise<void> {
   )
   app.use(cookieParser())
   app.useGlobalFilters(new SentryExceptionFilter())
-
-  const webOrigin = process.env.WEB_ORIGIN ?? 'http://localhost:3000'
-  const allowedOrigins = isProduction
-    ? webOrigin
-        .split(',')
-        .map((origin) => origin.trim())
-        .filter(Boolean)
-    : [webOrigin, 'http://127.0.0.1:3000']
+  app.useGlobalInterceptors(new LoggingInterceptor())
 
   app.enableCors({
-    origin: allowedOrigins,
+    origin: appConfig.allowedOrigins,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   })
 
-  const port = Number(process.env.PORT ?? 4000)
-  await app.listen(port, '0.0.0.0')
-  logger.log(`NestJS API running on http://localhost:${port}/api`)
+  await app.listen(appConfig.port, '0.0.0.0')
+  logger.log(`NestJS API running on http://localhost:${appConfig.port}/api`)
 }
 
 void bootstrap()

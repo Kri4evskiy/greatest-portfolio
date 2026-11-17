@@ -1,7 +1,9 @@
-import { type InjectionToken, Module } from '@nestjs/common'
-import { APP_GUARD, Reflector } from '@nestjs/core'
+import { type InjectionToken, type MiddlewareConsumer, Module, type NestModule } from '@nestjs/common'
+import { APP_GUARD, APP_INTERCEPTOR, Reflector } from '@nestjs/core'
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler'
 import { AppController } from './app.controller.js'
+import { TimeoutInterceptor } from './common/interceptors/timeout.interceptor.js'
+import { LoggingMiddleware } from './common/middleware/logging.middleware.js'
 import { AuthModule } from './modules/auth/auth.module.js'
 import { KnowledgeModule } from './modules/knowledge/knowledge.module.js'
 import { TelemetryModule } from './modules/telemetry/telemetry.module.js'
@@ -41,6 +43,14 @@ const throttlerReflectorToken = throttlerParamTypes?.[2] as InjectionToken | und
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
     },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: TimeoutInterceptor,
+    },
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer): void {
+    consumer.apply(LoggingMiddleware).forRoutes('*')
+  }
+}

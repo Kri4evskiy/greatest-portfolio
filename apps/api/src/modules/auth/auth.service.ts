@@ -1,3 +1,4 @@
+import { createHash, timingSafeEqual } from 'node:crypto'
 import { Inject, Injectable } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
 import {
@@ -9,6 +10,7 @@ import {
   VISITOR_ROLE_LABELS,
   type VisitorRoleType,
 } from '@repo/shared-schemas'
+import { appConfig } from '../../config/app.config.js'
 import { PrismaService } from '../../prisma/prisma.service.js'
 import { TelemetryService } from '../telemetry/telemetry.service.js'
 
@@ -30,6 +32,12 @@ export class AuthService {
     @Inject(TelemetryService) private readonly telemetry: TelemetryService,
   ) {}
 
+  private isPasscodeMatch(candidate: string, expected: string): boolean {
+    const candidateDigest = createHash('sha256').update(candidate).digest()
+    const expectedDigest = createHash('sha256').update(expected).digest()
+    return timingSafeEqual(candidateDigest, expectedDigest)
+  }
+
   getGuestProfile(): SessionProfile {
     return {
       id: null,
@@ -44,8 +52,8 @@ export class AuthService {
     input: GuestPassFormInput,
     userAgent?: string | undefined,
   ): Promise<{ profile: SessionProfile; accessToken: string }> {
-    const expectedAdminPasscode = process.env.ADMIN_SECRET_PASSCODE ?? 'workfolio-admin-2026'
-    const isAdmin = Boolean(input.adminPasscode) && input.adminPasscode === expectedAdminPasscode
+    const isAdmin =
+      Boolean(input.adminPasscode) && this.isPasscodeMatch(input.adminPasscode ?? '', appConfig.adminSecretPasscode)
     const assignedRole: Role = isAdmin ? 'ADMIN' : 'USER'
 
     const expiresAt = new Date(Date.now() + KB_COOKIE_MAX_AGE_MS)
