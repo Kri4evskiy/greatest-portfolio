@@ -186,6 +186,7 @@ greatest-portfolio/
 ## 🧭 Architecture Documentation Navigation
 
 - [Root AI Context Router (`AGENTS.md`)](./AGENTS.md)
-- [FSD-Modular & NestJS Enterprise Architecture (`.agents/frontend/architecture-fsd-modular.md`)](./.agents/frontend/architecture-fsd-modular.md)
+- [FSD-Modular Frontend Architecture (`.agents/frontend/architecture-fsd-modular.md`)](./.agents/frontend/architecture-fsd-modular.md)
+- [NestJS Enterprise Modular Backend Architecture (`.agents/backend/architecture-enterprise-modular.md`)](./.agents/backend/architecture-enterprise-modular.md)
 - [Tech Debt & Post-MVP Roadmap (`.agents/tech-debt-backlog.md`)](./.agents/tech-debt-backlog.md)
 - [Full Catalog of 16 ADRs: Why, Where & How (`.agents/architecture/adr-stack.md`)](./.agents/architecture/adr-stack.md)
