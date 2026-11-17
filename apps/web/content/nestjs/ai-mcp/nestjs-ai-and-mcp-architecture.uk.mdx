@@ -119,8 +119,8 @@ export class PortfolioAgentTools {
 import { AiService } from '@nestjs/ai'
 import { Body, Controller, Post, Res, UseGuards } from '@nestjs/common'
 import type { Response } from 'express'
-import { Roles } from '../auth/roles.decorator.js'
-import { JwtRolesGuard } from '../auth/jwt-roles.guard.js'
+import { Roles } from '../auth/decorators/roles.decorator.js'
+import { JwtRolesGuard } from '../auth/guards/jwt-roles.guard.js'
 
 @Controller('ai')
 @UseGuards(JwtRolesGuard)

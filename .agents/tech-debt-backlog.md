@@ -13,22 +13,21 @@
 
 ### Приоритет №1: Реструктуризация бэкенда NestJS 12 по Enterprise-стандарту (`apps/api/src`)
 
-- [ ] **Переход от плоской структуры в `apps/api/src` к 4-компонентному разделению (`common`, `config`, `migrations`, `modules` — по аналогии с `coffee-app`):**
+- [x] **Переход от плоской структуры в `apps/api/src` к 4-компонентному разделению (`common`, `config`, `migrations`, `modules` — по аналогии с `coffee-app`):**
   1. `common/` — **Общие компоненты фреймворка (Cross-Cutting Concerns):**
-     - `decorators/` — кастомные декораторы (`@Protocol`, `@Public`, `@Roles`);
-     - `dto/` — общие DTO (пагинация, сортировка, мета-ответы);
-     - `filters/` — централизованные обработчики ошибок (`sentry-exception.filter.ts`, `http-exception.filter.ts`);
-     - `guards/` — глобальные и межмодульные гарды (`throttler.guard.ts`, `api-key.guard.ts`);
-     - `interceptors/` — сквозные перехватчики (`logging.interceptor.ts`, `transform.interceptor.ts`, `timeout.interceptor.ts`);
-     - `middleware/` — промежуточные слои логирования и контекста запроса;
+     - `decorators/` — кастомные декораторы (`public.decorator.ts`, `skip-timeout.decorator.ts`);
+     - `dto/` — общие DTO (`pagination-query.dto.ts`);
+     - `filters/` — централизованные обработчики ошибок (`sentry-exception.filter.ts`);
+     - `interceptors/` — сквозные перехватчики (`logging.interceptor.ts`, `timeout.interceptor.ts` через `APP_INTERCEPTOR`);
+     - `middleware/` — промежуточные слои логирования (`logging.middleware.ts`);
      - `pipes/` — строгие валидаторы входных данных (`zod-validation.pipe.ts`).
   2. `config/` — **Централизованная типизированная конфигурация:** `app.config.ts`, `database.config.ts` с Zod-валидацией env-переменных при старте процесса (включая запрет дефолтного `JWT_SECRET` при `NODE_ENV === 'production'`).
-  3. `migrations/` — **Слой управления миграциями и схемой БД:** выделенные скрипты версионирования, наката и сидирования схемы базы данных.
+  3. `migrations/` — **Слой управления миграциями и схемой БД:** `scripts/seed-data.ts`, `scripts/seed.ts`.
   4. `modules/` — **Изолированные доменные модули (Domain Modules):**
-     - `modules/auth/` — `guards/` (`jwt-roles.guard.ts`), `decorators/` (`roles.decorator.ts`), `dto/`, `auth.controller.ts`, `auth.service.ts`, `auth.module.ts`;
-     - `modules/knowledge/` — `dto/`, `knowledge.controller.ts`, `knowledge.service.ts`, `knowledge.module.ts`;
+     - `modules/auth/` — `guards/jwt-roles.guard.ts`, `decorators/roles.decorator.ts`, `dto/auth.dto.ts`, `auth.controller.ts`, `auth.service.ts`, `auth.module.ts`;
+     - `modules/knowledge/` — `dto/knowledge.dto.ts`, `knowledge.controller.ts`, `knowledge.service.ts`, `knowledge.module.ts`;
      - `modules/telemetry/` — `telemetry.controller.ts`, `telemetry.service.ts`, `telemetry.module.ts`.
-  - **Спецификация:** `.agents/frontend/architecture-fsd-modular.md` (Секция 3).
+  - **Спецификация:** `.agents/backend/architecture-enterprise-modular.md` и `.agents/backend/development.md`.
 
 ### Приоритет №2: Внедрение Redis (Distributed Rate Limiting & Response Cache)
 
@@ -68,13 +67,13 @@
 
 ### 2. Security & Production Hardening (`apps/web`, `apps/api`)
 
-- [ ] **Access + Refresh JWT Rotation:** дополнить Edge HS256-верификацию парой короткоживущего `Access` (`15m`) + ротируемого `HttpOnly Refresh` (`7d`) токенов с хранением и отзывом сессий в `VisitorSession` (`PostgreSQL`).
+- [ ] **Access + Refresh JWT Rotation:** дополнить Edge HS256-верификацию парой короткоживущего `Access` (`15m`) + ротируемого `HttpOnly Refresh` (`7d`) токенов с хранением и отзывом сессий в `VisitorSession` (`PostgreSQL`). _(Готовая заготовка: при переходе `JwtRolesGuard` на глобальный `APP_GUARD` использовать `@Public()` из `common/decorators/public.decorator.ts` для открытых эндпоинтов.)_
 - [ ] **Throttler ESM Upgrade Cleanup (`apps/api`):** периодически проверять обновления `@nestjs/throttler` и после перехода пакета на нативный ESM (`"type": "module"`) удалить временный CJS/ESM мост для `Reflector` из `apps/api/src/app.module.ts`.
 
 ### 3. Observability & Real Cloud Integrations
 
 - [ ] **Live Sentry & PostHog SDK:** заменить обёртки-заглушки на реальные транспорты `@sentry/nextjs`, `@sentry/nestjs` и `posthog-js`, включаемые при наличии ключей в `.env`.
-- [ ] **Neon.tech Cloud Database Migration:** подключить боевой `DATABASE_URL` от Neon.tech PostgreSQL, прогнать `prisma migrate deploy` и сид (`prisma/seed.ts`).
+- [ ] **Neon.tech Cloud Database Migration:** подключить боевой `DATABASE_URL` от Neon.tech PostgreSQL, прогнать `prisma migrate deploy` и сид (`pnpm --filter @repo/api prisma:seed` / `src/migrations/scripts/seed.ts`). _(Готовая заготовка: при добавлении админ-таблицы логов `SystemEventLog` / `VisitorSession` использовать `PaginationQueryDto` из `common/dto/pagination-query.dto.ts`.)_
 - [ ] **Nginx Reverse Proxy для VPS-деплоя (`docker-compose.prod.yml`):** легковесный Nginx как единая точка входа (порты 80/443, SSL Let's Encrypt, сквозное проксирование на `web:3000` и `api:4000`).
 - [ ] **Dual-Mode Air-Gapped Local Environment («Тумблер офлайна»):** гарантировать запуск 100% функционала монорепозитория (база знаний, MDX, поиск, локальная телеметрия TCP `:4001`) при полном отсутствии интернета и внешних облачных сервисов (In-Memory Prisma + In-Memory Throttler).
 - [ ] **S3-compatible Object Storage (Cloudflare R2 vs AWS S3):** интеграция `@aws-sdk/client-s3` с эндпоинтом Cloudflare R2 ($0 за трафик, 10 ГБ навсегда бесплатно) для сгенерированных PDF-резюме и ассетов + локальный MinIO в Docker.
@@ -87,7 +86,7 @@
 
 ### 5. Backend AI & Model Context Protocol (`apps/api` — Future Milestone)
 
-- [ ] **Read-Only шоукейс `@nestjs/mcp` (`$0` за токены, статус `evaluating`):** публичный MCP (`Streamable HTTP`) с 16 ADR, опытом CV и `TL;DR` статей для `Cursor` / `Claude Desktop` — строго **Read-Only**, строго после `@nestjs/throttler`, с лимитами Zod (`limit <= 16`, `.max(60)`) и соблюдением `<Redact />`.
+- [ ] **Read-Only шоукейс `@nestjs/mcp` (`$0` за токены, статус `evaluating`):** публичный MCP (`Streamable HTTP`) с 16 ADR, опытом CV и `TL;DR` статей для `Cursor` / `Claude Desktop` — строго **Read-Only**, строго после `@nestjs/throttler`, с лимитами Zod (`limit <= 16`, `.max(60)`) и соблюдением `<Redact />`. _(Готовая заготовка: `PaginationQueryDto` / `PaginationQuerySchema` в `common/dto/pagination-query.dto.ts` при необходимости пагинации списков.)_
 - [ ] _(Отложено / `deferred`)_ **Живой агент `@nestjs/ai`:** не нужен, пока поиск закрывает `Cmd+K` за $0/мес; при возврате — строго за `@UseGuards(JwtRolesGuard)` с `maxOutputTokens`.
 
 ---

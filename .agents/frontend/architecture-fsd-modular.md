@@ -1,6 +1,7 @@
-# 📐 Архитектура файловой структуры: FSD-Modular (Next.js 16) и Enterprise Modules (NestJS 12)
+# 📐 Архитектура файловой структуры: FSD-Modular (`apps/web`, Next.js 16)
 
-Этот документ описывает стандарт организации файлов и папок в монорепозитории, адаптацию принципов **Feature-Sliced Design (FSD)** под Next.js App Router и модульный паттерн NestJS по эталону Enterprise-приложений.
+Этот документ описывает стандарт организации файлов и папок во фронтенд-приложении `apps/web` и адаптацию принципов **Feature-Sliced Design (FSD)** под Next.js App Router.
+*(Архитектура бэкенда `apps/api` описана отдельно в `.agents/backend/architecture-enterprise-modular.md`.)*
 
 ---
 
@@ -79,65 +80,8 @@ apps/web/src/
 
 ---
 
-## 3. Стандарт Enterprise Modules для `apps/api` (NestJS 12)
+## 3. Чеклист при добавлении новых модулей (`apps/web/src`)
 
-По образцу эталонной архитектуры (проект `coffee-app`):
-
-```text
-apps/api/src/
-│
-├── main.ts                     # Bootstrap: Helmet, CORS, CookieParser, Listen
-├── app.module.ts               # Root Module: импорт core-модулей, ThrottlerGuard
-│
-├── common/                     # Общий код фреймворка (Cross-Cutting Concerns)
-│   ├── decorators/             # Общие кастомные декораторы (@Protocol, @Public)
-│   ├── dto/                    # Общие DTO (пагинация, сортировка)
-│   ├── filters/                # SentryExceptionFilter, HttpExceptionFilter
-│   ├── guards/                 # ThrottlerGuard, ApiKeyGuard
-│   ├── interceptors/           # LoggingInterceptor, TransformInterceptor, TimeoutInterceptor
-│   ├── middleware/             # LoggingMiddleware, RequestContextMiddleware
-│   └── pipes/                  # ZodValidationPipe
-│
-├── config/                     # Типизированная конфигурация окружения
-│   └── app.config.ts           # Порты, URL-ы, секреты с валидацией
-│
-├── migrations/                 # Слой управления миграциями БД (Prisma / SQL)
-│   └── scripts/                # Скрипты наката и сидирования
-│
-├── prisma/                     # Слой доступа к данным (Database Persistence)
-│   ├── prisma.module.ts
-│   └── prisma.service.ts
-│
-└── modules/                    # Доменные модули (Domain Modules)
-    │
-    ├── auth/                   # Модуль аутентификации и сессий
-    │   ├── guards/             # JwtRolesGuard
-    │   ├── decorators/         # RolesDecorator (@Roles)
-    │   ├── dto/                # GuestPassDto, LoginDto (реэкспорт из @repo/shared-schemas)
-    │   ├── auth.controller.ts
-    │   ├── auth.service.ts
-    │   └── auth.module.ts
-    │
-    ├── knowledge/              # Модуль Базы Знаний и метрик
-    │   ├── dto/                # ArticleMetricsDto, ReactionDto
-    │   ├── knowledge.controller.ts
-    │   ├── knowledge.service.ts
-    │   └── knowledge.module.ts
-    │
-    └── telemetry/              # Модуль телеметрии и SSE
-        ├── telemetry.controller.ts
-        ├── telemetry.service.ts
-        └── telemetry.module.ts
-```
-
----
-
-## 4. Чеклист при добавлении новых модулей
-
-1. **Фронтенд (`apps/web/src`):**
-   - Размещай новый модуль строго в его слое (`widgets/`, `features/`, `entities/`, `shared/`).
-   - Серверные хуки `TanStack Query` размещай в подпапке `queries/` соответствующей фичи или сущности (`features/auth/queries/`, `entities/knowledge-article/queries/`), а чистые браузерные DOM-хуки — в `shared/hooks/`.
-2. **Бэкенд (`apps/api/src`):**
-   - Размещай доменную логику в `modules/<domain>/`, а сквозные гарды, интерцепторы, пайпы и фильтры — в `common/`.
-3. **Верификация:**
-   - Прогоняй `pnpm biome check --write .`, `pnpm turbo typecheck` и `pnpm turbo build`.
+1. Размещай новый модуль строго в его слое (`widgets/`, `features/`, `entities/`, `shared/`).
+2. Серверные хуки `TanStack Query` размещай в подпапке `queries/` соответствующей фичи или сущности (`features/auth/queries/`, `entities/knowledge-article/queries/`), а чистые браузерные DOM-хуки — в `shared/hooks/`.
+3. **Верификация:** прогоняй `pnpm biome check --write .`, `pnpm turbo typecheck` и `pnpm turbo build`.
