@@ -3,7 +3,7 @@
 ## 📌 Текущая база (Production Baseline)
 
 Архитектурное ядро находится в продакшен-состоянии (подробности и 16 ADR лежат в `.agents/frontend/*`, `.agents/backend/*`, `.agents/architecture/*` и статьях базы знаний):
-- **Monorepo & DX:** `pnpm 12.18.0` + `Turborepo` + `Biome 2.6.4` + `Lefthook` · `@repo/shared-schemas` (`Zod v4`) + `@repo/ui` (`Storybook 10`) · Multi-stage `Docker` + `GitHub Actions CI/CD`.
+- **Monorepo & DX:** `pnpm 12.21.0` + `Turborepo` + `Biome 2.6.4` + `Lefthook` · `@repo/shared-schemas` (`Zod v4`) + `@repo/ui` (`Storybook 10`) · Multi-stage `Docker` + `GitHub Actions CI/CD`.
 - **Frontend (`apps/web`):** `Next.js 16` (`React 19 Compiler`) · архитектура `FSD-Modular` (`app` ➔ `widgets` ➔ `features` ➔ `entities` ➔ `shared`) · `next-intl` (`EN/UK/RU`) · `Zero-Eval HAST MDX Engine` (`remark-directive` `:::sandbox` + `remark-rehype` + `hast-util-to-jsx-runtime` + `mtimeMs` кэш + `Dual-Theme Shiki`) · `Cmd+K` SSG-индекс · `TanStack Query v5` (`IndexedDB`) · `D3.js` / `MCP` клиентские острова · `Edge Web Crypto JWT` + строгий `CSP`.
 - **Backend (`apps/api` & `apps/telemetry-ms`):** `NestJS 12 ESM` + `Prisma` (с In-Memory fallback) + `HttpOnly JWT` + `Helmet` + `@nestjs/throttler` + изолированный TCP-микросервис телеметрии (`:4001`) с `SSE`-стримингом.
 
@@ -121,4 +121,4 @@
 
 1. **Neon.tech:** создать БД с `?sslmode=require`, накатить схему из CI/локально (`prisma migrate deploy` / `prisma:push`, т.к. прод-образ `api` очищен через `pnpm prune --prod`).
 2. **Backend (`docker/api.Dockerfile` + `docker/telemetry-ms.Dockerfile`):** задать `DATABASE_URL`, `JWT_ACCESS_SECRET`, `TELEMETRY_MS_HOST`, `TELEMETRY_MS_TCP_PORT=4001`, `CORS_ORIGIN=https://<vercel-app>`, `NODE_ENV=production`.
-3. **Frontend (`Vercel`):** Node `22.x` (`Corepack` подхватит `"packageManager": "pnpm@12.18.0"` и `pnpm-workspace.yaml`), build command `pnpm turbo run build --filter=@repo/web...`, env `NEXT_PUBLIC_API_URL`, `APP_ENV=production`.
+3. **Frontend (`Vercel`):** Node `22.x` (`Corepack` подхватит `"packageManager": "pnpm@12.21.0"` и `pnpm-workspace.yaml`), build command `pnpm turbo run build --filter=@repo/web...`, env `NEXT_PUBLIC_API_URL`, `APP_ENV=production`.

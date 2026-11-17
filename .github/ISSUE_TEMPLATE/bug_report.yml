@@ -45,8 +45,8 @@ body:
     id: environment
     attributes:
       label: "Environment Info"
-      description: "Node version, pnpm version, OS, browser (e.g. Node 22.18, pnpm 12.18, Windows 11, Chrome 130)."
-      placeholder: "Node 22.18.0, pnpm 12.18.0, Windows 11"
+      description: "Node version, pnpm version, OS, browser (e.g. Node 22.18, pnpm 12.21, Windows 11, Chrome 130)."
+      placeholder: "Node 22.18.0, pnpm 12.21.0, Windows 11"
     validations:
       required: false
   - type: checkboxes

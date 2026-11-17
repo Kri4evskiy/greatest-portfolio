@@ -55,7 +55,7 @@ The project is built as a unified monorepo powered by **`pnpm workspaces`** ([`p
 ### Prerequisites
 
 - **Node.js:** `>= 22.0.0`
-- **pnpm:** `>= 12.x` (`pnpm@12.18.0`, activate via `corepack enable` or `npm install -g pnpm@latest`)
+- **pnpm:** `>= 12.x` (`pnpm@12.21.0`, activate via `corepack enable` or `npm install -g pnpm@latest`)
 
 ### Option 1: Instant Local Run (Zero Database or Docker Setup Required)
 

@@ -131,7 +131,7 @@ runs:
 
 Why every piece is ordered this way:
 
-- **`pnpm/action-setup@v5` runs before `actions/setup-node@v6`:** `setup-node` with `cache: pnpm` requires `pnpm` to already exist on `$PATH` to resolve the store path. Omitting a hardcoded `version:` keeps root `package.json` (`"packageManager": "pnpm@12.18.0"`) as the single source of truth.
+- **`pnpm/action-setup@v5` runs before `actions/setup-node@v6`:** `setup-node` with `cache: pnpm` requires `pnpm` to already exist on `$PATH` to resolve the store path. Omitting a hardcoded `version:` keeps root `package.json` (`"packageManager": "pnpm@12.21.0"`) as the single source of truth.
 - **Unified Node 24 Action Runtime:** `actions/checkout@v6`, `actions/setup-node@v6`, `actions/cache@v5`, and `pnpm/action-setup@v5` all execute on GitHub's modern Node 24 action runtime.
 - **`pnpm install --frozen-lockfile` governed by `allowBuilds`:** unlike production multi-stage Dockerfiles (`--ignore-scripts`), CI builds approved native dependencies (`@prisma/client`, `@swc/core`, `@biomejs/biome`) strictly listed in `pnpm-workspace.yaml` `allowBuilds`, while blocking arbitrary transitive install scripts by default.
 - **`LEFTHOOK: 0` & Zero Telemetry:** setting `LEFTHOOK: 0` prevents root `prepare: "lefthook install"` from touching `.git/hooks` on ephemeral CI runners.
@@ -233,7 +233,7 @@ Setting `prepare-codegen: "true"` generates those three artifacts before `turbo 
 - **Supply-Chain Isolation:** many npm compromises happen via malicious install scripts or vulnerable transitive packages. Running `security` **without `pnpm install` (`node_modules`)** inspects `pnpm-lock.yaml` directly without executing third-party code or wasting install time.
 - **Fail-order discipline:** `docker compose config --quiet` executes *before* `pnpm audit` so a broken Compose topology or env interpolation error is caught offline even if npm advisory lookups fail.
 - **Why `--prod --audit-level=high`:** `devDependencies` (Storybook, Vite, Biome, Turborepo) never ship inside our `docker/*.Dockerfile` runtime images (`pnpm prune --prod`). Scoping the blocking gate to `--prod` maximizes signal-to-noise without false alarms from build-only tooling.
-- **Documented Exceptions in `pnpm 12`:** if an unreachable false-positive advisory ever needs a temporary documented suppression, `pnpm@12.18.0` configures `audit.ignore` at the top level of `pnpm-workspace.yaml` (via `pnpm audit --ignore <GHSA>`).
+- **Documented Exceptions in `pnpm 12`:** if an unreachable false-positive advisory ever needs a temporary documented suppression, `pnpm@12.21.0` configures `audit.ignore` at the top level of `pnpm-workspace.yaml` (via `pnpm audit --ignore <GHSA>`).
 
 ### Evolution Roadmap (Zero DAG Rewrite)
 

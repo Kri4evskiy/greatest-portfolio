@@ -131,7 +131,7 @@ runs:
 
 Ключові деталі реалізації:
 
-- **Порядок `pnpm/action-setup@v5` до `actions/setup-node@v6`:** опція `cache: pnpm` потребує вже наявного бінарника `pnpm`, щоб визначити шлях до стору. Версія не дублюється в YAML — екшен читає `"packageManager": "pnpm@12.18.0"` із кореневого `package.json`.
+- **Порядок `pnpm/action-setup@v5` до `actions/setup-node@v6`:** опція `cache: pnpm` потребує вже наявного бінарника `pnpm`, щоб визначити шлях до стору. Версія не дублюється в YAML — екшен читає `"packageManager": "pnpm@12.21.0"` із кореневого `package.json`.
 - **Єдиний runtime для Actions:** `actions/checkout@v6`, `actions/setup-node@v6`, `actions/cache@v5` і `pnpm/action-setup@v5` працюють на сучасному Node 24 runtime.
 - **`pnpm install --frozen-lockfile` із білим списком `allowBuilds`:** на відміну від продакшен-Dockerfiles (`--ignore-scripts`), у CI дозволеним пакетам (`@prisma/client`, `@swc/core`, `@biomejs/biome`) потрібно скомпілювати бінарники. Безпеку забезпечує `allowBuilds` у `pnpm-workspace.yaml` — будь-які сторонні `postinstall`-скрипти заблоковані за замовчуванням.
 - **`LEFTHOOK: 0` та вимкнення телеметрії:** глобальна `LEFTHOOK: 0` вимикає встановлення локальних git-хуків скриптом `prepare` усередині ефемерного раннера.

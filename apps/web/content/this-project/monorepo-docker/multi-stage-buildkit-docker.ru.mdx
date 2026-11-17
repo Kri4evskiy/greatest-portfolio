@@ -19,7 +19,7 @@ tldr:
 Чтобы в продакшен-контейнеры не попадали исходники, компиляторы и чужие пакеты монорепозитория, каждый Dockerfile в папке `docker/` строит образ в три шага:
 
 1. **`pruner`:** запускает `turbo prune @repo/<app> --docker`, формируя минимальный подграф (`out/json/`, `out/full/`, `out/pnpm-lock.yaml`) только для целевого сервиса.
-2. **`builder`:** активирует `pnpm@12.18.0`, ставит зависимости через `--frozen-lockfile --ignore-scripts` с общим кэшем BuildKit, запускает `pnpm turbo run build --filter=@repo/<app>...` и очищает `devDependencies`.
+2. **`builder`:** активирует `pnpm@12.21.0`, ставит зависимости через `--frozen-lockfile --ignore-scripts` с общим кэшем BuildKit, запускает `pnpm turbo run build --filter=@repo/<app>...` и очищает `devDependencies`.
 3. **`runner`:** копирует только скомпилированные артефакты (`dist/` или `.next/standalone`) и запускает процесс от непривилегированного пользователя (`USER node` / `USER nextjs`).
 
 ---
@@ -42,7 +42,7 @@ FROM node:22-alpine AS builder
 RUN apk add --no-cache libc6-compat openssl
 ENV DO_NOT_TRACK=1
 ENV TURBO_TELEMETRY_DISABLED=1
-RUN corepack enable && corepack prepare pnpm@12.18.0 --activate && pnpm --version
+RUN corepack enable && corepack prepare pnpm@12.21.0 --activate && pnpm --version
 WORKDIR /app
 
 COPY --from=pruner /app/out/json/ .

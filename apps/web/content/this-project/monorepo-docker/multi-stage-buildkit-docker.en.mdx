@@ -19,7 +19,7 @@ tldr:
 To keep source files, compilers, and unrelated workspace packages out of production images, every Dockerfile in `docker/` separates container construction into three deterministic stages:
 
 1. **`pruner`:** runs `turbo prune @repo/<app> --docker` to emit the minimal subgraph (`out/json/`, `out/full/`, `out/pnpm-lock.yaml`) needed by the target service.
-2. **`builder`:** activates `pnpm@12.18.0`, runs `pnpm install --frozen-lockfile --ignore-scripts` with a shared BuildKit cache mount, runs `pnpm turbo run build --filter=@repo/<app>...`, and prunes `devDependencies`.
+2. **`builder`:** activates `pnpm@12.21.0`, runs `pnpm install --frozen-lockfile --ignore-scripts` with a shared BuildKit cache mount, runs `pnpm turbo run build --filter=@repo/<app>...`, and prunes `devDependencies`.
 3. **`runner`:** copies only compiled artifacts (`dist/` or `.next/standalone`) and executes under a non-root user (`USER node` / `USER nextjs`).
 
 ---
@@ -42,7 +42,7 @@ FROM node:22-alpine AS builder
 RUN apk add --no-cache libc6-compat openssl
 ENV DO_NOT_TRACK=1
 ENV TURBO_TELEMETRY_DISABLED=1
-RUN corepack enable && corepack prepare pnpm@12.18.0 --activate && pnpm --version
+RUN corepack enable && corepack prepare pnpm@12.21.0 --activate && pnpm --version
 WORKDIR /app
 
 COPY --from=pruner /app/out/json/ .
