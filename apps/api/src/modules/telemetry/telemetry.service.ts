@@ -81,7 +81,7 @@ export class TelemetryService {
     const welcomeEvent: TelemetryEvent = {
       id: randomUUID(),
       type: 'SYSTEM_HEARTBEAT',
-      message: 'SSE Telemetry Stream connected (NestJS + Microservice TCP:4001)',
+      message: 'SSE Telemetry Stream connected (NestJS + Microservice)',
       timestamp: new Date().toISOString(),
     }
 
@@ -90,7 +90,7 @@ export class TelemetryService {
         (): TelemetryEvent => ({
           id: randomUUID(),
           type: 'SYSTEM_HEARTBEAT',
-          message: `System pulse OK • Uptime ${Math.floor(process.uptime())}s`,
+          message: `System pulse OK | Uptime ${Math.floor(process.uptime())}s`,
           timestamp: new Date().toISOString(),
         }),
       ),
