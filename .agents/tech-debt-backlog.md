@@ -1,77 +1,66 @@
 # 🛠️ Tech Debt & Post-MVP Backlog
 
-## 📌 База (реализовано и в продакшен-состоянии)
+## 📌 Текущая база (Production Baseline)
 
-Архитектурное ядро **MVP + Этапы 1–5.5** завершено (подробности и ADR лежат в `.agents/frontend/*`, `.agents/backend/*`, `.agents/architecture/*` и MDX-базе):
-`pnpm 12.18.0` + `Turborepo` + `Biome 2.6.4` + `Lefthook` · `@repo/shared-schemas` (`Zod v4`) + `@repo/ui` (`Storybook 10`) · `NestJS 12 ESM` + `Prisma` (с In-Memory fallback) + `HttpOnly JWT` + TCP/`SSE` · `Next.js 16` + `next-intl` (`EN/UK/RU`) + `TanStack Query v5` / `IndexedDB` + `Cmd+K` + Remark AST MDX + `D3.js` · Multi-stage `Docker` + `GitHub Actions CI/CD`.
-
----
-
-## 🗺️ Следующий этап продукта
-
-### ⏳ Этап 6 (Next Epoch — UI v2): Визуальный редизайн Notion Workfolio
-
-- [ ] **Notion Workfolio Authentic Visual Redesign (`UI v2`):** перевести визуальный язык с классических SaaS-карточек ближе к оригинальному Notion Workfolio (обложка и аватар страницы, палитра «тёплой бумаги и чернил» для Light/Dark, облегчённые таблицы/списки без тяжёлых рамок, спокойная типографика) поверх готового ядра.
+Архитектурное ядро находится в продакшен-состоянии (подробности и 16 ADR лежат в `.agents/frontend/*`, `.agents/backend/*`, `.agents/architecture/*` и статьях базы знаний):
+- **Monorepo & DX:** `pnpm 12.18.0` + `Turborepo` + `Biome 2.6.4` + `Lefthook` · `@repo/shared-schemas` (`Zod v4`) + `@repo/ui` (`Storybook 10`) · Multi-stage `Docker` + `GitHub Actions CI/CD`.
+- **Frontend (`apps/web`):** `Next.js 16` (`React 19 Compiler`) · архитектура `FSD-Modular` (`app` ➔ `widgets` ➔ `features` ➔ `entities` ➔ `shared`) · `next-intl` (`EN/UK/RU`) · `Zero-Eval HAST MDX Engine` (`remark-directive` `:::sandbox` + `remark-rehype` + `hast-util-to-jsx-runtime` + `mtimeMs` кэш + `Dual-Theme Shiki`) · `Cmd+K` SSG-индекс · `TanStack Query v5` (`IndexedDB`) · `D3.js` / `MCP` клиентские острова · `Edge Web Crypto JWT` + строгий `CSP`.
+- **Backend (`apps/api` & `apps/telemetry-ms`):** `NestJS 12 ESM` + `Prisma` (с In-Memory fallback) + `HttpOnly JWT` + `Helmet` + `@nestjs/throttler` + изолированный TCP-микросервис телеметрии (`:4001`) с `SSE`-стримингом.
 
 ---
 
-## 🔧 Активный технический бэклог (Open Tech Debt)
+## 🔥 Приоритетная очередь разработки (Next Up)
 
-### 🔥 Ближайший приоритет №1: Реструктуризация бэкенда NestJS 12 по Enterprise-стандарту
+### Приоритет №1: Реструктуризация бэкенда NestJS 12 по Enterprise-стандарту (`apps/api/src`)
 
-- [ ] **Этап 4: Реструктуризация бэкенда NestJS 12 по Enterprise-стандарту (по аналогии с проектом `coffee-app`):**
-  - **Контекст и цели:** Фронтенд `apps/web/src` полностью переведён на `FSD-Modular` (`app` ➔ `widgets` ➔ `features` ➔ `entities` ➔ `shared`) с Zero-Eval HAST MDX-движком (Фазы A и B: `remark-directive` + `remark-rehype` + `hast-util-to-jsx-runtime` + `mtimeMs` кэш). Следующий шаг — переход от плоской структуры в `apps/api/src` к четкому 4-компонентному разделению приложения на **modules**, **migrations**, **config** и **common**:
-    1. `common/` — **Общие компоненты фреймворка (Cross-Cutting Concerns):**
-       - `decorators/` — кастомные декораторы (`@Protocol`, `@Public`, `@Roles`);
-       - `dto/` — общие DTO (пагинация, сортировка, мета-ответы);
-       - `filters/` — централизованные обработчики ошибок (`sentry-exception.filter.ts`, `http-exception.filter.ts`);
-       - `guards/` — глобальные и межмодульные гарды (`throttler.guard.ts`, `api-key.guard.ts`);
-       - `interceptors/` — сквозные перехватчики (`logging.interceptor.ts`, `transform.interceptor.ts`, `timeout.interceptor.ts`);
-       - `middleware/` — промежуточные слои логирования и контекста запроса;
-       - `pipes/` — строгие валидаторы входных данных (`zod-validation.pipe.ts`).
-    2. `config/` — **Централизованная типизированная конфигурация:** `app.config.ts`, `database.config.ts` с Zod-валидацией env-переменных при старте процесса.
-    3. `migrations/` — **Слой управления миграциями и схемой БД:** выделенные скрипты версионирования, наката и сидирования схемы базы данных.
-    4. `modules/` — **Изолированные доменные модули (Domain Modules):**
-       - `modules/auth/` — разделение на `guards/` (`jwt-roles.guard.ts`), `decorators/` (`roles.decorator.ts`), `dto/`, `auth.controller.ts`, `auth.service.ts`, `auth.module.ts`;
-       - `modules/knowledge/` — `dto/`, `knowledge.controller.ts`, `knowledge.service.ts`, `knowledge.module.ts`;
-       - `modules/telemetry/` — `telemetry.controller.ts`, `telemetry.service.ts`, `telemetry.module.ts`.
-  - **Документ спецификации:** `.agents/frontend/architecture-fsd-modular.md` (Секция 3).
+- [ ] **Переход от плоской структуры в `apps/api/src` к 4-компонентному разделению (`common`, `config`, `migrations`, `modules` — по аналогии с `coffee-app`):**
+  1. `common/` — **Общие компоненты фреймворка (Cross-Cutting Concerns):**
+     - `decorators/` — кастомные декораторы (`@Protocol`, `@Public`, `@Roles`);
+     - `dto/` — общие DTO (пагинация, сортировка, мета-ответы);
+     - `filters/` — централизованные обработчики ошибок (`sentry-exception.filter.ts`, `http-exception.filter.ts`);
+     - `guards/` — глобальные и межмодульные гарды (`throttler.guard.ts`, `api-key.guard.ts`);
+     - `interceptors/` — сквозные перехватчики (`logging.interceptor.ts`, `transform.interceptor.ts`, `timeout.interceptor.ts`);
+     - `middleware/` — промежуточные слои логирования и контекста запроса;
+     - `pipes/` — строгие валидаторы входных данных (`zod-validation.pipe.ts`).
+  2. `config/` — **Централизованная типизированная конфигурация:** `app.config.ts`, `database.config.ts` с Zod-валидацией env-переменных при старте процесса (включая запрет дефолтного `JWT_SECRET` при `NODE_ENV === 'production'`).
+  3. `migrations/` — **Слой управления миграциями и схемой БД:** выделенные скрипты версионирования, наката и сидирования схемы базы данных.
+  4. `modules/` — **Изолированные доменные модули (Domain Modules):**
+     - `modules/auth/` — `guards/` (`jwt-roles.guard.ts`), `decorators/` (`roles.decorator.ts`), `dto/`, `auth.controller.ts`, `auth.service.ts`, `auth.module.ts`;
+     - `modules/knowledge/` — `dto/`, `knowledge.controller.ts`, `knowledge.service.ts`, `knowledge.module.ts`;
+     - `modules/telemetry/` — `telemetry.controller.ts`, `telemetry.service.ts`, `telemetry.module.ts`.
+  - **Спецификация:** `.agents/frontend/architecture-fsd-modular.md` (Секция 3).
 
-### ⏳ Ближайший приоритет №2: Внедрение Redis (Distributed Rate Limiting & Response Cache)
+### Приоритет №2: Внедрение Redis (Distributed Rate Limiting & Response Cache)
 
 - [ ] **Архитектурное внедрение Redis (`apps/api`, `docker-compose.yml`):**
   - **Зачем:**
-    1. _Distributed Rate Limiting:_ масштабирование защиты от брутфорса (`POST /api/auth/login`, `POST /api/auth/guest-pass`) при работе нескольких реплик API (защита от распределенного перебора, когда запросы балансируются между инстансами).
-    2. _Response Caching (Cache-Aside):_ кэширование высоконагруженных аналитических эндпоинтов (`GET /api/knowledge/stats`) с TTL 60 сек, снижающее нагрузку на PostgreSQL (Neon.tech) на 95%.
+    1. _Distributed Rate Limiting:_ масштабирование защиты от брутфорса (`POST /api/auth/login`, `POST /api/auth/guest-pass`) при работе нескольких реплик API.
+    2. _Response Caching (Cache-Aside):_ кэширование аналитических эндпоинтов (`GET /api/knowledge/stats`) с TTL 60 сек, снижающее нагрузку на PostgreSQL (Neon.tech) на 95%.
     3. _Session Revocation:_ фундамент для мгновенного отзыва скомпрометированных сессий и Refresh-токенов (`VisitorSession`).
   - **Паттерн Graceful In-Memory Fallback:** если переменная `REDIS_URL` отсутствует в `.env`, система автоматически и без ошибок откатывается на встроенный `In-Memory Throttler` и прямое чтение из БД.
-  - **Инфраструктура и Пакетная модель монорепозитория:**
-    - _Инфраструктурный уровень (Docker):_ Redis запускается как нативный легковесный сервис на C (`redis:7-alpine`, ~30 МБ) в `backend-network`. Ему не требуется собственный Node.js образ или компиляция.
-    - _Пакетный уровень (Архитектурная развилка):_
-      - _Вариант 1 (Прямой):_ Подключение `ioredis` и кэш-интерцепторов напрямую в `apps/api`.
-      - _Вариант 2 (Модульный Enterprise):_ Выделение общего пакета `packages/redis` (или `@repo/cache`) со своим изолированным `package.json`, строгой Zod-типизацией ключей/TTL и готовыми хелперами для повторного использования в `apps/api` и микросервисе `apps/telemetry-ms`.
-  - **Какие файлы затронет задача:**
-    - `docker-compose.yml`: добавление сервиса `redis` (`image: redis:7-alpine`, порт `127.0.0.1:6379:6379`, сеть `backend-network`, healthcheck `redis-cli ping`).
-    - `.env.example`: добавление `REDIS_URL=redis://localhost:6379` (или `rediss://...` от Upstash).
-    - `apps/api/package.json`: установка `ioredis`, `@nest-lab/throttler-storage-redis`, `@nestjs/cache-manager`, `cache-manager-redis-yet`.
-    - `apps/api/src/app.module.ts`: переключение `ThrottlerModule.forRootAsync` на фабрику с `ThrottlerStorageRedisService` при наличии `REDIS_URL` + подключение `CacheModule`.
-    - `apps/api/src/modules/knowledge/knowledge.controller.ts` и `knowledge.service.ts`: кэширование агрегированных счетчиков `stats` (`viewsCount`, `helpfulCount`).
-  - **Где читать контекст перед реализацией:**
-    - `.agents/backend/security-jwt.md` (Секция 4: Спецификация Redis Throttling & Caching).
-    - Статья `apps/web/content/this-project/security/production-security-hardening-csp-helmet-throttler.mdx`.
-    - NestJS Docs: `docs.nestjs.com/security/rate-limiting#proxies-and-distributed-storage`.
-    - Upstash Docs: `upstash.com/docs/redis/overall/getstarted`.
+  - **Инфраструктура и пакетная модель:**
+    - _Docker:_ `redis:7-alpine` (~30 МБ) в приватной сети `backend-network` (`127.0.0.1:6379:6379`, healthcheck `redis-cli ping`).
+    - _Архитектурная развилка:_ прямое подключение `ioredis` + `@nest-lab/throttler-storage-redis` + `@nestjs/cache-manager` в `apps/api` либо выделение пакета `packages/redis` (`@repo/cache`) для переиспользования между `apps/api` и `apps/telemetry-ms`.
+  - **Спецификация:** `.agents/backend/security-jwt.md` (Секция 4).
 
-### ⏳ Ближайший приоритет №3: Полноценный переход с Tailwind CSS v3 на Tailwind CSS v4 (`packages/ui`, `apps/web`)
+### Приоритет №3: Полноценный переход с Tailwind CSS v3 на Tailwind CSS v4 (`packages/ui`, `apps/web`)
 
 - [ ] **Многоуровневая миграция дизайн-системы на `Tailwind CSS v4` (Oxide / CSS-first Engine):**
   - **Базовый источник истины:** строго следовать официальному руководству **`https://tailwindcss.com/docs/upgrade-guide`**, пройтись по каждому пункту breaking changes и сопоставить со всеми нашими CSS-файлами (`packages/ui/src/styles/globals.css`, `apps/web/src/app/globals.css`) и компонентами (`packages/ui/src/components/*`, `apps/web/src/{widgets,features,entities,shared}/*`), пока кодовая база UI-компонентов компактна.
   - **Шаг 1 (`@repo/ui` + Storybook 10 — CSS-first & `@theme`):** перевод `packages/ui/src/styles/globals.css` с `@tailwind base/components/utilities` на `@import "tailwindcss";`, описание дизайн-токенов внутри директивы `@theme` и `@utility` поверх наших семантических CSS-переменных, настройка `@custom-variant dark (&:where(.dark, .dark *));`, замена `tailwindcss-animate` на совместимые анимации v4 и проверка всех `*.stories.tsx` в Storybook 10.
   - **Шаг 2 (`apps/web` PostCSS + `@source`):** переключение `apps/web/postcss.config.mjs` на `@tailwindcss/postcss`, подключение `@source` для сканирования компонентов `@repo/ui` и FSD-слоёв (`app`, `widgets`, `features`, `entities`, `shared`), удаление устаревших JS-конфигов `tailwind.config.ts`.
-  - **Шаг 3 (Аудит переименованных утилит по `upgrade-guide`):** комплексная замена изменённых классов во всех компонентах (`shadow-sm` ➔ `shadow-xs`, `rounded-sm` ➔ `rounded-xs`, `blur-sm` ➔ `blur-xs`, `outline-none` ➔ `outline-hidden`, `ring` ➔ `ring-3`, явный цвет границ `border-border` для `border`/`divide`, проверка `!important`-модификаторов в конце класса `flex!` вместо `!flex`) с сохранением Zero-FOUC переключения тем.
+  - **Шаг 3 (Аудит переименованных утилит по `upgrade-guide`):** комплексная замена изменённых классов во всех компонентах (`shadow-sm` ➔ `shadow-xs`, `rounded-sm` ➔ `rounded-xs`, `blur-sm` ➔ `blur-xs`, `outline-none` ➔ `outline-hidden`, `ring` ➔ `ring-3`, явный цвет границ `border-border` для `border`/`divide`, суффиксный `!important` вида `flex!` вместо `!flex`) с сохранением Zero-FOUC переключения тем.
   - **Шаг 4 (Фиксация современных таргетов `"browserslist"` в `package.json` — Zero Legacy Polyfills):**
     - Поскольку `Tailwind CSS v4` спроектирован строго под современные движки (**`Safari 16.4+`**, **`Chrome 111+`**, **`Firefox 128+`** — нативные `@property`, `color-mix()`, `@layer`), старые версии этих браузеров не поддерживаются.
-    - Добавить поле **`"browserslist": ["Chrome >= 111", "Edge >= 111", "Firefox >= 128", "Safari >= 16.4"]`** в `apps/web/package.json` (и `packages/ui/package.json`). Это запретит компиляторам `Next.js SWC` / `Turbopack` и `Lightning CSS` генерировать лишние синтаксические трансформы, вендорные префиксы и полифилы под устаревшие браузеры, уменьшив размер клиентского бандла и накладные расходы в рантайме.
+    - Добавить поле **`"browserslist": ["Chrome >= 111", "Edge >= 111", "Firefox >= 128", "Safari >= 16.4"]`** в `apps/web/package.json` (и `packages/ui/package.json`). Это запретит компиляторам `Next.js SWC` / `Turbopack` и `Lightning CSS` генерировать лишние синтаксические трансформы, вендорные префиксы и полифилы под устаревшие браузеры.
+
+### Приоритет №4: Визуальный редизайн Notion Workfolio (`UI v2`)
+
+- [ ] **Notion Workfolio Authentic Visual Redesign (`UI v2`):** после миграции на `Tailwind CSS v4` перевести визуальный язык с классических SaaS-карточек ближе к оригинальному Notion Workfolio (обложка и аватар страницы, палитра «тёплой бумаги и чернил» для Light/Dark, облегчённые таблицы/списки без тяжёлых рамок, спокойная типографика).
+
+---
+
+## 🔧 Инфраструктурный и Архитектурный Бэклог
 
 ### 1. CI/CD, Turborepo Cache & DX Optimization
 
@@ -86,8 +75,8 @@
 
 - [ ] **Live Sentry & PostHog SDK:** заменить обёртки-заглушки на реальные транспорты `@sentry/nextjs`, `@sentry/nestjs` и `posthog-js`, включаемые при наличии ключей в `.env`.
 - [ ] **Neon.tech Cloud Database Migration:** подключить боевой `DATABASE_URL` от Neon.tech PostgreSQL, прогнать `prisma migrate deploy` и сид (`prisma/seed.ts`).
-- [ ] **Nginx Reverse Proxy для VPS-деплоя (`docker-compose.prod.yml`):** легковесный Nginx как единая точка входа (порты 80/443, SSL Let's Encrypt, сквозное проксирование на `web:3000` и `api:4000`) без избыточного балансировщика нагрузки.
-- [ ] **Dual-Mode Air-Gapped Local Environment («Тумблер офлайна»):** гарантировать запуск 100% функционала монорепозитория (база знаний, MDX, поиск, локальная телеметрия TCP :4001) при полном отсутствии интернета и внешних облачных сервисов (In-Memory Prisma + In-Memory Throttler).
+- [ ] **Nginx Reverse Proxy для VPS-деплоя (`docker-compose.prod.yml`):** легковесный Nginx как единая точка входа (порты 80/443, SSL Let's Encrypt, сквозное проксирование на `web:3000` и `api:4000`).
+- [ ] **Dual-Mode Air-Gapped Local Environment («Тумблер офлайна»):** гарантировать запуск 100% функционала монорепозитория (база знаний, MDX, поиск, локальная телеметрия TCP `:4001`) при полном отсутствии интернета и внешних облачных сервисов (In-Memory Prisma + In-Memory Throttler).
 - [ ] **S3-compatible Object Storage (Cloudflare R2 vs AWS S3):** интеграция `@aws-sdk/client-s3` с эндпоинтом Cloudflare R2 ($0 за трафик, 10 ГБ навсегда бесплатно) для сгенерированных PDF-резюме и ассетов + локальный MinIO в Docker.
 - [ ] **Cross-Domain API Deployment (`NEXT_PUBLIC_API_URL`):** при выносе `apps/api` на отдельный домен добавить `NEXT_PUBLIC_API_URL` в `.env`, `.env.example`, `turbo.json` (`globalEnv`), перевести клиентские `fetch` / `EventSource` на `NEXT_PUBLIC_API_URL` с фолбэком на `''` и прокинуть домен в CSP `connect-src`.
 
@@ -96,19 +85,22 @@
 - [ ] **Unit & Integration Tests (`Vitest`):** тесты Zod v4 схем (`@repo/shared-schemas`), Zustand-сторов и NestJS-сервисов + интеграция джобы `unit-tests` в Stage 1 CI (`turbo run test --affected`).
 - [ ] **E2E Playwright Suite:** проверка RBAC-флоу (`GuestPassModal` → `HttpOnly` кука → чтение `.mdx` → маскирование `<Redact />`) + джоба `e2e` после `build` в CI (и обновить карточку `playwright-vitest-ci` в `engineering-roadmap.ts`).
 
-### 5. Content & Interactive Sandboxes (`apps/web/content/*`)
+### 5. Backend AI & Model Context Protocol (`apps/api` — Future Milestone)
 
-- [ ] **Interactive Tech Sandboxes in Knowledge Base:** добавление интерактивных полигонов прямо в статьи (Zod Live JSON Validator, JWT WebCrypto Signature Tester, SSE Live Trigger Button для телеметрии, Redis Latency Visualizer), подключаемых как ленивые `next/dynamic` клиентские острова (`<Widget />` или `:::sandbox` в `.mdx`) без утяжеления других страниц.
+- [ ] **Read-Only шоукейс `@nestjs/mcp` (`$0` за токены, статус `evaluating`):** публичный MCP (`Streamable HTTP`) с 16 ADR, опытом CV и `TL;DR` статей для `Cursor` / `Claude Desktop` — строго **Read-Only**, строго после `@nestjs/throttler`, с лимитами Zod (`limit <= 16`, `.max(60)`) и соблюдением `<Redact />`.
+- [ ] _(Отложено / `deferred`)_ **Живой агент `@nestjs/ai`:** не нужен, пока поиск закрывает `Cmd+K` за $0/мес; при возврате — строго за `@UseGuards(JwtRolesGuard)` с `maxOutputTokens`.
+
+---
+
+## 📚 План наполнения контентом Базы Знаний (Content Expansion)
+
+> Инфраструктура рендеринга `.mdx` (`Zero-Eval HAST`) и механизм встраивания ленивых клиентских островов (`features/kb-sandboxes/ui/mdx-client-widgets.tsx` через `<Widget />` или директиву `:::sandbox{name="..."}`) **полностью реализованы**. Задачи ниже — это написание новых инженерных конспектов (при необходимости к любой новой статье можно добавить специализированный интерактивный демо-остров в `MDX_WIDGET_REGISTRY`).
+
 - [ ] **Цикл из 3 профильных статей по безопасности в `others/security/` (в дополнение к обзорному манифесту Zero-Trust):**
   1. `frontend-browser-security-playbook.{en,ru,uk}.mdx` — **Frontend & Browser Defense:** углублённый разбор CSP (`nonce` vs `SSG`, `Trusted Types`, `SRI`), `HttpOnly`/`__Host-` кук, DOM/AST-санитизации, защиты от Open Redirect, Clickjacking и методов борьбы с мультимодальными AI-ботами (WebAuthn Passkeys, Turnstile, PAT вместо визуальных CAPTCHA).
   2. `backend-api-gateway-security-playbook.{en,ru,uk}.mdx` — **Backend & API Defense:** защита от распределённого AI-фаззинга (Sliding-Window Redis Rate Limiting + Tarpitting), ротация и отзыв `Access/Refresh` токенов, защита от BOLA/IDOR и Race Conditions (`SELECT FOR UPDATE`), Zod-схемы против Prototype Pollution/Mass Assignment и песочницы для MCP/AI-инструментов.
   3. `devops-supply-chain-container-security.{en,ru,uk}.mdx` — **DevOps, Docker & Supply Chain Defense:** изоляция внутренних сетей Docker (`backend-network`, zero host ports), `non-root` Alpine-образы, защита от вредоносных npm `postinstall`-скриптов через `allowBuilds` и `--ignore-scripts`, харденинг GitHub Actions (`persist-credentials: false`, SHA-пиннинг) и управление секретами.
-- [ ] **Новые инженерные статьи `.mdx`:** расширить раздел `NestJS` и смежные темы разборами `DI & Custom Providers`, `Guards / Pipes / Interceptors`, `NestJS Microservices + SSE`.
-
-### 6. Backend AI & Model Context Protocol (`apps/api` — Future Milestone)
-
-- [ ] **Read-Only шоукейс `@nestjs/mcp` (`$0` за токены, статус `evaluating`):** публичный MCP (`Streamable HTTP`) с 16 ADR, опытом CV и `TL;DR` статей для `Cursor` / `Claude Desktop` — строго **Read-Only**, строго после `@nestjs/throttler`, с лимитами Zod (`limit <= 16`, `.max(60)`) и соблюдением `<Redact />`.
-- [ ] _(Отложено / `deferred`)_ **Живой агент `@nestjs/ai`:** не нужен, пока поиск закрывает `Cmd+K` за $0/мес; при возврате — строго за `@UseGuards(JwtRolesGuard)` с `maxOutputTokens`.
+- [ ] **Новые инженерные статьи `.mdx` по бэкенду и архитектуре:** расширить раздел `nestjs/` и смежные темы разборами `DI & Custom Providers` (`core-di`), `Guards / Pipes / Interceptors` (`guards-pipes`) и `NestJS Microservices + SSE`.
 
 ---
 
