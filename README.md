@@ -185,6 +185,7 @@ greatest-portfolio/
 
 ## 🧭 Architecture Documentation Navigation
 
+- [Frontend Web App Guide (`apps/web/README.md`, RU)](./apps/web/README.md)
 - [Backend API Service Guide (`apps/api/README.md`, RU)](./apps/api/README.md)
 - [Root AI Context Router (`AGENTS.md`)](./AGENTS.md)
 - [FSD-Modular Frontend Architecture (`.agents/frontend/architecture-fsd-modular.md`)](./.agents/frontend/architecture-fsd-modular.md)
