@@ -51,6 +51,6 @@ const throttlerReflectorToken = throttlerParamTypes?.[2] as InjectionToken | und
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {
-    consumer.apply(LoggingMiddleware).forRoutes('*')
+    consumer.apply(LoggingMiddleware).forRoutes('{*path}')
   }
 }
