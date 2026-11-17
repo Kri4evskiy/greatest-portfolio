@@ -1,7 +1,7 @@
 # 📐 Архитектура файловой структуры: FSD-Modular (`apps/web`, Next.js 16)
 
 Этот документ описывает стандарт организации файлов и папок во фронтенд-приложении `apps/web` и адаптацию принципов **Feature-Sliced Design (FSD)** под Next.js App Router.
-*(Архитектура бэкенда `apps/api` описана отдельно в `.agents/backend/architecture-enterprise-modular.md`.)*
+_(Архитектура бэкенда `apps/api` описана отдельно в `.agents/backend/architecture-enterprise-modular.md`.)_
 
 ---
 

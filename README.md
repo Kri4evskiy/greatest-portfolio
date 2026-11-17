@@ -185,6 +185,7 @@ greatest-portfolio/
 
 ## 🧭 Architecture Documentation Navigation
 
+- [Backend API Service Guide (`apps/api/README.md`, RU)](./apps/api/README.md)
 - [Root AI Context Router (`AGENTS.md`)](./AGENTS.md)
 - [FSD-Modular Frontend Architecture (`.agents/frontend/architecture-fsd-modular.md`)](./.agents/frontend/architecture-fsd-modular.md)
 - [NestJS Enterprise Modular Backend Architecture (`.agents/backend/architecture-enterprise-modular.md`)](./.agents/backend/architecture-enterprise-modular.md)
