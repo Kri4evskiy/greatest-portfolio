@@ -1,0 +1,281 @@
+---
+title: "Practical Backend Testing: Unit, Integration (Testcontainers), Database & Contract Testing"
+sidebarLabel: "Unit, Integration, DB & Contracts"
+summary: "Hands-on engineering guide for NestJS 12 ESM + Prisma 7 + PostgreSQL on Vitest: proper use of Test Doubles, spinning up real PostgreSQL via Testcontainers, 4 DB isolation strategies, Contract Testing (Zod/OpenAPI vs Pact), and concurrency/SSE tests."
+category: "testing"
+format: "deep-dive"
+tags: ["testing", "vitest", "testcontainers", "nestjs", "prisma", "contract-testing", "postgresql"]
+readingTime: "16 min"
+publishedAt: "2026-11-19"
+order: 2
+tldr:
+  - "Mock only external boundaries you do not own (payment gateways, email providers, third-party APIs). Mocking `prisma.articleMetrics.upsert` creates false confidence while hiding broken SQL and migrations."
+  - "`Vitest` supports TypeScript 7 (`tsgo`) and Native ESM natively without `ts-jest` legacy limitations."
+  - "In-memory SQLite is a dangerous stand-in for PostgreSQL: it misses `JSONB`, `UUID`, partial indexes, `SELECT FOR UPDATE`, and `NULL` constraint semantics."
+  - "For parallel DB tests, pick purposefully between Transaction Rollback, `TRUNCATE CASCADE`, per-worker schemas (`?schema=worker_1`), or PostgreSQL `TEMPLATE` databases."
+---
+
+## 1. Test Doubles Without Confusion: Dummy, Stub, Spy, Mock, and Fake
+
+Backend teams frequently refer to every test substitute as a "mock", leading to brittle tests tightly coupled to internal method calls. Keep the 5 **Test Doubles** distinct:
+
+| Double | Behavior | Appropriate Backend Usage | Example |
+| :--- | :--- | :--- | :--- |
+| **Dummy** | Empty placeholder fulfilling a parameter signature | Unused arguments like `req` or logger | `{} as Request` in a pure mapper unit test |
+| **Stub** | Returns canned values without call assertions | Deterministic time (`Clock`) or static external response | `stubClock = { now: () => fixedDate }` |
+| **Spy** | Wraps a real implementation while recording calls | Verifying telemetry emission or audit hooks | `vi.spyOn(telemetry, 'publishEvent')` |
+| **Mock** | Replaces implementation AND asserts expectations | **External boundaries only:** Stripe, SendGrid, S3, Telegram API | Mocking `TelegramClient.sendMessage` |
+| **Fake** | Lightweight working implementation of a contract | In-memory cache/session store honoring schema contracts | `InMemoryArticleStore` |
+
+> [!IMPORTANT]
+> **Golden Backend Rule:** *"Mock only boundaries you do not own."* When you mock your own `PrismaService` in every test, you merely assert that you repeated the same object literal twice — never whether the SQL compiles, the table exists in migrations, or unique constraints reject invalid data.
+
+---
+
+## 2. Unit vs HTTP Integration in NestJS 12 ESM + TypeScript 7 (`Vitest`)
+
+With `TypeScript 7` (`tsgo`), legacy `Jest + ts-jest` breaks on old TypeScript JS Compiler API assumptions (`typescript <7`). For **Native ESM + TS 7** backends, **Vitest** provides fast native ESM execution, built-in fake timers, and seamless TypeScript compatibility.
+
+### Pure Unit Tests (Zero `Test.createTestingModule` Overhead)
+
+Pure unit tests skip the NestJS DI container entirely, executing in milliseconds — ideal for fail-fast Zod environment validation, crypto checks, and domain math:
+
+```typescript title="apps/api/src/config/app.config.spec.ts"
+import { describe, expect, it } from 'vitest'
+import { loadAppConfig } from './app.config.js'
+
+describe('loadAppConfig (fail-fast security)', () => {
+  it('rejects dev default JWT_SECRET in production', () => {
+    expect(() =>
+      loadAppConfig({
+        NODE_ENV: 'production',
+        JWT_SECRET: 'workfolio-super-secret-jwt-key-2026',
+        ADMIN_SECRET_PASSCODE: 'strong-override-passcode-991',
+      }),
+    ).toThrow(/Security violation: JWT_SECRET/)
+  })
+
+  it('parses comma-separated WEB_ORIGIN into allowedOrigins in production', () => {
+    const cfg = loadAppConfig({
+      NODE_ENV: 'production',
+      JWT_SECRET: 'prod-secret-minimum-32-characters-long-key',
+      ADMIN_SECRET_PASSCODE: 'real-admin-passcode-2026',
+      WEB_ORIGIN: 'https://portfolio.dev, https://staging.portfolio.dev',
+    })
+
+    expect(cfg.allowedOrigins).toEqual(['https://portfolio.dev', 'https://staging.portfolio.dev'])
+  })
+})
+```
+
+### NestJS HTTP Pipeline Integration (`Supertest` + `Test.createTestingModule`)
+
+To verify that `ZodValidationPipe`, `JwtRolesGuard`, `HttpOnly` cookies, `ThrottlerGuard`, and `SentryExceptionFilter` actually execute, calling controller methods directly is insufficient because NestJS request decorators are bypassed:
+
+```typescript title="apps/api/src/modules/auth/auth.integration.spec.ts"
+import { INestApplication } from '@nestjs/common'
+import { Test } from '@nestjs/testing'
+import cookieParser from 'cookie-parser'
+import request from 'supertest'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { AppModule } from '../../app.module.js'
+import { SentryExceptionFilter } from '../../common/filters/sentry-exception.filter.js'
+
+describe('Auth & Knowledge HTTP Pipeline (Integration)', () => {
+  let app: INestApplication
+
+  beforeAll(async () => {
+    const moduleRef = await Test.createTestingModule({
+      imports: [AppModule],
+    }).compile()
+
+    app = moduleRef.createNestApplication()
+    app.setGlobalPrefix('api')
+    app.use(cookieParser())
+    app.useGlobalFilters(new SentryExceptionFilter())
+    await app.init()
+  })
+
+  afterAll(async () => {
+    await app.close()
+  })
+
+  it('rejects invalid GuestPass payload via ZodValidationPipe (400)', async () => {
+    await request(app.getHttpServer())
+      .post('/api/auth/guest-pass')
+      .send({ displayName: 'A', visitorType: 'INVALID_ROLE' })
+      .expect(400)
+  })
+
+  it('issues HttpOnly cookie and grants access to protected /api/knowledge/metrics', async () => {
+    const loginRes = await request(app.getHttpServer())
+      .post('/api/auth/guest-pass')
+      .send({ displayName: 'Team Lead', visitorType: 'TEAM_LEAD' })
+      .expect(200)
+
+    const cookies = loginRes.headers['set-cookie'] ?? []
+    expect(cookies.some((c) => c.includes('kb_access_token=') && c.includes('HttpOnly'))).toBe(true)
+
+    const metricsRes = await request(app.getHttpServer())
+      .get('/api/knowledge/metrics')
+      .set('Cookie', cookies)
+      .expect(200)
+
+    expect(Array.isArray(metricsRes.body)).toBe(true)
+  })
+})
+```
+
+> [!WARNING]
+> Notice `app.use(cookieParser())` and `app.setGlobalPrefix('api')` inside the test setup: `Test.createTestingModule` does **not** automatically run `main.ts`. Extract shared bootstrap middleware/filter setup into a reusable `configureApp(app)` helper so tests match production identically.
+
+---
+
+## 3. Database Testing Done Right: PostgreSQL + Prisma 7 + Testcontainers
+
+### Why In-Memory SQLite Fails as a PostgreSQL Substitute
+
+| PostgreSQL Feature | SQLite Behavior | Production Failure Hidden by SQLite |
+| :--- | :--- | :--- |
+| **`JSONB` & operators `@>`, `->`** | Stored as plain `TEXT`, no GIN operators | Queries crash or lose type fidelity in prod |
+| **`SELECT ... FOR UPDATE SKIP LOCKED`** | Unsupported | Silent queue worker race conditions |
+| **Partial & Functional Indexes (`WHERE ...`)** | Limited / different query planner | Hidden `Seq Scan` regressions |
+| **`UUID`, `INET`, `TIMESTAMPTZ` types** | Coerced to `TEXT` / `NUMERIC` without TZ | Invalid UUID length or timezone drift |
+| **`TRUNCATE ... RESTART IDENTITY CASCADE`** | No `TRUNCATE` syntax | Cascade bugs remain untested |
+
+### Real PostgreSQL 16 via Testcontainers + Prisma 7
+
+With Prisma 7, the client uses `@prisma/adapter-pg` and `pg.Pool`, while CLI migrations apply cleanly against the ephemeral container URI:
+
+```typescript title="apps/api/test/helpers/postgres-test-db.ts"
+import { execFileSync } from 'node:child_process'
+import { PrismaPg } from '@prisma/adapter-pg'
+import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql'
+import { Pool } from 'pg'
+import { PrismaClient } from '../../src/generated/prisma/client.js'
+
+export interface IsolatedPostgresContext {
+  container: StartedPostgreSqlContainer
+  pool: Pool
+  prisma: PrismaClient
+  connectionUrl: string
+  teardown: () => Promise<void>
+}
+
+export async function startPostgresTestDb(): Promise<IsolatedPostgresContext> {
+  const container = await new PostgreSqlContainer('postgres:16-alpine').start()
+  const connectionUrl = container.getConnectionUri()
+
+  execFileSync('pnpm', ['exec', 'prisma', 'migrate', 'deploy'], {
+    env: { ...process.env, DATABASE_URL: connectionUrl, DIRECT_URL: connectionUrl },
+    stdio: 'pipe',
+  })
+
+  const pool = new Pool({ connectionString: connectionUrl })
+  const adapter = new PrismaPg(pool)
+  const prisma = new PrismaClient({ adapter })
+  await prisma.$connect()
+
+  return {
+    container,
+    pool,
+    prisma,
+    connectionUrl,
+    teardown: async () => {
+      await prisma.$disconnect()
+      await pool.end()
+      await container.stop()
+    },
+  }
+}
+```
+
+### 4 Test Isolation Strategies for PostgreSQL
+
+Booting a fresh Docker container per test file is slow. Run **one PostgreSQL container per test suite** (in Vitest `globalSetup`) and isolate tests with one of four strategies:
+
+| Strategy | Mechanism | Pros | Cons & Caveats |
+| :--- | :--- | :--- | :--- |
+| **1. Transaction Rollback** | Open `BEGIN` before each test, `ROLLBACK` in `afterEach` | Blazing fast (`< 5 ms` per test) | Fails if app code opens independent connections or needs post-`COMMIT` behavior |
+| **2. `TRUNCATE ... CASCADE`** | `beforeEach` truncates all app tables except `_prisma_migrations` | 100% genuine commits, constraints, and triggers | Requires sequential execution per shared DB (`fileParallelism: false` or separate schemas) |
+| **3. Schema per Worker** | Worker `N` connects to `?schema=worker_${N}` and runs migrations once | True parallel test execution across CPU cores | Minor per-worker schema migration overhead at startup |
+| **4. Template DB (`TEMPLATE`)** | Migrate one base DB once, then `CREATE DATABASE test_1 TEMPLATE base_db` | Fully isolated DB instance per file | Fails if any active connection remains open to the template DB |
+
+```sql title="PostgreSQL TRUNCATE CASCADE cleanup helper"
+DO $$
+DECLARE
+  stmt text;
+BEGIN
+  SELECT 'TRUNCATE TABLE ' || string_agg(quote_ident(tablename), ', ') || ' RESTART IDENTITY CASCADE'
+  INTO stmt
+  FROM pg_tables
+  WHERE schemaname = 'public'
+    AND tablename <> '_prisma_migrations';
+
+  IF stmt IS NOT NULL THEN
+    EXECUTE stmt;
+  END IF;
+END $$;
+```
+
+---
+
+## 4. Contract Testing: Monorepo Zod / OpenAPI vs Pact
+
+Integration tests verify your API against its own database, not whether external consumers still understand your JSON payloads.
+
+```text
+[ Consumer: apps/web or Mobile ]                  [ Provider: apps/api ]
+         │                                                   │
+         ├── Option A (Monorepo):                            │
+         │   Import shared @repo/shared-schemas + OpenAPI Diff
+         │   (breaks immediately during tsc / CI build!)     │
+         │                                                   │
+         └── Option B (Polyglot / Multi-Repo Microservices): │
+             1. Consumer runs tests against Pact Mock Server │
+             2. Publishes Pact JSON contract ──────► [ Pact Broker ]
+                                                             │
+             3. Provider CI pulls Pact contracts ◄───────────┘
+                and replays them against real Provider HTTP API
+```
+
+### API Contract Breaking vs Non-Breaking Checklist
+
+- **Breaking changes:** removing a response property, renaming fields, tightening enum values, adding a new **required** field to a request body, or changing status codes/error formats.
+- **Non-breaking changes:** adding an *optional* response property, adding an optional query parameter, or introducing a brand-new endpoint.
+
+---
+
+## 5. Testing Async Flows, SSE Streams, Time, and Concurrency
+
+### 1. Deterministic Clocks Instead of `setTimeout` Sleeps
+Never test JWT expiration or cache TTLs with `await sleep(2000)`:
+- Use `vi.useFakeTimers()` + `vi.setSystemTime(...)` in Vitest or inject a `Clock { now(): Date }` abstraction.
+
+### 2. Testing Server-Sent Events (`@Sse()`)
+Test NestJS SSE at two levels:
+1. **Service level (`TelemetryService.getEventStream()`):** subscribe using RxJS `take(2)` + `firstValueFrom` / `lastValueFrom` to verify emitted payloads strip sensitive fields (`actorName`, `ADMIN`).
+2. **HTTP transport level:** verify `Content-Type: text/event-stream` and confirm `TimeoutInterceptor` honors `@SkipTimeout()` rather than aborting streams after 15 seconds.
+
+### 3. Concurrency & Race Condition Tests (`Promise.all`)
+Atomic DB operations like `upsert` with `{ increment: 1 }` or `SELECT ... FOR UPDATE` should be hammered concurrently against real PostgreSQL:
+
+```typescript title="apps/api/test/concurrency-metrics.integration.spec.ts"
+import { describe, expect, it } from 'vitest'
+
+it('does not lose increments under 50 concurrent upsert requests', async () => {
+  const slug = 'concurrency-test-article'
+  const totalRequests = 50
+
+  await Promise.all(
+    Array.from({ length: totalRequests }, () =>
+      prismaService.incrementArticleView(slug, 'testing'),
+    ),
+  )
+
+  const row = await prisma.articleMetrics.findUniqueOrThrow({ where: { slug } })
+  expect(row.viewsCount).toBe(totalRequests)
+})
+```
+
+If someone replaces atomic `{ increment: 1 }` with a naive `read -> compute (views + 1) -> update` pattern, this test reliably catches the lost updates (`12`–`30` instead of `50`) before hitting production.

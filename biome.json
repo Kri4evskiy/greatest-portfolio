@@ -14,6 +14,7 @@
       "!**/.next-build",
       "!**/.turbo",
       "!**/dist",
+      "!**/src/generated",
       "!**/storybook-static",
       "!**/pnpm-lock.yaml",
       "!**/*.min.js",

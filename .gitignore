@@ -15,6 +15,7 @@ storybook-static/
 AppData/
 
 # Prisma generated & SQLite/local DBs
+apps/api/src/generated/prisma/
 *.db
 *.db-journal
 

@@ -1,0 +1,306 @@
+---
+title: "Смоук-тести бекенду з діагностичним статусом та повна карта видів тестування"
+sidebarLabel: "Смоук-тести та карта тестування"
+summary: "Анатомія смоук-тестів проти реального скомпільованого артефакту з виводом діагностичного статусу (dist/main.js, health/readiness проби, Graceful Degradation) та повна інженерна карта із 14 видів тестування бекенду."
+category: "testing"
+format: "deep-dive"
+tags: ["testing", "smoke-tests", "backend", "diagnostics", "qa", "nestjs", "architecture"]
+readingTime: "15 хв"
+publishedAt: "2026-11-19"
+order: 1
+tldr:
+  - "Смоук-тест перевіряє реальний скомпільований артефакт (`dist/main.js` або Docker-образ), виявляючи поломки ESM-резолвінгу, Zod-конфігів середовища, DI-графа та відсутні WASM/бінарні файли."
+  - "Якісний раннер виводить точний діагностичний статус (`lastInfo`: `ECONNREFUSED`, `EACCES`, HTTP-статус + тіло відповіді, ранній `exitCode` і накопичені логи сервера), а не сліпий таймаут."
+  - "Проба Liveness ніколи не повинна перевіряти зовнішні БД/Redis — інакше збій бази спричинить каскадний шторм рестартів усього кластера."
+  - "Для надійного бекенду одних unit-тестів замало: потрібна усвідомлена комбінація із 14 практик (Integration із Testcontainers, Contract, Property-Based, Mutation, Load/k6, Fuzzing, Chaos)."
+---
+
+## 1. Навіщо бекенду смоук-тест із діагностичним статусом
+
+Більшість помилок деплою трапляються **не** в бізнес-логіці, яку ви покрили unit-тестами з моками, а на стику збірки, конфігурації середовища та реального рантайму Node.js:
+
+- У `tsconfig` усе скомпілювалося, але під час запуску `node dist/main.js` у Native ESM відвалився імпорт без `.js`-розширення або зламався CJS/ESM-міст (`Reflector` у `@nestjs/throttler`).
+- `pnpm prune --prod` видалив файл, потрібний для генерації або WASM-рушія Prisma.
+- Змінили fail-fast Zod-схему змінних середовища — і процес падає на `bootstrap()` до підняття HTTP-сервера.
+- Драйверний адаптер БД (`@prisma/adapter-pg`) підключається ліниво, і без активного зонда `SELECT 1` сервіс при старті бреше в `/api/health`, що база доступна (`databaseConnected: true`), хоча вона давно лежить.
+
+**Смоук-тест (Smoke Test — «тест на дим»)** — це мінімальна, але **реальна** наскрізна перевірка зібраного артефакту (`dist/main.js` або контейнера) одразу після збірки чи деплою: «сервер вмикається, не димить і тримає базовий вертикальний зріз запитів».
+
+---
+
+## 2. Анатомія діагностичного смоук-теста (4 фази)
+
+Наївний смоук-тест виглядає як `node dist/main.js & sleep 3 && curl http://localhost:4000/api/health`. Такий підхід крихкий: у разі помилки ви отримуєте марний `exit code 7 (Failed to connect)` без розуміння — впав процес на старті, віддав `500`, не встиг піднятися за 3 секунди чи порт заблоковано фаєрволом.
+
+Правильний смоук-раннер будується за 4-фазним конвеєром із **накопиченням діагностичного статусу**:
+
+```text
+[1. Spawn Артефакту]
+   ├── Ізольований env (порт 4098/4099, скидання/підміна DATABASE_URL)
+   ├── Перехоплення stdout + stderr у буфер логів
+   └── Ранній детектор падіння (child.on('exit') -> fail-fast без очікування таймауту!)
+          │
+          ▼
+[2. Readiness Polling + lastInfo]
+   ├── Кожні 200 мс: fetch('/api/health')
+   ├── Успіх (2xx) ──► перехід до фази 3
+   ├── HTTP >= 400  ──► lastInfo = "HTTP <status>: <body>"
+   └── Мережева помилка ► lastInfo = "<name>: <message> (<cause.code>)" (ECONNREFUSED / EACCES / ETIMEDOUT)
+          │
+          ▼
+[3. Критичний вертикальний зріз + Деградація]
+   ├── Сценарій A (Nominal / In-Memory): /api/health -> auth cookie -> protected GET -> write POST
+   └── Сценарій B (Unreachable DB):      недоступний порт -> перевірка fallback без падіння процесу
+          │
+          ▼
+[4. Гарантований Teardown (finally)]
+   └── SIGTERM + очікування виходу (захист від зомбі-процесів у CI) + дамп логів при збої
+```
+
+### Еталонна реалізація на Node.js (`smoke-api.mjs`)
+
+Нижче — практичний патерн смоук-раннера з діагностичним статусом `lastInfo` для `NestJS 12 ESM` + `Prisma 7`:
+
+```typescript title="scripts/smoke-api.mjs"
+import { spawn } from 'node:child_process'
+import { resolve } from 'node:path'
+
+const API_ENTRY = resolve(process.cwd(), 'apps/api/dist/main.js')
+
+async function waitForHealth(
+  url: string,
+  timeoutMs: number,
+  isExited: () => boolean,
+  getCode: () => number | null,
+): Promise<Response> {
+  const startedAt = Date.now()
+  let lastInfo = 'no attempts yet'
+
+  while (Date.now() - startedAt < timeoutMs) {
+    if (isExited()) {
+      throw new Error(`Server exited early with code ${String(getCode())}`)
+    }
+
+    try {
+      const response = await fetch(url)
+      if (response.ok) {
+        return response
+      }
+      lastInfo = `HTTP ${response.status}: ${await response.text()}`
+    } catch (err) {
+      const causeCode =
+        err instanceof Error && 'cause' in err && typeof err.cause === 'object' && err.cause !== null && 'code' in err.cause
+          ? String((err.cause as { code?: unknown }).code ?? '')
+          : ''
+      lastInfo = err instanceof Error ? `${err.name}: ${err.message} (${causeCode})` : String(err)
+    }
+
+    await new Promise((resolveDelay) => setTimeout(resolveDelay, 200))
+  }
+
+  throw new Error(`Timed out waiting for ${url}; lastInfo=${lastInfo}`)
+}
+
+async function runScenario(
+  name: string,
+  envOverrides: Record<string, string>,
+  verifyFn: (baseUrl: string, health: { status: string; databaseConnected: boolean }) => Promise<void>,
+): Promise<void> {
+  const env: NodeJS.ProcessEnv = { ...process.env, NODE_ENV: 'development', ...envOverrides }
+  if (!('DATABASE_URL' in envOverrides)) {
+    delete env.DATABASE_URL
+    delete env.DIRECT_URL
+  }
+
+  const child = spawn(process.execPath, [API_ENTRY], {
+    env,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  })
+
+  let logs = ''
+  let exited = false
+  let exitCode: number | null = null
+
+  child.stdout.on('data', (chunk: Buffer) => {
+    logs += chunk.toString()
+  })
+  child.stderr.on('data', (chunk: Buffer) => {
+    logs += chunk.toString()
+  })
+  child.on('exit', (code) => {
+    exited = true
+    exitCode = code
+  })
+
+  try {
+    const port = envOverrides.PORT ?? '4098'
+    const baseUrl = `http://127.0.0.1:${port}/api`
+    const healthRes = await waitForHealth(`${baseUrl}/health`, 15000, () => exited, () => exitCode)
+    const healthJson = (await healthRes.json()) as { status: string; databaseConnected: boolean }
+    await verifyFn(baseUrl, healthJson)
+  } catch (error) {
+    console.error(`[${name}] FAILED:\n${logs.trim()}`)
+    throw error
+  } finally {
+    if (!exited) {
+      child.kill('SIGTERM')
+      await new Promise((done) => {
+        child.once('exit', done)
+        setTimeout(done, 1500)
+      })
+    }
+  }
+}
+```
+
+### Що саме дає діагностичний статус `lastInfo`
+
+| Симптом у `lastInfo` | Справжня причина | Що ви лагодите за 10 секунд |
+| :--- | :--- | :--- |
+| `Server exited early with code 1` | Впав `bootstrap()`, Zod env validation або імпорт ESM | Дивитесь перший рядок стеку у перехопленому `stderr` |
+| `TypeError: fetch failed (ECONNREFUSED)` | Сервер слухає інший порт або біндиться не на `0.0.0.0` | Перевіряєте `PORT` і `app.listen(port, '0.0.0.0')` |
+| `TypeError: fetch failed (EACCES)` | Мережеві сокети заблоковані пісочницею ОС або політикою | Виносите пробу в середовище з дозволеним loopback |
+| `HTTP 500: {"statusCode":500,...}` | Сервер піднявся, але впав middleware, DI або контролер | Дебажите `SentryExceptionFilter` та логи запиту |
+| `HTTP 429: Too Many Requests` | Спрацював `@nestjs/throttler` на агресивному polling | Виключаєте health-перевірку з квоти або знижуєте частоту |
+
+> [!TIP]
+> Завжди перевіряйте у смоук-тесті **дві гілки поведінки**: штатний шлях (видача `HttpOnly` куки -> доступ до захищеного ендпоінта -> запис) та **Graceful Degradation** (запуск із завідомо недоступним `DATABASE_URL`). Це гарантує, що fallback-гілка реально працює на скомпільованому JS, а не існує лише на папері.
+
+---
+
+## 3. Liveness, Readiness і Startup Probes: де помилка у смоук-ендпоінті покладе весь прод
+
+У Kubernetes, Docker Compose та PaaS (Render/Fly.io) health-ендпоінти напряму пов'язані зі смоук-перевірками оркестратора:
+
+| Проба | Що перевіряє | Дія оркестратора при збої | Чи повинна перевіряти БД / Redis? |
+| :--- | :--- | :--- | :--- |
+| **Startup (`/health/startup`)** | Ініціалізація важких модулів і прогрів | Чекає; при перевищенні ліміту перезапускає под | Опціонально (якщо БД обов'язкова для старту) |
+| **Liveness (`/health/live`)** | Чи живий event loop і чи не задедлочився процес | **Вбиває і перезапускає контейнер (`SIGKILL`)** | **НІКОЛИ!** |
+| **Readiness (`/health/ready`)** | Чи готовий інстанс приймати реальний трафік | Прибирає IP інстанса з балансувальника, але не вбиває | **ТАК** (`SELECT 1`, `PING` з коротким таймаутом) |
+
+> [!CAUTION]
+> **Класична продакшен-катастрофа:** якщо в `/health/live` (або `docker-compose` healthcheck з авторестартом) зашити перевірку `await prisma.$queryRaw\`SELECT 1\``, то при 5-секундному морганні PostgreSQL оркестратор одночасно вб'є **усі** живі репліки API. Коли БД повернеться, десятки контейнерів почнуть холодний старт разом і доб'ють базу штормом перепідключень (Thundering Herd).
+
+---
+
+## 4. Smoke vs Sanity vs Regression Testing
+
+| Критерій | Smoke Testing | Sanity Testing | Regression Testing |
+| :--- | :--- | :--- | :--- |
+| **Питання** | «Білди взагалі запускаються і базові шляхи живі?» | «Виправлений баг / нова фіча працюють логічно?» | «Ми нічого не зламали у старій функціональності?» |
+| **Глибина** | Поверхнева (1% критичних шляхів, 10–30 сек) | Вузька і точкова по конкретному модулю | Повна (уся батарея Unit + Integration + E2E) |
+| **Коли запускати** | Після кожної збірки образу та кожного деплою | Одразу після точкового hotfix / дрібного патчу | На кожному Pull Request і перед релізом |
+| **Середовище** | Реальний зібраний `dist/` або staging/prod | Локальний dev або preview-середовище | Ізольований CI (Testcontainers + Playwright) |
+
+---
+
+## 5. Повна карта альтернативних видів тестування бекенду (14 практик)
+
+Смоук-тест ловить збої збірки та старту, але він принципово **не призначений** для пошуку багів бізнес-логіки, гонок даних чи вразливостей. Нижче — повна карта з **14 видів тестування бекенду**.
+
+### Зведена матриця видів тестування
+
+| № | Вид тестування | Головний ризик, який ловить | Швидкість | Реальний I/O / БД | Етап CI/CD | Інструменти (Node / NestJS) |
+| :-: | :--- | :--- | :---: | :---: | :--- | :--- |
+| 1 | **Static & Type-Level** | Типові баги, `any`, невідповідність Zod/TS контрактів | Миттєво (`1–3s`) | Ні | Pre-commit + PR | `tsc --noEmit`, `Biome`, `expectTypeOf` |
+| 2 | **Unit Testing** | Помилки чистої бізнес-логіки, формул, парсерів, криптографії | Дуже швидко (`ms`) | Ні (моки меж) | Pre-commit / PR | `Vitest` |
+| 3 | **Module / Slice Testing** | Збої DI, декораторів, Pipes, Guards, Interceptors, Filters | Швидко (`1–3s`) | Ні / фейки | PR Fast Gate | `@nestjs/testing` (`Test.createTestingModule`) |
+| 4 | **Integration Testing** | Зламаний SQL, міграції, транзакції, CORS, Cookies, Rate Limit | Середньо (`5–30s`) | **Так (Testcontainers)** | PR Merge Gate | `Vitest` + `Supertest` + `Testcontainers` |
+| 5 | **Contract Testing** | Поломка API для фронтенду чи сусідніх мікросервісів | Швидко (`2–5s`) | Ні / локальний брокер | PR Gate | `@repo/shared-schemas`, OpenAPI Diff, `Pact` |
+| 6 | **End-to-End (E2E)** | Розрив повного сценарію UI ➔ Edge Proxy ➔ API ➔ БД ➔ TCP MS | Повільно (`30–180s`) | **Так (весь стек)** | Post-Build / Staging | `Playwright`, `Supertest` |
+| 7 | **Smoke & Synthetics** | Мертвий білд, зламаний ESM/Docker, недоступність у проді | Швидко (`5–20s`) | **Так (реальний білд)** | Post-Deploy + Cron | Скрипти `node`/`curl`, `k6`, `Checkly` |
+| 8 | **Performance (Load/Stress/Spike/Soak)** | Витоки пам'яті, вичерпання пулу БД, деградація `p99` | Довго (`5–60m`) | **Так (staging)** | Nightly / Pre-Release | `k6`, `Artillery`, `autocannon` |
+| 9 | **Security & API Fuzzing** | IDOR/BOLA, SQLi, XSS, обхід Auth, падіння на сміттєвому JSON | Середньо (`1–15m`) | **Так** | PR + Nightly | `pnpm audit`, `Semgrep`, `OWASP ZAP`, `Schemathesis` |
+| 10 | **Property-Based Testing** | Приховані крайові випадки (`""`, `NaN`, межі, Unicode) | Швидко–Середньо | Ні | PR Gate | `fast-check` |
+| 11 | **Mutation Testing** | «Порожні» тести, що дають високий line coverage без реальних `expect` | Довго (`2–15m`) | Ні | Nightly / Critical modules | `StrykerJS` (`@stryker-mutator/vitest-runner`) |
+| 12 | **Chaos & Fault Injection** | Зависання при обриві мережі, Retry Storms, дедлоки пулу | Середньо (`1–5m`) | **Так (зі зламом)** | Staging / GameDays | `Toxiproxy`, `Chaos Mesh` |
+| 13 | **Shadow Traffic & Canary** | Регресії на реальному прод-трафіку та 1% користувачів | Real-time | **Так (Production)** | Release Rollout | Nginx mirror, Envoy, Argo Rollouts |
+| 14 | **Snapshot & Approval** | Незапланований дрейф серіалізованих JSON/SQL-запитів | Швидко (`ms`) | Ні | PR Gate | `Vitest` `toMatchSnapshot` / `toMatchInlineSnapshot` |
+
+---
+
+### Розбір кожного виду: навіщо він потрібен і що ламається без нього
+
+#### 1. Static & Type-Level Testing
+`tsc --noEmit` у режимі `strict: true` + `noUncheckedIndexedAccess` + `exactOptionalPropertyTypes` — це перша лінія тестів без жодного рядка test-раннера. Вони гарантують, що перейменування поля в `@repo/shared-schemas` миттєво підсвітить усі зламані контролери та фронтенд-форми.
+
+#### 2. Unit Testing (Чисті домени)
+Перевіряє одну функцію або клас **без мережі, файлової системи та БД**. Ідеальний для білінгу, знижок, податків, TTL, парсерів/санітайзерів URL і криптографічних перевірок (`timingSafeEqual`).
+
+#### 3. Component / Module Slice Testing (`@nestjs/testing`)
+У NestJS бізнес-логіка оточена шаром декораторів і DI (`ZodValidationPipe`, `JwtRolesGuard`, `TimeoutInterceptor`, `SentryExceptionFilter`). Slice-тест підіймає **один модуль** через `Test.createTestingModule`, підміняє лише зовнішній сервіс або репозиторій і перевіряє реальні статус-коди `400`/`401`/`403`/`429`.
+
+#### 4. Integration Testing (Реальні БД і брокери)
+Перевіряє стик вашого коду зі справжніми **PostgreSQL, Redis, S3/MinIO, TCP-мікросервісом** через **Testcontainers**. Ловить помилки SQL, міграції Prisma, гонки (`race conditions`), порушення `UNIQUE`/`FOREIGN KEY` обмежень і особливості `@prisma/adapter-pg`.
+
+#### 5. Contract Testing (Контракти між сервісами)
+Гарантує, що Провайдер (`apps/api`) не змінив формат JSON-відповіді або обов'язковість поля, на які розраховує Споживач (`apps/web` або інший сервіс):
+- **У монорепозиторії:** вирішується єдиними Zod-схемами (`@repo/shared-schemas`) і перевіркою дифа OpenAPI.
+- **Між незалежними репозиторіями:** застосовується **Consumer-Driven Contract Testing (Pact)**.
+
+#### 6. End-to-End (E2E) & System Testing
+Перевіряє весь шлях користувача: реальний браузер (`Playwright`) натискає кнопку ➔ Next.js Edge Proxy перевіряє підпис куки ➔ запит йде в NestJS API ➔ API пише в PostgreSQL і шле TCP-подію в `telemetry-ms` ➔ UI отримує SSE-оновлення. Покриває 5–20 ключових бізнес-сценаріїв.
+
+#### 7. Smoke & Synthetic Monitoring
+- **Post-build / Post-deploy Smoke:** разовий прогін після збірки/викату (розділ 2).
+- **Synthetic Monitoring:** періодичні зонди кожні 1–5 хвилин із різних регіонів (`Checkly`, `Grafana Synthetics`), що ловлять падіння DNS, закінчення TLS-сертифікатів і збої зовнішніх API раніше за користувачів.
+
+#### 8. Performance Testing: 4 різні підвиди
+1. **Load Testing:** перевірка SLA за очікуваного прод-трафіку (`p95 < 120 ms`).
+2. **Stress Testing:** плавне підняття RPS до межі руйнування, щоб побачити реальну стелю і спосіб відмови (`503` проти OOM Kill).
+3. **Spike Testing:** різкий стрибок трафіку в 10–20× за секунди.
+4. **Soak / Endurance Testing:** помірне навантаження на 4–24 години — ловить повільні витоки пам'яті (незакриті SSE-підписки), дескрипторів і відставання `autovacuum`.
+
+#### 9. Security Testing & Fuzzing
+- **SAST (`Semgrep`, `CodeQL`):** пошук небезпечних патернів у коді.
+- **SCA (`pnpm audit`, `Socket.dev`):** аудит вразливих і скомпрометованих залежностей.
+- **DAST & API Fuzzing (`OWASP ZAP`, `Schemathesis`):** фаззинг за OpenAPI-схемою + перевірки **IDOR/BOLA** та квот rate-limiting.
+
+#### 10. Property-Based Testing (`fast-check`)
+Ви описуєте **інваріант** (властивість для будь-яких вхідних даних), а `fast-check` генерує сотні крайніх значень (`""`, `NaN`, Unicode) і стискає збій до мінімального контрприкладу.
+
+#### 11. Mutation Testing (`Stryker`)
+Навмисно ламає ваш код (мутанти: `>` ➔ `>=`, `&&` ➔ `||`) і перевіряє, чи впали тести. Замінює оманливий line coverage на чесний **Mutation Score**.
+
+#### 12. Chaos Engineering & Fault Injection
+Навмисно додає затримки (`Toxiproxy`), обриви пакетів і таймаути БД, перевіряючи `TimeoutInterceptor`, Circuit Breakers, ретраї з jitter і Graceful Degradation fallback.
+
+#### 13. Shadow Traffic (Dark Launching) & Canary Verification
+Дзеркалювання копії прод-запитів у фоні (Shadow) або поступове викочування на 1–5% трафіку (Canary) із контролем `5xx` та `p99`.
+
+#### 14. Snapshot & Approval Testing
+Фіксація серіалізованих JSON/SQL/AST структур для виявлення небажаного дрейфу контракту (без сліпого оновлення великих снепшотів).
+
+---
+
+## 6. Піраміда, Трофей чи Соти: яку стратегію обрати для бекенду
+
+```text
+   Класична Піраміда              Testing Trophy (Kent C. Dodds)       Testing Honeycomb (Spotify)
+          /  E2E  \                       /   E2E   \                        /   E2E   \
+         /---------\                     /-----------\                      /-----------\
+        /Integration\                   / Integration \   <-- основа       / Integration \  <-- ядро
+       /-------------\                 /  (API + DB)   \                  /  (Service +   \
+      /  Unit (Mocks) \               /-----------------\                /  Real DB/Kafka) \
+     /-----------------\             /   Unit (Domain)   \              /-------------------\
+                                    /---------------------\            /   Unit (Pure Logic) \
+                                   / Static (TS + Biome/Zod)\         /-----------------------\
+```
+
+- **Класична піраміда (70/20/10)** гарна для алгоритмів та бібліотек, але в API-бекендах часто перетворюється на самообман через моки БД.
+- **Testing Trophy / Honeycomb** для сучасних сервісів (`NestJS + Prisma + Postgres`) переносять фокус на **Integration-тести з реальною БД (Testcontainers)** і статичну типізацію (`TypeScript + Zod`), залишаючи Unit для чистої бізнес-логіки.
+
+---
+
+## 7. Матриця рішень: який тест ловить конкретний прод-інцидент
+
+| Якщо у продакшені трапилось... | Який тест спіймав би це до релізу | Чому інші тести промовчали |
+| :--- | :--- | :--- |
+| Застосунок не стартує в Docker через ESM або відсутній WASM | **Smoke Test проти `dist/` і образу** | Unit та Integration запускалися через `tsx` по TS-сирцях |
+| Змінили поле в API-відповіді, і впав фронтенд | **Contract Test / Shared Zod + Typecheck** | Незалежні моки розійшлися в часі |
+| SQL-запит падає на PostgreSQL через типи або `NULL` | **Integration Test + реальний PostgreSQL** | SQLite in-memory та моки не знають семантику Postgres |
+| Подвійне списання балансу при одночасних кліках | **Concurrency Integration Test (`Promise.all`)** | Послідовні тести не перетинають транзакції |
+| Сервіс падає з OOM через 6 годин під навантаженням | **Soak Test (`k6`, 4–12 годин)** | Короткі прогони не накопичують витік слухачів/кешу |
+| Збій Redis або гальмування БД вішає всі воркери API | **Chaos Test (`Toxiproxy` + таймаути)** | У звичайних тестах БД відповідає локально за `1 ms` |
+| Користувач A читає чужі документи за `?id=42` | **Security / IDOR Integration Test** | Позитивні тести перевіряли лише легітимний доступ |
+| Помилка `>` замість `>=` ламає граничну знижку | **Mutation Testing (`Stryker`) + Property-Based** | Звичайні тести не перевіряли межу `100` |

@@ -1,0 +1,307 @@
+---
+title: "Backend Smoke Tests with Diagnostic Status & The Complete Backend Testing Taxonomy"
+sidebarLabel: "Smoke Tests & Testing Map"
+summary: "Anatomy of a diagnostic smoke test executed against the real compiled artifact (dist/main.js, readiness polling, Graceful Degradation checks) plus an engineering taxonomy of all 14 backend testing disciplines."
+category: "testing"
+format: "deep-dive"
+tags: ["testing", "smoke-tests", "backend", "diagnostics", "qa", "nestjs", "architecture"]
+readingTime: "15 min"
+publishedAt: "2026-11-19"
+order: 1
+tldr:
+  - "Smoke tests run against the real compiled artifact (`dist/main.js` or production container), catching ESM resolution breaks, Zod env validation failures, DI wiring errors, and missing runtime/WASM files."
+  - "A diagnostic smoke runner tracks `lastInfo` (`ECONNREFUSED`, `EACCES`, HTTP status + body, early `exitCode`, and buffered server logs) rather than failing with an opaque timeout."
+  - "Never verify external databases or Redis inside a Liveness probe — doing so turns transient DB blips into cluster-wide restart storms."
+  - "Unit tests alone leave huge blind spots; resilient backends combine 14 complementary practices (Testcontainers Integration, Contract, Property-Based, Mutation, Load/k6, Fuzzing, Chaos)."
+---
+
+## 1. Why Backend Systems Need Smoke Tests with Diagnostic Status
+
+Most deployment failures do **not** happen inside pure business functions covered by mocked unit tests — they happen at the boundary between compilation, environment configuration, and the real Node.js runtime:
+
+- `tsc` succeeds, yet `node dist/main.js` crashes in Native ESM because a relative import lacks `.js` or a CJS/ESM bridge breaks.
+- `pnpm prune --prod` strips an asset required at runtime (such as a WASM query compiler or template file).
+- A fail-fast Zod environment validator rejects missing production secrets during `bootstrap()` before the HTTP server ever binds a port.
+- A database driver adapter (`@prisma/adapter-pg`) connects lazily, so without an active `SELECT 1` startup probe `/api/health` falsely reports `databaseConnected: true` even when PostgreSQL is unreachable.
+
+A **Smoke Test** is the minimal, real end-to-end verification of the **actual built artifact** (`dist/main.js` or Docker image) right after build or deploy: confirm the service starts cleanly, does not emit smoke, and serves a critical vertical slice.
+
+---
+
+## 2. Anatomy of a Diagnostic Smoke Test (4 Phases)
+
+A naive smoke test looks like `node dist/main.js & sleep 3 && curl http://localhost:4000/api/health`. That pattern is brittle and blind: when it fails you get a generic connection error with no clue whether the process crashed immediately, returned `500`, needed 4 seconds to boot, or hit a port/firewall block.
+
+A production-grade smoke runner follows a deterministic 4-phase pipeline with **rich diagnostic status tracking**:
+
+```text
+[1. Spawn Real Artifact]
+   ├── Isolated env (ephemeral port 4098/4099, controlled DATABASE_URL)
+   ├── Capture stdout + stderr buffers
+   └── Early-exit listener (child.on('exit') -> fail-fast without waiting out full timeout)
+          │
+          ▼
+[2. Readiness Polling + lastInfo]
+   ├── Poll fetch('/api/health') every 200 ms
+   ├── 2xx OK     ──► proceed to Phase 3
+   ├── HTTP >= 400 ─► lastInfo = "HTTP <status>: <body>"
+   └── Net error  ──► lastInfo = "<name>: <message> (<cause.code>)" (ECONNREFUSED / EACCES / ETIMEDOUT)
+          │
+          ▼
+[3. Critical Vertical Slice + Graceful Degradation]
+   ├── Scenario A (Nominal / In-Memory): /api/health -> HttpOnly cookie auth -> protected GET -> write POST
+   └── Scenario B (Unreachable DB):      dead port -> verify fallback without process crash
+          │
+          ▼
+[4. Guaranteed Teardown (finally)]
+   └── SIGTERM + bounded wait (zero zombie processes in CI) + dump captured logs on failure
+```
+
+### Reference Runner in Node.js (`smoke-api.mjs`)
+
+Below is a practical diagnostic smoke runner built for `NestJS 12 ESM` + `Prisma 7`:
+
+```typescript title="scripts/smoke-api.mjs"
+import { spawn } from 'node:child_process'
+import { resolve } from 'node:path'
+
+const API_ENTRY = resolve(process.cwd(), 'apps/api/dist/main.js')
+
+async function waitForHealth(
+  url: string,
+  timeoutMs: number,
+  isExited: () => boolean,
+  getCode: () => number | null,
+): Promise<Response> {
+  const startedAt = Date.now()
+  let lastInfo = 'no attempts yet'
+
+  while (Date.now() - startedAt < timeoutMs) {
+    if (isExited()) {
+      throw new Error(`Server exited early with code ${String(getCode())}`)
+    }
+
+    try {
+      const response = await fetch(url)
+      if (response.ok) {
+        return response
+      }
+      lastInfo = `HTTP ${response.status}: ${await response.text()}`
+    } catch (err) {
+      const causeCode =
+        err instanceof Error && 'cause' in err && typeof err.cause === 'object' && err.cause !== null && 'code' in err.cause
+          ? String((err.cause as { code?: unknown }).code ?? '')
+          : ''
+      lastInfo = err instanceof Error ? `${err.name}: ${err.message} (${causeCode})` : String(err)
+    }
+
+    await new Promise((resolveDelay) => setTimeout(resolveDelay, 200))
+  }
+
+  throw new Error(`Timed out waiting for ${url}; lastInfo=${lastInfo}`)
+}
+
+async function runScenario(
+  name: string,
+  envOverrides: Record<string, string>,
+  verifyFn: (baseUrl: string, health: { status: string; databaseConnected: boolean }) => Promise<void>,
+): Promise<void> {
+  const env: NodeJS.ProcessEnv = { ...process.env, NODE_ENV: 'development', ...envOverrides }
+  if (!('DATABASE_URL' in envOverrides)) {
+    delete env.DATABASE_URL
+    delete env.DIRECT_URL
+  }
+
+  const child = spawn(process.execPath, [API_ENTRY], {
+    env,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  })
+
+  let logs = ''
+  let exited = false
+  let exitCode: number | null = null
+
+  child.stdout.on('data', (chunk: Buffer) => {
+    logs += chunk.toString()
+  })
+  child.stderr.on('data', (chunk: Buffer) => {
+    logs += chunk.toString()
+  })
+  child.on('exit', (code) => {
+    exited = true
+    exitCode = code
+  })
+
+  try {
+    const port = envOverrides.PORT ?? '4098'
+    const baseUrl = `http://127.0.0.1:${port}/api`
+    const healthRes = await waitForHealth(`${baseUrl}/health`, 15000, () => exited, () => exitCode)
+    const healthJson = (await healthRes.json()) as { status: string; databaseConnected: boolean }
+    await verifyFn(baseUrl, healthJson)
+  } catch (error) {
+    console.error(`[${name}] FAILED:\n${logs.trim()}`)
+    throw error
+  } finally {
+    if (!exited) {
+      child.kill('SIGTERM')
+      await new Promise((done) => {
+        child.once('exit', done)
+        setTimeout(done, 1500)
+      })
+    }
+  }
+}
+```
+
+### Interpreting `lastInfo` Diagnostic Output
+
+| `lastInfo` Signal | Root Cause | Immediate Fix |
+| :--- | :--- | :--- |
+| `Server exited early with code 1` | Startup crash in `bootstrap()`, Zod env validation, or ESM import | Read first stack frame from captured `stderr` |
+| `TypeError: fetch failed (ECONNREFUSED)` | Wrong port binding or host mismatch | Verify `PORT` env and `app.listen(port, '0.0.0.0')` |
+| `TypeError: fetch failed (EACCES)` | Loopback sockets blocked by OS sandbox/firewall | Run smoke probe in an environment permitting loopback |
+| `HTTP 500: {"statusCode":500,...}` | Server booted, but middleware/DI/controller threw | Inspect global exception filter and server logs |
+| `HTTP 429: Too Many Requests` | Rate limiter triggered by tight polling loop | Exempt health endpoint or slow polling cadence |
+
+> [!TIP]
+> Always smoke-test **both** your nominal path (`HttpOnly` cookie issuance -> protected read -> write mutation) and **Graceful Degradation** (launching against an unreachable `DATABASE_URL`). That proves fallback code actually survives compilation and bundling instead of working only in theory.
+
+---
+
+## 3. Liveness, Readiness, and Startup Probes: Where Health Checks Can Break Prod
+
+Orchestrators like Kubernetes, Docker Compose, and cloud PaaS providers rely on distinct health probes:
+
+| Probe | What It Verifies | Orchestrator Action on Failure | Check External DB / Redis? |
+| :--- | :--- | :--- | :--- |
+| **Startup (`/health/startup`)** | Heavy module initialization and warmup | Waits until threshold, then restarts pod | Optional (only if DB is hard-required to boot) |
+| **Liveness (`/health/live`)** | Event loop responsiveness (not deadlocked) | **Kills & restarts container (`SIGKILL`)** | **NEVER** |
+| **Readiness (`/health/ready`)** | Instance ability to serve live user traffic | Removes pod from load balancer without killing it | **YES** (`SELECT 1`, `PING` with short timeout) |
+
+> [!CAUTION]
+> **Classic Production Outage:** Putting `await prisma.$queryRaw\`SELECT 1\`` inside a **Liveness** probe causes a 5-second database hiccup to restart **every** API replica simultaneously. When PostgreSQL recovers, dozens of cold containers hammer it at once (Thundering Herd), keeping the outage alive.
+
+---
+
+## 4. Smoke vs Sanity vs Regression Testing
+
+| Dimension | Smoke Testing | Sanity Testing | Regression Testing |
+| :--- | :--- | :--- | :--- |
+| **Core Question** | "Does the build boot and keep critical paths alive?" | "Does the targeted fix behave logically?" | "Did recent changes break existing features?" |
+| **Depth** | Shallow (top ~1% critical paths, 10–30s) | Narrow and focused on one changed slice | Broad & deep (full Unit + Integration + E2E) |
+| **Trigger** | Every artifact build & every deployment | Immediately after a targeted hotfix | Every Pull Request & pre-release gate |
+| **Environment** | Real compiled `dist/` or staging/prod | Local dev or preview environment | Isolated CI (Testcontainers + Playwright) |
+
+---
+
+## 5. Complete Taxonomy of Alternative Backend Tests (14 Disciplines)
+
+Smoke tests verify runtime wiring, not business correctness, concurrency safety, or security. Production backends combine **14 complementary testing disciplines**.
+
+### Master Comparison Matrix
+
+| # | Testing Discipline | Primary Risk Caught | Speed | Real I/O / DB | CI Stage | Node / NestJS Tooling |
+| :-: | :--- | :--- | :---: | :---: | :--- | :--- |
+| 1 | **Static & Type-Level** | Type mismatches, `any` leaks, Zod/TS drift | Instant (`1–3s`) | No | Pre-commit + PR | `tsc --noEmit`, `Biome`, `expectTypeOf` |
+| 2 | **Unit Testing** | Pure domain logic bugs, math, parsers, crypto | Very fast (`ms`) | No (boundary mocks) | Pre-commit / PR | `Vitest` |
+| 3 | **Module / Slice Testing** | Broken DI, Pipes, Guards, Interceptors, Filters | Fast (`1–3s`) | No / fakes | PR Fast Gate | `@nestjs/testing` (`Test.createTestingModule`) |
+| 4 | **Integration Testing** | Bad SQL, broken migrations, CORS, Cookies, Rate Limits | Medium (`5–30s`) | **Yes (Testcontainers)** | PR Merge Gate | `Vitest` + `Supertest` + `Testcontainers` |
+| 5 | **Contract Testing** | Breaking API payload changes across services | Fast (`2–5s`) | No / local broker | PR Gate | `@repo/shared-schemas`, OpenAPI Diff, `Pact` |
+| 6 | **End-to-End (E2E)** | Broken full journeys UI ➔ Edge ➔ API ➔ DB ➔ MS | Slow (`30–180s`) | **Yes (full stack)** | Post-Build / Staging | `Playwright`, `Supertest` |
+| 7 | **Smoke & Synthetics** | Dead build, ESM breaks, live prod regressions | Fast (`5–20s`) | **Yes (real build)** | Post-Deploy + Cron | `node`/`curl` scripts, `k6`, `Checkly` |
+| 8 | **Performance (Load/Stress/Spike/Soak)** | Memory leaks, pool exhaustion, `p99` tail spikes | Long (`5–60m`) | **Yes (staging)** | Nightly / Pre-Release | `k6`, `Artillery`, `autocannon` |
+| 9 | **Security & API Fuzzing** | IDOR/BOLA, SQLi, Auth bypass, malformed input crashes | Medium (`1–15m`) | **Yes** | PR + Nightly | `pnpm audit`, `Semgrep`, `OWASP ZAP`, `Schemathesis` |
+| 10 | **Property-Based Testing** | Edge-case inputs (`""`, `NaN`, Unicode, bounds) | Fast–Medium | No | PR Gate | `fast-check` |
+| 11 | **Mutation Testing** | Weak assertions hidden behind high line coverage | Long (`2–15m`) | No | Nightly / Critical code | `StrykerJS` (`@stryker-mutator/vitest-runner`) |
+| 12 | **Chaos & Fault Injection** | Hanging timeouts, Retry Storms, pool deadlocks | Medium (`1–5m`) | **Yes (with faults)** | Staging / GameDays | `Toxiproxy`, `Chaos Mesh` |
+| 13 | **Shadow Traffic & Canary** | Regressions under real prod payloads & 1% rollout | Real-time | **Yes (Production)** | Release Rollout | Nginx mirror, Envoy, Argo Rollouts |
+| 14 | **Snapshot & Approval** | Unintended drift in serialized JSON/SQL structures | Fast (`ms`) | No | PR Gate | `Vitest` `toMatchSnapshot` |
+
+---
+
+### Deep Breakdown of Each Practice
+
+#### 1. Static & Type-Level Testing
+`tsc --noEmit` with `strict: true`, `noUncheckedIndexedAccess`, and `exactOptionalPropertyTypes` catches entire bug classes before any runtime test executes. Changing a field in `@repo/shared-schemas` immediately flags every affected NestJS controller and Next.js form.
+
+#### 2. Unit Testing (Pure Domain Logic)
+Tests a single module in isolation with **zero disk, network, or database I/O**. Best suited for pricing/billing math, rate calculations, URL/Markdown sanitizers, crypto verification (`timingSafeEqual`), and state machines.
+
+#### 3. Component / Module Slice Testing (`@nestjs/testing`)
+NestJS behavior lives heavily inside DI metadata and request pipelines (`ZodValidationPipe`, `JwtRolesGuard`, `TimeoutInterceptor`, `SentryExceptionFilter`). Slice tests mount a single module via `Test.createTestingModule`, swap only external I/O providers, and verify HTTP status codes and guard behavior.
+
+#### 4. Integration Testing (Real Databases & Brokers)
+Exercises your code against real **PostgreSQL, Redis, S3/MinIO, and TCP microservices** using **Testcontainers**. Integration tests catch invalid SQL, broken Prisma migrations, `UNIQUE`/`FOREIGN KEY` violations, connection pool issues, and race conditions that mocked repositories completely ignore.
+
+#### 5. Contract Testing (Cross-Service Compatibility)
+Ensures the Provider (`apps/api`) never breaks assumptions relied on by Consumers (`apps/web` or peer services):
+- **Monorepo:** enforced via shared Zod contracts (`@repo/shared-schemas`) and OpenAPI diff gates.
+- **Polyglot / Multi-Repo Microservices:** **Consumer-Driven Contract Testing (Pact)** lets consumers publish expected request/response interactions to a broker so providers verify compatibility independently.
+
+#### 6. End-to-End (E2E) & System Testing
+Drives the entire system end-to-end: `Playwright` clicks in a real browser ➔ Next.js Edge Proxy verifies HMAC-SHA256 JWT cookies ➔ NestJS API writes to PostgreSQL and emits TCP events to `telemetry-ms` ➔ UI renders live SSE updates. Keep E2E focused on 5–20 critical business journeys.
+
+#### 7. Smoke & Synthetic Monitoring
+- **Post-build / Post-deploy Smoke:** immediate runtime gate after building or releasing (Section 2).
+- **Synthetic Monitoring:** scheduled multi-region probes running critical read/auth journeys every 1–5 minutes against production (`Checkly`, `Grafana Synthetics`) to catch DNS, TLS, and third-party outages proactively.
+
+#### 8. Performance Testing: 4 Distinct Subtypes
+1. **Load Testing:** verifies SLA compliance under expected production throughput (e.g., 300 RPS for 15 minutes with `p95 < 120 ms`).
+2. **Stress Testing:** ramps traffic upward until the system breaks, revealing maximum capacity and failure mode (`503` backpressure vs OOM kill).
+3. **Spike Testing:** injects a sudden 10–20× traffic burst over seconds to test autoscaling latency and DB pool saturation.
+4. **Soak / Endurance Testing:** sustains moderate load for 4–24 hours to catch slow memory leaks (e.g., uncleaned SSE subscriptions), file descriptor leaks, and PostgreSQL vacuum lag.
+
+#### 9. Security Testing & Fuzzing
+- **SAST (`Semgrep`, `CodeQL`):** static detection of unsafe sinks (`eval`, raw SQL concatenation, leaked secrets).
+- **SCA (`pnpm audit`, `Socket.dev`):** vulnerable or malicious supply-chain dependencies.
+- **DAST & API Fuzzing (`OWASP ZAP`, `Schemathesis`):** automated generation of thousands of malformed/edge payloads from OpenAPI specs plus explicit **IDOR/BOLA** authorization tests (User A attempting to access User B's resources) and rate-limit enforcement checks.
+
+#### 10. Property-Based Testing (`fast-check`)
+Instead of hand-picking three static examples, you declare **invariants** that must hold for *all* inputs. `fast-check` generates hundreds of edge inputs (empty strings, Unicode surrogates, extreme integers, `NaN`) and automatically **shrinks** failures to the minimal reproducing case.
+
+#### 11. Mutation Testing (`Stryker`)
+Answers *"Do our assertions actually detect bugs?"*. Stryker injects deliberate faults (mutants) into your code — flipping `>` to `>=`, `&&` to `||`, deleting statements — and re-runs tests. Surviving mutants expose weak tests despite misleadingly high line coverage.
+
+#### 12. Chaos Engineering & Fault Injection
+Uses proxies like `Toxiproxy` between your API and PostgreSQL/Redis/microservices to inject `3000 ms` latency, packet drops, or abrupt TCP resets, verifying `TimeoutInterceptor`, Circuit Breakers, jittered retries (avoiding Retry Storms), and Graceful Degradation fallbacks.
+
+#### 13. Shadow Traffic (Dark Launching) & Canary Verification
+- **Shadow Traffic:** edge proxies mirror live read traffic to a new candidate version asynchronously without affecting user responses, comparing error rates, latency, and response diffs.
+- **Canary Rollout:** shifts 1–5% of live traffic with automated rollback if `5xx` or `p99` breaches baseline thresholds.
+
+#### 14. Snapshot & Approval Testing
+Captures serialized outputs (SQL plans, structured error envelopes, AST trees) to detect unintended drift. Avoid blind snapshot updates on giant JSON payloads — otherwise engineers accidentally approve regressions.
+
+---
+
+## 6. Test Pyramid vs Testing Trophy vs Testing Honeycomb
+
+```text
+     Classic Pyramid                Testing Trophy                    Testing Honeycomb
+        /  E2E  \                     /   E2E   \                        /   E2E   \
+       /---------\                   /-----------\                      /-----------\
+      /Integration\                 / Integration \   <-- weight       / Integration \  <-- core
+     /-------------\               /  (API + DB)   \                  /  (Service +   \
+    /  Unit (Mocks) \             /-----------------\                /  Real DB/Kafka) \
+   /-----------------\           /   Unit (Domain)   \              /-------------------\
+                                /---------------------\            /   Unit (Pure Logic) \
+                               / Static (TS + Biome/Zod)\         /-----------------------\
+```
+
+- **Classic Pyramid (70/20/10)** shines in math-heavy libraries, compilers, and pure algorithms, but in CRUD/API backends it often degrades into heavily mocked unit suites that pass while SQL and migrations fail.
+- **Testing Trophy / Honeycomb** shifts the primary investment to **Integration tests backed by real databases (Testcontainers)** plus strict static typing (`TypeScript + Zod`), reserving Unit tests for pure domain logic and Smoke/E2E tests for full-artifact confidence.
+
+---
+
+## 7. Decision Matrix: Mapping Production Incidents to Test Layers
+
+| Production Failure Mode | Test Layer That Catches It Early | Why Other Layers Miss It |
+| :--- | :--- | :--- |
+| App crashes in Docker due to ESM paths or missing WASM | **Smoke Test on `dist/` & Docker image** | Unit/Integration tests run under `tsx` over TS sources |
+| API payload change breaks frontend silently | **Contract Test / Shared Zod + Typecheck** | Independent mocks drift apart |
+| SQL query breaks on PostgreSQL types, locks, or `NULL` | **Integration Test + real PostgreSQL** | SQLite in-memory and mocks ignore Postgres semantics |
+| Double spend / duplicate counter under concurrent clicks | **Concurrency Integration Test (`Promise.all`)** | Sequential tests never overlap transactions |
+| Process OOMs after 6 hours under steady traffic | **Soak Test (`k6`, 4–12 hours)** | Short runs miss slow listener/cache leaks |
+| Redis/DB blip hangs every API worker thread | **Chaos Test (`Toxiproxy` + timeouts)** | Local test DBs respond in `1 ms` |
+| User A reads User B's record via `?id=42` | **Security / IDOR Integration Test** | Happy-path tests only verify authorized access |
+| Off-by-one bug (`>` vs `>=`) slips past 100% coverage | **Mutation Testing (`Stryker`) + Property-Based** | Happy-path inputs avoided the exact boundary value |

@@ -1,0 +1,196 @@
+---
+title: "Навантажувальне, Chaos, Mutation, Property-Based тестування та стратегія CI для бекенду"
+sidebarLabel: "Навантаження, Chaos, Mutation та CI"
+summary: "Просунуті методи верифікації надійності бекенду: профілі k6 (Load/Stress/Spike/Soak та Coordinated Omission), інваріанти fast-check і OpenAPI Fuzzing, мутаційне тестування Stryker, Chaos-ін'єкції Toxiproxy та усунення Flaky-тестів у CI."
+category: "testing"
+format: "deep-dive"
+tags: ["testing", "load-testing", "k6", "chaos-engineering", "mutation-testing", "property-based", "ci-cd"]
+readingTime: "16 хв"
+publishedAt: "2026-11-19"
+order: 3
+tldr:
+  - "Середня латентність у навантажувальних тестах бреше: вимірюйте `p95` / `p99` / `p99.9` і використовуйте open-model (`constant-arrival-rate` у `k6`), щоб не маскувати деградацію через Coordinated Omission."
+  - "100% Line Coverage може пропускати тривіальні помилки на кшталт `>` замість `>=`. Mutation Testing (`Stryker`) на критичних модулях виявляє слабкі перевірки."
+  - "`fast-check` перевіряє математичні та парсерні інваріанти на сотнях згенерованих входів із автостисненням контрприкладу."
+  - "Багатоступеневий CI розділяє швидкий PR-гейт (< 2 хв), Testcontainers + Smoke (2–5 хв) та нічні важкі прогони (Soak, Stryker, Fuzzing)."
+---
+
+## 1. Навантажувальне тестування (`k6`): 4 профілі та пастка Coordinated Omission
+
+Коли продакшен падає під сплеском користувачів, причина майже ніколи не криється в одній функції — падає **ємність пулів, черг, GC чи бази даних**. Для їх перевірки застосовують 4 різні профілі навантаження:
+
+```text
+Load (Штатний SLA)         Stress (Пошук стелі)       Spike (Раптовий сплеск)    Soak (Витоки і GC)
+RPS                        RPS                          RPS         /\               RPS
+ │   ________________       │          /                 │         /  \               │  ________________
+ │  /                \      │        /   (OOM / 503)     │   _____/    \____          │ /   4–24 години  \
+ │ /                  \     │      /                     │  /                \        │/                  \
+ └────────────────────► t   └────────────────────► t     └────────────────────► t     └────────────────────► t
+```
+
+| Профіль | Мета | Тривалість | Що ловить насамперед |
+| :--- | :--- | :---: | :--- |
+| **Load** | Підтвердити SLA за цільового прод-RPS | 10–30 хв | Неоптимальні SQL-запити, просідання `p95`/`p99` |
+| **Stress** | Знайти точку відмови та характер деградації | 15–30 хв | Межа CPU/RAM, ліміт `pg.Pool`, каскадні `504` |
+| **Spike** | Пережити миттєвий стрибок `10–20×` за секунди | 3–10 хв | Холодний старт автоскейлера, переповнення черг |
+| **Soak / Endurance** | Стійкість на тривалій дистанції | 4–24 год | Повільні витоки пам'яті (SSE `Subject`), витоки сокетів, відставання `autovacuum` |
+
+### Чому середній час відповіді бреше і що таке Coordinated Omission
+
+1. **Середнє (Mean) приховує хвіст (`p99`):** якщо 99 запитів виконались за `10 ms`, а 1 запит провисів `10 000 ms`, середнє буде `~110 ms`, але при віяловому виклику 10 мікросервісів на один екран імовірність зловити хоча б один повільний `p99`-запит зростає до $1 - 0.99^{10} \approx 9.6\%$.
+2. **Coordinated Omission (Закрита vs Відкрита модель):** якщо в тесті 50 віртуальних користувачів (VU) шлють запит у нескінченному циклі `fetch() -> wait()`, і сервер гальмує по 5 секунд, кожен VU просто шле у 50 разів менше запитів. Використовуйте **open-model** (`constant-arrival-rate` / `ramping-arrival-rate`) у `k6`, який генерує фіксований потік запитів за секунду незалежно від гальм сервера:
+
+```javascript title="tests/load/knowledge-sla.k6.js"
+import { check } from 'k6'
+import http from 'k6/http'
+
+export const options = {
+  scenarios: {
+    steady_api_traffic: {
+      executor: 'constant-arrival-rate',
+      rate: 120,
+      timeUnit: '1s',
+      duration: '5m',
+      preAllocatedVUs: 40,
+      maxVUs: 200,
+    },
+  },
+  thresholds: {
+    http_req_failed: ['rate<0.005'],
+    http_req_duration: ['p(95)<120', 'p(99)<300'],
+  },
+}
+
+export default function () {
+  const health = http.get('http://127.0.0.1:4000/api/health')
+  check(health, { 'health is 200': (r) => r.status === 200 })
+
+  const login = http.post(
+    'http://127.0.0.1:4000/api/auth/guest-pass',
+    JSON.stringify({ displayName: 'Load Bot', visitorType: 'DEVELOPER' }),
+    { headers: { 'Content-Type': 'application/json' } },
+  )
+  check(login, { 'guest-pass issued': (r) => r.status === 200 })
+
+  const metrics = http.get('http://127.0.0.1:4000/api/knowledge/metrics')
+  check(metrics, { 'metrics loaded': (r) => r.status === 200 })
+}
+```
+
+---
+
+## 2. Property-Based Testing (`fast-check`) та API Fuzzing
+
+### Property-Based Testing: інваріанти замість ручних прикладів
+
+Звичайний тест перевіряє конкретні кейси (`"hello"` -> ok, `""` -> error). Property-Based тест формулює **інваріант**, який має бути істинним для *будь-яких* вхідних даних із генератора `fast-check`:
+- **Ідемпотентність:** `f(f(x)) === f(x)` (нормалізатори, дедуплікатори).
+- **Оборотність (Round-Trip):** `decode(encode(x))` відновлює початковий `x`.
+- **Безпека (No Crash / Sanitization):** довільне сміття на вході ніколи не викидає неперехоплений виняток і не пропускає `javascript:` / `//evil.com`.
+
+```typescript title="apps/web/src/entities/knowledge-content/lib/link-sanitizer.property.spec.ts"
+import fc from 'fast-check'
+import { describe, expect, it } from 'vitest'
+
+function sanitizeInternalRedirect(rawInput: string): string {
+  const trimmed = rawInput.trim()
+  if (!trimmed.startsWith('/') || trimmed.startsWith('//') || trimmed.includes('\\')) {
+    return '/'
+  }
+  return trimmed
+}
+
+describe('sanitizeInternalRedirect (Property-Based)', () => {
+  it('always returns a safe single-slash local path without protocol-relative bypasses', () => {
+    fc.assert(
+      fc.property(fc.string(), (arbitraryInput) => {
+        const result = sanitizeInternalRedirect(arbitraryInput)
+        expect(result.startsWith('/')).toBe(true)
+        expect(result.startsWith('//')).toBe(false)
+        expect(result.includes('\\')).toBe(false)
+      }),
+      { numRuns: 1000 },
+    )
+  })
+})
+```
+
+При виявленні бага `fast-check` автоматично виконує **shrinking** — скорочує 80-символьний рядок сміття до мінімального контрприкладу на кшталт `"//a"`.
+
+### API Fuzzing (`Schemathesis`)
+
+Якщо у вашого бекенду є OpenAPI/Swagger-схема, фаззер (`Schemathesis`) автоматично генерує тисячі граничних і зламаних HTTP-запитів (від'ємні числа, масиви замість рядків, гігантський Unicode, пропущені поля) і гарантує дві властивості:
+1. API **ніколи не відповідає `500 Internal Server Error`** (лише валідні `400`/`422`).
+2. Відповідь сервера суворо відповідає оголошеній OpenAPI-схемі.
+
+---
+
+## 3. Mutation Testing (`Stryker`): чому 100% Line Coverage може брехати
+
+Погляньте на цю функцію та тест зі **100% покриттям рядків і гілок**:
+
+```typescript
+export function isEligibleForDiscount(totalCents: number): boolean {
+  return totalCents >= 10000
+}
+
+// Слабкий тест: дає 100% line & branch coverage!
+it('checks discount eligibility', () => {
+  expect(isEligibleForDiscount(20000)).toBe(true)
+  expect(isEligibleForDiscount(500)).toBe(false)
+})
+```
+
+Якщо розробник випадково опечатається й напише `totalCents > 10000`, обидва тести **залишаться зеленими**, хоча бізнес-вимогу зламано для чека рівно на `10000` центів.
+
+**StrykerJS** автоматично створює мутантів (`>=` ➔ `>`, `>=` ➔ `<`, `return true`) і перезапускає тести. Мутант, що вижив, змушує додати точну граничну перевірку `expect(isEligibleForDiscount(10000)).toBe(true)`.
+
+> [!TIP]
+> Не запускайте `Stryker` на весь монорепозиторій у кожному PR — це дорого за CPU. Виділяйте його точково в нічний або окремий CI-джоб для **критичних модулів**: білінг, авторизація/RBAC, криптографічні перевірки, парсери та санітайзери.
+
+---
+
+## 4. Chaos Engineering та тестування відмовостійкості
+
+Відмова зовнішніх залежностей неминуча. Chaos-тест через **Toxiproxy** стає TCP-проксі між вашим `apps/api` та `PostgreSQL` / `Redis` / `telemetry-ms` і програмовано ін'єктує збої:
+
+```text
+[ apps/api ] ──► [ Toxiproxy (:25432) ] ──(latency 3000ms / timeout / reset_peer)──► [ PostgreSQL ]
+```
+
+Що перевіряє такий сценарій:
+1. **Таймаути не висять нескінченно:** `TimeoutInterceptor` (`15s`) і таймаути драйвера (`connectionTimeoutMillis`, `statement_timeout`) вчасно звільняють потік.
+2. **Немає Retry Storm:** клієнт не б'є по лежачому upstream миттєвими повторами — використовується обмежений `maxRetries` з **Exponential Backoff + Jitter**.
+3. **Graceful Degradation:** при обриві зв'язку `PrismaService` коректно закриває пул, не валить Node.js необробленою подією `pool.on('error')` і перемикається на резервний режим.
+
+---
+
+## 5. Багатоступеневий CI/CD конвеєр та боротьба з Flaky-тестами
+
+```text
+[1. Pre-commit (< 5s)]     Biome check + tsc (affected)
+          │
+          ▼
+[2. PR Fast Gate (< 2m)]   Lint + Typecheck + Unit + Slice + Property-Based + Contract
+          │
+          ▼
+[3. PR Merge Gate (2–5m)]  Integration (Testcontainers Postgres) + Full Build + ESM Smoke Test
+          │
+          ▼
+[4. Post-Deploy Staging]   Smoke Test + Playwright E2E + Synthetic Probes
+          │
+          ▼
+[5. Nightly Schedule]      k6 Soak/Load + Stryker Mutation (core) + API Fuzzing + Audit
+```
+
+### 7 головних причин Flaky-тестів (плаваючих падінь) та їхні точні виправлення
+
+| Причина плаваючого збою | Як проявляється | Інженерне рішення |
+| :--- | :--- | :--- |
+| **1. Спільний стан БД у паралелі** | Тести падають випадково при запуску в 4 потоки | Ізоляція схемою на воркер або транзакцією/truncate |
+| **2. Час і часові пояси (`new Date()`)** | Падає опівночі UTC або в останній день місяця | `vi.useFakeTimers()` та ін'єкція `Clock`, тести строго в `UTC` |
+| **3. Фіксований `sleep(500)` замість polling** | На навантаженому CI-раннері подія приходить за `650 ms` | Явний `expect.poll(...)` / `waitFor(...)` з таймаутом |
+| **4. Запити без `ORDER BY`** | PostgreSQL повертає рядки в довільному порядку | Детермінований `ORDER BY created_at ASC, id ASC` |
+| **5. Колізія статичних портів** | Другий паралельний тест падає з `EADDRINUSE :4000` | Порт `0` (OS ephemeral port) або унікальний порт на воркер |
+| **6. Живі зовнішні API (Slack, Stripe)** | Тести ламаються через мережевий флап або rate limit | Локальний stub/mock HTTP-сервер (`msw` / `nock` / WireMock) |
+| **7. Протікання синглтонів та `process.env`** | Попередній тест змінив `process.env.NODE_ENV` | Передача чистого об'єкта `env` аргументом (`loadAppConfig(env)`) і скидання в `afterEach` |

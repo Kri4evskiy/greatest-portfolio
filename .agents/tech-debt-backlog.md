@@ -5,7 +5,7 @@
 Архитектурное ядро находится в продакшен-состоянии (`v0.8.0`; подробности и 16 ADR лежат в `.agents/frontend/*`, `.agents/backend/*`, `.agents/architecture/*` и статьях базы знаний):
 - **Monorepo & DX:** `pnpm 12.21.0` + `Turborepo` + `TypeScript 7.0.2` (native Go compiler) + `Biome 2.6.4` + `Lefthook` · `@repo/shared-schemas` (`Zod v4`) + `@repo/ui` (`Tailwind CSS v4.3.5` + `Storybook 10` `9/9`) · Multi-stage `Docker` + `GitHub Actions CI/CD`.
 - **Frontend (`apps/web`):** `Next.js 16.4.6` (`React 19 Compiler`) · архитектура `FSD-Modular` (`app` ➔ `widgets` ➔ `features` ➔ `entities` ➔ `shared`) · `next-intl` (`EN/UK/RU`, `143` SSG-роута) · 2D Appearance (`Mode × Palette` + Zero-FOUC `PALETTE_INIT_SCRIPT` + cross-tab sync в `ThemeProvider` через `useUIStore.getState()`) · self-hosted Zero-CLS `Inter` + `JetBrains Mono` (`next/font/google`) · `@starting-style` + `@container` · `Zero-Eval HAST MDX Engine` (`remark-directive` `:::sandbox` + `remark-rehype` + `hast-util-to-jsx-runtime` + `mtimeMs` кэш + `Dual-Theme Shiki`) · `Cmd+K` SSG-индекс · `TanStack Query v5` (`IndexedDB`) · `D3.js` клиентские острова · `Edge Web Crypto JWT` + строгий `CSP` (`font-src 'self' data:`).
-- **Backend (`apps/api` & `apps/telemetry-ms`):** `NestJS 12 ESM` (4-компонентная Enterprise-структура `common`/`config`/`migrations`/`modules`, fail-fast Zod env validation & timing-safe auth) + `Prisma` (с In-Memory fallback и CLI `prisma:seed`) + `HttpOnly JWT` + `Helmet` + `@nestjs/throttler` + изолированный TCP-микросервис телеметрии (`:4001`) с `SSE`-стримингом.
+- **Backend (`apps/api` & `apps/telemetry-ms`):** `NestJS 12 ESM` (4-компонентная Enterprise-структура `common`/`config`/`migrations`/`modules`, fail-fast Zod env validation & timing-safe auth) + `Prisma 7` (`7.10.1`, Rust-free Wasm + Native ESM + `@prisma/adapter-pg`, с In-Memory fallback и CLI `prisma:seed`) + `HttpOnly JWT` + `Helmet` + `@nestjs/throttler` + изолированный TCP-микросервис телеметрии (`:4001`) с `SSE`-стримингом.
 
 ---
 
@@ -13,13 +13,13 @@
 
 ### Приоритет №1: Апгрейд `Prisma ORM` с v6 (`6.4.1`) до `Prisma 7` (`apps/api`, `docker/api.Dockerfile`)
 
-- [ ] **Миграция слоя персистентности на `Prisma 7` (Rust-free Wasm + Native ESM):**
+- [x] **Миграция слоя персистентности на `Prisma 7` (Rust-free Wasm + Native ESM — выполнено на `7.10.1`):**
   - **Зачем:** переход на нативный ESM без Rust-бинарников, уменьшение холодного старта и размера Docker-образов, полная актуализация стека следом за `TypeScript 7.0.2` и `Tailwind CSS v4.3.5`.
   - **Ключевые шаги (`apps/api`):**
-    1. Обновить `prisma` и `@prisma/client` с `6.4.1` до `7.x`.
-    2. Перенести URL-конфигурацию БД из `prisma/schema.prisma` (`url` / `directUrl`) в корневой конфиг пакета `apps/api/prisma.config.ts` (`defineConfig`, `env('DATABASE_URL')`).
-    3. Переключить генератор с `prisma-client-js` на `prisma-client` с явным полем `output` (`./generated/prisma`), подключить обязательный SQL driver adapter (`@prisma/adapter-pg` + `pg`) и обновить импорты в `PrismaService` и `src/migrations/scripts/seed.ts`.
-    4. Сохранить 100% работоспособность **Graceful In-Memory Fallback** (когда `DATABASE_URL` отсутствует), строгую проверку типов в `TypeScript 7`, ESM-запуск в `NestJS 12` и сборку `docker/api.Dockerfile`.
+    1. Обновлены `prisma`, `@prisma/client` до `7.10.1`, подключены `@prisma/adapter-pg@7.10.1`, `pg`, `@types/pg`, из `pnpm-workspace.yaml` `allowBuilds` удалён неиспользуемый `@prisma/client`.
+    2. URL-конфигурация БД перенесена из `prisma/schema.prisma` (`url` / `directUrl`) в `apps/api/prisma.config.ts` (`defineConfig`, нативный `loadEnvFile` для `.env`, `DIRECT_URL || DATABASE_URL || placeholder` для автономного `prisma generate`).
+    3. Генератор переключён на `prisma-client` (`output = "../src/generated/prisma"`, `moduleFormat = "esm"`, `importFileExtension = "js"`), `PrismaService` переведён на композицию (`PrismaClient` + `PrismaPg` + `Pool`, eager-проверка `SELECT 1`), обновлён `src/migrations/scripts/seed.ts`.
+    4. Сохранена 100% работоспособность **Graceful In-Memory Fallback**, строгий typecheck в `TypeScript 7.0.2`, ESM-запуск `NestJS 12` и упрощена сборка `docker/api.Dockerfile` (удалены `/tmp/.prisma` и runtime `openssl`).
 
 ### Приоритет №2: Production SEO (`robots.ts` / `sitemap.ts`), Локализованные Error/404 и Zero-Friction `Docker Compose` Demo
 

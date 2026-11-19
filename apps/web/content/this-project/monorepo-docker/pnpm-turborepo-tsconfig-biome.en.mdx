@@ -26,7 +26,6 @@ packages:
 allowBuilds:
   "@biomejs/biome": true
   "@parcel/watcher": true
-  "@prisma/client": true
   "@prisma/engines": true
   "@swc/core": true
   esbuild: true
@@ -56,7 +55,7 @@ allowBuilds:
     "build": {
       "dependsOn": ["^build"],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
-      "outputs": [".next/**", "!.next/cache/**", "dist/**", "storybook-static/**"]
+      "outputs": [".next/**", "!.next/cache/**", "dist/**", "src/generated/**", "storybook-static/**"]
     },
     "build-storybook": {
       "dependsOn": ["^build"],

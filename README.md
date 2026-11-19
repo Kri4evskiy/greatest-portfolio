@@ -6,13 +6,13 @@
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-v4-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white)
 ![NestJS](https://img.shields.io/badge/NestJS-12_ESM-E0234E?style=flat-square&logo=nestjs&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-7.0-3178C6?style=flat-square&logo=typescript&logoColor=white)
-![Prisma](https://img.shields.io/badge/Prisma-6-2D3748?style=flat-square&logo=prisma&logoColor=white)
+![Prisma](https://img.shields.io/badge/Prisma-7-2D3748?style=flat-square&logo=prisma&logoColor=white)
 ![Turborepo](https://img.shields.io/badge/Turborepo-Monorepo-EF4444?style=flat-square&logo=turborepo&logoColor=white)
 ![pnpm](https://img.shields.io/badge/pnpm-12-F69220?style=flat-square&logo=pnpm&logoColor=white)
 ![Biome](https://img.shields.io/badge/Biome-2.6-60A5FA?style=flat-square&logo=biome&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-Multi--Stage-2496ED?style=flat-square&logo=docker&logoColor=white)
 
-Production-grade Full-Stack monorepo featuring a personal portfolio (styled in **Editorial Workfolio** aesthetics) and a protected interactive **Engineering Knowledge Base**, showcasing modern enterprise architecture (`Next.js 16`, `Tailwind CSS v4`, `NestJS 12 Native ESM`, `Prisma ORM`, `Microservices TCP + SSE`, `TanStack Query v5 + IndexedDB`, `D3.js`).
+Production-grade Full-Stack monorepo featuring a personal portfolio (styled in **Editorial Workfolio** aesthetics) and a protected interactive **Engineering Knowledge Base**, showcasing modern enterprise architecture (`Next.js 16`, `Tailwind CSS v4`, `NestJS 12 Native ESM`, `Prisma 7 ORM`, `Microservices TCP + SSE`, `TanStack Query v5 + IndexedDB`, `D3.js`).
 
 ---
 
@@ -148,7 +148,7 @@ The repository is engineered according to the **Zero-Friction Onboarding** princ
 9. **Content & Visualization:** `MDX` + `WebP` (`<ArticleImageGrid />`) + interactive `D3.js` graphs
 10. **Core Backend:** `NestJS 12` (Native ESM, modular DI architecture)
 11. **Security:** `JWT` in `HttpOnly Cookies` (`kb_access_token`) + `RBAC` (`GUEST` / `USER` / `ADMIN`)
-12. **Database & ORM:** `PostgreSQL` (`Neon.tech` / Docker Postgres) + `Prisma ORM`
+12. **Database & ORM:** `PostgreSQL` (`Neon.tech` / Docker Postgres) + `Prisma 7 ORM` (Rust-free Wasm + Native ESM + `@prisma/adapter-pg`)
 13. **Microservices & Real-Time:** `@nestjs/microservices` (`apps/telemetry-ms`, TCP `:4001`) + `Server-Sent Events (@Sse)`
 14. **Infrastructure:** `Docker` (Multi-stage builds with `turbo prune`) + `Docker Compose`
 15. **Observability:** `Sentry` (Error Tracking) + `PostHog` (Product Analytics)

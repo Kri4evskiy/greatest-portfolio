@@ -1,0 +1,281 @@
+---
+title: "Практичне тестування бекенду: Unit, Integration (Testcontainers), БД та Contract Testing"
+sidebarLabel: "Unit, Integration, БД та контракти"
+summary: "Інженерний посібник із тестування NestJS 12 ESM + Prisma 7 + PostgreSQL на Vitest: правильне використання Test Doubles, підняття реального PostgreSQL через Testcontainers, 4 стратегії ізоляції БД, Contract Testing (Zod/OpenAPI vs Pact) та тести конкурентності/SSE."
+category: "testing"
+format: "deep-dive"
+tags: ["testing", "vitest", "testcontainers", "nestjs", "prisma", "contract-testing", "postgresql"]
+readingTime: "16 хв"
+publishedAt: "2026-11-19"
+order: 2
+tldr:
+  - "Мокуйте лише зовнішні межі, якими ви не володієте (платіжні шлюзи, SMTP, сторонні API). Мок `prisma.articleMetrics.upsert` дає оманливу впевненість, приховуючи зламаний SQL та міграції."
+  - "`Vitest` нативно працює з TypeScript 7 (`tsgo`) та Native ESM без legacy-костилів `ts-jest`."
+  - "SQLite in-memory не замінює PostgreSQL: він не перевіряє `JSONB`, `UUID`, часткові індекси, блокування `SELECT FOR UPDATE` та обмеження `NULL`."
+  - "Для паралельних тестів БД обирайте між Rollback-транзакціями, `TRUNCATE CASCADE`, ізольованими схемами (`?schema=worker_1`) або шаблонною БД (`TEMPLATE`)."
+---
+
+## 1. Test Doubles без плутанини: Dummy, Stub, Spy, Mock та Fake
+
+У бекенд-тестах слово «мок» часто використовують для всього поспіль, через що тести перетворюються на крихку копію реалізації. Розділимо 5 видів **Test Doubles**:
+
+| Тип | Що робить | Коли застосовувати на бекенді | Приклад |
+| :--- | :--- | :--- | :--- |
+| **Dummy** | Порожній об'єкт-заглушка для задоволення сигнатури | Невикористаний аргумент на кшталт `req` чи `logger` | `{} as Request` у тесті чистого мапера |
+| **Stub** | Повертає наперед задану відповідь без перевірок викликів | Емуляція відповіді зовнішнього HTTP API або `Clock` | `stubClock = { now: () => fixedDate }` |
+| **Spy** | Обгортає реальний об'єкт і записує факти викликів | Перевірка виклику події телеметрії або метрики | `vi.spyOn(telemetry, 'publishEvent')` |
+| **Mock** | Підміняє реалізацію ТА перевіряє очікування (`toHaveBeenCalledWith`) | **Лише зовнішні межі:** Stripe, SendGrid, S3, Telegram Bot API | Мок `TelegramClient.sendMessage` |
+| **Fake** | Робоча полегшена реалізація контракту (In-Memory) | Сховище сесій/кешу або In-Memory fallback із повним контрактом | `InMemoryArticleStore` |
+
+> [!IMPORTANT]
+> **Золоте правило бекенду:** *«Mock only boundaries you do not own»*. Якщо ви мокуєте власний `PrismaService` у кожному тесті контролера — ваші тести перевіряють, що ви вмієте повторювати аргументи виклику, але **не** перевіряють, чи існує таблиця в міграції, чи працює `upsert` і чи не падає SQL.
+
+---
+
+## 2. Unit vs HTTP Integration у NestJS 12 ESM + TypeScript 7 (`Vitest`)
+
+З появою `TypeScript 7` (`tsgo`) традиційна зв'язка `Jest + ts-jest` впирається у застаріле JS Compiler API (`typescript <7`). У проєктах на **Native ESM + TS 7** стандартом стає **Vitest**: швидкий холодний старт, нативна підтримка ESM та `vi.useFakeTimers()`.
+
+### Коли достатньо чистого Unit-теста (без `Test.createTestingModule`)
+
+Чисті Unit-тести не підіймають DI-контейнер NestJS — вони виконуються за мілісекунди та ідеально перевіряють fail-fast конфігурацію й криптографію:
+
+```typescript title="apps/api/src/config/app.config.spec.ts"
+import { describe, expect, it } from 'vitest'
+import { loadAppConfig } from './app.config.js'
+
+describe('loadAppConfig (fail-fast security)', () => {
+  it('rejects dev default JWT_SECRET in production', () => {
+    expect(() =>
+      loadAppConfig({
+        NODE_ENV: 'production',
+        JWT_SECRET: 'workfolio-super-secret-jwt-key-2026',
+        ADMIN_SECRET_PASSCODE: 'strong-override-passcode-991',
+      }),
+    ).toThrow(/Security violation: JWT_SECRET/)
+  })
+
+  it('parses comma-separated WEB_ORIGIN into allowedOrigins in production', () => {
+    const cfg = loadAppConfig({
+      NODE_ENV: 'production',
+      JWT_SECRET: 'prod-secret-minimum-32-characters-long-key',
+      ADMIN_SECRET_PASSCODE: 'real-admin-passcode-2026',
+      WEB_ORIGIN: 'https://portfolio.dev, https://staging.portfolio.dev',
+    })
+
+    expect(cfg.allowedOrigins).toEqual(['https://portfolio.dev', 'https://staging.portfolio.dev'])
+  })
+})
+```
+
+### HTTP Component / Integration тест у NestJS (`Supertest` + `Test.createTestingModule`)
+
+Коли потрібно перевірити, що реально відпрацьовують `ZodValidationPipe`, `JwtRolesGuard`, `HttpOnly`-куки, `ThrottlerGuard` та `SentryExceptionFilter`, Unit-тест контролера марний — декоратори `@UseGuards` і `@Body(pipe)` при прямому виклику методу TS взагалі не виконуються:
+
+```typescript title="apps/api/src/modules/auth/auth.integration.spec.ts"
+import { INestApplication } from '@nestjs/common'
+import { Test } from '@nestjs/testing'
+import cookieParser from 'cookie-parser'
+import request from 'supertest'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { AppModule } from '../../app.module.js'
+import { SentryExceptionFilter } from '../../common/filters/sentry-exception.filter.js'
+
+describe('Auth & Knowledge HTTP Pipeline (Integration)', () => {
+  let app: INestApplication
+
+  beforeAll(async () => {
+    const moduleRef = await Test.createTestingModule({
+      imports: [AppModule],
+    }).compile()
+
+    app = moduleRef.createNestApplication()
+    app.setGlobalPrefix('api')
+    app.use(cookieParser())
+    app.useGlobalFilters(new SentryExceptionFilter())
+    await app.init()
+  })
+
+  afterAll(async () => {
+    await app.close()
+  })
+
+  it('rejects invalid GuestPass payload via ZodValidationPipe (400)', async () => {
+    await request(app.getHttpServer())
+      .post('/api/auth/guest-pass')
+      .send({ displayName: 'A', visitorType: 'INVALID_ROLE' })
+      .expect(400)
+  })
+
+  it('issues HttpOnly cookie and grants access to protected /api/knowledge/metrics', async () => {
+    const loginRes = await request(app.getHttpServer())
+      .post('/api/auth/guest-pass')
+      .send({ displayName: 'Team Lead', visitorType: 'TEAM_LEAD' })
+      .expect(200)
+
+    const cookies = loginRes.headers['set-cookie'] ?? []
+    expect(cookies.some((c) => c.includes('kb_access_token=') && c.includes('HttpOnly'))).toBe(true)
+
+    const metricsRes = await request(app.getHttpServer())
+      .get('/api/knowledge/metrics')
+      .set('Cookie', cookies)
+      .expect(200)
+
+    expect(Array.isArray(metricsRes.body)).toBe(true)
+  })
+})
+```
+
+> [!WARNING]
+> Зверніть увагу на `app.use(cookieParser())` та `app.setGlobalPrefix('api')` у тесті: у `NestJS` налаштування з `main.ts` **не** застосовуються автоматично в `Test.createTestingModule`. Виносьте спільну ініціалізацію middleware/filters у перевикористовувану функцію `configureApp(app)`, щоб тестовий застосунок на 100% збігався з продом.
+
+---
+
+## 3. Тестування БД правильно: PostgreSQL + Prisma 7 + Testcontainers
+
+### Чому SQLite in-memory для тестів PostgreSQL — небезпечна ілюзія
+
+| Фіча PostgreSQL | Поведінка в SQLite | Що зламається на проді при зелених тестах |
+| :--- | :--- | :--- |
+| **`JSONB` та оператори `@>`, `->`** | Зберігається як `TEXT`, немає індексних операторів | Запити падають або втрачають типізацію в проді |
+| **`SELECT ... FOR UPDATE SKIP LOCKED`** | Не підтримується | Гонки у воркерах черг на проді |
+| **Partial & Functional Indexes (`WHERE ...`)** | Обмежено / інша семантика планувальника | Приховані `Seq Scan` та деградація швидкодії |
+| **Типи `UUID`, `INET`, `TIMESTAMPTZ`** | Зводяться до `TEXT` / `NUMERIC` без таймзон | Помилки валідації довжини UUID або зсуви TZ |
+| **`TRUNCATE ... RESTART IDENTITY CASCADE`** | Не існує `TRUNCATE` | Неможливо тестувати реальні каскади |
+
+### Підняття реального PostgreSQL 16 через Testcontainers + Prisma 7
+
+У Prisma 7 клієнт працює через драйверний адаптер `@prisma/adapter-pg` та `pg.Pool`, а міграції застосовуються з `DATABASE_URL` із контейнера:
+
+```typescript title="apps/api/test/helpers/postgres-test-db.ts"
+import { execFileSync } from 'node:child_process'
+import { PrismaPg } from '@prisma/adapter-pg'
+import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql'
+import { Pool } from 'pg'
+import { PrismaClient } from '../../src/generated/prisma/client.js'
+
+export interface IsolatedPostgresContext {
+  container: StartedPostgreSqlContainer
+  pool: Pool
+  prisma: PrismaClient
+  connectionUrl: string
+  teardown: () => Promise<void>
+}
+
+export async function startPostgresTestDb(): Promise<IsolatedPostgresContext> {
+  const container = await new PostgreSqlContainer('postgres:16-alpine').start()
+  const connectionUrl = container.getConnectionUri()
+
+  execFileSync('pnpm', ['exec', 'prisma', 'migrate', 'deploy'], {
+    env: { ...process.env, DATABASE_URL: connectionUrl, DIRECT_URL: connectionUrl },
+    stdio: 'pipe',
+  })
+
+  const pool = new Pool({ connectionString: connectionUrl })
+  const adapter = new PrismaPg(pool)
+  const prisma = new PrismaClient({ adapter })
+  await prisma.$connect()
+
+  return {
+    container,
+    pool,
+    prisma,
+    connectionUrl,
+    teardown: async () => {
+      await prisma.$disconnect()
+      await pool.end()
+      await container.stop()
+    },
+  }
+}
+```
+
+### 4 стратегії ізоляції тестів у PostgreSQL
+
+Підіймати окремий Docker-контейнер на кожен тестовий файл надто повільно. Оптимально запускати **один контейнер на весь прогін** (у `globalSetup` Vitest) та ізолювати тести одним із 4 способів:
+
+| Стратегія | Як працює | Плюси | Мінуси та обмеження |
+| :--- | :--- | :--- | :--- |
+| **1. Transaction Rollback** | Кожен тест відкриває `BEGIN`, а в `afterEach` робить `ROLLBACK` | Максимальна швидкість (`< 5 ms` на тест) | Не працює, якщо тестований код сам відкриває незалежні транзакції або перевіряє поведінку після `COMMIT` |
+| **2. `TRUNCATE ... CASCADE`** | `beforeEach` очищає всі користувацькі таблиці крім `_prisma_migrations` | 100% чесні коміти, транзакції та обмеження FK | Потрібен **послідовний запуск у межах однієї БД** (`fileParallelism: false` або окремі схеми на воркер) |
+| **3. Schema per Worker** | Воркер `N` підключається до `?schema=worker_${N}` і проганяє міграції у свою схему | Справжній паралелізм Vitest без блокувань між файлами | Невеликий оверхед на створення схеми при старті воркера |
+| **4. Template DB (`TEMPLATE`)** | Одна БД мігрується один раз як шаблон, далі `CREATE DATABASE test_1 TEMPLATE base_db` | Швидке створення повністю ізольованої БД на файл | Заборонено, якщо до шаблонної БД у момент клонування відкриті активні з'єднання |
+
+```sql title="Очищення таблиць для стратегії TRUNCATE CASCADE"
+DO $$
+DECLARE
+  stmt text;
+BEGIN
+  SELECT 'TRUNCATE TABLE ' || string_agg(quote_ident(tablename), ', ') || ' RESTART IDENTITY CASCADE'
+  INTO stmt
+  FROM pg_tables
+  WHERE schemaname = 'public'
+    AND tablename <> '_prisma_migrations';
+
+  IF stmt IS NOT NULL THEN
+    EXECUTE stmt;
+  END IF;
+END $$;
+```
+
+---
+
+## 4. Contract Testing: Monorepo Zod / OpenAPI проти Pact
+
+Інтеграційні тести перевіряють роботу вашого API з його БД, але не гарантують, що зовнішній споживач розуміє ваш JSON.
+
+```text
+[ Consumer: apps/web або Mobile ]                 [ Provider: apps/api ]
+         │                                                   │
+         ├── Варіант A (Monorepo):                           │
+         │   Імпорт спільних схем @repo/shared-schemas + OpenAPI Diff
+         │   (ламається на етапі tsc / CI build!)            │
+         │                                                   │
+         └── Варіант B (Незалежні мікросервіси / команди):   │
+             1. Consumer запускає тест із Pact Mock Server   │
+             2. Генерує JSON-контракт (Pact File) ──► [ Pact Broker ]
+                                                             │
+             3. Provider у своєму CI завантажує Pact ◄───────┘
+                і проганяє на своєму реальному HTTP API (без запуску Consumer!)
+```
+
+### Що вважається Breaking Change в API-контракті
+
+- **Ламаюча зміна (Breaking):** видалення поля відповіді, перейменування поля, звуження типу/enum, додавання нового **обов'язкового** поля в `request body`, зміна HTTP-статусу успіху або формату помилки.
+- **Безпечна зміна (Non-breaking):** додавання нового *опціонального* поля у відповідь, додавання опціонального query-параметра, додавання нового ендпоінта.
+
+---
+
+## 5. Тестування асинхронності, SSE, часу та гонок (Concurrency)
+
+### 1. Детермінований час замість `setTimeout`
+Ніколи не тестуйте закінчення JWT-сесії чи TTL кешу через реальне очікування `await sleep(2000)`:
+- Використовуйте `vi.useFakeTimers()` + `vi.setSystemTime(...)` у Vitest або ін'єктуйте інтерфейс `Clock { now(): Date }`.
+
+### 2. Тестування SSE-стрімів (`@Sse()`)
+У NestJS SSE-метод повертає `Observable<MessageEvent>`. Його варто тестувати на двох рівнях:
+1. На рівні сервісу (`TelemetryService.getEventStream()`): підписатися через RxJS `take(2)` + `firstValueFrom` і перевірити, що події знеособлені (без приватних полів).
+2. На рівні HTTP-транспорту: упевнитися, що `Content-Type: text/event-stream` не буферизується, а `TimeoutInterceptor` пропускає `@SkipTimeout()` і не обриває потік через 15 секунд.
+
+### 3. Тестування гонок (`Promise.all` Race Condition Test)
+Атомарні операції у БД на кшталт `upsert` із `{ increment: 1 }` або `SELECT ... FOR UPDATE` потрібно перевіряти конкурентним тестом проти реального PostgreSQL:
+
+```typescript title="apps/api/test/concurrency-metrics.integration.spec.ts"
+import { describe, expect, it } from 'vitest'
+
+it('does not lose increments under 50 concurrent upsert requests', async () => {
+  const slug = 'concurrency-test-article'
+  const totalRequests = 50
+
+  await Promise.all(
+    Array.from({ length: totalRequests }, () =>
+      prismaService.incrementArticleView(slug, 'testing'),
+    ),
+  )
+
+  const row = await prisma.articleMetrics.findUniqueOrThrow({ where: { slug } })
+  expect(row.viewsCount).toBe(totalRequests)
+})
+```
+
+Якщо в реалізації замість атомарного `{ increment: 1 }` хтось напише класичний баг `read -> compute (views + 1) -> update`, цей тест стабільно впаде (замість `50` у базі опиниться `12`–`30`), миттєво виявивши race condition ще до релізу.

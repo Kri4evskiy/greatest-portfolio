@@ -1,6 +1,6 @@
 # ⚙️ `@repo/api` — Основной бэкенд (NestJS 12 ESM)
 
-Основное HTTP/SSE API портфолио и инженерной базы знаний. Приложение построено на **NestJS 12 (Native ESM)**, **Prisma ORM (PostgreSQL + In-Memory fallback)**, **Zod v4 (`@repo/shared-schemas`)** и **TCP-клиенте к микросервису телеметрии (`apps/telemetry-ms`)**.
+Основное HTTP/SSE API портфолио и инженерной базы знаний. Приложение построено на **NestJS 12 (Native ESM)**, **Prisma 7 ORM (`@prisma/adapter-pg` + PostgreSQL + In-Memory fallback)**, **Zod v4 (`@repo/shared-schemas`)** и **TCP-клиенте к микросервису телеметрии (`apps/telemetry-ms`)**.
 
 ---
 
@@ -25,16 +25,18 @@ apps/api/src/
 │
 ├── config/                     # Типизированная Fail-Fast конфигурация (Zod)
 │   ├── app.config.ts           # PORT, WEB_ORIGIN, JWT_SECRET, ADMIN_SECRET_PASSCODE, TELEMETRY_MS_*, SENTRY_DSN
-│   └── database.config.ts      # DATABASE_URL, DIRECT_URL
+│   └── database.config.ts      # DATABASE_URL, DIRECT_URL, парсер ?schema=
+│
+├── generated/prisma/           # Автогенерируемый ESM-клиент Prisma 7 (игнорируется Git и Biome)
 │
 ├── migrations/                 # Слой управления сидированием БД
 │   └── scripts/
 │       ├── seed-data.ts        # Единый источник INITIAL_ARTICLE_SEEDS (для seed.ts и In-Memory fallback)
-│       └── seed.ts             # Идемпотентный CLI-скрипт (upsert в ArticleMetrics)
+│       └── seed.ts             # Идемпотентный CLI-скрипт (Pool + PrismaPg, upsert в ArticleMetrics)
 │
 ├── prisma/                     # Доступ к данным (@Global() PrismaModule)
 │   ├── prisma.module.ts
-│   └── prisma.service.ts       # PrismaClient + автоматический In-Memory fallback без DATABASE_URL
+│   └── prisma.service.ts       # Композиция PrismaClient + @prisma/adapter-pg + In-Memory fallback без DATABASE_URL
 │
 └── modules/                    # Изолированные доменные модули (Domain Modules)
     ├── auth/                   # JWT в HttpOnly Cookies, Guest Pass, RBAC
@@ -118,9 +120,9 @@ apps/api/src/
 
 ## 4. База данных, In-Memory Fallback и Сидирование
 
-- **PostgreSQL + Prisma (`src/prisma/prisma.service.ts`):** модели `VisitorSession`, `ArticleMetrics`, `SystemEventLog`.
-- **Resilient In-Memory Fallback:** если `DATABASE_URL` не задан или PostgreSQL недоступна при старте, `PrismaService` автоматически переключается на встроенное хранилище в памяти (`Map`), используя те же начальные данные `INITIAL_ARTICLE_SEEDS`. Это позволяет поднимать 100% функционала API локально без внешней БД.
-- **Сидирование реальной БД (`src/migrations/scripts/seed.ts`):** standalone CLI-скрипт, который при старте сервера **не** запускается, а вызывается вручную или на этапе деплоя для идемпотентного `upsert` начальных записей `ArticleMetrics`.
+- **PostgreSQL + Prisma 7 (`prisma.config.ts` + `src/prisma/prisma.service.ts`):** генератор `prisma-client` (Rust-free Wasm, Native ESM в `src/generated/prisma/`), драйверный адаптер `@prisma/adapter-pg` + `pg.Pool`, модели `VisitorSession`, `ArticleMetrics`, `SystemEventLog`. Конфиг `prisma.config.ts` использует `DIRECT_URL` (или `DATABASE_URL` с безопасным placeholder для автономного `prisma generate`).
+- **Resilient In-Memory Fallback:** если `DATABASE_URL` не задан или проверка `SELECT 1` при старте в `onModuleInit` обнаруживает недоступность PostgreSQL, `PrismaService` корректно закрывает пул и автоматически переключается на встроенное хранилище в памяти (`Map`), используя те же начальные данные `INITIAL_ARTICLE_SEEDS`. Это позволяет поднимать 100% функционала API локально без внешней БД.
+- **Сидирование реальной БД (`src/migrations/scripts/seed.ts`):** standalone CLI-скрипт (через `pnpm --filter @repo/api prisma:seed` или `prisma db seed`), который при старте сервера **не** запускается, а вызывается вручную или на этапе деплоя для идемпотентного `upsert` начальных записей `ArticleMetrics`.
 
 ---
 

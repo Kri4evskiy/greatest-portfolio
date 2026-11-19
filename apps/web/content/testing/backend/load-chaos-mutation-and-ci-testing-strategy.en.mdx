@@ -1,0 +1,196 @@
+---
+title: "Load, Chaos, Mutation, Property-Based Testing & CI Strategy for Backends"
+sidebarLabel: "Load, Chaos, Mutation & CI"
+summary: "Advanced backend reliability verification: k6 performance profiles (Load/Stress/Spike/Soak & Coordinated Omission), fast-check property invariants and OpenAPI fuzzing, Stryker mutation testing, Toxiproxy fault injection, and eliminating flaky CI tests."
+category: "testing"
+format: "deep-dive"
+tags: ["testing", "load-testing", "k6", "chaos-engineering", "mutation-testing", "property-based", "ci-cd"]
+readingTime: "16 min"
+publishedAt: "2026-11-19"
+order: 3
+tldr:
+  - "Mean latency lies in load tests: track `p95` / `p99` / `p99.9` and use open-model executors (`constant-arrival-rate` in `k6`) to avoid Coordinated Omission."
+  - "100% Line Coverage can still miss off-by-one bugs (`>` vs `>=`). Selective Mutation Testing (`Stryker`) on critical modules exposes weak assertions."
+  - "`fast-check` verifies invariants across hundreds of generated edge inputs and automatically shrinks failures to the minimal counterexample."
+  - "A multi-stage CI pipeline separates fast PR gates (<2 min), Testcontainers + Build + Smoke (2–5 min), and nightly heavy runs (Soak, Stryker, Fuzzing)."
+---
+
+## 1. Performance & Load Testing (`k6`): 4 Profiles and Coordinated Omission
+
+Production systems rarely collapse because of one isolated function — they collapse when **connection pools, queues, garbage collectors, or database locks saturate**. Four distinct performance profiles expose different failure modes:
+
+```text
+Load (Steady SLA)          Stress (Breaking Point)      Spike (Sudden Surge)         Soak (Leaks & GC)
+RPS                        RPS                          RPS         /\               RPS
+ │   ________________       │          /                 │         /  \               │  ________________
+ │  /                \      │        /   (OOM / 503)     │   _____/    \____          │ /   4–24 hours   \
+ │ /                  \     │      /                     │  /                \        │/                  \
+ └────────────────────► t   └────────────────────► t     └────────────────────► t     └────────────────────► t
+```
+
+| Profile | Objective | Duration | Typical Bugs Uncovered |
+| :--- | :--- | :---: | :--- |
+| **Load** | Verify SLA at target production RPS | 10–30 min | Missing indexes, `p95`/`p99` latency regressions |
+| **Stress** | Find ceiling & failure behavior | 15–30 min | CPU/RAM limits, `pg.Pool` saturation, cascading `504` |
+| **Spike** | Survive instant `10–20×` traffic surge | 3–10 min | Autoscaler lag, thundering herd on DB connections |
+| **Soak / Endurance** | Verify long-running stability | 4–24 hrs | Slow memory leaks (SSE `Subject` listeners), FD leaks, `autovacuum` lag |
+
+### Why Averages Lie & How Coordinated Omission Skews Benchmarks
+
+1. **Averages hide tail latency (`p99`):** if 99 requests finish in `10 ms` and 1 stalls for `10,000 ms`, the mean looks tolerable (`~110 ms`), yet across a screen making 10 parallel backend calls the chance of hitting at least one `p99` stall jumps to $1 - 0.99^{10} \approx 9.6\%$.
+2. **Coordinated Omission (Closed vs Open Load Models):** in naive fixed-VU loops (`fetch() -> wait()`), whenever your API slows down, each VU naturally sends fewer requests — masking overload! Always use **open-model** executors (`constant-arrival-rate` / `ramping-arrival-rate`) in `k6` so target RPS stays constant regardless of backend slowdown:
+
+```javascript title="tests/load/knowledge-sla.k6.js"
+import { check } from 'k6'
+import http from 'k6/http'
+
+export const options = {
+  scenarios: {
+    steady_api_traffic: {
+      executor: 'constant-arrival-rate',
+      rate: 120,
+      timeUnit: '1s',
+      duration: '5m',
+      preAllocatedVUs: 40,
+      maxVUs: 200,
+    },
+  },
+  thresholds: {
+    http_req_failed: ['rate<0.005'],
+    http_req_duration: ['p(95)<120', 'p(99)<300'],
+  },
+}
+
+export default function () {
+  const health = http.get('http://127.0.0.1:4000/api/health')
+  check(health, { 'health is 200': (r) => r.status === 200 })
+
+  const login = http.post(
+    'http://127.0.0.1:4000/api/auth/guest-pass',
+    JSON.stringify({ displayName: 'Load Bot', visitorType: 'DEVELOPER' }),
+    { headers: { 'Content-Type': 'application/json' } },
+  )
+  check(login, { 'guest-pass issued': (r) => r.status === 200 })
+
+  const metrics = http.get('http://127.0.0.1:4000/api/knowledge/metrics')
+  check(metrics, { 'metrics loaded': (r) => r.status === 200 })
+}
+```
+
+---
+
+## 2. Property-Based Testing (`fast-check`) & API Fuzzing
+
+### Property-Based Testing: Invariants Over Handpicked Examples
+
+Traditional unit tests verify fixed examples (`"hello"` -> ok, `""` -> error). Property-based tests declare **invariants** that must hold across *all* generated inputs:
+- **Idempotency:** `f(f(x)) === f(x)` (normalizers, deduplicators).
+- **Round-trip:** `decode(encode(x))` reconstructs `x`.
+- **Safety / Sanitization:** arbitrary junk never triggers an unhandled exception or bypasses redirect allowlists (`javascript:`, `//evil.com`).
+
+```typescript title="apps/web/src/entities/knowledge-content/lib/link-sanitizer.property.spec.ts"
+import fc from 'fast-check'
+import { describe, expect, it } from 'vitest'
+
+function sanitizeInternalRedirect(rawInput: string): string {
+  const trimmed = rawInput.trim()
+  if (!trimmed.startsWith('/') || trimmed.startsWith('//') || trimmed.includes('\\')) {
+    return '/'
+  }
+  return trimmed
+}
+
+describe('sanitizeInternalRedirect (Property-Based)', () => {
+  it('always returns a safe single-slash local path without protocol-relative bypasses', () => {
+    fc.assert(
+      fc.property(fc.string(), (arbitraryInput) => {
+        const result = sanitizeInternalRedirect(arbitraryInput)
+        expect(result.startsWith('/')).toBe(true)
+        expect(result.startsWith('//')).toBe(false)
+        expect(result.includes('\\')).toBe(false)
+      }),
+      { numRuns: 1000 },
+    )
+  })
+})
+```
+
+When a counterexample fails, `fast-check` automatically **shrinks** an 80-character random string down to the smallest failing input (e.g., `"//a"`).
+
+### API Fuzzing (`Schemathesis`)
+
+Given an OpenAPI specification, a fuzzer automatically generates thousands of boundary and malformed HTTP payloads (negative integers, arrays instead of strings, deep Unicode, missing fields) to verify two invariants:
+1. Your API **never crashes with `500 Internal Server Error`** (returning proper `400`/`422`).
+2. Every response matches the declared OpenAPI response schema.
+
+---
+
+## 3. Mutation Testing (`Stryker`): Why 100% Line Coverage Lies
+
+Consider this helper and its test suite, which achieves **100% line and branch coverage**:
+
+```typescript
+export function isEligibleForDiscount(totalCents: number): boolean {
+  return totalCents >= 10000
+}
+
+// Weak test: 100% line & branch coverage, yet blind to the boundary!
+it('checks discount eligibility', () => {
+  expect(isEligibleForDiscount(20000)).toBe(true)
+  expect(isEligibleForDiscount(500)).toBe(false)
+})
+```
+
+If an engineer accidentally changes `>=` to `>`, both assertions still pass while every `$100.00` order loses its discount.
+
+**StrykerJS** mutates your source (`>=` ➔ `>`, `>=` ➔ `<`, `return true`) and re-runs tests. The surviving mutant exposes the missing boundary assertion `expect(isEligibleForDiscount(10000)).toBe(true)`.
+
+> [!TIP]
+> Do not run `Stryker` across an entire monorepo on every PR — it is CPU-intensive. Scope it to **high-value domain modules** (billing, RBAC/auth, crypto checks, parsers, sanitizers) on a nightly or targeted pipeline.
+
+---
+
+## 4. Chaos Engineering & Fault Injection
+
+Infrastructure failures are guaranteed over time. Place **Toxiproxy** between `apps/api` and `PostgreSQL` / `Redis` / `telemetry-ms` to inject deterministic network faults:
+
+```text
+[ apps/api ] ──► [ Toxiproxy (:25432) ] ──(latency 3000ms / timeout / reset_peer)──► [ PostgreSQL ]
+```
+
+What fault injection validates:
+1. **Bounded timeouts:** `TimeoutInterceptor` (`15s`) and driver timeouts (`connectionTimeoutMillis`, `statement_timeout`) fail cleanly instead of hanging Node workers indefinitely.
+2. **No Retry Storms:** upstream clients enforce bounded retries with **Exponential Backoff + Jitter**.
+3. **Graceful Degradation:** when TCP drops mid-flight, `PrismaService` tears down the pool cleanly, absorbs `pool.on('error')` safely, and falls back without crashing the process.
+
+---
+
+## 5. Multi-Stage CI Testing Pipeline & Eliminating Flaky Tests
+
+```text
+[1. Pre-commit (< 5s)]     Biome check + tsc (affected)
+          │
+          ▼
+[2. PR Fast Gate (< 2m)]   Lint + Typecheck + Unit + Slice + Property-Based + Contract
+          │
+          ▼
+[3. PR Merge Gate (2–5m)]  Integration (Testcontainers Postgres) + Full Build + ESM Smoke Test
+          │
+          ▼
+[4. Post-Deploy Staging]   Smoke Test + Playwright E2E + Synthetic Probes
+          │
+          ▼
+[5. Nightly Schedule]      k6 Soak/Load + Stryker Mutation (core) + API Fuzzing + Audit
+```
+
+### Top 7 Causes of Flaky Tests and Their Exact Fixes
+
+| Flakiness Root Cause | Symptom | Deterministic Fix |
+| :--- | :--- | :--- |
+| **1. Shared mutable DB state** | Random failures when tests run in parallel | Per-worker schema or transaction/truncate isolation |
+| **2. Wall-clock time & timezones (`new Date()`)** | Fails at UTC midnight or month boundaries | `vi.useFakeTimers()`, injected `Clock`, force `TZ=UTC` |
+| **3. Hardcoded `sleep(500)` instead of polling** | Loaded CI runners take `650 ms` | Poll explicitly with bounded `expect.poll` / `waitFor` |
+| **4. Queries omitting `ORDER BY`** | Postgres returns rows in arbitrary order | Explicit deterministic `ORDER BY created_at ASC, id ASC` |
+| **5. Static port collisions** | Parallel suites throw `EADDRINUSE :4000` | Ephemeral port `0` or per-worker unique port |
+| **6. Live external APIs (Slack, Stripe)** | Network blips or rate limits fail CI | Local HTTP stub (`msw` / `nock` / WireMock) |
+| **7. Mutated singletons & `process.env`** | Earlier test leaks `NODE_ENV` | Pass explicit `env` objects (`loadAppConfig(env)`) & restore in `afterEach` |

@@ -1,7 +1,7 @@
 ---
 title: "Multi-Stage Docker в монорепозитории: BuildKit Cache Mounts, pnpm prune и Prisma"
 sidebarLabel: "Multi-Stage Docker и BuildKit"
-summary: "Архитектура контейнеризации Full-Stack монорепозитория: 3-стадийная сборка Next.js standalone и NestJS, общий кэш пакетов BuildKit, очистка devDependencies с сохранением Prisma Client и запуск под UID 1001."
+summary: "Архитектура контейнеризации Full-Stack монорепозитория: 3-стадийная сборка Next.js standalone и NestJS, общий кэш пакетов BuildKit, очистка devDependencies с Rust-free Prisma 7 Wasm и запуск от непривилегированного пользователя."
 category: "this-project"
 format: "deep-dive"
 tags: ["docker", "buildkit", "pnpm-12", "prisma", "devops"]
@@ -11,7 +11,7 @@ order: 2
 tldr:
   - "Сборка каждого сервиса (`web`, `api`, `telemetry-ms`) разделена на 3 изолированные стадии `pruner -> builder -> runner` на базе `node:22-alpine`."
   - "`turbo prune @repo/<app> --docker` отсекает лишние пакеты, а `--mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store` разделяет кэш пакетов между всеми контейнерами."
-  - "Команда `pnpm prune --prod --ignore-scripts` удаляет dev-инструменты (TypeScript, Biome, Turbo, Prisma CLI), сохраняя сгенерированный рантайм `.prisma/client` через буфер `/tmp`."
+  - "Команда `pnpm prune --prod --ignore-scripts` удаляет dev-инструменты (TypeScript, Biome, Turbo, Prisma CLI) без `/tmp`-костылей: Prisma 7 компилирует ESM-клиент в `dist/generated/prisma/`, а Rust-free Wasm-рантайм остаётся в `@prisma/client`."
 ---
 
 ## 1. Трёхстадийный конвейер сборки (`pruner -> builder -> runner`)
@@ -53,19 +53,20 @@ RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
 
 ---
 
-## 3. Очистка `devDependencies` и сохранение `.prisma/client`
+## 3. Очистка `devDependencies` и Rust-free Prisma 7
 
-В стадии `builder` команда `pnpm turbo run build --filter=@repo/api...` сначала генерирует Prisma-клиент и компилирует TypeScript. Перед вызовом `pnpm prune --prod --ignore-scripts` сгенерированные артефакты `.prisma` и `@prisma/client` временно сохраняются в `/tmp` и возвращаются обратно после очистки, чтобы бинарный движок Prisma точно остался в финальном образе:
+В стадии `builder` команда `pnpm turbo run build --filter=@repo/api...` генерирует ESM-клиент Prisma 7 (`prisma-client`) в `apps/api/src/generated/prisma/` и компилирует его через `tsc` прямо в `apps/api/dist/generated/prisma/`. Поскольку Prisma 7 заменила нативный Rust-движок в `.prisma/client` на Wasm-компилятор запросов внутри production-пакета `@prisma/client` (в паре с `@prisma/adapter-pg` и `pg`), очистка `pnpm prune --prod --ignore-scripts` выполняется без временного буфера `/tmp`, а стадии `runner` больше не нужен `openssl`:
 
 ```dockerfile title="docker/api.Dockerfile"
 RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
     pnpm turbo run build --filter=@repo/api... && \
-    cp -R /app/node_modules/.pnpm/@prisma+client*/node_modules/.prisma /tmp/.prisma && \
-    cp -R /app/node_modules/.pnpm/@prisma+client*/node_modules/@prisma/client /tmp/prisma-client && \
-    pnpm prune --prod --ignore-scripts && \
-    cp -R /tmp/.prisma /app/node_modules/.pnpm/@prisma+client*/node_modules/ && \
-    cp -R /tmp/prisma-client/* /app/node_modules/.pnpm/@prisma+client*/node_modules/@prisma/client/ && \
-    rm -rf /tmp/.prisma /tmp/prisma-client
+    pnpm prune --prod --ignore-scripts
+
+# Stage 3: Production non-root runner
+FROM node:22-alpine AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+ENV PORT=4000
 ```
 
 ### Характеристики финальных продакшен-образов

@@ -30,7 +30,7 @@ This repository implements a multi-tier, zero-trust security architecture design
 ### 5. Contract Validation & Input Sanitization
 
 - **Runtime Validation:** All API inputs and cross-service telemetry payloads are strictly validated against **Zod v4 schemas** ([`@repo/shared-schemas`](./packages/shared-schemas/src/)). Invalid payloads are rejected before business logic execution.
-- **Database Safety:** All PostgreSQL interactions are mediated through **Prisma ORM**, eliminating SQL injection vectors through parameterized queries.
+- **Database Safety:** All PostgreSQL interactions are mediated through **Prisma 7 ORM** (`@prisma/adapter-pg` + `pg` parameterized queries), eliminating SQL injection vectors while running Rust-free in Native ESM without external native query engine binaries.
 
 ### 6. Supply Chain & Build Security
 
@@ -47,7 +47,7 @@ Only the latest `main` branch is actively supported with security patches:
 | Component                 | Version / Target                 | Supported |
 | :------------------------ | :------------------------------- | :-------- |
 | `apps/web`                | Next.js 16 (React 19)            | ✅ Yes    |
-| `apps/api`                | NestJS 12                        | ✅ Yes    |
+| `apps/api`                | NestJS 12, Prisma 7 (`7.10.1`)   | ✅ Yes    |
 | `apps/telemetry-ms`       | NestJS Microservices (TCP)       | ✅ Yes    |
 | `packages/shared-schemas` | Zod v4 (`^4.6.7`)                | ✅ Yes    |
 | Toolchain                 | TypeScript 7 (`^7.0.2`), pnpm 12 | ✅ Yes    |

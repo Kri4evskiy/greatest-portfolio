@@ -1,0 +1,215 @@
+---
+title: "Database Indexing Deep Dive: Automatic Indexes Across Engines, Must-Index Rules, and Why Indexing Every Column Fails"
+sidebarLabel: "Database Indexing Deep Dive"
+summary: "Comprehensive cross-DBMS guide for PostgreSQL, MySQL (InnoDB), SQL Server, Oracle, SQLite, and MongoDB: B-Tree/GIN/BRIN internals, automatic index matrix (including the Foreign Key trap), ESR & Partial/Covering design rules, and the 7 failure modes of over-indexing."
+category: "databases-sql"
+format: "deep-dive"
+tags: ["databases", "postgresql", "indexing", "sql", "performance", "mysql", "mongodb", "prisma"]
+readingTime: "16 min"
+publishedAt: "2026-11-19"
+order: 1
+tldr:
+  - "`PRIMARY KEY` and `UNIQUE` constraints are indexed automatically across SQL engines (MongoDB indexes `_id` only). **Foreign Keys are NOT auto-indexed** in PostgreSQL, SQL Server, Oracle, or SQLite — only MySQL (InnoDB) creates them automatically."
+  - "Always index Foreign Keys (`JOIN` and `ON DELETE CASCADE`), high-selectivity `WHERE` predicates, keyset pagination sort columns, and frequent composite filters using **ESR (Equality -> Sort -> Range)**."
+  - "Indexing every column cripples databases: 5–15× slower writes, disabled PostgreSQL **HOT updates**, WAL/replication bloat, RAM buffer pool eviction, and `AUTOVACUUM` bottlenecks."
+  - "Prefer composite, partial (`WHERE deleted_at IS NULL`), and covering (`INCLUDE`) indexes over dozens of single-column indexes, and audit dead indexes via `pg_stat_user_indexes`."
+---
+
+## 1. How Indexes Work Under the Hood
+
+Without an index, a database performs a **`Seq Scan` (Full Table Scan)** reading every page on disk or in memory in $O(N)$ time. On a 20-million-row table, looking up one user scans gigabytes of pages.
+
+An **index** is a separate ordered structure (most commonly a balanced **B-Tree**) storing sorted key values alongside row pointers (`ctid` in PostgreSQL / clustered PK in InnoDB), reducing lookups to $O(\log N)$:
+
+```text
+                       [ B-Tree Root Page: A..Z ]
+                        /                      \
+       [ Branch: A..M ]                          [ Branch: N..Z ]
+        /            \                            /            \
+[ Leaf: A..F ]  [ Leaf: G..M ]  ◄── linked ──► [ Leaf: N..S ]  [ Leaf: T..Z ]
+   │  (ctid)       │                              │
+   └───────────────┼──────────────────────────────┘
+                   ▼
+         [ Heap / Table Pages on Disk ]
+```
+
+### Core PostgreSQL Access Paths
+
+- **`Index Scan`:** traverses the B-Tree and jumps into the main table (Heap) to fetch remaining columns.
+- **`Index Only Scan`:** best-case scenario — every requested column lives inside the index key or `INCLUDE(...)` payload, skipping Heap fetches completely (when the Visibility Map is kept clean by `VACUUM`).
+- **`Bitmap Index Scan`:** collects scattered row IDs (or combines multiple indexes with `AND`/`OR`) into a page bitmap, then reads matching table pages sequentially to avoid random disk seeks.
+- **`Seq Scan`:** faster than any index on tiny tables (a few hundred rows) or queries returning > 15–20% of the table.
+
+### Choosing the Right Index Type
+
+| Index Type | Optimal Query Patterns | Typical PostgreSQL Example |
+| :--- | :--- | :--- |
+| **B-Tree** *(default)* | `=`, `<`, `<=`, `>`, `>=`, `BETWEEN`, `IN`, `IS NULL`, `ORDER BY`, prefix `LIKE 'abc%'` | ~90% of indexes (`email`, `created_at`, Foreign Keys) |
+| **Hash** | Strict equality `=` only (compact for long URLs/hashes, cannot sort) | `CREATE INDEX ... USING hash (url)` |
+| **GIN** *(Generalized Inverted)* | Searching *inside* composite values: `JSONB` (`@>`), arrays (`&&`), full-text (`tsvector`) | `USING gin (payload jsonb_path_ops)` |
+| **GiST** | Geospatial (PostGIS), ranges (`daterange`, `tsrange`), `EXCLUDE` constraints, fuzzy `pg_trgm` | Non-overlapping booking time slots |
+| **BRIN** *(Block Range)* | Massive append-only tables (100M+ logs/events) physically ordered by insert timestamp | `USING brin (created_at)` — **1000×** smaller than B-Tree |
+
+---
+
+## 2. What Is Indexed AUTOMATICALLY Across Database Engines
+
+One of the costliest migration traps (for instance moving from MySQL to PostgreSQL with Prisma) is assuming every DBMS auto-indexes Foreign Keys. They do **not**:
+
+| DBMS / Engine | `PRIMARY KEY` | `UNIQUE` | `FOREIGN KEY` | Engine Specifics |
+| :--- | :---: | :---: | :---: | :--- |
+| **PostgreSQL** | ✅ B-Tree | ✅ B-Tree | ❌ **NO** | `EXCLUDE` creates an index (usually GiST) automatically |
+| **MySQL (InnoDB)** | ✅ Clustered B-Tree *(table rows live inside the PK tree)* | ✅ Secondary B-Tree | ✅ **YES** *(auto-creates secondary index unless a matching prefix exists)* | Generates hidden 6-byte `ROW_ID` when no PK is defined |
+| **Microsoft SQL Server** | ✅ Clustered *(by default)* | ✅ Nonclustered *(by default)* | ❌ **NO** | Clustered vs Nonclustered can be overridden explicitly |
+| **Oracle Database** | ✅ *(unless compatible index exists)* | ✅ *(unless compatible index exists)* | ❌ **NO** | **Critical:** unindexed FKs cause child-table `TM` locks during parent PK updates/deletes |
+| **SQLite** | ✅ `INTEGER PRIMARY KEY` aliases `rowid`; others create `sqlite_autoindex_*` | ✅ `sqlite_autoindex_*` | ❌ **NO** | `WITHOUT ROWID` tables store data as a clustered PK B-Tree |
+| **MongoDB (WiredTiger)** | ✅ `_id` *(mandatory unique)* | ⚠️ Only when explicitly created (`{ unique: true }`) | ❌ **NO** *(reference fields like `userId` are unindexed)* | Any unindexed query triggers a full `COLLSCAN` |
+
+> [!CAUTION]
+> **Classic Prisma + PostgreSQL Trap:**
+> Declaring `@relation(fields: [authorId], references: [id])` in `schema.prisma` does **NOT** create an index on `authorId` in PostgreSQL. With 1,000 rows everything feels instant; at 500,000 rows every `JOIN` and parent `onDelete: Cascade` triggers a full table scan. Always add `@@index([authorId])` explicitly.
+
+```prisma title="Explicit Foreign Key Indexing in Prisma (PostgreSQL)"
+model ArticleComment {
+  id        String   @id @default(uuid())
+  authorId  String
+  createdAt DateTime @default(now())
+
+  author VisitorSession @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([authorId])
+  @@index([authorId, createdAt])
+}
+```
+
+---
+
+## 3. What You MUST Index (and Composite Index Design Rules)
+
+### Must-Index Checklist
+
+1. **All Foreign Keys** in PostgreSQL, SQL Server, Oracle, SQLite (and reference IDs in MongoDB) to accelerate `JOIN`s and prevent lock/scan storms on parent deletion.
+2. **High-selectivity filter predicates (`WHERE`):** `email`, `slug`, `token_hash`, `external_id`, `tenant_id`.
+3. **Sorting & Keyset Pagination (`ORDER BY ... LIMIT`):** e.g., `(tenant_id, created_at DESC, id DESC)` so the engine reads the top N entries straight off the B-Tree without an in-memory `Sort`.
+4. **High-frequency `JOIN`, `GROUP BY`, and `DISTINCT` columns** on large tables.
+
+### Leftmost Prefix & the ESR Rule (`Equality -> Sort -> Range`)
+
+Column order in a composite index `(a, b, c)` determines everything. Think of a phone book sorted by `(LastName, FirstName)`:
+
+- Serves: `WHERE a = 1`, `WHERE a = 1 AND b = 2`, `WHERE a = 1 AND b = 2 AND c > 10`.
+- **Does NOT serve efficiently:** `WHERE b = 2` or `WHERE c > 10` without filtering on `a`.
+- **Redundant prefix:** if `(a, b)` exists, a standalone index on `(a)` is usually dead weight — `(a, b)` already accelerates `WHERE a = 1`.
+
+When combining equality filters, sorting, and range predicates, order columns strictly as **ESR**:
+1. **E (Equality):** exact match columns (`status = 'OPEN'`).
+2. **S (Sort):** `ORDER BY` columns (`created_at DESC`).
+3. **R (Range):** inequality/range columns (`amount > 100`, `created_at >= ...`).
+
+```sql title="Applying ESR to Filter + Sort"
+-- Query:
+SELECT id, title, created_at
+FROM system_event_log
+WHERE event_type = 'ARTICLE_VIEWED'
+ORDER BY created_at DESC
+LIMIT 50;
+
+-- Optimal index (Equality: event_type, Sort: created_at):
+CREATE INDEX idx_event_log_type_created
+  ON system_event_log (event_type, created_at DESC);
+```
+
+### Partial, Covering (`INCLUDE`), and Expression Indexes
+
+1. **Partial (Filtered) Indexes — 10–100× Smaller:**
+   When 99.5% of 10M orders are `COMPLETED` and workers only poll `status = 'PENDING'` (or active records `WHERE deleted_at IS NULL`):
+   ```sql
+   CREATE INDEX idx_orders_pending_created
+     ON orders (created_at)
+     WHERE status = 'PENDING';
+   ```
+   Fits effortlessly in RAM and adds zero overhead to completed rows.
+
+2. **Covering Indexes (`INCLUDE`):**
+   Unlocks `Index Only Scan` without bloating the B-Tree sort key:
+   ```sql
+   CREATE INDEX idx_articles_category_include
+     ON article_metrics (category)
+     INCLUDE (slug, views_count);
+   ```
+
+3. **Expression / Functional Indexes:**
+   Wrapping a column in `LOWER(email)` disables a standard index on `email`. Either normalize before write or index the exact expression:
+   ```sql
+   CREATE UNIQUE INDEX idx_users_lower_email ON users (LOWER(email));
+   ```
+
+### What NOT to Index
+
+- **Tiny tables** (< 500 rows) where a single-page `Seq Scan` beats tree traversal.
+- **Standalone low-selectivity columns** (50/50 booleans or 3-value enums) — use a **Partial Index** instead if you query a rare 0.1% flag.
+- **Wide, unqueried text blobs** (`raw_html`, `stack_trace`).
+
+---
+
+## 4. What Happens If You Index EVERY Column? (7 Failure Modes)
+
+Adding an index on every column "just in case" systematically degrades OLTP databases:
+
+### 1. Severe Write Amplification (5–15× Slower Writes)
+Every `INSERT` and `DELETE` must update the heap **plus every single index B-Tree** (root-to-leaf lookup, page edits, B-Tree page splits, and page latch contention). Fifteen indexes turn one row insert into 16 structure mutations.
+
+### 2. Killing PostgreSQL HOT (Heap-Only Tuples) Updates
+PostgreSQL's **HOT update** optimization lets `UPDATE users SET last_seen_at = NOW()` skip *all* index updates if `last_seen_at` is unindexed and free space exists on the 8 KB heap page. Indexing every column permanently disables HOT updates for **every** `UPDATE`.
+
+### 3. WAL Bloat, Replication Lag & IOPS Saturation
+Each modified index page emits Write-Ahead Log records (including `full_page_writes` after checkpoints), multiplying WAL volume, inflating cloud IOPS bills, delaying read replicas, and slowing point-in-time recovery.
+
+### 4. RAM Buffer Pool Eviction (Cache Thrashing)
+Fifteen indexes commonly outweigh the table itself by **3–5×** (10 GB table ➔ 40 GB indexes). Maintaining those indexes drags cold index pages into `shared_buffers` / InnoDB Buffer Pool, evicting hot table rows and spiking disk reads.
+
+### 5. `AUTOVACUUM` Bottlenecks & Index Bloat
+Under MVCC, PostgreSQL `autovacuum` must scan **every index** on a table to prune dead tuple pointers left by `UPDATE`/`DELETE`. Heavy indexing causes autovacuum to fall behind write velocity, driving severe index bloat and risking wraparound pressure.
+
+### 6. Higher Query Planner CPU & Misestimated Plans
+Evaluating 20 overlapping candidate indexes increases `Planning Time` CPU overhead under high OLTP QPS and raises the risk of suboptimal plans when table statistics lag.
+
+### 7. Longer Migrations, Lock Contention & Deadlocks
+Schema changes, `REINDEX`, and heavy concurrent `UPDATE`s hold latches across more B-Tree pages, expanding lock duration and deadlock probability.
+
+---
+
+## 5. PostgreSQL Index Audit & Diagnostic Cheat Sheet
+
+```sql title="1. Inspect actual page reads and scan types"
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT slug, views_count
+FROM article_metrics
+WHERE category = 'databases-sql'
+ORDER BY views_count DESC
+LIMIT 20;
+```
+
+```sql title="2. Find unused (zero-scan) non-constraint indexes wasting write bandwidth"
+SELECT
+  schemaname || '.' || relname AS table_name,
+  indexrelname AS index_name,
+  idx_scan AS scans_count,
+  pg_size_pretty(pg_relation_size(indexrelid)) AS index_size
+FROM pg_stat_user_indexes
+WHERE idx_scan = 0
+  AND indexrelid NOT IN (SELECT conindid FROM pg_constraint WHERE conindid <> 0)
+ORDER BY pg_relation_size(indexrelid) DESC;
+```
+
+```sql title="3. Compare heap size vs total index footprint"
+SELECT
+  relname AS table_name,
+  pg_size_pretty(pg_table_size(relid)) AS table_heap_size,
+  pg_size_pretty(pg_indexes_size(relid)) AS total_indexes_size
+FROM pg_stat_user_tables
+ORDER BY pg_indexes_size(relid) DESC;
+```
+
+> [!TIP]
+> **Index Hygiene Heuristic:** Whenever `total_indexes_size > table_heap_size` on a write-heavy OLTP table, audit `pg_stat_user_indexes` immediately — you almost certainly have unused single-column indexes, redundant leftmost prefixes, or unoptimized candidates for partial indexes.

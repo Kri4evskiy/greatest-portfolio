@@ -1,8 +1,10 @@
 import { randomUUID } from 'node:crypto'
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common'
-import { PrismaClient } from '@prisma/client'
+import { PrismaPg } from '@prisma/adapter-pg'
 import type { ArticleMeta, KnowledgeCategory, Role, VisitorRoleType } from '@repo/shared-schemas'
-import { databaseConfig } from '../config/database.config.js'
+import { Pool } from 'pg'
+import { databaseConfig, extractPostgresSchema } from '../config/database.config.js'
+import { type Prisma, PrismaClient } from '../generated/prisma/client.js'
 import { INITIAL_ARTICLE_SEEDS } from '../migrations/scripts/seed-data.js'
 
 export interface StoredVisitorSession {
@@ -16,18 +18,16 @@ export interface StoredVisitorSession {
 }
 
 @Injectable()
-export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
+export class PrismaService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(PrismaService.name)
+  private client: PrismaClient | null = null
+  private pool: Pool | null = null
   private dbConnected = false
 
   private readonly memorySessions = new Map<string, StoredVisitorSession>()
   private readonly memoryMetrics = new Map<string, ArticleMeta>()
 
   constructor() {
-    super({
-      log: ['error', 'warn'],
-    })
-
     const now = new Date().toISOString()
     for (const item of INITIAL_ARTICLE_SEEDS) {
       this.memoryMetrics.set(item.slug, {
@@ -41,25 +41,65 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   }
 
   async onModuleInit(): Promise<void> {
-    if (!databaseConfig.isConfigured) {
+    if (!databaseConfig.isConfigured || !databaseConfig.databaseUrl) {
       this.logger.warn('DATABASE_URL not set — using resilient in-memory store with Prisma schema contract')
       return
     }
 
     try {
-      await this.$connect()
+      const pool = new Pool({ connectionString: databaseConfig.databaseUrl })
+      pool.on('error', (error) => {
+        this.logger.warn(`PostgreSQL pool error: ${error.message}`)
+      })
+
+      const schema = extractPostgresSchema(databaseConfig.databaseUrl)
+      const adapter = schema ? new PrismaPg(pool, { schema }) : new PrismaPg(pool)
+      const client = new PrismaClient({
+        adapter,
+        log: ['error', 'warn'],
+      })
+
+      this.pool = pool
+      this.client = client
+
+      await client.$connect()
+      await client.$queryRaw`SELECT 1`
       this.dbConnected = true
-      this.logger.log('Connected to PostgreSQL via Prisma ORM')
+      this.logger.log('Connected to PostgreSQL via Prisma 7 ORM (pg adapter)')
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error'
       this.logger.warn(`PostgreSQL connection unavailable (${message}) — falling back to resilient in-memory store`)
-      this.dbConnected = false
+      await this.disconnectClient()
     }
   }
 
   async onModuleDestroy(): Promise<void> {
-    if (this.dbConnected) {
-      await this.$disconnect()
+    await this.disconnectClient()
+  }
+
+  private async disconnectClient(): Promise<void> {
+    this.dbConnected = false
+    const client = this.client
+    const pool = this.pool
+    this.client = null
+    this.pool = null
+
+    if (client) {
+      try {
+        await client.$disconnect()
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error'
+        this.logger.warn(`Prisma disconnect warning: ${message}`)
+      }
+    }
+
+    if (pool) {
+      try {
+        await pool.end()
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error'
+        this.logger.warn(`PostgreSQL pool shutdown warning: ${message}`)
+      }
     }
   }
 
@@ -74,9 +114,9 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     userAgent?: string | undefined
     expiresAt: Date
   }): Promise<StoredVisitorSession> {
-    if (this.dbConnected) {
+    if (this.dbConnected && this.client) {
       try {
-        const created = await this.visitorSession.create({
+        const created = await this.client.visitorSession.create({
           data: {
             displayName: data.displayName,
             visitorType: data.visitorType,
@@ -113,9 +153,9 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   }
 
   async getAllArticleMetrics(): Promise<ArticleMeta[]> {
-    if (this.dbConnected) {
+    if (this.dbConnected && this.client) {
       try {
-        const rows = await this.articleMetrics.findMany({
+        const rows = await this.client.articleMetrics.findMany({
           orderBy: { slug: 'asc' },
         })
         if (rows.length > 0) {
@@ -136,9 +176,9 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   }
 
   async incrementArticleView(slug: string, category: KnowledgeCategory): Promise<ArticleMeta> {
-    if (this.dbConnected) {
+    if (this.dbConnected && this.client) {
       try {
-        const updated = await this.articleMetrics.upsert({
+        const updated = await this.client.articleMetrics.upsert({
           where: { slug },
           update: {
             viewsCount: { increment: 1 },
@@ -175,9 +215,9 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   }
 
   async incrementArticleHelpful(slug: string, category: KnowledgeCategory): Promise<ArticleMeta> {
-    if (this.dbConnected) {
+    if (this.dbConnected && this.client) {
       try {
-        const updated = await this.articleMetrics.upsert({
+        const updated = await this.client.articleMetrics.upsert({
           where: { slug },
           update: {
             helpfulCount: { increment: 1 },
@@ -214,14 +254,15 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   }
 
   async logSystemEvent(eventType: string, payload: Record<string, unknown>): Promise<void> {
-    if (!this.dbConnected) {
+    if (!this.dbConnected || !this.client) {
       return
     }
     try {
-      await this.systemEventLog.create({
+      const jsonPayload = JSON.parse(JSON.stringify(payload)) as Prisma.InputJsonValue
+      await this.client.systemEventLog.create({
         data: {
           eventType,
-          payload: JSON.parse(JSON.stringify(payload)),
+          payload: jsonPayload,
         },
       })
     } catch (err) {

@@ -32,4 +32,12 @@ export function loadDatabaseConfig(env: NodeJS.ProcessEnv = process.env): Databa
   }
 }
 
+export function extractPostgresSchema(connectionString: string): string | undefined {
+  try {
+    return new URL(connectionString).searchParams.get('schema') || undefined
+  } catch {
+    return undefined
+  }
+}
+
 export const databaseConfig: DatabaseConfig = loadDatabaseConfig()

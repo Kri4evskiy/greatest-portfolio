@@ -1,0 +1,216 @@
+---
+title: "Індексація в базах даних: що індексується автоматично, що індексувати обов'язково і чому не можна індексувати всі поля"
+sidebarLabel: "Індексація БД: правила та пастки"
+summary: "Вичерпний розбір індексів у PostgreSQL, MySQL (InnoDB), SQL Server, Oracle, SQLite та MongoDB: внутрішня будова B-Tree/GIN/BRIN, матриця автоматичних індексів (і пастка Foreign Key), правила ESR і Partial/Covering індексів, а також 7 катастроф від індексації кожного поля."
+category: "databases-sql"
+format: "deep-dive"
+tags: ["databases", "postgresql", "indexing", "sql", "performance", "mysql", "mongodb", "prisma"]
+readingTime: "16 хв"
+publishedAt: "2026-11-19"
+order: 1
+tldr:
+  - "Автоматично індексуються `PRIMARY KEY` та `UNIQUE` (у MongoDB — лише `_id`). **Foreign Key НЕ індексуються автоматично** в PostgreSQL, SQL Server, Oracle та SQLite — автоматично їх індексує лише MySQL (InnoDB)."
+  - "Обов'язково індексуйте зовнішні ключі (`JOIN` та `ON DELETE CASCADE`), високоселективні фільтри `WHERE`, стовпці сортування/курсорної пагінації та часті складені предикати за правилом **ESR (Equality -> Sort -> Range)**."
+  - "Індексація всіх полів поспіль убиває швидкодію: уповільнює `INSERT/UPDATE/DELETE` у 5–15×, вимикає PostgreSQL **HOT updates**, витісняє гарячі дані з RAM (Buffer Pool) і гальмує `AUTOVACUUM`."
+  - "Замість десятків одиночних індексів застосовуйте складені, часткові (`WHERE deleted_at IS NULL`) та покривні (`INCLUDE`) індекси, регулярно перевіряючи `idx_scan = 0` у `pg_stat_user_indexes`."
+---
+
+## 1. Як індекси працюють усередині та якими бувають
+
+Без індексу СКБД змушена читати всю таблицю блок за блоком із диска/буфера (**`Seq Scan` / Full Table Scan**) зі складністю $O(N)$. Для таблиці на 20 мільйонів рядків пошук одного користувача перетворюється на читання гігабайтів даних.
+
+**Індекс** — це окрема допоміжна структура даних на диску та в оперативній пам'яті (найчастіше збалансоване дерево **B-Tree**), яка зберігає відсортовані значення ключів і посилання (`ctid` у PostgreSQL / PK в InnoDB) на рядки основної таблиці, знижуючи вартість пошуку до $O(\log N)$:
+
+```text
+                       [ Коренева сторінка B-Tree: A..Z ]
+                        /                              \
+       [ Вузол: A..M ]                                 [ Вузол: N..Z ]
+        /            \                                  /            \
+[ Лист: A..F ]  [ Лист: G..M ]  ◄─── зв'язний список ──► [ Лист: N..S ]  [ Лист: T..Z ]
+   │  (ctid)       │                                        │
+   └───────────────┼────────────────────────────────────────┘
+                   ▼
+         [ Heap / Таблиця на диску ]
+```
+
+### Основні способи читання даних планувальником PostgreSQL
+
+- **`Index Scan`:** пошук ключів у B-Tree + переходи в основну таблицю (Heap) за рештою колонок рядка.
+- **`Index Only Scan`:** ідеальний випадок — усі потрібні в `SELECT` колонки вже лежать усередині самого індексу (або в `INCLUDE(...)`), тому читання самої таблиці (Heap Fetch) взагалі пропускається (за свіжої Visibility Map від `VACUUM`).
+- **`Bitmap Index Scan`:** коли індекс знаходить багато розкиданих рядків (або об'єднує два індекси через `AND`/`OR`), СКБД спершу будує бітову карту сторінок, а потім читає сторінки таблиці послідовно.
+- **`Seq Scan`:** читання всієї таблиці поспіль — **швидше** за індекс на малих таблицях або коли запит забирає > 15–20% усіх рядків.
+
+### Типи індексів і коли який обирати
+
+| Тип індексу | Під які запити заточений | Приклади в PostgreSQL |
+| :--- | :--- | :--- |
+| **B-Tree** *(за замовчуванням)* | `=`, `<`, `<=`, `>`, `>=`, `BETWEEN`, `IN`, `IS NULL`, `ORDER BY`, префіксний `LIKE 'abc%'` | Майже 90% усіх індексів (`email`, `created_at`, FK) |
+| **Hash** | Суворо лише точне дорівнювання `=` (менший розмір для довгих URL/UUID, не сортує) | `CREATE INDEX ... USING hash (url)` |
+| **GIN** *(Generalized Inverted)* | Пошук *усередині* складених значень: `JSONB` (`@>`), масиви (`&&`, `@>`), повнотекст (`tsvector`) | `USING gin (payload jsonb_path_ops)` |
+| **GiST** | Геодані (PostGIS), інтервали (`daterange`, `tsrange`), `EXCLUDE`-обмеження, нечіткий пошук (`pg_trgm`) | Бронювання неперетинних слотів дат |
+| **BRIN** *(Block Range)* | Величезні append-only таблиці (логи, метрики 100M+ рядків), фізично відсортовані за часом вставки | `USING brin (created_at)` — важить у **1000×** менше за B-Tree |
+
+---
+
+## 2. Що індексується АВТОМАТИЧНО в різних базах даних
+
+Найпідступніша помилка при зміні СКБД (наприклад, переході з MySQL на PostgreSQL чи роботі з Prisma) — вважати, що всі бази автоматично індексують зовнішні ключі. Це **не так**:
+
+| СКБД / Рушій | `PRIMARY KEY` | `UNIQUE` | `FOREIGN KEY` | Інше / Примітка |
+| :--- | :---: | :---: | :---: | :--- |
+| **PostgreSQL** | ✅ B-Tree | ✅ B-Tree | ❌ **НІ** | `EXCLUDE` автоматично створює індекс (зазвичай GiST) |
+| **MySQL (InnoDB)** | ✅ Clustered B-Tree *(сама таблиця зберігається в дереві PK)* | ✅ Secondary B-Tree | ✅ **ТАК** *(створює вторинний індекс, якщо немає відповідного префіксного)* | Неявно додає 6-байтовий прихований `ROW_ID`, якщо PK не задано |
+| **Microsoft SQL Server** | ✅ Clustered *(за замовчуванням)* | ✅ Nonclustered *(за замовчуванням)* | ❌ **НІ** | Поведінку Clustered/Nonclustered можна змінити явно |
+| **Oracle Database** | ✅ *(якщо немає сумісного індексу)* | ✅ *(якщо немає сумісного індексу)* | ❌ **НІ** | **Критично:** без індексу на FK оновлення/видалення PK батька вішає блокування рівня всієї дочірньої таблиці (`TM lock`)! |
+| **SQLite** | ✅ `INTEGER PRIMARY KEY` = аліас `rowid`; інші PK створюють `sqlite_autoindex_*` | ✅ `sqlite_autoindex_*` | ❌ **НІ** | Таблиця `WITHOUT ROWID` зберігається як кластерний B-Tree за PK |
+| **MongoDB (WiredTiger)** | ✅ Поле `_id` *(обов'язковий unique)* | ⚠️ Лише якщо явно створити `{ unique: true }` | ❌ **НІ** *(посилальні `userId` не індексуються)* | Усі вторинні поля без ручного `createIndex()` скануються через `COLLSCAN` |
+
+> [!CAUTION]
+> **Класична пастка Prisma + PostgreSQL:**
+> При оголошенні зв'язку `@relation(fields: [authorId], references: [id])` у `schema.prisma` **PostgreSQL не створить індекс на `authorId` автоматично** (і Prisma сама його не додає!). Поки в таблиці 1 000 рядків — усе літає. Щойно таблиця виросте до 500 000 рядків, кожен `JOIN` і кожне видалення батьківського запису з `onDelete: Cascade` перетворюється на важкий `Seq Scan` по всій таблиці. Завжди додавайте `@@index([authorId])` явно!
+
+```prisma title="Правильне оголошення FK-індексу у Prisma (PostgreSQL)"
+model ArticleComment {
+  id        String   @id @default(uuid())
+  authorId  String
+  createdAt DateTime @default(now())
+
+  author VisitorSession @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([authorId])
+  @@index([authorId, createdAt])
+}
+```
+
+---
+
+## 3. Що індексувати ОБОВ'ЯЗКОВО (і як проєктувати складені індекси)
+
+### Чеклист обов'язкових кандидатів на індекс
+
+1. **Усі зовнішні ключі (`FOREIGN KEY`)** у PostgreSQL, SQL Server, Oracle, SQLite (і поля-посилання в MongoDB) — для швидких `JOIN` та запобігання блокуванням/сканам при `DELETE`/`UPDATE` батька.
+2. **Високоселективні колонки фільтрації (`WHERE`):** `email`, `slug`, `token_hash`, `external_id`, `tenant_id`.
+3. **Колонки сортування та курсорної (Keyset) пагінації (`ORDER BY ... LIMIT`):** наприклад `(tenant_id, created_at DESC, id DESC)`, щоб база брала перші 20 рядків прямо з верхівки відсортованого індексу без дорогого `Sort`.
+4. **Предикати `JOIN`, `GROUP BY` і `DISTINCT`** на великих таблицях.
+
+### Правило крайнього лівого префікса та правило ESR (`Equality -> Sort -> Range`)
+
+Порядок колонок у складеному індексі `(a, b, c)` критичний (як телефонний довідник: `Прізвище, Ім'я`):
+
+- Працює для: `WHERE a = 1`, `WHERE a = 1 AND b = 2`, `WHERE a = 1 AND b = 2 AND c > 10`.
+- **НЕ працює ефективно** для: `WHERE b = 2` або `WHERE c > 10` без умови на `a`.
+- **Надлишковий префікс:** якщо вже є індекс `(a, b)`, окремий індекс `(a)` зазвичай зайвий — `(a, b)` сам закриває `WHERE a = 1`.
+
+При поєднанні рівності, сортування та діапазону ставте колонки суворо в порядку **ESR**:
+1. **E (Equality):** колонки з точним дорівнюванням (`status = 'OPEN'`).
+2. **S (Sort):** колонки з `ORDER BY` (`created_at DESC`).
+3. **R (Range):** колонки з діапазоном (`amount > 100`, `created_at >= ...`).
+
+```sql title="ESR на практиці: фільтр + сортування"
+-- Запит:
+SELECT id, title, created_at
+FROM system_event_log
+WHERE event_type = 'ARTICLE_VIEWED'
+ORDER BY created_at DESC
+LIMIT 50;
+
+-- Ідеальний індекс (Equality: event_type, Sort: created_at):
+CREATE INDEX idx_event_log_type_created
+  ON system_event_log (event_type, created_at DESC);
+```
+
+### Partial, Covering (`INCLUDE`) та Функціональні індекси
+
+1. **Partial (Частковий) індекс — економія пам'яті в 10–100×:**
+   Якщо з 10 млн замовлень 99.5% уже `COMPLETED`, а ви шукаєте лише `status = 'PENDING'` або активні рядки `WHERE deleted_at IS NULL`:
+   ```sql
+   CREATE INDEX idx_orders_pending_created
+     ON orders (created_at)
+     WHERE status = 'PENDING';
+   ```
+
+2. **Covering (Покривний) індекс із `INCLUDE`:**
+   Дає змогу планувальнику виконати `Index Only Scan`, не зазираючи в основну таблицю:
+   ```sql
+   CREATE INDEX idx_articles_category_include
+     ON article_metrics (category)
+     INCLUDE (slug, views_count);
+   ```
+
+3. **Функціональний індекс (`Expression Index`):**
+   Звичайний індекс на `email` **перестає працювати**, якщо написати `WHERE LOWER(email) = 'user@mail.com'`. Зберігайте нормалізований email або індексуйте сам вираз:
+   ```sql
+   CREATE UNIQUE INDEX idx_users_lower_email ON users (LOWER(email));
+   ```
+
+### Що індексувати НЕ потрібно
+
+- **Крихітні таблиці** (довідники країн, ролей, статусів на 5–500 рядків) — `Seq Scan` в одній сторінці RAM швидший за обхід B-Tree.
+- **Колонки з низькою селективністю самі по собі** (`is_active: true/false`, `gender`) — якщо значення зустрічається у 40–60% рядків, база однаково обере `Seq Scan`. Для рідкісних значень (0.1%) використовуйте **Partial Index** `WHERE is_flagged = true`.
+- **Довгі поля, за якими немає фільтрів** (`description`, `raw_html`, `stack_trace`).
+
+---
+
+## 4. Що буде, якщо проіндексувати ВСІ поля таблиці?
+
+Ідея *«додати індекс на кожну колонку про всяк випадок»* у продакшені **гарантовано ламає базу даних** одразу за 7 напрямами:
+
+### 1. Вибухове сповільнення запису (Write Amplification 5–15×)
+Під час кожного `INSERT` та `DELETE` СКБД зобов'язана оновити **не лише таблицю, а й кожне дерево індексу** (пошук, редагування сторінок, B-Tree page splits, конкуренція за лачі сторінок). За 15 індексів одна вставка рядка перетворюється на 16 модифікацій B-Tree.
+
+### 2. Вимкнення оптимізації HOT (Heap-Only Tuples) у PostgreSQL
+У PostgreSQL працює важлива оптимізація **HOT-оновлень**: якщо ви робите `UPDATE users SET last_seen_at = NOW()` і колонка `last_seen_at` **не індексована**, а на тій самій 8-КБ сторінці таблиці є вільне місце, PostgreSQL **взагалі не чіпає жодного індексу таблиці**.
+
+Щойно ви проіндексували всі поля — будь-яка модифікація *будь-якої* колонки вимикає HOT і змушує оновлювати всі 15–20 індексів на кожен `UPDATE`.
+
+### 3. Роздування WAL-логів, лаг реплікації та вичерпання IOPS
+Кожна зміна індексної сторінки пишеться в **Write-Ahead Log (WAL)** (включно з `full_page_writes` після checkpoint). Надлишкові індекси множать обсяг WAL у рази, збільшують рахунки за IOPS і спричиняють відставання read-реплік.
+
+### 4. Витіснення гарячих даних із RAM (Buffer Pool Thrashing)
+Сумарний розмір 15 індексів легко перевищує розмір самої таблиці у **3–5 разів**. Під час записів зайві індексні сторінки підтягуються в `shared_buffers` / InnoDB Buffer Pool, **витісняючи звідти справді гарячі рядки таблиці** та провокуючи часті звернення до диска.
+
+### 5. Деградація `VACUUM` / `AUTOVACUUM` та Index Bloat
+Через MVCC при `UPDATE`/`DELETE` у PostgreSQL мертві версії рядків прибирає `autovacuum`. Перед видаленням мертвого кортежу `VACUUM` зобов'язаний **просканувати кожен індекс таблиці**. За великої кількості індексів `autovacuum` не встигає за потоком запису ➔ таблиця та індекси стрімко «розпухають» (**Bloat**).
+
+### 6. Дорожчий планувальник (Planner Overhead) і гірші плани запитів
+Перебір 20 перетинних індексів збільшує `Planning Time` CPU на високому QPS і підвищує ризик вибору неоптимального індексу при застарілій статистиці `ANALYZE`.
+
+### 7. Довгі міграції, блокування та Deadlocks
+Будь-який `ALTER TABLE`, `REINDEX` чи масовий `UPDATE` утримує блокування довше і розширює вікно для взаємних блокувань (**Deadlocks**).
+
+---
+
+## 5. Шпаргалка діагностики індексів у PostgreSQL
+
+```sql title="1. Реальне читання сторінок і час (шукаємо Seq Scan та Buffers: read)"
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT slug, views_count
+FROM article_metrics
+WHERE category = 'databases-sql'
+ORDER BY views_count DESC
+LIMIT 20;
+```
+
+```sql title="2. Пошук «мертвих» (жодного разу не використаних) та важких індексів"
+SELECT
+  schemaname || '.' || relname AS table_name,
+  indexrelname AS index_name,
+  idx_scan AS scans_count,
+  pg_size_pretty(pg_relation_size(indexrelid)) AS index_size
+FROM pg_stat_user_indexes
+WHERE idx_scan = 0
+  AND indexrelid NOT IN (SELECT conindid FROM pg_constraint WHERE conindid <> 0)
+ORDER BY pg_relation_size(indexrelid) DESC;
+```
+
+```sql title="3. Порівняння розміру самої таблиці та сумарного розміру її індексів"
+SELECT
+  relname AS table_name,
+  pg_size_pretty(pg_table_size(relid)) AS table_heap_size,
+  pg_size_pretty(pg_indexes_size(relid)) AS total_indexes_size
+FROM pg_stat_user_tables
+ORDER BY pg_indexes_size(relid) DESC;
+```
+
+> [!TIP]
+> **Правило гігієни індексів:** якщо сумарний розмір індексів перевищує розмір самої таблиці (`total_indexes_size > table_heap_size`) при активному записі — проведіть аудит `pg_stat_user_indexes`: майже напевно накопичилися невикористані одиночні індекси, надлишкові ліві префікси або кандидати під Partial Index.
