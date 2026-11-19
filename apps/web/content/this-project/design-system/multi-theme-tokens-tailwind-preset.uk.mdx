@@ -1,20 +1,20 @@
 ---
 title: "Матриця мульти-темних CSS-токенів, Tailwind v4 @theme та архітектура пакета @repo/ui"
 sidebarLabel: "Дизайн-токени та Tailwind v4"
-summary: "Як спроєктувати масштабовану дизайн-систему в монорепозиторії: двовимірна матриця тем (Light/Dark × палітри), інверсія залежностей через CSS-first @repo/ui/theme.css, Tailwind CSS v4 (@theme inline, @custom-variant, @source), Storybook 10 та адаптивні подання даних."
+summary: "Як спроєктувати масштабовану дизайн-систему в монорепозиторії: 2D-матриця тем (Mode × Palette) із Zero-FOUC перемиканням, Cascade Layers у Tailwind CSS v4 та @repo/ui/theme.css, Zero-CLS шрифти, @container queries та 100% покриття у Storybook 10."
 category: "this-project"
 format: "deep-dive"
 tags: ["design-tokens", "tailwind", "ui-system", "storybook", "architecture"]
-readingTime: "6 хв"
+readingTime: "8 хв"
 publishedAt: "2026-11-10"
 order: 1
 tldr:
-  - "Стилі в `packages/ui/src/styles/theme.css` побудовані на семантичних HSL-змінних і двох незалежних осях: режимі яскравості (`.dark`) та палітрі (`[data-palette=\"graphite\" | \"sepia\"]`)."
-  - "Використовується CSS-first конфігурація Tailwind CSS v4 (`@theme inline`, `@custom-variant dark`, `@layer base`), що експортується як `@repo/ui/theme.css`, тоді як `apps/web` збирається через `@tailwindcss/postcss` і явні шляхи `@source`."
-  - "Фіксуються сучасні таргети `browserslist` (`Chrome >= 111`, `Edge >= 111`, `Firefox >= 128`, `Safari >= 16.4`), а щільні дані автоматично перемикаються між картками (`< md`) і таблицями (`>= md`)."
+  - "Повна 2D-матриця семантичних HSL-токенів (`Light / Dark / System` × `Warm Paper / Graphite / Sepia`) описана в `packages/ui/src/styles/theme.css` через `@theme inline` і керується з `ThemeToggle` із Zero-FOUC скриптом у `<head>` (`PALETTE_INIT_SCRIPT`)."
+  - "Шари каскаду Tailwind CSS v4 розділено усвідомлено: Baseline-правила (`scrollbar-gutter: stable`, `text-wrap: balance/pretty`) живуть у `@layer base`, `.shiki` і `@starting-style` анімації діалогів — у `@layer components`, а `prefers-reduced-motion: reduce` — поза шарами без `!important`."
+  - "Інверсія залежностей (`@repo/ui/theme.css` ➔ `apps/web/src/app/globals.css` із `@source`), сучасні таргети `browserslist`, локальні Zero-CLS шрифти `Inter` + `JetBrains Mono` через `next/font/google`, точкові `@container` queries та `9/9` історій у Storybook 10."
 ---
 
-## 1. Двовимірна матриця семантичних токенів (`Light/Dark` × `Palette`)
+## 1. Двовимірна матриця семантичних токенів (`Mode` × `Palette`)
 
 Замість прив'язки компонентів до конкретних палітр Tailwind (`slate-*`, `emerald-*`, `amber-*`) уся колірна система винесена в семантичні CSS-змінні у форматі `H S% L%` (сумісному як із нативним `color-mix()` для модифікаторів прозорості в Tailwind v4, так і з SVG-атрибутами `hsl(var(--chart-1))`):
 
@@ -55,16 +55,24 @@ tldr:
 }
 ```
 
+### Живий 2D-перемикач оформлення та Zero-FOUC гідратація
+
+У хедері [`ThemeToggle`](apps/web/src/widgets/header/theme-toggle.tsx) відкриває компактний 2D-поповер для керування обома осями одночасно:
+- **Режим яскравості (`Color Mode`):** `Light`, `Dark` або `System` (через `next-themes` і клас `.dark`).
+- **Палітра (`Palette`):** `Warm Paper` (`default`), `Graphite` або `Sepia` (зберігається в `localStorage['workfolio-palette']` і синхронізується з `html[data-palette]` через `useUIStore`).
+
+Щоб при перезавантаженні сторінки з активною палітрою `Graphite` чи `Sepia` не виникав спалах базової палітри (FOUC), `LocaleRootLayout` вбудовує статичний скрипт `PALETTE_INIT_SCRIPT` безпосередньо в `<head>` до першого рендера й гідратації.
+
 > [!TIP]
-> Розділення осей `.dark` і `data-palette` у зв'язці з `@theme inline` дозволяє підключити будь-яку нову тему або брендинг клієнта (`multi-tenant / white-label`) перевизначенням ~20 змінних у CSS без жодної правки в React-компонентах.
+> Розділення осей `.dark` і `data-palette` у зв'язці з `@theme inline` дозволяє підключити будь-яку нову тему або брендинг клієнта (`multi-tenant / white-label`) перевизначенням CSS-змінних без жодної правки в React-компонентах.
 
 ---
 
-## 2. CSS-first інверсія залежностей (`@repo/ui/theme.css` + `@source`)
+## 2. CSS-first архітектура, Cascade Layers і Baseline UX
 
-Щоб пакет `@repo/ui` залишався повністю незалежним і не знав про файлову структуру `apps/web`, він експортує чистий шар токенів і базових стилів `@repo/ui/theme.css` (без `@import "tailwindcss";`), а вітрина Storybook у `packages/ui/src/styles/globals.css` збирається нативним плагіном `@tailwindcss/vite`.
+Щоб пакет `@repo/ui` залишався повністю незалежним і не знав про файлову структуру `apps/web`, він експортує чистий шар токенів і каскадних правил `@repo/ui/theme.css` (без `@import "tailwindcss";`), а вітрина Storybook у `packages/ui/src/styles/globals.css` збирається нативним плагіном `@tailwindcss/vite`.
 
-У `apps/web` підключається `@tailwindcss/postcss`, а вхідний CSS-файл явно вказує межі сканування `@source`:
+У `apps/web` файл [`globals.css`](apps/web/src/app/globals.css) виступає точкою складання (**Composition Root**) для `@tailwindcss/postcss`:
 
 ```css title="apps/web/src/app/globals.css"
 @import "tailwindcss";
@@ -75,21 +83,31 @@ tldr:
 @source "../../../../packages/ui/src";
 ```
 
-Обидва пакети (`apps/web/package.json` і `packages/ui/package.json`) фіксують сучасні таргети `"browserslist": ["Chrome >= 111", "Edge >= 111", "Firefox >= 128", "Safari >= 16.4"]`, щоб `Lightning CSS` і `Next.js SWC` не генерували зайві поліфіли під `@property` і `color-mix()`.
+Усередині `theme.css` стилі розкладено по **CSS Cascade Layers**:
+1. **`@layer base`:** задає дефолтний `border-color: hsl(var(--border))`, `cursor: pointer` на активних кнопках, `scrollbar-gutter: stable` (прибирає зсув макета на 15px при відкритті модалок у Windows), `scrollbar-width: thin`, `scroll-padding-top: 5rem`, плавний скрол і `text-wrap: balance` / `text-wrap: pretty`.
+2. **`@layer components`:** ізолює `.shiki` і GPU-анімації входу `@starting-style` (`opacity` + `scale`) для `[data-dialog-overlay]` і `[data-dialog-content]`.
+3. **Unlayered override:** `@media (prefers-reduced-motion: reduce)` винесено *поза* шари — за специфікацією Cascade Layers позашарові правила завжди перекривають `@layer utilities` (`transition-*`, `animate-*`) без використання `!important`.
 
-Така схема дає три архітектурні переваги:
-1. Єдине CSS-first джерело мапінгу змінних у класи Tailwind (`bg-surface-subtle`, `text-warning`, `border-code-border`) як для `apps/web`, так і для ізольованого `Storybook 10`.
-2. Відсутність зворотних шляхів `../../apps/*` усередині пакета дизайн-системи.
-3. Можливість підключити другий фронтенд-сервіс до тієї самої дизайн-системи двома рядками: `@import "@repo/ui/theme.css";` і `@source`.
+Обидва пакети (`apps/web/package.json` і `packages/ui/package.json`) фіксують сучасні таргети `"browserslist": ["Chrome >= 111", "Edge >= 111", "Firefox >= 128", "Safari >= 16.4"]`, щоб `Lightning CSS` і `Next.js SWC` не генерували зайві поліфіли під `@property` і `color-mix()`.
 
 ---
 
-## 3. Адаптивні подання щільних даних (`< md` проти `>= md`)
+## 3. Zero-CLS шрифти, `@container` queries та усвідомлені компроміси
 
-У компонентах із високою щільністю інформації замість горизонтального стискання таблиць на вузьких екранах (`360px`) застосовується зміна патерну відображення:
+- **Локальні Zero-CLS веб-шрифти:** `LocaleRootLayout` підключає `Inter` і `JetBrains_Mono` (`subsets: ['latin', 'cyrillic']`, `display: 'swap'`) через `next/font/google` і зв'язує `--font-inter` / `--font-jetbrains-mono` із `--font-sans` та `--font-mono` в `@theme inline`. Next.js завантажує `.woff2` на етапі `next build` і віддає їх як власну статику (`0` зовнішніх запитів у рантаймі, `0` CLS).
+- **Точкові Container Queries (`@container`):** базовий `Card` з `@repo/ui` вмикає `@container`, тому картки Бази Знань (`@xs:flex-row`, `@sm:text-lg`) і сітка MDX `<ArticleImageGrid />` (`@md:grid-cols-2`) адаптуються до ширини своєї реальної колонки (зокрема між сайдбаром і TOC), а не ширини вікна браузера.
+- **Усвідомлені компроміси (Trade-offs):**
+  - **Radix Dialog + `@starting-style` замість нативного `<dialog>`:** `Radix UI Dialog` (на який переведено й `CommandPaletteModal`) забезпечує надійний focus-trap, `aria-modal` і scroll-lock у всіх браузерах, а нативні CSS-переходи входу реалізовано поверх нього через `@starting-style`.
+  - **Відкладені `CSS Anchor Positioning` і `light-dark()`:** їхня підтримка поки не покриває весь наш `browserslist` (`Safari 16.4+`, `Firefox 128+`), тоді як поточна матриця CSS-змінних і Radix уже працюють стабільно.
+
+---
+
+## 4. Адаптивні подання щільних даних і 100% покриття Storybook
+
+У компонентах із високою щільністю інформації замість горизонтального стискання таблиць на вузьких екранах (`360px`) застосовується зміна патерну відображення, а всі `9/9` примітивів `@repo/ui` (`Badge`, `Button`, `Callout`, `Card`, `Dialog`, `Input`, `Skeleton`, `Tabs`, `Tooltip`) задокументовано в **Storybook 10**:
 
 | Компонент | Смартфони (`< md`) | Планшети та десктоп (`>= md`) |
 | :--- | :--- | :--- |
 | **`TechRadarTable`** | Стек карток (`md:hidden`) зі швидким переходом до `ADR` | 6-колонкова таблиця `TanStack Table` (`hidden md:block`) із сортуванням і фільтрами |
 | **`D3.js` / `SVG` графи** | Горизонтальний скрол-контейнер `overflow-x-auto` з `min-w-[540px]` | Повна інтерактивна векторна сцена на всю ширину колонки |
-| **`Storybook 10` (`@repo/ui`)** | Перевірка контрасту та переносів у в'юпортах `360px` і `768px` | Інтерактивне перемикання тем `Warm Paper / Dark / Graphite / Sepia` в тулбарі |
+| **`Storybook 10` (`@repo/ui`)** | Перевірка контрасту та переносів у в'юпортах `360px` і `768px` | Інтерактивне перемикання тем `Warm Paper / Dark / Graphite / Sepia` (`9/9` компонентів) |

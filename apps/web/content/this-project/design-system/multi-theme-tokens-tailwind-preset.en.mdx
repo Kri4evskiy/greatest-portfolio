@@ -1,20 +1,20 @@
 ---
 title: "Multi-Theme CSS Token Matrix, Tailwind v4 @theme & @repo/ui Package Architecture"
 sidebarLabel: "Design Tokens & Tailwind v4"
-summary: "How to architect a scalable design system in a monorepo: 2D semantic token matrix (Light/Dark × palettes), Dependency Inversion via CSS-first @repo/ui/theme.css, Tailwind CSS v4 (@theme inline, @custom-variant, @source), Storybook 10, and responsive data views."
+summary: "How to architect a scalable design system in a monorepo: 2D semantic token matrix (Mode × Palette) with Zero-FOUC switching, Tailwind CSS v4 Cascade Layers & @repo/ui/theme.css, Zero-CLS fonts, @container queries, and 100% Storybook 10 coverage."
 category: "this-project"
 format: "deep-dive"
 tags: ["design-tokens", "tailwind", "ui-system", "storybook", "architecture"]
-readingTime: "6 min"
+readingTime: "8 min"
 publishedAt: "2026-11-10"
 order: 1
 tldr:
-  - "Builds `packages/ui/src/styles/theme.css` around semantic HSL variables and two orthogonal axes: luminance mode (`.dark`) and color palette (`[data-palette=\"graphite\" | \"sepia\"]`)."
-  - "Uses Tailwind CSS v4 CSS-first configuration (`@theme inline`, `@custom-variant dark`, `@layer base`) exported as `@repo/ui/theme.css`, while `apps/web` compiles via `@tailwindcss/postcss` and explicit `@source` paths."
-  - "Pins modern `browserslist` targets (`Chrome >= 111`, `Edge >= 111`, `Firefox >= 128`, `Safari >= 16.4`) and switches dense data views responsively between `< md` cards and `>= md` tables."
+  - "Defines a full 2D semantic HSL token matrix (`Light / Dark / System` × `Warm Paper / Graphite / Sepia`) in `packages/ui/src/styles/theme.css` exposed via `@theme inline` and controlled live in `ThemeToggle` with a Zero-FOUC `<head>` init script (`PALETTE_INIT_SCRIPT`)."
+  - "Uses Tailwind CSS v4 Cascade Layers cleanly: Baseline UX (`scrollbar-gutter: stable`, `text-wrap: balance/pretty`) in `@layer base`, `.shiki` + `@starting-style` dialog transitions in `@layer components`, and unlayered `prefers-reduced-motion: reduce` above utilities."
+  - "Enforces Dependency Inversion (`@repo/ui/theme.css` ➔ `apps/web/src/app/globals.css` with `@source`), pins modern `browserslist` targets, bundles self-hosted `Inter` + `JetBrains Mono` via `next/font/google`, and adopts targeted `@container` queries across `9/9` Storybook-documented primitives."
 ---
 
-## 1. Two-Dimensional Semantic Token Matrix (`Light/Dark` × `Palette`)
+## 1. Two-Dimensional Semantic Token Matrix (`Mode` × `Palette`)
 
 Instead of coupling components to raw Tailwind palette classes (`slate-*`, `emerald-*`, `amber-*`), the entire color system is defined as semantic HSL CSS variables (supporting alpha modifiers via native `color-mix()` in Tailwind v4 as well as SVG attributes like `hsl(var(--chart-1))`):
 
@@ -55,16 +55,24 @@ Instead of coupling components to raw Tailwind palette classes (`slate-*`, `emer
 }
 ```
 
+### Live 2D Appearance Switcher & Zero-FOUC Hydration
+
+In the header, [`ThemeToggle`](apps/web/src/widgets/header/theme-toggle.tsx) opens a compact 2D Appearance popover controlling both orthogonal axes:
+- **Color Mode:** `Light`, `Dark`, or `System` (managed by `next-themes` via `.dark`).
+- **Palette Preset:** `Warm Paper` (`default`), `Graphite`, or `Sepia` (stored in `localStorage['workfolio-palette']` and synced to `html[data-palette]` via `useUIStore`).
+
+To prevent Flash of Unstyled Content (FOUC) when reloading with `Graphite` or `Sepia` active, `LocaleRootLayout` injects an allowlisted static `PALETTE_INIT_SCRIPT` directly in `<head>` before hydration.
+
 > [!TIP]
-> Separating `.dark` from `data-palette` and wrapping runtime tokens in `@theme inline` makes adding a new theme or `multi-tenant / white-label` brand a pure ~20-variable CSS override with zero changes to React components.
+> Separating `.dark` from `data-palette` and wrapping runtime tokens in `@theme inline` makes adding a new theme or `multi-tenant / white-label` brand a pure CSS variable override with zero changes to React components.
 
 ---
 
-## 2. CSS-First Dependency Inversion (`@repo/ui/theme.css` + `@source`)
+## 2. CSS-First Architecture, Cascade Layers & Baseline UX
 
-To keep `@repo/ui` self-contained and agnostic of `apps/web`, the UI package exports a pure token-and-base stylesheet `@repo/ui/theme.css` (without `@import "tailwindcss";` inside it) and keeps its own Storybook entry (`packages/ui/src/styles/globals.css`) powered by `@tailwindcss/vite`.
+To keep `@repo/ui` self-contained and agnostic of `apps/web`, the UI package exports a pure token-and-layer stylesheet `@repo/ui/theme.css` (without `@import "tailwindcss";`), while Storybook compiles `packages/ui/src/styles/globals.css` with `@tailwindcss/vite`.
 
-In `apps/web`, PostCSS runs `@tailwindcss/postcss` and declares `@source` boundaries in its own entry CSS:
+In `apps/web`, [`globals.css`](apps/web/src/app/globals.css) acts as the **Composition Root** compiled by `@tailwindcss/postcss`:
 
 ```css title="apps/web/src/app/globals.css"
 @import "tailwindcss";
@@ -75,21 +83,31 @@ In `apps/web`, PostCSS runs `@tailwindcss/postcss` and declares `@source` bounda
 @source "../../../../packages/ui/src";
 ```
 
-Both `apps/web/package.json` and `packages/ui/package.json` declare modern browser targets (`"browserslist": ["Chrome >= 111", "Edge >= 111", "Firefox >= 128", "Safari >= 16.4"]`) so `Lightning CSS` and `Next.js SWC` emit zero legacy polyfills for `@property` and `color-mix()`.
+Inside `theme.css`, rules are organized intentionally across **CSS Cascade Layers**:
+1. **`@layer base`:** Sets default `border-color: hsl(var(--border))`, active button `cursor: pointer`, `scrollbar-gutter: stable` (eliminates 15px layout shift when modals lock scrolling on Windows), `scrollbar-width: thin`, `scroll-padding-top: 5rem`, smooth scroll when motion is allowed, and `text-wrap: balance` / `text-wrap: pretty`.
+2. **`@layer components`:** Isolates `.shiki` dual-theme syntax rules and GPU-composited `@starting-style` entry animations (`opacity` + `scale`) for `[data-dialog-overlay]` and `[data-dialog-content]`.
+3. **Unlayered override:** `@media (prefers-reduced-motion: reduce)` sits intentionally *outside* `@layer` so it supersedes Tailwind's `@layer utilities` (`transition-*`, `animate-*`) without needing `!important`.
 
-This architecture provides three advantages:
-1. A single CSS-first source of truth mapping CSS variables to utility classes (`bg-surface-subtle`, `text-warning`, `border-code-border`) across both `apps/web` and `Storybook 10`.
-2. Zero upward `../../apps/*` imports inside the shared design system package.
-3. Instant onboarding for any new frontend app in the monorepo via `@import "@repo/ui/theme.css";` + `@source`.
+Both `apps/web/package.json` and `packages/ui/package.json` pin `"browserslist": ["Chrome >= 111", "Edge >= 111", "Firefox >= 128", "Safari >= 16.4"]` so `Lightning CSS` and `Next.js SWC` emit zero legacy polyfills for `@property` and `color-mix()`.
 
 ---
 
-## 3. Responsive Data Views (`< md` Cards vs `>= md` Tables)
+## 3. Zero-CLS Typography, `@container` Queries & Conscious Trade-offs
 
-For information-dense components, rather than squeezing wide tables onto `360px` screens, the UI switches representation patterns by breakpoint:
+- **Self-Hosted Zero-CLS Web Fonts:** `LocaleRootLayout` loads `Inter` and `JetBrains_Mono` (`latin` + `cyrillic` subsets, `display: 'swap'`) via `next/font/google`, exporting `--font-inter` and `--font-jetbrains-mono` mapped to `--font-sans` and `--font-mono` in `@theme inline`. Next.js downloads and bundles `.woff2` assets statically at build time (`0` external requests at runtime, `0` CLS).
+- **Targeted Container Queries (`@container`):** `@repo/ui` `Card` declares `@container` so Knowledge Base article cards (`@xs:flex-row`, `@sm:text-lg`) and MDX `<ArticleImageGrid />` (`@md:grid-cols-2`) adapt to the width of their actual column—whether displayed full-width or squeezed between the sidebar and TOC.
+- **Conscious Modern Web Platform Trade-offs:**
+  - **Radix Dialog + `@starting-style` vs raw `<dialog>`:** Keeping `@radix-ui/react-dialog` (and migrating `CommandPaletteModal` onto it) guarantees battle-tested focus trapping, `aria-modal`, and cross-browser scroll-locking, while layering modern CSS `@starting-style` transitions cleanly on top.
+  - **Deferring CSS Anchor Positioning & `light-dark()`:** Full cross-engine support still trails our `browserslist` baseline (`Safari 16.4+`, `Firefox 128+`), whereas our semantic CSS variable matrix + Radix positioning already cover every theme and popover reliably today.
+
+---
+
+## 4. Responsive Data Views & 100% Storybook Coverage
+
+For information-dense components, rather than squeezing wide tables onto `360px` screens, the UI switches representation patterns by breakpoint, while every primitive in `packages/ui` (`9/9`: `Badge`, `Button`, `Callout`, `Card`, `Dialog`, `Input`, `Skeleton`, `Tabs`, `Tooltip`) ships with isolated `*.stories.tsx` documentation in **Storybook 10**:
 
 | Component | Smartphones (`< md`) | Tablets & Desktop (`>= md`) |
 | :--- | :--- | :--- |
 | **`TechRadarTable`** | Stacked card list (`md:hidden`) with direct `ADR` action buttons | Full 6-column `TanStack Table` (`hidden md:block`) with sorting and filtering |
 | **`D3.js` / `SVG` Graphs** | Horizontal scroll container `overflow-x-auto` with `min-w-[540px]` | Full-width interactive vector simulation |
-| **`Storybook 10` (`@repo/ui`)** | Viewport presets for `360px` and `768px` contrast verification | Live toolbar switcher for `Warm Paper / Dark / Graphite / Sepia` |
+| **`Storybook 10` (`@repo/ui`)** | Viewport presets for `360px` and `768px` contrast verification | Live toolbar switcher for `Warm Paper / Dark / Graphite / Sepia` (`9/9` primitives) |

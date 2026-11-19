@@ -1,6 +1,6 @@
 # 🌐 `@repo/web` — Фронтенд-приложение (Next.js 16 + React 19 + FSD-Modular)
 
-Публичное портфолио в эстетике **Notion Workfolio**, интерактивное CV (`/cv`), глобальный поиск `Cmd+K` и защищённая мультиязычная **База Знаний** (`/knowledge-base`). Приложение построено на **Next.js 16 (App Router)**, **React 19 Compiler**, **FSD-Modular**, **Zero-Eval HAST MDX Engine**, **next-intl (`EN / UK / RU`)**, **TanStack Query v5 + IndexedDB** и **Zustand**.
+Публичное портфолио в эстетике **Notion Workfolio**, интерактивное CV (`/cv`), глобальный поиск `Cmd+K` и защищённая мультиязычная **База Знаний** (`/knowledge-base`). Приложение построено на **Next.js 16 (App Router)**, **React 19 Compiler**, **Tailwind CSS v4 (CSS-first Oxide)**, **Zero-CLS `next/font`**, **FSD-Modular**, **Zero-Eval HAST MDX Engine**, **next-intl (`EN / UK / RU`)**, **TanStack Query v5 + IndexedDB** и **Zustand**.
 
 ---
 
@@ -20,24 +20,24 @@ apps/web/
     ├── proxy.ts                          # Next.js 16 Edge Proxy: Web Crypto JWT + next-intl роутинг
     │
     ├── app/                              # [Слой 1: Routing & Composition]
-    │   ├── globals.css                   # Подключение стилей @repo/ui и Shiki dual-theme каскада
+    │   ├── globals.css                   # Composition Root Tailwind v4 (@import "@repo/ui/theme.css" + @source)
     │   ├── global-error.tsx              # Глобальный Error Boundary
     │   ├── search-index/[locale]/
     │   │   └── route.ts                  # Статический SSG JSON-индекс для Cmd+K (force-static)
     │   └── [locale]/
-    │       ├── layout.tsx                # Корневой layout: ThemeProvider, QueryProvider, Header, Footer, Modals
+    │       ├── layout.tsx                # Корневой layout: next/font, Zero-FOUC palette <script>, провайдеры, модалки
     │       ├── page.tsx                  # Главная страница Workfolio (RSC)
     │       ├── cv/page.tsx               # Страница резюме (PDF <object> + структурированный ATS-вид)
     │       └── knowledge-base/           # Защищённая База Знаний (layout + index + [...slug] catch-all)
     │
     ├── widgets/                          # [Слой 2: Composite UI Blocks]
-    │   ├── header/                       # WorkfolioHeader, LanguageSwitcher, ThemeToggle
+    │   ├── header/                       # WorkfolioHeader, LanguageSwitcher, ThemeToggle (2D Mode × Palette)
     │   ├── footer/                       # WorkfolioFooter
     │   └── section-nav/                  # PageSectionNavigator (плавающий outline / мобильная pill-кнопка)
     │
     ├── features/                         # [Слой 3: User Scenarios & Interactions]
     │   ├── auth/                         # GuestPassModal + queries/use-visitor-profile.ts
-    │   ├── search/                       # CommandPaletteModal (Cmd+K) + search-index-client.ts
+    │   ├── search/                       # CommandPaletteModal (на базе @repo/ui Dialog) + search-index-client.ts
     │   ├── telemetry-stream/             # FooterSseStatus + use-telemetry-stream.ts (SSE + bfcache)
     │   └── kb-sandboxes/ui/              # Ленивые клиентские острова (mdx-client-widgets.tsx, D3, MCP)
     │
@@ -50,9 +50,9 @@ apps/web/
     └── shared/                           # [Слой 5: Infrastructure & Common Tools]
         ├── hooks/                        # Чистые браузерные DOM/ScrollSpy-хуки (use-section-navigation.ts)
         ├── i18n/                         # routing.ts, request.ts (next/root-params), navigation.ts
-        ├── lib/                          # edge-jwt.ts (Web Crypto HS256), analytics.ts
+        ├── lib/                          # edge-jwt.ts (Web Crypto HS256), palette.ts (Zero-FOUC), analytics.ts
         ├── providers/                    # ThemeProvider (next-themes), QueryProvider (TanStack + IndexedDB)
-        └── store/                        # useUIStore (Zustand — исключительно клиентское UI-состояние)
+        └── store/                        # useUIStore (Zustand — модалки, фильтры, папки сайдбара, palette)
 ```
 
 ### Почему нет плоских папок `components/`, `hooks/`, `lib/` и как разделены хуки
@@ -106,8 +106,13 @@ apps/web/
    - `useUIStore` (`Zustand`) отвечает исключительно за синхронное UI-состояние: открытие `GuestPassModal` / `CommandPaletteModal`, фильтр `TechRadarTable`, инспектор ADR и раскрытые ветки `KnowledgeSidebar` (с SSR-безопасной гидратацией из `sessionStorage`).
 4. **Интеграция с монорепозиторием (`@repo/shared-schemas`, `@repo/ui`, `apps/api`):**
    - `@repo/shared-schemas` (`Zod v4`) — единый источник контрактов: `GuestPassFormSchema` (валидация формы `React Hook Form` на клиенте и `ZodValidationPipe` на бэкенде), `SessionProfileSchema`, `ArticleMetaSchema`, `TelemetryEventSchema`, `KnowledgeCategoryEnum` и константы `KB_ACCESS_COOKIE_NAME`.
-   - `@repo/ui` — дизайн-система на Tailwind + Radix UI с документацией в Storybook 10.
+   - `@repo/ui` — дизайн-система на **Tailwind CSS v4** + **Radix UI** со 100% покрытием всех 9/9 компонентов в Storybook 10.
    - Связь с `apps/api` идёт через same-origin `/api/*` rewrites в `next.config.ts` (`API_INTERNAL_URL`), что позволяет бесшовно передавать `HttpOnly` cookie `kb_access_token` и держать `EventSource` на `/api/telemetry/stream`.
+5. **CSS-first Tailwind CSS v4, 2D Appearance (`Mode × Palette`), Zero-CLS шрифты и осознанные Modern Web trade-offs:**
+   - **Composition Root + инверсия зависимостей:** `apps/web/src/app/globals.css` запускает движок `@tailwindcss/postcss`, импортирует чистый контракт дизайн-системы `@repo/ui/theme.css` (`@theme inline`, `@custom-variant dark`) и объявляет границы сканирования `@source` для `src/`, `content/` и `packages/ui/src`.
+   - **Cascade Layers & Baseline UX:** в `@layer base` включены `scrollbar-gutter: stable`, `scrollbar-width: thin`, `scroll-padding-top`, `text-wrap: balance` (заголовки) и `text-wrap: pretty` (абзацы); `.shiki` и `@starting-style` анимации входа `Dialog` изолированы в `@layer components`; `@media (prefers-reduced-motion: reduce)` вынесено вне `@layer`, чтобы перекрывать утилиты без `!important`.
+   - **2D Appearance и Zero-CLS шрифты:** `ThemeToggle` объединяет режим яркости (`Light / Dark / System`) и семантическую палитру (`Warm Paper / Graphite / Sepia`) с синхронным Zero-FOUC `<script>` в `<head>` (`PALETTE_INIT_SCRIPT`); `Inter` и `JetBrains Mono` (`latin + cyrillic`) встраиваются на этапе сборки через `next/font/google`.
+   - **Точечные `@container` queries и компромиссы:** `Card` и `ArticleImageGrid` адаптируются от ширины собственного контейнера (`@xs`, `@sm`, `@md`); для модальных окон и `CommandPaletteModal` осознанно оставлен `Radix UI Dialog` (фокус-трап и scroll-lock) с CSS `@starting-style` вместо нативного `<dialog>`, а `CSS Anchor Positioning` и `light-dark()` отложены до полного соответствия нашему `browserslist` (`Chrome >= 111`, `Edge >= 111`, `Firefox >= 128`, `Safari >= 16.4`).
 
 ---
 
