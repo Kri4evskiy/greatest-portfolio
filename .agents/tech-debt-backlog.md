@@ -4,8 +4,8 @@
 
 Архитектурное ядро находится в продакшен-состоянии (`v0.8.0`; подробности и 16 ADR лежат в `.agents/frontend/*`, `.agents/backend/*`, `.agents/architecture/*` и статьях базы знаний):
 - **Monorepo & DX:** `pnpm 12.21.0` + `Turborepo` + `TypeScript 7.0.2` (native Go compiler) + `Biome 2.6.4` + `Lefthook` · `@repo/shared-schemas` (`Zod v4`) + `@repo/ui` (`Tailwind CSS v4.3.5` + `Storybook 10` `9/9`) · Multi-stage `Docker` + `GitHub Actions CI/CD`.
-- **Frontend (`apps/web`):** `Next.js 16.4.6` (`React 19 Compiler`) · архитектура `FSD-Modular` (`app` ➔ `widgets` ➔ `features` ➔ `entities` ➔ `shared`) · `next-intl` (`EN/UK/RU`, `143` SSG-роута) · 2D Appearance (`Mode × Palette` + Zero-FOUC `PALETTE_INIT_SCRIPT` + cross-tab sync в `ThemeProvider` через `useUIStore.getState()`) · self-hosted Zero-CLS `Inter` + `JetBrains Mono` (`next/font/google`) · `@starting-style` + `@container` · `Zero-Eval HAST MDX Engine` (`remark-directive` `:::sandbox` + `remark-rehype` + `hast-util-to-jsx-runtime` + `mtimeMs` кэш + `Dual-Theme Shiki`) · `Cmd+K` SSG-индекс · `TanStack Query v5` (`IndexedDB`) · `D3.js` клиентские острова · `Edge Web Crypto JWT` + строгий `CSP` (`font-src 'self' data:`).
-- **Backend (`apps/api` & `apps/telemetry-ms`):** `NestJS 12 ESM` (4-компонентная Enterprise-структура `common`/`config`/`migrations`/`modules`, fail-fast Zod env validation & timing-safe auth) + `Prisma 7` (`7.10.1`, Rust-free Wasm + Native ESM + `@prisma/adapter-pg`, с In-Memory fallback и CLI `prisma:seed`) + `HttpOnly JWT` + `Helmet` + `@nestjs/throttler` + изолированный TCP-микросервис телеметрии (`:4001`) с `SSE`-стримингом.
+- **Frontend (`apps/web`):** `Next.js 16.4.6` (`React 19 Compiler`) · архитектура `FSD-Modular` (`app` ➔ `widgets` ➔ `features` ➔ `entities` ➔ `shared`) · `next-intl` (`EN/UK/RU`, `167` SSG-роутов) · 2D Appearance (`Mode × Palette` + Zero-FOUC `PALETTE_INIT_SCRIPT` + cross-tab sync в `ThemeProvider` через `useUIStore.getState()`) · self-hosted Zero-CLS `Inter` + `JetBrains Mono` (`next/font/google`) · `@starting-style` + `@container` · `Zero-Eval HAST MDX Engine` (`remark-directive` `:::sandbox` + `remark-rehype` + `hast-util-to-jsx-runtime` + `mtimeMs` кэш + `Dual-Theme Shiki`) · `KnowledgeDirectoryExplorer` (инкрементальный `Show more` разделов по 6, свёртывание подтем `> 6` и Топ-10 `#тегов` с поиском) · `Cmd+K` SSG-индекс · `TanStack Query v5` (`IndexedDB`) · `D3.js` клиентские острова · `Edge Web Crypto JWT` + строгий `CSP` (`font-src 'self' data:`).
+- **Backend (`apps/api` & `apps/telemetry-ms`):** `NestJS 12 ESM` (4-компонентная Enterprise-структура `common`/`config`/`migrations`/`modules`, fail-fast Zod env validation & timing-safe auth) + `Prisma 7` (`7.10.1`, Rust-free Wasm + Native ESM + `@prisma/adapter-pg`, с In-Memory fallback и CLI `prisma:seed`) + общие Zod-схемы Offset/Cursor пагинации (`@repo/shared-schemas`) и эндпоинты `GET /api/knowledge/metrics/paginated` / `GET /api/telemetry/events` + `HttpOnly JWT` + `Helmet` + `@nestjs/throttler` + изолированный TCP-микросервис телеметрии (`:4001`) с `SSE`-стримингом.
 
 ---
 
@@ -24,7 +24,7 @@
 ### Приоритет №2: Production SEO (`robots.ts` / `sitemap.ts`), Локализованные Error/404 и Zero-Friction `Docker Compose` Demo
 
 - [ ] **Технический SEO-минимум и границы ошибок (`apps/web/src/app`):**
-  1. `apps/web/src/app/robots.ts` и `sitemap.ts`: генерация правил индексации и карты всех **143 SSG-маршрутов** с `alternates.languages` (`hreflang` для `en` / `ua` / `ru`) + `metadataBase`.
+  1. `apps/web/src/app/robots.ts` и `sitemap.ts`: генерация правил индексации и карты всех **167 SSG-роутов** с `alternates.languages` (`hreflang` для `en` / `ua` / `ru`) + `metadataBase`.
   2. Локализованные `apps/web/src/app/[locale]/not-found.tsx` и `error.tsx` в дополнение к root `global-error.tsx`.
      _(Динамические `opengraph-image.tsx` / `icon.tsx` вынесены в отдельную задачу бэклога ниже — логично делать их в связке с `UI v2`, чтобы не перерисовывать карточку дважды.)_
 - [ ] **`docker-compose.yml` Zero-Friction Demo для тимлида vs Strict Production (`docker-compose.prod.yml`):**
@@ -56,6 +56,30 @@
 
 - [ ] **Авторский редизайн Workfolio (`UI v2`):** глубокое визуальное и типографическое переосмысление интерфейса поверх уже готового фундамента (`Tailwind CSS v4`, 2D-палитры `Warm Paper / Graphite / Sepia`, Zero-CLS шрифты `Inter` + `JetBrains Mono`, `@starting-style`, `@container` и опциональные `View Transitions`), строго следуя `.agents/frontend/*` (Mobile-First с опорой на `360px`, чистая иерархия, продуманные карточки и таблицы без визуального шума).
 
+### Приоритет №6 (Full-Stack Backend Track): DB-Backed Knowledge Base CMS (`NestJS Entities` + `Prisma 7` + `R2/MinIO` + Server-Side Pagination)
+
+- [ ] **Полноценный CMS-бэкенд для Базы Знаний с реальной пагинацией из БД и объектным хранением `.mdx`:**
+  1. **Цель и контекст (результаты аудита диска):** перенести каталог и выдачу Базы Знаний на реальные SQL-запросы к PostgreSQL через NestJS 12, чтобы кнопки `Показать ещё разделы`, `Показать ещё` внутри подтем (`4+` карточек) и фильтрация/поиск `#тегов` выполняли настоящие запросы на бэкенд, а `.mdx`-тела статей и медиафайлы хранились в `Cloudflare R2` / `MinIO` без пересборки всего фронтенда при добавлении новых заметок. *(Фактический аудит репозитория: текущие `.mdx` в `apps/web/content` занимают лишь ~699 KB; основной объём диска съедает локальный кэш `.turbo` — ~6.4 GB — и общий `node_modules` ~1.22 GB, поэтому `.turbo` достаточно периодически очищать.)*
+  2. **Реляционная схема `Prisma 7` (`apps/api/prisma/schema.prisma`) — новые Entities:**
+     - `KnowledgeTopic` (`id`, `slug @unique`, `order`, `icon`, локализованные заголовки `titleEn`/`titleRu`/`titleUk`, связь `1:N` ➔ `KnowledgeSubtopic`).
+     - `KnowledgeSubtopic` (`id`, `topicId`, `slug`, `order`, локализованные заголовки `titleEn`/`titleRu`/`titleUk`, `@@unique([topicId, slug])`, `@@index([topicId, order])`, связь `1:N` ➔ `KnowledgeArticle`).
+     - `KnowledgeArticle` (`id`, `subtopicId`, `slug`, `routePath @unique`, `locale`, `format`, `title`, `sidebarLabel`, `summary`, `readingTime`, `order`, `status`: `DRAFT | PUBLISHED | ARCHIVED`, `storageKey` для тела `.mdx` в R2/MinIO, `contentHash` SHA-256 для ETag/инвалидации кэша, `byteSize`, связь с `ArticleMetrics`, `@@index([subtopicId, locale, status, order])`).
+     - `KnowledgeTag` (`id`, `slug @unique`, `label`, `usageCount`) + join-таблица `KnowledgeArticleTag` (`@@id([articleId, tagId])`, `@@index([tagId])`) для быстрого `Топ-10` и SQL-фильтрации `M:N`.
+  3. **Модули `NestJS 12` и API-контракты (`apps/api/src/modules/knowledge-cms/*` + `@repo/shared-schemas`):**
+     - Enterprise-декомпозиция сервисов: `TopicsService`, `SubtopicsService`, `ArticlesService`, `TagsService`, `StorageService` (`@aws-sdk/client-s3` для R2/MinIO).
+     - Переиспользование уже готовых Zod-контрактов `OffsetPaginationQuerySchema` и `CursorPaginationQuerySchema` из `@repo/shared-schemas`:
+       - `GET /api/knowledge/topics?limit=6&offset=0&locale=ru` — Offset-пагинация верхних разделов с превью первых подтем, `total` и `hasMore` для кнопки `Показать ещё разделы`.
+       - `GET /api/knowledge/topics/:topicSlug/subtopics?limit=6&offset=0&locale=ru` — Offset-пагинация подтем внутри выбранного раздела.
+       - `GET /api/knowledge/articles?topic=&subtopic=&tag=&format=&q=&limit=4&cursor=` — Cursor-пагинация (`take: limit + 1`) для сетки `4 карточки + Show more` в подтемах, серверной фильтрации по `#тегу`/формату и полнотекстового поиска PostgreSQL (`tsvector` + GIN-индекс).
+       - `GET /api/knowledge/tags?limit=10&search=&offset=0` — серверный `Топ-10 #тегов` и серверный поиск с пагинацией при раскрытии панели «Все теги».
+       - `GET /api/knowledge/articles/:routePath` — чтение метадаты из PostgreSQL + скачивание сырого `.mdx` из R2/MinIO с кэшированием скомпилированного HAST в Redis/памяти по `contentHash`.
+       - Admin CRUD (`@Roles('ADMIN')`) + CLI-скрипт `sync:mdx-to-cms` для первичной и инкрементальной синхронизации локальных `apps/web/content/**/*.mdx` в PostgreSQL + R2/MinIO.
+  4. **Frontend-интеграция (`apps/web`, FSD-Modular + `TanStack Query v5`):**
+     - **SSR/ISR HydrationBoundary + `useInfiniteQuery`:** серверный prefetch первой порции (6 разделов + Топ-10 тегов) для мгновенного первого экрана и SEO, а догрузка по кнопкам `Показать ещё` (разделы, подтемы, сетка 4+ статей) — через `useInfiniteQuery` в `apps/web/src/entities/knowledge-article/queries/` с реальными запросами в Network Tab.
+     - **Debounced (`250ms`) серверный поиск по `#тегам`** в раскрывающейся панели с кэшированием в `TanStack Query`.
+     - **On-Demand ISR (`revalidateTag`)** при создании/обновлении статьи в Admin API или синхронизации с R2.
+     - **Graceful Air-Gapped Fallback:** если `DATABASE_URL` или S3/R2-ключи не заданы, UI без ошибок работает на локальном SSG-движке `apps/web/content/*.mdx` (в единой модели Capability Gating).
+
 ---
 
 ## 🔧 Инфраструктурный и Архитектурный Бэклог
@@ -84,8 +108,8 @@
 - [ ] **Live Sentry & PostHog SDK:** заменить обёртки-заглушки на реальные транспорты `@sentry/nextjs`, `@sentry/nestjs` и `posthog-js`, включаемые при наличии ключей в `.env`.
 - [ ] **Neon.tech Cloud Database Migration:** подключить боевой `DATABASE_URL` от Neon.tech PostgreSQL, прогнать `prisma migrate deploy` и сид (`pnpm --filter @repo/api prisma:seed` / `src/migrations/scripts/seed.ts`). _(Готовая заготовка: при добавлении админ-таблицы логов `SystemEventLog` / `VisitorSession` использовать `PaginationQueryDto` из `common/dto/pagination-query.dto.ts`.)_
 - [ ] **S3-compatible Object Storage (`Cloudflare R2` + локальный `MinIO` — Backend Learning & Showcase):** освоить и внедрить в `apps/api` интеграцию через `@aws-sdk/client-s3`:
-  - _Зачем:_ практическое изучение работы с приватными объектными бакетами (`R2` / `MinIO`), IAM least-privilege ключами, генерацией краткоживущих **Presigned URLs** и безопасным бэкенд-стримингом/проксированием PDF-резюме и загружаемых ассетов с проверкой MIME-типов и размеров файлов.
-  - _Локальная разработка:_ легковесный `minio` сервис в `docker-compose` + graceful fallback на локальный статический файл `/cv/*.pdf`, когда S3 env-переменные не заданы.
+  - _Зачем:_ практическое изучение работы с приватными объектными бакетами (`R2` / `MinIO`), IAM least-privilege ключами, генерацией краткоживущих **Presigned URLs** и безопасным бэкенд-стримингом/проксированием PDF-резюме и загружаемых ассетов с проверкой MIME-типов и размеров файлов. Единый `StorageService` / бакет обслуживает как CV (`/cv/*.pdf`), так и тела `.mdx`-статей + медиа-ассеты Базы Знаний для **Приоритета №6**.
+  - _Локальная разработка:_ легковесный `minio` сервис в `docker-compose` + graceful fallback на локальный статический файл `/cv/*.pdf` и локальные `apps/web/content/*.mdx`, когда S3 env-переменные не заданы.
 - [ ] **Nginx Reverse Proxy (`docker-compose.prod.yml` — Self-Hosted / VPS Learning Track):** настроить `Nginx` как единую точку входа (порты `80/443`, TLS) между внешними клиентами, фронтендом (`web:3000`) и бэкендом (`api:4000`) в качестве self-hosted/VPS альтернативы облачному Runbook (Vercel + Render):
   - отработать конфигурирование upstream-проксирования `/api/*` ➔ `api:4000`, отключение буферизации (`proxy_buffering off;`, `proxy_read_timeout`, `Connection ''`) для бесперебойных **SSE-стримов**, передачу `X-Forwarded-For` / `X-Real-IP` для `@nestjs/throttler` (`trust proxy: 1`), L7 rate limiting и базовую защиту заголовков.
 - [ ] **Dual-Mode Air-Gapped Local Environment и Capability-Gated UI («Тумблер офлайна»):** развивать единый graceful-режим для всех _будущих_ внешних сервисов (`Redis`, `S3/R2/MinIO`, `Sentry`, `PostHog`, `Telegram Bot API`), не ломая уже автономное ядро (`In-Memory Prisma`, `In-Memory Throttler`, self-hosted `.woff2` шрифты, локальный MDX/Shiki):
@@ -100,7 +124,7 @@
     1. `apps/web/src/app/[locale]/opengraph-image.tsx` (и при желании `twitter-image.tsx`) на базе `next/og` (`ImageResponse` / Satori) размером `1200×630` PNG + экспортами `alt`, `size`, `contentType` — чтобы при отправке ссылки в **Telegram, LinkedIn, Slack или X** вместо пустой ссылки отображалась фирменная карточка-превью с именем, позицией и стеком.
     2. `apps/web/src/app/icon.tsx` (`32×32`) + `apple-icon.tsx` (`180×180`) и корректный `metadataBase` (`new URL(process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000')`) в `layout.tsx`, иначе абсолютные `og:image` URL при деплое собираются с `localhost`.
     3. _Нюанс Satori + Air-Gapped / CSS-токены:_ `ImageResponse` не поддерживает `var(--background)` / CSS-переменные и внешние Google Fonts в офлайне — цветовые константы нужно передавать инлайн-стилями (Satori subset flexbox), а шрифт `Inter` грузить локальным буфером `.ttf` / `.otf` / `.woff` через `node:fs/promises` (`.woff2` Satori не парсит!).
-    4. _2 уровня генерации:_ сначала корневая карточка для `/` и `/cv`, затем опционально `opengraph-image.tsx` внутри `/knowledge-base/[...slug]/` с `generateStaticParams` (автогенерация превью из `title`, `category` и `tags` каждой из 143 SSG-статей).
+    4. _2 уровня генерации:_ сначала корневая карточка для `/` и `/cv`, затем опционально `opengraph-image.tsx` внутри `/knowledge-base/[...slug]/` с `generateStaticParams` (автогенерация превью из `title`, `category` и `tags` каждой статьи — сейчас 167 SSG-роутов).
 
 ### 5. Backend AI & Model Context Protocol (`apps/api` — Future Milestone)
 
