@@ -1,6 +1,7 @@
 import '../globals.css'
 import { DEFAULT_LOCALE, SUPPORTED_LOCALES, SupportedLocaleEnum } from '@repo/shared-schemas'
 import type { Metadata } from 'next'
+import { Inter, JetBrains_Mono } from 'next/font/google'
 import { notFound } from 'next/navigation'
 import { NextIntlClientProvider } from 'next-intl'
 import { getMessages, getTranslations } from 'next-intl/server'
@@ -12,6 +13,18 @@ import { QueryProvider } from '@/shared/providers/query-provider'
 import { ThemeProvider } from '@/shared/providers/theme-provider'
 import { WorkfolioFooter } from '@/widgets/footer/workfolio-footer'
 import { WorkfolioHeader } from '@/widgets/header/workfolio-header'
+
+const inter = Inter({
+  subsets: ['latin', 'cyrillic'],
+  variable: '--font-inter',
+  display: 'swap',
+})
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ['latin', 'cyrillic'],
+  variable: '--font-jetbrains-mono',
+  display: 'swap',
+})
 
 export function generateStaticParams() {
   return SUPPORTED_LOCALES.map((locale) => ({ locale }))
@@ -45,7 +58,7 @@ export default async function LocaleRootLayout({
   const messages = await getMessages()
 
   return (
-    <html lang={parsed.data} suppressHydrationWarning>
+    <html lang={parsed.data} className={`${inter.variable} ${jetbrainsMono.variable}`} suppressHydrationWarning>
       <head>
         {/* biome-ignore lint/security/noDangerouslySetInnerHtml: Static allowlisted IIFE preventing FOUC for saved data-palette before hydration */}
         <script dangerouslySetInnerHTML={{ __html: PALETTE_INIT_SCRIPT }} />

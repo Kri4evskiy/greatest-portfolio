@@ -2,7 +2,7 @@ import { cva, type VariantProps } from 'class-variance-authority'
 import * as React from 'react'
 import { cn } from '../lib/utils'
 
-export const cardVariants = cva('rounded-lg text-card-foreground transition-all', {
+export const cardVariants = cva('@container rounded-lg text-card-foreground transition-all', {
   variants: {
     variant: {
       default: 'border border-border bg-card shadow-xs',

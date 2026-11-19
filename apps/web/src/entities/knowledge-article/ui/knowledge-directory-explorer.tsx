@@ -165,7 +165,7 @@ export function KnowledgeDirectoryExplorer({ tree, articles, tags, locale }: Kno
                 return (
                   <Link key={article.routePath} href={`/knowledge-base/${article.routePath}`} className="group block">
                     <Card className="flex h-full flex-col justify-between transition-all group-hover:border-primary/50 group-hover:shadow-md">
-                      <CardHeader className="pb-3">
+                      <CardHeader className="p-4 pb-3 @sm:p-5 @sm:pb-3">
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <div className="flex flex-wrap items-center gap-1.5">
                             <Badge variant="secondary" className="font-mono text-[10px]">
@@ -185,13 +185,13 @@ export function KnowledgeDirectoryExplorer({ tree, articles, tags, locale }: Kno
                             {article.readingTime}
                           </span>
                         </div>
-                        <CardTitle className="mt-2 text-base leading-snug transition-colors group-hover:text-primary">
+                        <CardTitle className="mt-2 text-base leading-snug transition-colors group-hover:text-primary @sm:text-lg">
                           {article.title}
                         </CardTitle>
                         <CardDescription className="text-xs leading-relaxed">{article.summary}</CardDescription>
                       </CardHeader>
 
-                      <CardContent className="pt-0">
+                      <CardContent className="p-4 pt-0 @sm:px-5 @sm:pb-5 @sm:pt-0">
                         {article.tags.length > 0 ? (
                           <div className="mb-3 flex flex-wrap gap-1">
                             {article.tags.map((tag) => (

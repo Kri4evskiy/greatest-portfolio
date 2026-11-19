@@ -44,8 +44,8 @@ export function ArticleImageGrid({
   const [zoomedItem, setZoomedItem] = useState<ArticleDiagramCard | null>(null)
 
   return (
-    <div className="my-6 space-y-2">
-      <div className="flex items-center justify-between text-xs text-muted-foreground">
+    <div className="@container my-6 space-y-2">
+      <div className="flex flex-wrap items-center justify-between gap-1 text-xs text-muted-foreground">
         <span className="flex items-center gap-1.5 font-mono">
           <ImageIcon className="h-3.5 w-3.5" />
           MDX Component: &lt;ArticleImageGrid /&gt; (WebP Adaptive Grid)
@@ -53,13 +53,13 @@ export function ArticleImageGrid({
         <span className="font-mono text-[11px]">Click card to zoom</span>
       </div>
 
-      <div className={`grid gap-4 ${columns === 1 ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-2'}`}>
+      <div className={`grid gap-4 ${columns === 1 ? 'grid-cols-1' : 'grid-cols-1 @md:grid-cols-2'}`}>
         {items.map((item) => (
           <button
             key={item.id}
             type="button"
             onClick={() => setZoomedItem(item)}
-            className="group flex flex-col justify-between rounded-lg border border-border bg-card p-4 text-left transition-all hover:border-primary/50 hover:shadow-md"
+            className="group flex flex-col justify-between rounded-lg border border-border bg-card p-3 text-left transition-all hover:border-primary/50 hover:shadow-md @sm:p-4"
           >
             <div className="w-full">
               <div className="flex items-center justify-between gap-2">

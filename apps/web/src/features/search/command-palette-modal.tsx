@@ -1,7 +1,7 @@
 'use client'
 
 import { getKnowledgeFormatLabel, type SupportedLocale } from '@repo/shared-schemas'
-import { Badge } from '@repo/ui'
+import { Badge, Dialog, DialogContent, DialogDescription, DialogTitle } from '@repo/ui'
 import {
   ArrowRight,
   BookOpen,
@@ -99,10 +99,6 @@ export function CommandPaletteModal({ locale }: CommandPaletteModalProps) {
     if (!isOpen) return
     setQuery(initialQuery)
     setActiveIndex(0)
-    const timer = window.setTimeout(() => {
-      inputRef.current?.focus()
-    }, 20)
-    return () => window.clearTimeout(timer)
   }, [isOpen, initialQuery])
 
   // Global Cmd+K / Ctrl+K shortcut listener
@@ -115,25 +111,12 @@ export function CommandPaletteModal({ locale }: CommandPaletteModalProps) {
         } else {
           openPalette('')
         }
-      } else if (event.key === 'Escape' && isOpen) {
-        event.preventDefault()
-        closePalette()
       }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [isOpen, openPalette, closePalette])
-
-  // Prevent background scrolling while open
-  useEffect(() => {
-    if (!isOpen) return
-    const previousOverflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => {
-      document.body.style.overflow = previousOverflow
-    }
-  }, [isOpen])
 
   const quickActions = useMemo<PaletteEntry[]>(
     () => [
@@ -281,24 +264,24 @@ export function CommandPaletteModal({ locale }: CommandPaletteModalProps) {
     }
   }
 
-  if (!isOpen) {
-    return null
-  }
-
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label="Global Command Palette"
-      className="fixed inset-0 z-50 flex items-start justify-center bg-foreground/40 px-3 pt-14 backdrop-blur-xs sm:px-4 sm:pt-20"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) closePalette()
-      }}
-      onKeyDown={(e) => {
-        if (e.key === 'Escape') closePalette()
+    <Dialog
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open) closePalette()
       }}
     >
-      <div className="flex max-h-[80dvh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
+      <DialogContent
+        hideCloseButton
+        onOpenAutoFocus={(event) => {
+          event.preventDefault()
+          inputRef.current?.focus()
+        }}
+        className="top-[10dvh] flex max-h-[80dvh] w-[calc(100%-1.5rem)] max-w-2xl translate-y-0 flex-col gap-0 overflow-hidden rounded-2xl border-border bg-card p-0 shadow-2xl sm:top-[12dvh]"
+      >
+        <DialogTitle className="sr-only">{t('cmdPlaceholder')}</DialogTitle>
+        <DialogDescription className="sr-only">{t('cmdHintNavigate')}</DialogDescription>
+
         {/* Search Input Header */}
         <div className="flex items-center gap-2.5 border-b border-border px-3.5 py-3 sm:px-4">
           {isLoadingIndex ? (
@@ -485,7 +468,7 @@ export function CommandPaletteModal({ locale }: CommandPaletteModalProps) {
           </div>
           <span>Ctrl+K / ⌘K</span>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   )
 }

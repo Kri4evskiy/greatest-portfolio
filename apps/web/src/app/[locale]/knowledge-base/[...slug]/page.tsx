@@ -125,8 +125,8 @@ function ArticlePreviewCard({
     <Link href={`/knowledge-base/${item.routePath}`} className="group block h-full">
       <Card className="flex h-full flex-col justify-between transition-all group-hover:border-primary/50 group-hover:shadow-md">
         <CardHeader className="pb-3">
-          <div className="flex items-center justify-between gap-2">
-            <Badge variant="outline" className="font-mono text-[10px] text-primary">
+          <div className="flex flex-col gap-1.5 @xs:flex-row @xs:items-center @xs:justify-between">
+            <Badge variant="outline" className="w-fit font-mono text-[10px] text-primary">
               {getKnowledgeFormatLabel(item.format, locale)}
             </Badge>
             <span className="flex items-center gap-1 font-mono text-[11px] text-muted-foreground">
@@ -134,7 +134,7 @@ function ArticlePreviewCard({
               {item.readingTime}
             </span>
           </div>
-          <CardTitle className="mt-1.5 text-base leading-snug transition-colors group-hover:text-primary">
+          <CardTitle className="mt-1.5 text-base leading-snug transition-colors group-hover:text-primary @sm:text-lg">
             {item.title}
           </CardTitle>
           <CardDescription className="text-xs leading-relaxed">{item.summary}</CardDescription>
