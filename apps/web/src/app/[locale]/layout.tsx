@@ -7,6 +7,7 @@ import { getMessages, getTranslations } from 'next-intl/server'
 import { type ReactNode, Suspense } from 'react'
 import { GuestPassModal } from '@/features/auth/guest-pass-modal'
 import { CommandPaletteModal } from '@/features/search/command-palette-modal'
+import { PALETTE_INIT_SCRIPT } from '@/shared/lib/palette'
 import { QueryProvider } from '@/shared/providers/query-provider'
 import { ThemeProvider } from '@/shared/providers/theme-provider'
 import { WorkfolioFooter } from '@/widgets/footer/workfolio-footer'
@@ -45,6 +46,10 @@ export default async function LocaleRootLayout({
 
   return (
     <html lang={parsed.data} suppressHydrationWarning>
+      <head>
+        {/* biome-ignore lint/security/noDangerouslySetInnerHtml: Static allowlisted IIFE preventing FOUC for saved data-palette before hydration */}
+        <script dangerouslySetInnerHTML={{ __html: PALETTE_INIT_SCRIPT }} />
+      </head>
       <body
         suppressHydrationWarning
         className="min-h-screen bg-background font-sans text-foreground antialiased selection:bg-primary selection:text-primary-foreground"

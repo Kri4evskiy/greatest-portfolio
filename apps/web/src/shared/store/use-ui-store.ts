@@ -1,5 +1,11 @@
 import type { TechCategory, TechRadarItem } from '@repo/shared-schemas'
 import { create } from 'zustand'
+import {
+  applyPaletteToDocument,
+  persistPaletteToStorage,
+  readPaletteFromStorage,
+  type WorkfolioPalette,
+} from '@/shared/lib/palette'
 
 const KB_EXPANDED_SESSION_KEY = 'workfolio-kb-expanded'
 
@@ -53,6 +59,8 @@ interface UIState {
   isKbSidebarOpen: boolean
   expandedKbFolders: Record<string, boolean>
   hasHydratedKbFolders: boolean
+  palette: WorkfolioPalette
+  hasHydratedPalette: boolean
 
   openGuestPassModal: (redirectPath?: string | null) => void
   closeGuestPassModal: () => void
@@ -69,6 +77,8 @@ interface UIState {
   expandKbAncestors: (pathKeys: readonly string[]) => void
   collapseAllKbFolders: () => void
   expandAllKbFolders: (pathKeys: readonly string[]) => void
+  hydratePaletteFromStorage: () => void
+  setPalette: (palette: WorkfolioPalette) => void
 }
 
 const DEFAULT_EXPANDED_FOLDERS: Record<string, boolean> = {}
@@ -84,6 +94,8 @@ export const useUIStore = create<UIState>((set) => ({
   isKbSidebarOpen: true,
   expandedKbFolders: DEFAULT_EXPANDED_FOLDERS,
   hasHydratedKbFolders: false,
+  palette: 'default',
+  hasHydratedPalette: false,
 
   openGuestPassModal: (redirectPath = null) =>
     set({
@@ -181,4 +193,24 @@ export const useUIStore = create<UIState>((set) => ({
       persistExpandedFoldersToSession(next)
       return { expandedKbFolders: next }
     }),
+  hydratePaletteFromStorage: () =>
+    set((state) => {
+      if (state.hasHydratedPalette) {
+        return state
+      }
+      const restored = readPaletteFromStorage()
+      applyPaletteToDocument(restored)
+      return {
+        palette: restored,
+        hasHydratedPalette: true,
+      }
+    }),
+  setPalette: (palette) => {
+    applyPaletteToDocument(palette)
+    persistPaletteToStorage(palette)
+    set({
+      palette,
+      hasHydratedPalette: true,
+    })
+  },
 }))

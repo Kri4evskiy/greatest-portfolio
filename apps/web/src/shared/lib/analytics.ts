@@ -8,6 +8,7 @@ export type AnalyticsEventName =
   | 'cv_pdf_downloaded'
   | 'language_switched'
   | 'theme_toggled'
+  | 'palette_changed'
 
 export function trackEvent(
   event: AnalyticsEventName,
