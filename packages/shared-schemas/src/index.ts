@@ -1,6 +1,7 @@
 export * from './auth.schema.js'
 export * from './knowledge.schema.js'
 export * from './locale.schema.js'
+export * from './pagination.schema.js'
 export * from './roles.schema.js'
 export * from './tech-radar.schema.js'
 export * from './telemetry.schema.js'

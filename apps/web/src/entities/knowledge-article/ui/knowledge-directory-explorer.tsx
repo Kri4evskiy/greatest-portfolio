@@ -8,15 +8,59 @@ import {
   type SupportedLocale,
 } from '@repo/shared-schemas'
 import { Badge, Card, CardContent, CardDescription, CardHeader, CardTitle } from '@repo/ui'
-import { ArrowRight, Clock, FolderOpen, Hash, Layers, RotateCcw, Search, Sparkles } from 'lucide-react'
+import {
+  ArrowRight,
+  ChevronDown,
+  ChevronUp,
+  Clock,
+  FolderOpen,
+  Hash,
+  Layers,
+  RotateCcw,
+  Search,
+  Sparkles,
+  X,
+} from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useState } from 'react'
-import type { KnowledgeTreeFolderNode, MdxArticleFrontmatter } from '@/entities/knowledge-content'
+import type {
+  KnowledgeTreeArticleNode,
+  KnowledgeTreeFolderNode,
+  MdxArticleFrontmatter,
+} from '@/entities/knowledge-content'
 import { Link } from '@/shared/i18n/navigation'
 import { useUIStore } from '@/shared/store/use-ui-store'
 
 const NOTE_FORMATS: readonly KnowledgeNoteFormat[] = ['cheat-sheet', 'deep-dive', 'adr']
+const MAX_VISIBLE_TAGS = 10
+const MAX_VISIBLE_SUBTOPICS = 6
+const MAX_PREVIEW_NOTES_PER_SUBTOPIC = 3
+
+interface TagFilterPillProps {
+  tag: string
+  count: number
+  active: boolean
+  onToggle: (tag: string) => void
+}
+
+/** Shared #tag pill button rendered in both the collapsed Top-10 bar and searchable drawer. */
+function TagFilterPill({ tag, count, active, onToggle }: TagFilterPillProps) {
+  return (
+    <button
+      type="button"
+      onClick={() => onToggle(tag)}
+      className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 font-mono text-[11px] transition-colors ${
+        active
+          ? 'border-primary bg-primary text-primary-foreground'
+          : 'border-border/80 bg-background text-muted-foreground hover:border-primary/40 hover:text-foreground'
+      }`}
+    >
+      <span>#{tag}</span>
+      <span className="opacity-70">({count})</span>
+    </button>
+  )
+}
 
 interface KnowledgeDirectoryExplorerProps {
   tree: readonly KnowledgeTreeFolderNode[]
@@ -33,10 +77,44 @@ export function KnowledgeDirectoryExplorer({ tree, articles, tags, locale }: Kno
   const urlTag = searchParams.get('tag')?.trim().toLowerCase() ?? null
   const [selectedFormat, setSelectedFormat] = useState<KnowledgeNoteFormat | 'ALL'>('ALL')
   const [selectedTag, setSelectedTag] = useState<string | null>(urlTag)
+  const [showAllTags, setShowAllTags] = useState(false)
+  const [tagSearchQuery, setTagSearchQuery] = useState('')
+  const [expandedTopics, setExpandedTopics] = useState<Record<string, boolean>>({})
+
+  const toggleShowAllTags = () => {
+    setShowAllTags((prev) => {
+      if (prev) setTagSearchQuery('')
+      return !prev
+    })
+  }
+
+  const toggleTopicExpanded = (pathKey: string) => {
+    setExpandedTopics((prev) => ({
+      ...prev,
+      [pathKey]: !(prev[pathKey] ?? false),
+    }))
+  }
 
   useEffect(() => {
     setSelectedTag(urlTag)
   }, [urlTag])
+
+  const hiddenTagsCount = Math.max(0, tags.length - MAX_VISIBLE_TAGS)
+
+  const collapsedTags = useMemo(() => {
+    const topTags = tags.slice(0, MAX_VISIBLE_TAGS)
+    if (!selectedTag || topTags.some((item) => item.tag === selectedTag)) {
+      return topTags
+    }
+    const activeRareTag = tags.find((item) => item.tag === selectedTag)
+    return activeRareTag ? [...topTags, activeRareTag] : topTags
+  }, [tags, selectedTag])
+
+  const filteredAllTags = useMemo(() => {
+    const normalizedQuery = tagSearchQuery.trim().replace(/^#+/, '').toLowerCase()
+    if (!normalizedQuery) return tags
+    return tags.filter((item) => item.tag.toLowerCase().includes(normalizedQuery))
+  }, [tags, tagSearchQuery])
 
   const isFiltering = selectedFormat !== 'ALL' || selectedTag !== null
 
@@ -102,42 +180,103 @@ export function KnowledgeDirectoryExplorer({ tree, articles, tags, locale }: Kno
 
         {/* #Tag Pills */}
         {tags.length > 0 ? (
-          <div className="flex flex-wrap items-center gap-1.5 border-t border-border/60 pt-3">
-            <span className="mr-1 inline-flex items-center gap-1 font-mono text-[11px] text-muted-foreground">
-              <Hash className="h-3 w-3" />
-              <span>{t('filterTagsLabel')}</span>
-            </span>
-            {tags.map(({ tag, count }) => {
-              const active = selectedTag === tag
-              return (
-                <button
-                  key={tag}
-                  type="button"
-                  onClick={() => setSelectedTag(active ? null : tag)}
-                  className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 font-mono text-[11px] transition-colors ${
-                    active
-                      ? 'border-primary bg-primary text-primary-foreground'
-                      : 'border-border/80 bg-background text-muted-foreground hover:border-primary/40 hover:text-foreground'
-                  }`}
-                >
-                  <span>#{tag}</span>
-                  <span className="opacity-70">({count})</span>
-                </button>
-              )
-            })}
+          <div className="space-y-2.5 border-t border-border/60 pt-3">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="mr-1 inline-flex items-center gap-1 font-mono text-[11px] text-muted-foreground">
+                <Hash className="h-3 w-3" />
+                <span>{t('filterTagsLabel')}</span>
+              </span>
 
-            {isFiltering ? (
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedFormat('ALL')
-                  setSelectedTag(null)
-                }}
-                className="ml-auto inline-flex items-center gap-1 rounded-md px-2 py-0.5 font-mono text-[11px] text-primary hover:underline"
-              >
-                <RotateCcw className="h-3 w-3" />
-                <span>{t('clearFilters')}</span>
-              </button>
+              {!showAllTags
+                ? collapsedTags.map(({ tag, count }) => (
+                    <TagFilterPill
+                      key={tag}
+                      tag={tag}
+                      count={count}
+                      active={selectedTag === tag}
+                      onToggle={(value) => setSelectedTag((prev) => (prev === value ? null : value))}
+                    />
+                  ))
+                : null}
+
+              {hiddenTagsCount > 0 ? (
+                <button
+                  type="button"
+                  aria-expanded={showAllTags}
+                  onClick={toggleShowAllTags}
+                  className="inline-flex items-center gap-1 rounded-md border border-dashed border-primary/40 bg-primary/5 px-2 py-0.5 font-mono text-[11px] font-medium text-primary transition-colors hover:border-primary hover:bg-primary/10"
+                >
+                  {showAllTags ? (
+                    <>
+                      <span>{t('hideAllTags')}</span>
+                      <ChevronUp className="h-3 w-3 text-primary" />
+                    </>
+                  ) : (
+                    <>
+                      <span>{t('showAllTags', { count: hiddenTagsCount })}</span>
+                      <ChevronDown className="h-3 w-3 text-primary" />
+                    </>
+                  )}
+                </button>
+              ) : null}
+
+              {isFiltering ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedFormat('ALL')
+                    setSelectedTag(null)
+                  }}
+                  className="ml-auto inline-flex items-center gap-1 rounded-md px-2 py-0.5 font-mono text-[11px] text-primary hover:underline"
+                >
+                  <RotateCcw className="h-3 w-3" />
+                  <span>{t('clearFilters')}</span>
+                </button>
+              ) : null}
+            </div>
+
+            {showAllTags && hiddenTagsCount > 0 ? (
+              <div className="space-y-2.5 rounded-lg border border-border/70 bg-muted/20 p-3">
+                <div className="relative flex items-center">
+                  <Search className="pointer-events-none absolute left-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                  <input
+                    type="text"
+                    value={tagSearchQuery}
+                    onChange={(e) => setTagSearchQuery(e.target.value)}
+                    placeholder={t('searchTagsPlaceholder')}
+                    aria-label={t('searchTagsPlaceholder')}
+                    className="w-full rounded-md border border-border bg-background py-1.5 pl-8 pr-8 font-mono text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
+                  />
+                  {tagSearchQuery.length > 0 ? (
+                    <button
+                      type="button"
+                      aria-label={t('clearFilters')}
+                      onClick={() => setTagSearchQuery('')}
+                      className="absolute right-2 rounded-sm p-0.5 text-muted-foreground hover:text-foreground"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  ) : null}
+                </div>
+
+                <div className="max-h-48 overflow-y-auto pr-1">
+                  {filteredAllTags.length === 0 ? (
+                    <p className="py-2 text-center font-mono text-xs text-muted-foreground">{t('noMatchingTags')}</p>
+                  ) : (
+                    <div className="flex flex-wrap gap-1.5">
+                      {filteredAllTags.map(({ tag, count }) => (
+                        <TagFilterPill
+                          key={tag}
+                          tag={tag}
+                          count={count}
+                          active={selectedTag === tag}
+                          onToggle={(value) => setSelectedTag((prev) => (prev === value ? null : value))}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
             ) : null}
           </div>
         ) : null}
@@ -227,6 +366,9 @@ export function KnowledgeDirectoryExplorer({ tree, articles, tags, locale }: Kno
               (child): child is KnowledgeTreeFolderNode => child.type === 'folder',
             )
             const isThisProject = topic.segment === 'this-project'
+            const isTopicExpanded = expandedTopics[topic.pathKey] ?? false
+            const hiddenSubtopicsCount = Math.max(0, subtopics.length - MAX_VISIBLE_SUBTOPICS)
+            const visibleSubtopics = isTopicExpanded ? subtopics : subtopics.slice(0, MAX_VISIBLE_SUBTOPICS)
 
             return (
               <section
@@ -257,35 +399,73 @@ export function KnowledgeDirectoryExplorer({ tree, articles, tags, locale }: Kno
 
                 {/* Level 2: Clickable Subtopic Tabs/Cards inside the Topic */}
                 {subtopics.length > 0 ? (
-                  <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                    {subtopics.map((sub) => (
-                      <Link key={sub.pathKey} href={`/knowledge-base/${sub.pathKey}`} className="group block">
-                        <div className="flex h-full flex-col justify-between rounded-lg border border-border/80 bg-background/80 p-3.5 transition-all group-hover:border-primary/50 group-hover:bg-accent/40 group-hover:shadow-xs">
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="flex min-w-0 items-center gap-2 text-sm font-semibold text-foreground group-hover:text-primary">
-                              <FolderOpen className="h-4 w-4 shrink-0 text-primary/80" />
-                              <span className="truncate">{sub.label}</span>
-                            </span>
-                            <Badge variant="outline" className="shrink-0 font-mono text-[10px]">
-                              {sub.articleCount}
-                            </Badge>
-                          </div>
+                  <>
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                      {visibleSubtopics.map((sub) => {
+                        const directNotes = sub.children.filter(
+                          (child): child is KnowledgeTreeArticleNode => child.type === 'article',
+                        )
+                        const previewNotes = directNotes.slice(0, MAX_PREVIEW_NOTES_PER_SUBTOPIC)
+                        const remainingNotesCount = Math.max(0, sub.articleCount - previewNotes.length)
 
-                          {/* Level 3 Preview: Titles of articles inside this subtopic */}
-                          <ul className="mt-2.5 space-y-1 border-t border-border/50 pt-2 text-xs text-muted-foreground">
-                            {sub.children.slice(0, 3).map((leaf) =>
-                              leaf.type === 'article' ? (
-                                <li key={leaf.pathKey} className="flex items-center gap-1.5 truncate">
-                                  <span className="h-1 w-1 shrink-0 rounded-full bg-primary/60" />
-                                  <span className="truncate">{leaf.article.sidebarLabel}</span>
-                                </li>
-                              ) : null,
-                            )}
-                          </ul>
-                        </div>
-                      </Link>
-                    ))}
-                  </div>
+                        return (
+                          <Link key={sub.pathKey} href={`/knowledge-base/${sub.pathKey}`} className="group block">
+                            <div className="flex h-full flex-col justify-between rounded-lg border border-border/80 bg-background/80 p-3.5 transition-all group-hover:border-primary/50 group-hover:bg-accent/40 group-hover:shadow-xs">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="flex min-w-0 items-center gap-2 text-sm font-semibold text-foreground group-hover:text-primary">
+                                  <FolderOpen className="h-4 w-4 shrink-0 text-primary/80" />
+                                  <span className="truncate">{sub.label}</span>
+                                </span>
+                                <Badge variant="outline" className="shrink-0 font-mono text-[10px]">
+                                  {sub.articleCount}
+                                </Badge>
+                              </div>
+
+                              {/* Level 3 Preview: Titles of articles inside this subtopic */}
+                              {previewNotes.length > 0 || remainingNotesCount > 0 ? (
+                                <ul className="mt-2.5 space-y-1 border-t border-border/50 pt-2 text-xs text-muted-foreground">
+                                  {previewNotes.map((leaf) => (
+                                    <li key={leaf.pathKey} className="flex items-center gap-1.5 truncate">
+                                      <span className="h-1 w-1 shrink-0 rounded-full bg-primary/60" />
+                                      <span className="truncate">{leaf.article.sidebarLabel}</span>
+                                    </li>
+                                  ))}
+                                  {remainingNotesCount > 0 ? (
+                                    <li className="pl-2.5 font-mono text-[11px] text-primary/80">
+                                      {t('moreNotesInSubtopic', { count: remainingNotesCount })}
+                                    </li>
+                                  ) : null}
+                                </ul>
+                              ) : null}
+                            </div>
+                          </Link>
+                        )
+                      })}
+                    </div>
+
+                    {hiddenSubtopicsCount > 0 ? (
+                      <div className="mt-3 flex justify-center border-t border-border/50 pt-3">
+                        <button
+                          type="button"
+                          aria-expanded={isTopicExpanded}
+                          onClick={() => toggleTopicExpanded(topic.pathKey)}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background/80 px-3 py-1.5 font-mono text-xs font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:bg-muted/50 hover:text-foreground"
+                        >
+                          {isTopicExpanded ? (
+                            <>
+                              <ChevronUp className="h-3.5 w-3.5 text-primary" />
+                              <span>{t('showLessSubtopics')}</span>
+                            </>
+                          ) : (
+                            <>
+                              <ChevronDown className="h-3.5 w-3.5 text-primary" />
+                              <span>{t('showMoreSubtopics', { count: hiddenSubtopicsCount })}</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    ) : null}
+                  </>
                 ) : null}
               </section>
             )

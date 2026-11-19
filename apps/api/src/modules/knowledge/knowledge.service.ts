@@ -2,9 +2,11 @@ import { Inject, Injectable } from '@nestjs/common'
 import {
   type ArticleMeta,
   type KnowledgeCategory,
+  type PaginatedArticleMetricsResponse,
   type SessionProfile,
   VISITOR_ROLE_LABELS,
 } from '@repo/shared-schemas'
+import type { PaginationQueryDto } from '../../common/dto/pagination-query.dto.js'
 import { PrismaService } from '../../prisma/prisma.service.js'
 import { TelemetryService } from '../telemetry/telemetry.service.js'
 
@@ -21,6 +23,10 @@ export class KnowledgeService {
 
   async getAllMetrics(): Promise<ArticleMeta[]> {
     return this.prisma.getAllArticleMetrics()
+  }
+
+  async getPaginatedMetrics(query: PaginationQueryDto): Promise<PaginatedArticleMetricsResponse> {
+    return this.prisma.getPaginatedArticleMetrics(query)
   }
 
   async recordView(
