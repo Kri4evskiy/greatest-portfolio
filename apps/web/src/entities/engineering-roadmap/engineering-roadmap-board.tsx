@@ -132,13 +132,13 @@ export function EngineeringRoadmapBoard({ items }: { items: readonly LocalizedRo
               onClick={() => setActiveFilter(tab.id)}
               className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
                 isActive
-                  ? 'border-primary bg-primary text-primary-foreground shadow-sm'
+                  ? 'border-primary bg-primary text-primary-foreground shadow-xs'
                   : 'border-border bg-card text-muted-foreground hover:border-primary/40 hover:text-foreground'
               }`}
             >
               <span>{tab.label}</span>
               <span
-                className={`rounded px-1.5 py-0.5 font-mono text-[10px] ${
+                className={`rounded-sm px-1.5 py-0.5 font-mono text-[10px] ${
                   isActive ? 'bg-primary-foreground/20 text-primary-foreground' : 'bg-muted text-muted-foreground'
                 }`}
               >
@@ -157,7 +157,7 @@ export function EngineeringRoadmapBoard({ items }: { items: readonly LocalizedRo
           return (
             <div
               key={item.id}
-              className="rounded-xl border border-border bg-card p-4 shadow-sm transition-colors hover:border-primary/30 sm:p-5"
+              className="rounded-xl border border-border bg-card p-4 shadow-xs transition-colors hover:border-primary/30 sm:p-5"
             >
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex flex-wrap items-center gap-1.5">
@@ -174,7 +174,7 @@ export function EngineeringRoadmapBoard({ items }: { items: readonly LocalizedRo
                   >
                     {item.priority}
                   </Badge>
-                  <span className="rounded border border-border/70 bg-muted/40 px-1.5 py-0.5 text-[10px]">
+                  <span className="rounded-sm border border-border/70 bg-muted/40 px-1.5 py-0.5 text-[10px]">
                     {t('effortLabel')}: {item.effort}
                   </span>
                 </div>
@@ -248,7 +248,7 @@ export function EngineeringRoadmapBoard({ items }: { items: readonly LocalizedRo
           <FileCode2 className="h-4 w-4 shrink-0 text-primary" />
           <span>{t('sourceNote')}</span>
         </div>
-        <code className="rounded bg-background px-2 py-0.5 font-mono text-[11px] text-foreground">
+        <code className="rounded-sm bg-background px-2 py-0.5 font-mono text-[11px] text-foreground">
           apps/web/src/entities/engineering-roadmap/engineering-roadmap.ts
         </code>
       </div>

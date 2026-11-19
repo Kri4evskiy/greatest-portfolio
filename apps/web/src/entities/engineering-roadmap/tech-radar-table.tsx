@@ -55,7 +55,7 @@ function DesktopTechRadarDataTable({ data, columns, emptyResultLabel }: DesktopT
   })
 
   return (
-    <div className="hidden overflow-x-auto rounded-lg border border-border bg-card shadow-sm md:block">
+    <div className="hidden overflow-x-auto rounded-lg border border-border bg-card shadow-xs md:block">
       <table className="w-full border-collapse text-left text-sm">
         <thead>
           {table.getHeaderGroups().map((headerGroup) => (
@@ -267,7 +267,7 @@ export function TechRadarTable({ items: localizedItems }: { items: readonly Tech
           filteredData.map((item) => {
             const levelVariant = item.level === 'Core' ? 'success' : item.level === 'Production' ? 'default' : 'warning'
             return (
-              <div key={item.id} className="rounded-lg border border-border bg-card p-3.5 shadow-sm">
+              <div key={item.id} className="rounded-lg border border-border bg-card p-3.5 shadow-xs">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-1.5">
                     <span className="font-mono text-xs font-semibold text-muted-foreground">

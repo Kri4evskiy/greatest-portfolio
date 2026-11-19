@@ -15,7 +15,7 @@ body:
       description: "Which category does this article belong to?"
       options:
         - "this-project (Internal Monorepo Architecture)"
-        - "frontend-architecture (Next.js 16, React 19, Tailwind v3)"
+        - "frontend-architecture (Next.js 16, React 19, Tailwind v4)"
         - "backend-architecture (NestJS 12, Microservices, SSE)"
         - "database-prisma (PostgreSQL, Neon, Indexing, Transactions)"
         - "devops-ci-cd (GitHub Actions, Docker, Biome, Turborepo)"

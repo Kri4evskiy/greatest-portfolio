@@ -319,7 +319,7 @@ export function CommandPaletteModal({ locale }: CommandPaletteModalProps) {
             <button
               type="button"
               onClick={() => updateQuery('')}
-              className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+              className="rounded-sm p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
               aria-label="Clear search"
             >
               <X className="h-3.5 w-3.5" />
@@ -328,7 +328,7 @@ export function CommandPaletteModal({ locale }: CommandPaletteModalProps) {
           <button
             type="button"
             onClick={closePalette}
-            className="rounded border border-border bg-muted/60 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground hover:text-foreground"
+            className="rounded-sm border border-border bg-muted/60 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground hover:text-foreground"
           >
             ESC
           </button>
@@ -430,7 +430,7 @@ export function CommandPaletteModal({ locale }: CommandPaletteModalProps) {
                               {getKnowledgeFormatLabel(entry.item.format, locale)}
                             </Badge>
                             {!isUnlocked ? (
-                              <span className="inline-flex items-center gap-1 rounded bg-warning/15 px-1.5 py-0.5 font-mono text-[10px] text-warning">
+                              <span className="inline-flex items-center gap-1 rounded-sm bg-warning/15 px-1.5 py-0.5 font-mono text-[10px] text-warning">
                                 <Lock className="h-2.5 w-2.5" />
                                 {t('cmdLockedBadge')}
                               </span>
@@ -460,7 +460,7 @@ export function CommandPaletteModal({ locale }: CommandPaletteModalProps) {
                             {entry.item.tags.slice(0, 4).map((tag) => (
                               <span
                                 key={`${entry.id}-${tag}`}
-                                className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground"
+                                className="rounded-sm bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground"
                               >
                                 #{tag}
                               </span>

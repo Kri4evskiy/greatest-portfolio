@@ -5,7 +5,7 @@ import { cn } from '../lib/utils'
 export const cardVariants = cva('rounded-lg text-card-foreground transition-all', {
   variants: {
     variant: {
-      default: 'border border-border bg-card shadow-sm',
+      default: 'border border-border bg-card shadow-xs',
       subtle: 'border border-border/60 bg-surface-subtle',
       elevated: 'border border-border bg-surface-elevated shadow-md',
       ghost: 'border border-transparent bg-transparent',

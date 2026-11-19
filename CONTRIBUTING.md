@@ -8,7 +8,7 @@ Thank you for your interest in contributing to the **Engineer Workfolio & Living
 
 This repository uses **pnpm workspaces** and **Turborepo**:
 
-- **`apps/web`:** Next.js 16 App Router, React 19, FSD-Modular architecture (`app` ➔ `widgets` ➔ `features` ➔ `entities` ➔ `shared`), Tailwind CSS v3 (migration to v4 planned), dynamic MDX knowledge base.
+- **`apps/web`:** Next.js 16 App Router, React 19, FSD-Modular architecture (`app` ➔ `widgets` ➔ `features` ➔ `entities` ➔ `shared`), Tailwind CSS v4 (CSS-first Oxide engine), dynamic MDX knowledge base.
 - **`apps/api`:** NestJS 12 HTTP & SSE API, Prisma ORM, JWT authentication.
 - **`apps/telemetry-ms`:** NestJS Microservice isolated over TCP (`:4001`) for real-time telemetry.
 - **`packages/shared-schemas`:** Source-of-truth Zod v4 schemas and TypeScript contracts.

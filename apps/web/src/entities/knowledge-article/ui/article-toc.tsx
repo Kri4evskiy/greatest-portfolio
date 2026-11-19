@@ -88,7 +88,7 @@ export function MobileArticleToc({ items }: { items: readonly ArticleTocItem[] }
         <span className="flex items-center gap-2 font-mono uppercase tracking-wider text-muted-foreground">
           <ListTree className="h-3.5 w-3.5 text-primary" />
           <span>{t('tocTitle')}</span>
-          <span className="rounded bg-muted px-1.5 py-0.5 text-[10px]">{items.length}</span>
+          <span className="rounded-sm bg-muted px-1.5 py-0.5 text-[10px]">{items.length}</span>
         </span>
         <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </button>
@@ -106,7 +106,7 @@ export function MobileArticleToc({ items }: { items: readonly ArticleTocItem[] }
                       scrollToHeadingId(item.id)
                       setIsOpen(false)
                     }}
-                    className={`block w-full rounded py-1 text-left text-xs text-muted-foreground transition-colors hover:text-foreground ${indentClass}`}
+                    className={`block w-full rounded-sm py-1 text-left text-xs text-muted-foreground transition-colors hover:text-foreground ${indentClass}`}
                   >
                     {item.text}
                   </button>
@@ -129,7 +129,7 @@ export function DesktopArticleToc({ items }: { items: readonly ArticleTocItem[] 
 
   return (
     <aside className="hidden w-56 shrink-0 xl:sticky xl:top-20 xl:block">
-      <div className="max-h-[calc(100dvh-6rem)] overflow-y-auto rounded-xl border border-border bg-card p-3.5 shadow-sm">
+      <div className="max-h-[calc(100dvh-6rem)] overflow-y-auto rounded-xl border border-border bg-card p-3.5 shadow-xs">
         <div className="mb-2.5 flex items-center gap-1.5 font-mono text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
           <ListTree className="h-3.5 w-3.5 text-primary" />
           <span>{t('tocTitle')}</span>

@@ -57,7 +57,7 @@ export function WorkfolioHeader() {
             }}
             className="flex min-w-0 items-center gap-1.5 font-medium text-foreground transition-opacity hover:opacity-80 sm:gap-2"
           >
-            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded border border-border bg-muted font-mono text-[11px] font-bold">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-sm border border-border bg-muted font-mono text-[11px] font-bold">
               {AUTHOR_INITIALS}
             </span>
             <span className="hidden font-mono text-xs text-muted-foreground md:inline">workfolio /</span>
@@ -86,7 +86,7 @@ export function WorkfolioHeader() {
           >
             <Search className="h-3.5 w-3.5 shrink-0" />
             <span className="hidden text-xs md:inline">{t('searchPlaceholder')}</span>
-            <kbd className="hidden rounded border border-border bg-background px-1 py-0.5 font-mono text-[10px] lg:inline">
+            <kbd className="hidden rounded-sm border border-border bg-background px-1 py-0.5 font-mono text-[10px] lg:inline">
               ⌘K
             </kbd>
           </button>

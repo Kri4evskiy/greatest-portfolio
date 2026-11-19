@@ -155,7 +155,7 @@ export function ArchitectureFlowD3() {
   }, [selectedNode.id])
 
   return (
-    <div className="my-6 rounded-xl border border-border bg-card p-4 shadow-sm">
+    <div className="my-6 rounded-xl border border-border bg-card p-4 shadow-xs">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 pb-3">
         <div className="flex items-center gap-2">
           <Network className="h-4 w-4 text-primary" />

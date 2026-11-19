@@ -170,15 +170,15 @@ export async function WorkfolioHeroSection({ locale }: { locale: SupportedLocale
 
       <Callout variant="default" title={t('calloutTitle')} icon={<Terminal className="h-4 w-4 text-primary" />}>
         <div className="grid gap-2 pt-1 text-xs sm:grid-cols-3">
-          <div className="rounded border border-border/70 bg-background/80 p-2.5">
+          <div className="rounded-sm border border-border/70 bg-background/80 p-2.5">
             <div className="font-mono font-semibold text-foreground">{t('pillar1Title')}</div>
             <p className="mt-0.5 text-muted-foreground">{t('pillar1Desc')}</p>
           </div>
-          <div className="rounded border border-border/70 bg-background/80 p-2.5">
+          <div className="rounded-sm border border-border/70 bg-background/80 p-2.5">
             <div className="font-mono font-semibold text-foreground">{t('pillar2Title')}</div>
             <p className="mt-0.5 text-muted-foreground">{t('pillar2Desc')}</p>
           </div>
-          <div className="rounded border border-border/70 bg-background/80 p-2.5">
+          <div className="rounded-sm border border-border/70 bg-background/80 p-2.5">
             <div className="font-mono font-semibold text-foreground">{t('pillar3Title')}</div>
             <p className="mt-0.5 text-muted-foreground">{t('pillar3Desc')}</p>
           </div>
@@ -268,7 +268,7 @@ function ExperienceCard({
   const highlights = item.highlights[locale] ?? item.highlights.en
 
   return (
-    <div className="rounded-xl border border-border bg-card p-4 shadow-sm sm:p-5">
+    <div className="rounded-xl border border-border bg-card p-4 shadow-xs sm:p-5">
       <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-start">
         <div className="space-y-0.5">
           <div className="flex flex-wrap items-center gap-2">

@@ -1,1 +1,6 @@
-@import "@repo/ui/globals.css";
+@import "tailwindcss";
+@import "@repo/ui/theme.css";
+
+@source "../";
+@source "../../content";
+@source "../../../../packages/ui/src";

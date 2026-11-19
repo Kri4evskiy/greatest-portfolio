@@ -243,7 +243,7 @@ export function NestAiMcpDiagram({ defaultMode = 'mcp' }: { defaultMode?: Diagra
   }
 
   return (
-    <div className="my-6 rounded-xl border border-border bg-card p-4 shadow-sm">
+    <div className="my-6 rounded-xl border border-border bg-card p-4 shadow-xs">
       <div className="flex flex-col gap-3 border-b border-border/60 pb-3.5 sm:flex-row sm:items-center sm:justify-between">
         <div className="space-y-0.5">
           <div className="flex items-center gap-2">
@@ -262,7 +262,7 @@ export function NestAiMcpDiagram({ defaultMode = 'mcp' }: { defaultMode?: Diagra
             }}
             className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 font-mono text-[11px] font-medium transition-colors ${
               mode === 'mcp'
-                ? 'bg-primary text-primary-foreground shadow-sm'
+                ? 'bg-primary text-primary-foreground shadow-xs'
                 : 'text-muted-foreground hover:text-foreground'
             }`}
           >
@@ -277,7 +277,7 @@ export function NestAiMcpDiagram({ defaultMode = 'mcp' }: { defaultMode?: Diagra
             }}
             className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 font-mono text-[11px] font-medium transition-colors ${
               mode === 'ai'
-                ? 'bg-primary text-primary-foreground shadow-sm'
+                ? 'bg-primary text-primary-foreground shadow-xs'
                 : 'text-muted-foreground hover:text-foreground'
             }`}
           >
@@ -377,7 +377,7 @@ export function NestAiMcpDiagram({ defaultMode = 'mcp' }: { defaultMode?: Diagra
                     setSelectedIndex(idx)
                   }
                 }}
-                className="cursor-pointer focus:outline-none"
+                className="cursor-pointer focus:outline-hidden"
               >
                 <rect
                   x={-69}

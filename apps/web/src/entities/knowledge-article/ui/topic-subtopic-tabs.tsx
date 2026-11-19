@@ -27,7 +27,7 @@ export function TopicSubtopicTabs({
   const isThisProject = rootTopic.segment === 'this-project'
 
   return (
-    <div className="rounded-xl border border-border bg-card p-4 shadow-sm sm:p-5">
+    <div className="rounded-xl border border-border bg-card p-4 shadow-xs sm:p-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <Badge variant="secondary" className="font-mono text-[10px] uppercase tracking-wider">
@@ -57,14 +57,14 @@ export function TopicSubtopicTabs({
           href={rootHref}
           className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-all ${
             isAllActive
-              ? 'border-primary bg-primary text-primary-foreground shadow-sm'
+              ? 'border-primary bg-primary text-primary-foreground shadow-xs'
               : 'border-border/80 bg-muted/30 text-muted-foreground hover:border-primary/40 hover:bg-muted hover:text-foreground'
           }`}
         >
           <Layers className="h-3.5 w-3.5 shrink-0" />
           <span>{allSubtopicsLabel}</span>
           <span
-            className={`rounded px-1.5 py-0.5 font-mono text-[10px] ${
+            className={`rounded-sm px-1.5 py-0.5 font-mono text-[10px] ${
               isAllActive ? 'bg-primary-foreground/20 text-primary-foreground' : 'bg-background text-muted-foreground'
             }`}
           >
@@ -81,13 +81,13 @@ export function TopicSubtopicTabs({
               href={subHref}
               className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-all ${
                 isSubActive
-                  ? 'border-primary bg-primary text-primary-foreground shadow-sm'
+                  ? 'border-primary bg-primary text-primary-foreground shadow-xs'
                   : 'border-border/80 bg-muted/30 text-muted-foreground hover:border-primary/40 hover:bg-muted hover:text-foreground'
               }`}
             >
               <span>{sub.label}</span>
               <span
-                className={`rounded px-1.5 py-0.5 font-mono text-[10px] ${
+                className={`rounded-sm px-1.5 py-0.5 font-mono text-[10px] ${
                   isSubActive
                     ? 'bg-primary-foreground/20 text-primary-foreground'
                     : 'bg-background text-muted-foreground'

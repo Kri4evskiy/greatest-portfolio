@@ -48,7 +48,7 @@ export function CvDocumentShowcase({ cvMeta, locale }: CvDocumentShowcaseProps) 
   return (
     <div className="mx-auto max-w-5xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
       {/* Top Navigation & Primary Download Bar */}
-      <div className="rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-6">
+      <div className="rounded-2xl border border-border bg-card p-4 shadow-xs sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 pb-3.5">
           <Link
             href="/"
@@ -94,7 +94,7 @@ export function CvDocumentShowcase({ cvMeta, locale }: CvDocumentShowcaseProps) 
               href={cvMeta.publicUrl}
               download={cvMeta.downloadFileName}
               onClick={() => handleDownloadClick('cv_page_primary_btn')}
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition-opacity hover:opacity-90"
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground shadow-xs transition-opacity hover:opacity-90"
             >
               <Download className="h-4 w-4 shrink-0" />
               <span>{t('downloadPdfBtn')}</span>
@@ -237,7 +237,7 @@ export function CvDocumentShowcase({ cvMeta, locale }: CvDocumentShowcaseProps) 
         </div>
       ) : (
         /* Full Structured Web / ATS Resume (All 6 Roles, Skills, Courses, Education) */
-        <article className="space-y-8 rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-8">
+        <article className="space-y-8 rounded-2xl border border-border bg-card p-5 shadow-xs sm:p-8">
           {/* Summary */}
           <section className="space-y-2 border-b border-border/60 pb-6">
             <h2 className="font-mono text-xs font-semibold uppercase tracking-wider text-primary">

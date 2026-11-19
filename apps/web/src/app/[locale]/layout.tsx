@@ -1,4 +1,4 @@
-import '@repo/ui/globals.css'
+import '../globals.css'
 import { DEFAULT_LOCALE, SUPPORTED_LOCALES, SupportedLocaleEnum } from '@repo/shared-schemas'
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'

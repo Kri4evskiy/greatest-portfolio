@@ -1,7 +1,7 @@
 ---
-title: "Матриця мульти-темних CSS-токенів, Tailwind Preset та архітектура пакета @repo/ui"
-sidebarLabel: "Дизайн-токени та Tailwind Preset"
-summary: "Як спроєктувати масштабовану дизайн-систему в монорепозиторії: двовимірна матриця тем (Light/Dark × палітри), інверсія залежностей через Tailwind Preset, Storybook 10 та адаптивні подання даних."
+title: "Матриця мульти-темних CSS-токенів, Tailwind v4 @theme та архітектура пакета @repo/ui"
+sidebarLabel: "Дизайн-токени та Tailwind v4"
+summary: "Як спроєктувати масштабовану дизайн-систему в монорепозиторії: двовимірна матриця тем (Light/Dark × палітри), інверсія залежностей через CSS-first @repo/ui/theme.css, Tailwind CSS v4 (@theme inline, @custom-variant, @source), Storybook 10 та адаптивні подання даних."
 category: "this-project"
 format: "deep-dive"
 tags: ["design-tokens", "tailwind", "ui-system", "storybook", "architecture"]
@@ -9,74 +9,78 @@ readingTime: "6 хв"
 publishedAt: "2026-11-10"
 order: 1
 tldr:
-  - "Стилі в `packages/ui/src/styles/globals.css` побудовані на семантичних HSL-змінних і двох незалежних осях: режимі яскравості (`.dark`) та палітрі (`[data-palette=\"graphite\" | \"sepia\"]`)."
-  - "Пакет `@repo/ui` не залежить від застосунків: він експортує `@repo/ui/tailwind.config` як перевикористовуваний `preset`, який `apps/web` підключає в `presets: [uiPreset]`."
-  - "Складні дані автоматично змінюють подання: вертикальні картки на смартфонах (`< md`) та повнорозмірні таблиці `TanStack Table` / графи `D3.js` на десктопах (`>= md`)."
+  - "Стилі в `packages/ui/src/styles/theme.css` побудовані на семантичних HSL-змінних і двох незалежних осях: режимі яскравості (`.dark`) та палітрі (`[data-palette=\"graphite\" | \"sepia\"]`)."
+  - "Використовується CSS-first конфігурація Tailwind CSS v4 (`@theme inline`, `@custom-variant dark`, `@layer base`), що експортується як `@repo/ui/theme.css`, тоді як `apps/web` збирається через `@tailwindcss/postcss` і явні шляхи `@source`."
+  - "Фіксуються сучасні таргети `browserslist` (`Chrome >= 111`, `Edge >= 111`, `Firefox >= 128`, `Safari >= 16.4`), а щільні дані автоматично перемикаються між картками (`< md`) і таблицями (`>= md`)."
 ---
 
 ## 1. Двовимірна матриця семантичних токенів (`Light/Dark` × `Palette`)
 
-Замість прив'язки компонентів до конкретних палітр Tailwind (`slate-*`, `emerald-*`, `amber-*`) уся колірна система винесена в семантичні CSS-змінні у форматі `H S% L%` (сумісному з модифікаторами прозорості `hsl(var(--primary) / 0.15)`):
+Замість прив'язки компонентів до конкретних палітр Tailwind (`slate-*`, `emerald-*`, `amber-*`) уся колірна система винесена в семантичні CSS-змінні у форматі `H S% L%` (сумісному як із нативним `color-mix()` для модифікаторів прозорості в Tailwind v4, так і з SVG-атрибутами `hsl(var(--chart-1))`):
 
 - **Ієрархія поверхонь:** `--background`, `--surface-subtle`, `--surface-elevated`, `--card`, `--popover`.
 - **Семантичні статуси:** `--success`, `--warning`, `--info`, `--destructive` (із парними `*-foreground`).
 - **Візуалізація та код:** `--chart-1..4` для SVG/D3-діаграм і `--code-bg`, `--code-header`, `--code-border` для блоків коду.
 
-```css title="packages/ui/src/styles/globals.css"
+```css title="packages/ui/src/styles/theme.css"
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
-  --background: 40 33% 98%;
-  --surface-subtle: 38 26% 95%;
+  --background: 40 20% 99%;
+  --surface-subtle: 40 16% 96.5%;
   --surface-elevated: 0 0% 100%;
-  --primary: 24 9.8% 10%;
-  --success: 152 69% 31%;
-  --warning: 38 92% 42%;
-  --info: 217 91% 52%;
+  --primary: 24 10% 12%;
+  --success: 158 64% 32%;
+  --warning: 32 92% 38%;
+  --info: 214 84% 44%;
 }
 
 :root.dark,
 .dark {
   --background: 24 10% 8%;
-  --surface-subtle: 24 9% 11%;
-  --surface-elevated: 24 9% 14%;
-  --primary: 36 25% 94%;
-  --success: 152 60% 52%;
+  --surface-subtle: 24 9% 10%;
+  --surface-elevated: 24 9% 13%;
+  --primary: 40 15% 95%;
+  --success: 156 68% 54%;
 }
 
-:root[data-palette="graphite"] {
-  --background: 220 20% 98%;
-  --surface-subtle: 220 16% 95%;
-  --info: 221 83% 53%;
+@theme inline {
+  --color-background: hsl(var(--background));
+  --color-surface-subtle: hsl(var(--surface-subtle));
+  --color-primary: hsl(var(--primary));
+  --color-success: hsl(var(--success));
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
 }
 ```
 
 > [!TIP]
-> Розділення осей `.dark` і `data-palette` дозволяє підключити будь-яку нову тему або брендинг клієнта (`multi-tenant / white-label`) перевизначенням ~20 змінних у CSS без жодної правки в React-компонентах.
+> Розділення осей `.dark` і `data-palette` у зв'язці з `@theme inline` дозволяє підключити будь-яку нову тему або брендинг клієнта (`multi-tenant / white-label`) перевизначенням ~20 змінних у CSS без жодної правки в React-компонентах.
 
 ---
 
-## 2. Інверсія залежностей через експорт `Tailwind Preset`
+## 2. CSS-first інверсія залежностей (`@repo/ui/theme.css` + `@source`)
 
-Щоб пакет `@repo/ui` залишався повністю незалежним і не знав про файлову структуру `apps/web`, він експортує власний `tailwind.config.ts` як **Tailwind Preset**:
+Щоб пакет `@repo/ui` залишався повністю незалежним і не знав про файлову структуру `apps/web`, він експортує чистий шар токенів і базових стилів `@repo/ui/theme.css` (без `@import "tailwindcss";`), а вітрина Storybook у `packages/ui/src/styles/globals.css` збирається нативним плагіном `@tailwindcss/vite`.
 
-```typescript title="apps/web/tailwind.config.ts"
-import uiPreset from '@repo/ui/tailwind.config'
-import type { Config } from 'tailwindcss'
+У `apps/web` підключається `@tailwindcss/postcss`, а вхідний CSS-файл явно вказує межі сканування `@source`:
 
-const config: Config = {
-  presets: [uiPreset],
-  content: [
-    './src/**/*.{ts,tsx,mdx}',
-    '../../packages/ui/src/**/*.{ts,tsx}',
-  ],
-}
+```css title="apps/web/src/app/globals.css"
+@import "tailwindcss";
+@import "@repo/ui/theme.css";
 
-export default config
+@source "../";
+@source "../../content";
+@source "../../../../packages/ui/src";
 ```
 
+Обидва пакети (`apps/web/package.json` і `packages/ui/package.json`) фіксують сучасні таргети `"browserslist": ["Chrome >= 111", "Edge >= 111", "Firefox >= 128", "Safari >= 16.4"]`, щоб `Lightning CSS` і `Next.js SWC` не генерували зайві поліфіли під `@property` і `color-mix()`.
+
 Така схема дає три архітектурні переваги:
-1. Єдине джерело мапінгу CSS-змінних у класи Tailwind (`bg-surface-subtle`, `text-warning`, `border-code-border`) як для `apps/web`, так і для ізольованого `Storybook 10`.
+1. Єдине CSS-first джерело мапінгу змінних у класи Tailwind (`bg-surface-subtle`, `text-warning`, `border-code-border`) як для `apps/web`, так і для ізольованого `Storybook 10`.
 2. Відсутність зворотних шляхів `../../apps/*` усередині пакета дизайн-системи.
-3. Можливість підключити другий фронтенд-сервіс до тієї ж дизайн-системи одним рядком `presets: [uiPreset]`.
+3. Можливість підключити другий фронтенд-сервіс до тієї самої дизайн-системи двома рядками: `@import "@repo/ui/theme.css";` і `@source`.
 
 ---
 

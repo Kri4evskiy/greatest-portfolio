@@ -108,9 +108,9 @@ export function LanguageSwitcher() {
               disabled={isPending}
               title={meta.nativeName}
               onClick={() => handleSelectLocale(code)}
-              className={`rounded px-1.5 py-0.5 font-mono text-[11px] font-medium transition-colors ${
+              className={`rounded-sm px-1.5 py-0.5 font-mono text-[11px] font-medium transition-colors ${
                 isActive
-                  ? 'bg-background text-foreground shadow-sm'
+                  ? 'bg-background text-foreground shadow-xs'
                   : 'text-muted-foreground hover:bg-background/50 hover:text-foreground'
               }`}
             >

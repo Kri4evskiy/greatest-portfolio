@@ -77,7 +77,7 @@ export function PageSectionNavigator() {
         aria-label={t('sectionNavTitle')}
         className="group/rail fixed right-4 top-1/2 z-30 hidden -translate-y-1/2 xl:block 2xl:right-6"
       >
-        <div className="rounded-xl border border-border/70 bg-card/90 p-2 shadow-sm backdrop-blur-md transition-all duration-200 hover:border-border hover:bg-card hover:shadow-lg">
+        <div className="rounded-xl border border-border/70 bg-card/90 p-2 shadow-xs backdrop-blur-md transition-all duration-200 hover:border-border hover:bg-card hover:shadow-lg">
           <div className="mb-1.5 hidden px-2 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground group-hover/rail:block min-[1480px]:block">
             {t('sectionNavTitle')}
           </div>
@@ -139,7 +139,7 @@ export function PageSectionNavigator() {
               <button
                 type="button"
                 onClick={scrollToTop}
-                className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground hover:bg-muted hover:text-foreground"
+                className="inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground hover:bg-muted hover:text-foreground"
               >
                 <ArrowUp className="h-3 w-3" />
                 <span>{t('scrollToTop')}</span>

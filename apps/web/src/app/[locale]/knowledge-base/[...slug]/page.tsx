@@ -145,7 +145,7 @@ function ArticlePreviewCard({
               {item.tags.slice(0, 4).map((tag) => (
                 <span
                   key={`${item.routePath}-${tag}`}
-                  className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground"
+                  className="rounded-sm bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground"
                 >
                   #{tag}
                 </span>
@@ -182,7 +182,7 @@ export default async function KnowledgeCatchAllPage({ params }: CatchAllKnowledg
 
     return (
       <div className="flex flex-col gap-6 xl:flex-row xl:items-start">
-        <article className="min-w-0 flex-1 rounded-xl border border-border bg-card p-5 shadow-sm sm:p-8">
+        <article className="min-w-0 flex-1 rounded-xl border border-border bg-card p-5 shadow-xs sm:p-8">
           <BreadcrumbsNav rootLabel={t('breadcrumbsRoot')} items={breadcrumbs} />
 
           {article.isFallback ? (
@@ -294,7 +294,7 @@ export default async function KnowledgeCatchAllPage({ params }: CatchAllKnowledg
         />
       ) : null}
 
-      <div className="space-y-6 rounded-xl border border-border bg-card p-5 shadow-sm sm:p-7">
+      <div className="space-y-6 rounded-xl border border-border bg-card p-5 shadow-xs sm:p-7">
         <BreadcrumbsNav rootLabel={t('breadcrumbsRoot')} items={breadcrumbs} />
 
         {/* When viewing a specific Subtopic (Level 2+), show clear Subtopic header */}
