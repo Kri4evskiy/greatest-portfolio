@@ -34,6 +34,8 @@ import { useUIStore } from '@/shared/store/use-ui-store'
 
 const NOTE_FORMATS: readonly KnowledgeNoteFormat[] = ['cheat-sheet', 'deep-dive', 'adr']
 const MAX_VISIBLE_TAGS = 10
+const INITIAL_VISIBLE_TOPICS = 6
+const TOPICS_LOAD_STEP = 6
 const MAX_VISIBLE_SUBTOPICS = 6
 const MAX_PREVIEW_NOTES_PER_SUBTOPIC = 3
 
@@ -79,6 +81,7 @@ export function KnowledgeDirectoryExplorer({ tree, articles, tags, locale }: Kno
   const [selectedTag, setSelectedTag] = useState<string | null>(urlTag)
   const [showAllTags, setShowAllTags] = useState(false)
   const [tagSearchQuery, setTagSearchQuery] = useState('')
+  const [visibleTopicsCount, setVisibleTopicsCount] = useState(INITIAL_VISIBLE_TOPICS)
   const [expandedTopics, setExpandedTopics] = useState<Record<string, boolean>>({})
 
   const toggleShowAllTags = () => {
@@ -117,6 +120,11 @@ export function KnowledgeDirectoryExplorer({ tree, articles, tags, locale }: Kno
   }, [tags, tagSearchQuery])
 
   const isFiltering = selectedFormat !== 'ALL' || selectedTag !== null
+
+  const visibleTopics = useMemo(() => tree.slice(0, visibleTopicsCount), [tree, visibleTopicsCount])
+  const remainingTopicsCount = Math.max(0, tree.length - visibleTopics.length)
+  const nextTopicsBatchCount = Math.min(TOPICS_LOAD_STEP, remainingTopicsCount)
+  const canCollapseTopics = visibleTopics.length > INITIAL_VISIBLE_TOPICS
 
   const filteredArticles = useMemo(() => {
     if (!isFiltering) return articles
@@ -361,7 +369,7 @@ export function KnowledgeDirectoryExplorer({ tree, articles, tags, locale }: Kno
         </section>
       ) : (
         <div className="space-y-4">
-          {tree.map((topic) => {
+          {visibleTopics.map((topic) => {
             const subtopics = topic.children.filter(
               (child): child is KnowledgeTreeFolderNode => child.type === 'folder',
             )
@@ -470,6 +478,38 @@ export function KnowledgeDirectoryExplorer({ tree, articles, tags, locale }: Kno
               </section>
             )
           })}
+
+          {tree.length > INITIAL_VISIBLE_TOPICS ? (
+            <div className="flex flex-col items-center justify-between gap-3 rounded-xl border border-border/70 bg-muted/20 px-4 py-3 sm:flex-row">
+              <span className="font-mono text-xs text-muted-foreground">
+                {t('shownTopicsProgress', { shown: visibleTopics.length, total: tree.length })}
+              </span>
+
+              <div className="flex flex-wrap items-center gap-2">
+                {remainingTopicsCount > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => setVisibleTopicsCount((prev) => Math.min(tree.length, prev + TOPICS_LOAD_STEP))}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-primary/40 bg-primary/10 px-3.5 py-1.5 font-mono text-xs font-medium text-primary transition-colors hover:border-primary hover:bg-primary/15"
+                  >
+                    <ChevronDown className="h-3.5 w-3.5" />
+                    <span>{t('showMoreTopics', { count: nextTopicsBatchCount })}</span>
+                  </button>
+                ) : null}
+
+                {canCollapseTopics ? (
+                  <button
+                    type="button"
+                    onClick={() => setVisibleTopicsCount(INITIAL_VISIBLE_TOPICS)}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-1.5 font-mono text-xs font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:bg-muted/50 hover:text-foreground"
+                  >
+                    <ChevronUp className="h-3.5 w-3.5 text-primary" />
+                    <span>{t('showLessTopics')}</span>
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
         </div>
       )}
     </div>
