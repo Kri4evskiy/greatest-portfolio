@@ -307,7 +307,7 @@ export function CvDocumentShowcase({ cvMeta, locale }: CvDocumentShowcaseProps) 
                     <ul className="mt-3 space-y-1.5 text-xs leading-relaxed text-muted-foreground sm:text-sm">
                       {points.map((pt) => (
                         <li key={pt} className="flex items-start gap-2">
-                          <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                          <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-success" />
                           <span>{pt}</span>
                         </li>
                       ))}

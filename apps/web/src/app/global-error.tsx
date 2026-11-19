@@ -56,7 +56,7 @@ export default function GlobalError({ error, reset }: { error: Error & { digest?
     <html lang={lang} suppressHydrationWarning>
       <body className="flex min-h-screen items-center justify-center bg-background p-6 text-foreground">
         <div className="max-w-md space-y-4 rounded-xl border border-border bg-card p-6 text-center shadow-md">
-          <AlertTriangle className="mx-auto h-10 w-10 text-amber-500" />
+          <AlertTriangle className="mx-auto h-10 w-10 text-warning" />
           <h2 className="text-lg font-bold">{t.title}</h2>
           <p className="text-xs text-muted-foreground">{t.description}</p>
           <Button type="button" onClick={() => reset()} className="gap-2">

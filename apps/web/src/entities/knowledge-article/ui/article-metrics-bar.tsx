@@ -41,7 +41,7 @@ export function ArticleMetricsBar({ slug, category }: { slug: string; category: 
         </div>
         <span className="text-border">•</span>
         <Badge variant="outline" className="font-mono text-[11px]">
-          <Database className="mr-1 h-3 w-3 text-emerald-600" />
+          <Database className="mr-1 h-3 w-3 text-success" />
           {t('indexedDbBadge')}
         </Badge>
       </div>
@@ -57,7 +57,7 @@ export function ArticleMetricsBar({ slug, category }: { slug: string; category: 
         }}
         className="h-8 gap-1.5 font-mono text-xs"
       >
-        <ThumbsUp className="h-3.5 w-3.5 text-emerald-600" />
+        <ThumbsUp className="h-3.5 w-3.5 text-success" />
         <span>{t('helpfulBtn', { count: helpfulCount })}</span>
       </Button>
     </div>

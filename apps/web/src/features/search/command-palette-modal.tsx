@@ -290,7 +290,7 @@ export function CommandPaletteModal({ locale }: CommandPaletteModalProps) {
       role="dialog"
       aria-modal="true"
       aria-label="Global Command Palette"
-      className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 px-3 pt-14 backdrop-blur-xs sm:px-4 sm:pt-20"
+      className="fixed inset-0 z-50 flex items-start justify-center bg-foreground/40 px-3 pt-14 backdrop-blur-xs sm:px-4 sm:pt-20"
       onClick={(e) => {
         if (e.target === e.currentTarget) closePalette()
       }}

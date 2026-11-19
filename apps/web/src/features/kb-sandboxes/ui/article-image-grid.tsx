@@ -74,7 +74,7 @@ export function ArticleImageGrid({
               <div className="my-3 flex h-28 items-center justify-center rounded-md border border-border/60 bg-muted/40 p-3 font-mono text-xs text-muted-foreground">
                 <div className="text-center space-y-1">
                   <div className="font-semibold text-foreground">{item.title}</div>
-                  <div className="text-[11px] text-emerald-600">[WebP Vector/Raster Asset Preview]</div>
+                  <div className="text-[11px] text-success">[WebP Vector/Raster Asset Preview]</div>
                 </div>
               </div>
             </div>

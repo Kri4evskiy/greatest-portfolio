@@ -231,7 +231,7 @@ export default async function KnowledgeCatchAllPage({ params }: CatchAllKnowledg
           {article.tldr.length > 0 ? (
             <div className="my-5 rounded-xl border border-primary/30 bg-primary/5 p-4">
               <div className="mb-2 flex items-center gap-2 font-mono text-xs font-semibold uppercase tracking-wider text-primary">
-                <Zap className="h-4 w-4 text-amber-500" />
+                <Zap className="h-4 w-4 text-warning" />
                 <span>{t('tldrTitle')}</span>
               </div>
               <ul className="list-disc space-y-1.5 pl-5 text-xs leading-relaxed text-foreground/90 sm:text-sm">

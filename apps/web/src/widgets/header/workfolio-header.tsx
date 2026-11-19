@@ -60,14 +60,14 @@ export function WorkfolioHeader() {
             <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-sm border border-border bg-muted font-mono text-[11px] font-bold">
               {AUTHOR_INITIALS}
             </span>
-            <span className="hidden font-mono text-xs text-muted-foreground md:inline">workfolio /</span>
+            <span className="hidden shrink-0 font-mono text-xs text-muted-foreground lg:inline">workfolio /</span>
             <span className="truncate font-semibold tracking-tight text-xs sm:text-sm">Stanislav Krychevskyi</span>
           </Link>
 
           {isInsideKnowledgeBase || isOnCvPage ? (
             <>
-              <span className="hidden font-mono text-xs text-muted-foreground sm:inline">/</span>
-              <Badge variant="secondary" className="hidden font-mono text-xs sm:inline-flex">
+              <span className="hidden shrink-0 font-mono text-xs text-muted-foreground lg:inline">/</span>
+              <Badge variant="secondary" className="hidden shrink-0 font-mono text-xs lg:inline-flex">
                 {isInsideKnowledgeBase ? 'knowledge-base' : 'cv.pdf'}
               </Badge>
             </>
@@ -82,11 +82,11 @@ export function WorkfolioHeader() {
             onMouseEnter={() => prefetchKnowledgeSearchIndex(locale)}
             onFocus={() => prefetchKnowledgeSearchIndex(locale)}
             onClick={() => openCommandPalette('')}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-muted/30 text-muted-foreground transition-colors hover:border-primary/40 hover:bg-accent hover:text-foreground md:w-auto md:gap-2 md:px-2.5"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-muted/30 text-muted-foreground transition-colors hover:border-primary/40 hover:bg-accent hover:text-foreground lg:w-auto lg:gap-2 lg:px-2.5"
           >
             <Search className="h-3.5 w-3.5 shrink-0" />
-            <span className="hidden text-xs md:inline">{t('searchPlaceholder')}</span>
-            <kbd className="hidden rounded-sm border border-border bg-background px-1 py-0.5 font-mono text-[10px] lg:inline">
+            <span className="hidden text-xs lg:inline">{t('searchPlaceholder')}</span>
+            <kbd className="hidden rounded-sm border border-border bg-background px-1 py-0.5 font-mono text-[10px] xl:inline">
               ⌘K
             </kbd>
           </button>
@@ -108,7 +108,7 @@ export function WorkfolioHeader() {
                 <span className="hidden sm:inline">{t('knowledgeBase')}</span>
                 <Badge
                   variant={currentRole === 'ADMIN' ? 'warning' : 'success'}
-                  className="hidden px-1.5 py-0 font-mono text-[10px] md:inline-flex"
+                  className="hidden px-1.5 py-0 font-mono text-[10px] lg:inline-flex"
                 >
                   {currentRole}
                 </Badge>
@@ -142,7 +142,7 @@ export function WorkfolioHeader() {
               <Lock className="h-3.5 w-3.5 shrink-0 text-warning transition-transform group-hover:scale-110" />
               <span className="sm:hidden">{t('knowledgeBaseShort')}</span>
               <span className="hidden sm:inline">{t('knowledgeBase')}</span>
-              <Badge variant="warning" className="hidden px-1.5 py-0 font-mono text-[10px] md:inline-flex">
+              <Badge variant="warning" className="hidden px-1.5 py-0 font-mono text-[10px] lg:inline-flex">
                 {t('protectedBadge')}
               </Badge>
             </Button>

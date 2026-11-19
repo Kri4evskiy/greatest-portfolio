@@ -178,7 +178,7 @@ export function GuestPassModal() {
               {t('nameLabel')}
             </label>
             <Input id="guest-display-name" placeholder={t('namePlaceholder')} {...register('displayName')} />
-            {errors.displayName ? <p className="text-xs text-red-600">{errors.displayName.message}</p> : null}
+            {errors.displayName ? <p className="text-xs text-destructive">{errors.displayName.message}</p> : null}
           </div>
 
           <div className="space-y-1.5">
@@ -225,14 +225,14 @@ export function GuestPassModal() {
           </div>
 
           {issuePassMutation.isError ? (
-            <p className="rounded-md bg-red-500/10 p-2 text-xs text-red-600">
+            <p className="rounded-md bg-destructive/10 p-2 text-xs text-destructive">
               {issuePassMutation.error instanceof Error ? issuePassMutation.error.message : t('errorFallback')}
             </p>
           ) : null}
 
           <DialogFooter className="gap-2 sm:justify-between">
             <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-              <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
+              <ShieldCheck className="h-3.5 w-3.5 text-success" />
               <span>Set-Cookie: HttpOnly; SameSite=Lax</span>
             </div>
             <Button type="submit" disabled={isSubmitting || issuePassMutation.isPending} className="gap-1.5">

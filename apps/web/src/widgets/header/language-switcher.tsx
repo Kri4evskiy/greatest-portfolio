@@ -95,7 +95,7 @@ export function LanguageSwitcher() {
       {/* Desktop & Tablet inline segmented control (>= sm) */}
       <fieldset
         aria-label={t('languageLabel')}
-        className="hidden items-center gap-0.5 rounded-md border border-border bg-muted/40 p-0.5 sm:inline-flex"
+        className="hidden h-8 items-center gap-0.5 rounded-md border border-border bg-muted/40 p-0.5 sm:inline-flex"
       >
         <Globe className="ml-1.5 mr-0.5 h-3.5 w-3.5 text-muted-foreground" />
         {SUPPORTED_LOCALES.map((code) => {

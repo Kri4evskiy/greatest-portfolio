@@ -29,6 +29,12 @@
   "[css]": {
     "editor.defaultFormatter": "biomejs.biome"
   },
+  "[tailwindcss]": {
+    "editor.defaultFormatter": "biomejs.biome"
+  },
+  "files.associations": {
+    "*.css": "tailwindcss"
+  },
   "editor.codeActionsOnSave": {
     "source.fixAll.biome": "explicit"
   },
