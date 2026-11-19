@@ -44,12 +44,13 @@ This repository implements a multi-tier, zero-trust security architecture design
 
 Only the latest `main` branch is actively supported with security patches:
 
-| Component                 | Version / Target           | Supported |
-| :------------------------ | :------------------------- | :-------- |
-| `apps/web`                | Next.js 16 (React 19)      | ✅ Yes    |
-| `apps/api`                | NestJS 12                  | ✅ Yes    |
-| `apps/telemetry-ms`       | NestJS Microservices (TCP) | ✅ Yes    |
-| `packages/shared-schemas` | Zod v4 (`^4.6.7`)          | ✅ Yes    |
+| Component                 | Version / Target                 | Supported |
+| :------------------------ | :------------------------------- | :-------- |
+| `apps/web`                | Next.js 16 (React 19)            | ✅ Yes    |
+| `apps/api`                | NestJS 12                        | ✅ Yes    |
+| `apps/telemetry-ms`       | NestJS Microservices (TCP)       | ✅ Yes    |
+| `packages/shared-schemas` | Zod v4 (`^4.6.7`)                | ✅ Yes    |
+| Toolchain                 | TypeScript 7 (`^7.0.2`), pnpm 12 | ✅ Yes    |
 
 ---
 
