@@ -155,7 +155,7 @@ export function ReactRenderGraphD3() {
   }, [mode, triggerCount])
 
   return (
-    <div className="my-6 rounded-xl border border-border bg-card p-4 shadow-sm">
+    <div className="my-6 rounded-xl border border-border bg-card p-4 shadow-xs">
       <div className="flex flex-col justify-between gap-3 border-b border-border/60 pb-3 sm:flex-row sm:items-center">
         <div>
           <div className="flex items-center gap-2">

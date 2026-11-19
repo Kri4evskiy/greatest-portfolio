@@ -1,4 +1,5 @@
 import type { StorybookConfig } from '@storybook/react-vite'
+import { mergeConfig } from 'vite'
 
 const config: StorybookConfig = {
   stories: ['../src/**/*.stories.@(ts|tsx)'],
@@ -10,6 +11,12 @@ const config: StorybookConfig = {
   core: {
     disableTelemetry: true,
     disableWhatsNewNotifications: true,
+  },
+  async viteFinal(viteConfig) {
+    const { default: tailwindcss } = await import('@tailwindcss/vite')
+    return mergeConfig(viteConfig, {
+      plugins: [tailwindcss()],
+    })
   },
 }
 

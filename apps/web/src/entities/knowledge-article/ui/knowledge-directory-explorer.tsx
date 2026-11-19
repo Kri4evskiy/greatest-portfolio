@@ -52,7 +52,7 @@ export function KnowledgeDirectoryExplorer({ tree, articles, tags, locale }: Kno
   return (
     <div className="space-y-6">
       {/* Interactive Search Trigger + Format Tabs + #Tag Filter Bar */}
-      <div className="space-y-3 rounded-xl border border-border bg-card p-4 shadow-sm">
+      <div className="space-y-3 rounded-xl border border-border bg-card p-4 shadow-xs">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           {/* Format Filter Pills */}
           <div className="flex flex-wrap items-center gap-1.5">
@@ -96,7 +96,7 @@ export function KnowledgeDirectoryExplorer({ tree, articles, tags, locale }: Kno
               <Search className="h-3.5 w-3.5 text-primary" />
               <span>{t('sidebarSearchTrigger')}</span>
             </span>
-            <kbd className="rounded border border-border bg-background px-1.5 py-0.5 font-mono text-[10px]">⌘K</kbd>
+            <kbd className="rounded-sm border border-border bg-background px-1.5 py-0.5 font-mono text-[10px]">⌘K</kbd>
           </button>
         </div>
 
@@ -197,7 +197,7 @@ export function KnowledgeDirectoryExplorer({ tree, articles, tags, locale }: Kno
                             {article.tags.map((tag) => (
                               <span
                                 key={`${article.routePath}-${tag}`}
-                                className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground"
+                                className="rounded-sm bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground"
                               >
                                 #{tag}
                               </span>
@@ -231,7 +231,7 @@ export function KnowledgeDirectoryExplorer({ tree, articles, tags, locale }: Kno
             return (
               <section
                 key={topic.pathKey}
-                className={`rounded-xl border p-5 shadow-sm transition-colors ${
+                className={`rounded-xl border p-5 shadow-xs transition-colors ${
                   isThisProject ? 'border-primary/40 bg-primary/5' : 'border-border bg-card'
                 }`}
               >
@@ -260,7 +260,7 @@ export function KnowledgeDirectoryExplorer({ tree, articles, tags, locale }: Kno
                   <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                     {subtopics.map((sub) => (
                       <Link key={sub.pathKey} href={`/knowledge-base/${sub.pathKey}`} className="group block">
-                        <div className="flex h-full flex-col justify-between rounded-lg border border-border/80 bg-background/80 p-3.5 transition-all group-hover:border-primary/50 group-hover:bg-accent/40 group-hover:shadow-sm">
+                        <div className="flex h-full flex-col justify-between rounded-lg border border-border/80 bg-background/80 p-3.5 transition-all group-hover:border-primary/50 group-hover:bg-accent/40 group-hover:shadow-xs">
                           <div className="flex items-center justify-between gap-2">
                             <span className="flex min-w-0 items-center gap-2 text-sm font-semibold text-foreground group-hover:text-primary">
                               <FolderOpen className="h-4 w-4 shrink-0 text-primary/80" />

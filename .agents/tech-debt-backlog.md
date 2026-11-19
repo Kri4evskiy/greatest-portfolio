@@ -3,7 +3,7 @@
 ## 📌 Текущая база (Production Baseline)
 
 Архитектурное ядро находится в продакшен-состоянии (подробности и 16 ADR лежат в `.agents/frontend/*`, `.agents/backend/*`, `.agents/architecture/*` и статьях базы знаний):
-- **Monorepo & DX:** `pnpm 12.21.0` + `Turborepo` + `TypeScript 7` (native Go compiler) + `Biome 2.6.4` + `Lefthook` · `@repo/shared-schemas` (`Zod v4`) + `@repo/ui` (`Storybook 10`) · Multi-stage `Docker` + `GitHub Actions CI/CD`.
+- **Monorepo & DX:** `pnpm 12.21.0` + `Turborepo` + `TypeScript 7` (native Go compiler) + `Biome 2.6.4` + `Lefthook` · `@repo/shared-schemas` (`Zod v4`) + `@repo/ui` (`Tailwind CSS v4` + `Storybook 10`) · Multi-stage `Docker` + `GitHub Actions CI/CD`.
 - **Frontend (`apps/web`):** `Next.js 16` (`React 19 Compiler`) · архитектура `FSD-Modular` (`app` ➔ `widgets` ➔ `features` ➔ `entities` ➔ `shared`) · `next-intl` (`EN/UK/RU`) · `Zero-Eval HAST MDX Engine` (`remark-directive` `:::sandbox` + `remark-rehype` + `hast-util-to-jsx-runtime` + `mtimeMs` кэш + `Dual-Theme Shiki`) · `Cmd+K` SSG-индекс · `TanStack Query v5` (`IndexedDB`) · `D3.js` / `MCP` клиентские острова · `Edge Web Crypto JWT` + строгий `CSP`.
 - **Backend (`apps/api` & `apps/telemetry-ms`):** `NestJS 12 ESM` + `Prisma` (с In-Memory fallback) + `HttpOnly JWT` + `Helmet` + `@nestjs/throttler` + изолированный TCP-микросервис телеметрии (`:4001`) с `SSE`-стримингом.
 
@@ -44,14 +44,12 @@
 
 ### Приоритет №3: Полноценный переход с Tailwind CSS v3 на Tailwind CSS v4 (`packages/ui`, `apps/web`)
 
-- [ ] **Многоуровневая миграция дизайн-системы на `Tailwind CSS v4` (Oxide / CSS-first Engine):**
-  - **Базовый источник истины:** строго следовать официальному руководству **`https://tailwindcss.com/docs/upgrade-guide`**, пройтись по каждому пункту breaking changes и сопоставить со всеми нашими CSS-файлами (`packages/ui/src/styles/globals.css`, `apps/web/src/app/globals.css`) и компонентами (`packages/ui/src/components/*`, `apps/web/src/{widgets,features,entities,shared}/*`), пока кодовая база UI-компонентов компактна.
-  - **Шаг 1 (`@repo/ui` + Storybook 10 — CSS-first & `@theme`):** перевод `packages/ui/src/styles/globals.css` с `@tailwind base/components/utilities` на `@import "tailwindcss";`, описание дизайн-токенов внутри директивы `@theme` и `@utility` поверх наших семантических CSS-переменных, настройка `@custom-variant dark (&:where(.dark, .dark *));`, замена `tailwindcss-animate` на совместимые анимации v4 и проверка всех `*.stories.tsx` в Storybook 10.
-  - **Шаг 2 (`apps/web` PostCSS + `@source`):** переключение `apps/web/postcss.config.mjs` на `@tailwindcss/postcss`, подключение `@source` для сканирования компонентов `@repo/ui` и FSD-слоёв (`app`, `widgets`, `features`, `entities`, `shared`), удаление устаревших JS-конфигов `tailwind.config.ts`.
-  - **Шаг 3 (Аудит переименованных утилит по `upgrade-guide`):** комплексная замена изменённых классов во всех компонентах (`shadow-sm` ➔ `shadow-xs`, `rounded-sm` ➔ `rounded-xs`, `blur-sm` ➔ `blur-xs`, `outline-none` ➔ `outline-hidden`, `ring` ➔ `ring-3`, явный цвет границ `border-border` для `border`/`divide`, суффиксный `!important` вида `flex!` вместо `!flex`) с сохранением Zero-FOUC переключения тем.
-  - **Шаг 4 (Фиксация современных таргетов `"browserslist"` в `package.json` — Zero Legacy Polyfills):**
-    - Поскольку `Tailwind CSS v4` спроектирован строго под современные движки (**`Safari 16.4+`**, **`Chrome 111+`**, **`Firefox 128+`** — нативные `@property`, `color-mix()`, `@layer`), старые версии этих браузеров не поддерживаются.
-    - Добавить поле **`"browserslist": ["Chrome >= 111", "Edge >= 111", "Firefox >= 128", "Safari >= 16.4"]`** в `apps/web/package.json` (и `packages/ui/package.json`). Это запретит компиляторам `Next.js SWC` / `Turbopack` и `Lightning CSS` генерировать лишние синтаксические трансформы, вендорные префиксы и полифилы под устаревшие браузеры.
+- [x] **Многоуровневая миграция дизайн-системы на `Tailwind CSS v4` (Oxide / CSS-first Engine):**
+  - **Базовый источник истины:** строго следовать официальному руководству **`https://tailwindcss.com/docs/upgrade-guide`**, пройтись по каждому пункту breaking changes и сопоставить со всеми нашими CSS-файлами (`packages/ui/src/styles/theme.css`, `packages/ui/src/styles/globals.css`, `apps/web/src/app/globals.css`) и компонентами (`packages/ui/src/components/*`, `apps/web/src/{widgets,features,entities,shared}/*`), пока кодовая база UI-компонентов компактна.
+  - **Шаг 1 (`@repo/ui` + Storybook 10 — CSS-first & `@theme inline`):** выделен общий токен-слой `packages/ui/src/styles/theme.css` (`@repo/ui/theme.css`) с директивами `@custom-variant dark (&:where(.dark, .dark *));`, `@theme inline`, `@layer base` (дефолтный цвет границ `border-border` и `cursor: pointer` на активных кнопках), подключён `@tailwindcss/vite` в `.storybook/main.ts`, удалены `tailwind.config.ts` и `postcss.config.mjs`.
+  - **Шаг 2 (`apps/web` PostCSS + `@source`):** переключение `apps/web/postcss.config.mjs` на `@tailwindcss/postcss`, импорт `../globals.css` в `[locale]/layout.tsx` с `@import "@repo/ui/theme.css"` и явными `@source` для сканирования `@repo/ui`, `content` и FSD-слоёв, удаление `apps/web/tailwind.config.ts`.
+  - **Шаг 3 (Аудит переименованных утилит по `upgrade-guide`):** выполнена замена изменённых классов во всех компонентах (`shadow-sm` ➔ `shadow-xs`, `rounded` ➔ `rounded-sm`, `backdrop-blur-sm` ➔ `backdrop-blur-xs`, `outline-none` ➔ `outline-hidden`, `sm:space-x-2` ➔ `gap-2` в `DialogFooter`) с сохранением Zero-FOUC переключения тем.
+  - **Шаг 4 (Фиксация современных таргетов `"browserslist"` в `package.json` — Zero Legacy Polyfills):** добавлено `"browserslist": ["Chrome >= 111", "Edge >= 111", "Firefox >= 128", "Safari >= 16.4"]` в `apps/web/package.json` и `packages/ui/package.json`.
 
 ### Приоритет №4: Визуальный редизайн Notion Workfolio (`UI v2`)
 

@@ -46,7 +46,7 @@ function parseWidgetPropsJson(rawJson: string | undefined): Record<string, strin
 
 const inlineHastComponents: Partial<Components> = {
   code: ({ children }) => (
-    <code className="rounded border border-border/70 bg-muted/70 px-1.5 py-0.5 font-mono text-[0.85em] font-medium text-foreground">
+    <code className="rounded-sm border border-border/70 bg-muted/70 px-1.5 py-0.5 font-mono text-[0.85em] font-medium text-foreground">
       {children}
     </code>
   ),
@@ -125,7 +125,7 @@ function createBlockHastComponents(
             <a
               href={`#${id}`}
               aria-label={headingText}
-              className="opacity-0 transition-opacity group-hover:opacity-60 hover:opacity-100"
+              className="opacity-0 transition-opacity group-hover:opacity-60 hover:opacity-100 focus-visible:opacity-100"
             >
               <Hash className="h-4 w-4 text-muted-foreground" />
             </a>
@@ -146,7 +146,7 @@ function createBlockHastComponents(
             <a
               href={`#${id}`}
               aria-label={headingText}
-              className="opacity-0 transition-opacity group-hover:opacity-60 hover:opacity-100"
+              className="opacity-0 transition-opacity group-hover:opacity-60 hover:opacity-100 focus-visible:opacity-100"
             >
               <Hash className="h-3.5 w-3.5 text-muted-foreground" />
             </a>
@@ -172,7 +172,7 @@ function createBlockHastComponents(
       const alt = getStringAttr(props, 'data-figure-alt') ?? ''
       const caption = getStringAttr(props, 'data-figure-caption')
       return (
-        <figure className="my-6 overflow-hidden rounded-xl border border-border bg-card p-2 shadow-sm">
+        <figure className="my-6 overflow-hidden rounded-xl border border-border bg-card p-2 shadow-xs">
           {/* biome-ignore lint/performance/noImgElement: Static and external Markdown figures inside .mdx content */}
           <img
             src={src}
@@ -226,7 +226,7 @@ function createBlockHastComponents(
       return <li className="leading-relaxed [&>p]:inline">{props.children}</li>
     },
     table: ({ children }) => (
-      <div className="my-5 overflow-x-auto rounded-xl border border-border bg-card shadow-sm">
+      <div className="my-5 overflow-x-auto rounded-xl border border-border bg-card shadow-xs">
         <table className="w-full border-collapse text-left text-xs sm:text-sm">{children}</table>
       </div>
     ),

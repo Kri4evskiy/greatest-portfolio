@@ -114,7 +114,7 @@ function KnowledgeTreeItem({ node, depth, pathname, closeOnSelect, onSelectLeaf 
           aria-expanded={isExpanded}
           aria-label={`Toggle ${node.label}`}
           onClick={() => toggleFolder(node.pathKey)}
-          className="flex h-6 w-6 shrink-0 items-center justify-center rounded hover:bg-muted"
+          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-sm hover:bg-muted"
         >
           <ChevronRight
             className={`h-3.5 w-3.5 shrink-0 transition-transform duration-150 ${isExpanded ? 'rotate-90' : ''}`}
@@ -143,7 +143,7 @@ function KnowledgeTreeItem({ node, depth, pathname, closeOnSelect, onSelectLeaf 
           </span>
         </Link>
 
-        <span className="shrink-0 rounded bg-muted/80 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+        <span className="shrink-0 rounded-sm bg-muted/80 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
           {node.articleCount}
         </span>
       </div>
@@ -217,7 +217,7 @@ export function KnowledgeSidebar({
   }, [pathname, allFolderKeys, expandKbAncestors])
 
   const renderTreeContent = (closeOnSelect: boolean) => (
-    <div className="space-y-3 rounded-xl border border-border bg-card p-3 shadow-sm">
+    <div className="space-y-3 rounded-xl border border-border bg-card p-3 shadow-xs">
       <button
         type="button"
         onMouseEnter={() => prefetchKnowledgeSearchIndex(locale)}
@@ -232,7 +232,7 @@ export function KnowledgeSidebar({
           <Search className="h-3.5 w-3.5 shrink-0 text-primary" />
           <span className="truncate">{t('sidebarSearchTrigger')}</span>
         </span>
-        <kbd className="shrink-0 rounded border border-border bg-background px-1.5 py-0.5 font-mono text-[10px]">
+        <kbd className="shrink-0 rounded-sm border border-border bg-background px-1.5 py-0.5 font-mono text-[10px]">
           ⌘K
         </kbd>
       </button>
@@ -252,7 +252,7 @@ export function KnowledgeSidebar({
             <span className="truncate">{t('sidebarOverview')}</span>
           </span>
           <span
-            className={`ml-2 shrink-0 rounded px-1.5 py-0.5 font-mono text-[10px] ${
+            className={`ml-2 shrink-0 rounded-sm px-1.5 py-0.5 font-mono text-[10px] ${
               pathname === '/knowledge-base'
                 ? 'bg-primary-foreground/20 text-primary-foreground'
                 : 'bg-muted text-muted-foreground'
@@ -302,7 +302,7 @@ export function KnowledgeSidebar({
           type="button"
           aria-expanded={isMobileOpen}
           onClick={() => setIsMobileOpen((prev) => !prev)}
-          className="flex w-full items-center justify-between rounded-xl border border-border bg-card px-3.5 py-2.5 text-left text-xs font-medium text-foreground shadow-sm transition-colors hover:bg-accent/50"
+          className="flex w-full items-center justify-between rounded-xl border border-border bg-card px-3.5 py-2.5 text-left text-xs font-medium text-foreground shadow-xs transition-colors hover:bg-accent/50"
         >
           <span className="flex items-center gap-2 font-mono uppercase tracking-wider text-muted-foreground">
             <PanelLeft className="h-3.5 w-3.5 text-primary" />

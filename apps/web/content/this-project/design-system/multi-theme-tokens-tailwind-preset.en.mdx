@@ -1,7 +1,7 @@
 ---
-title: "Multi-Theme CSS Token Matrix, Tailwind Preset & @repo/ui Package Architecture"
-sidebarLabel: "Design Tokens & Tailwind Preset"
-summary: "How to architect a scalable design system in a monorepo: 2D semantic token matrix (Light/Dark × palettes), Dependency Inversion via Tailwind Preset, Storybook 10, and responsive data views."
+title: "Multi-Theme CSS Token Matrix, Tailwind v4 @theme & @repo/ui Package Architecture"
+sidebarLabel: "Design Tokens & Tailwind v4"
+summary: "How to architect a scalable design system in a monorepo: 2D semantic token matrix (Light/Dark × palettes), Dependency Inversion via CSS-first @repo/ui/theme.css, Tailwind CSS v4 (@theme inline, @custom-variant, @source), Storybook 10, and responsive data views."
 category: "this-project"
 format: "deep-dive"
 tags: ["design-tokens", "tailwind", "ui-system", "storybook", "architecture"]
@@ -9,74 +9,78 @@ readingTime: "6 min"
 publishedAt: "2026-11-10"
 order: 1
 tldr:
-  - "Builds `packages/ui/src/styles/globals.css` around semantic HSL variables and two orthogonal axes: luminance mode (`.dark`) and color palette (`[data-palette=\"graphite\" | \"sepia\"]`)."
-  - "Enforces clean dependency direction: `@repo/ui` exports `@repo/ui/tailwind.config` as a reusable `preset` consumed by `apps/web` via `presets: [uiPreset]`."
-  - "Switches dense data layouts responsively between stacked cards on smartphones (`< md`) and full `TanStack Table` / `D3.js` canvases on desktops (`>= md`)."
+  - "Builds `packages/ui/src/styles/theme.css` around semantic HSL variables and two orthogonal axes: luminance mode (`.dark`) and color palette (`[data-palette=\"graphite\" | \"sepia\"]`)."
+  - "Uses Tailwind CSS v4 CSS-first configuration (`@theme inline`, `@custom-variant dark`, `@layer base`) exported as `@repo/ui/theme.css`, while `apps/web` compiles via `@tailwindcss/postcss` and explicit `@source` paths."
+  - "Pins modern `browserslist` targets (`Chrome >= 111`, `Edge >= 111`, `Firefox >= 128`, `Safari >= 16.4`) and switches dense data views responsively between `< md` cards and `>= md` tables."
 ---
 
 ## 1. Two-Dimensional Semantic Token Matrix (`Light/Dark` × `Palette`)
 
-Instead of coupling components to raw Tailwind palette classes (`slate-*`, `emerald-*`, `amber-*`), the entire color system is defined as semantic HSL CSS variables (supporting alpha modifiers such as `hsl(var(--primary) / 0.15)`):
+Instead of coupling components to raw Tailwind palette classes (`slate-*`, `emerald-*`, `amber-*`), the entire color system is defined as semantic HSL CSS variables (supporting alpha modifiers via native `color-mix()` in Tailwind v4 as well as SVG attributes like `hsl(var(--chart-1))`):
 
 - **Surface Hierarchy:** `--background`, `--surface-subtle`, `--surface-elevated`, `--card`, `--popover`.
 - **Semantic Statuses:** `--success`, `--warning`, `--info`, `--destructive` (paired with `*-foreground`).
 - **Visualization & Code:** `--chart-1..4` for SVG/D3 diagrams and `--code-bg`, `--code-header`, `--code-border` for code blocks.
 
-```css title="packages/ui/src/styles/globals.css"
+```css title="packages/ui/src/styles/theme.css"
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
-  --background: 40 33% 98%;
-  --surface-subtle: 38 26% 95%;
+  --background: 40 20% 99%;
+  --surface-subtle: 40 16% 96.5%;
   --surface-elevated: 0 0% 100%;
-  --primary: 24 9.8% 10%;
-  --success: 152 69% 31%;
-  --warning: 38 92% 42%;
-  --info: 217 91% 52%;
+  --primary: 24 10% 12%;
+  --success: 158 64% 32%;
+  --warning: 32 92% 38%;
+  --info: 214 84% 44%;
 }
 
 :root.dark,
 .dark {
   --background: 24 10% 8%;
-  --surface-subtle: 24 9% 11%;
-  --surface-elevated: 24 9% 14%;
-  --primary: 36 25% 94%;
-  --success: 152 60% 52%;
+  --surface-subtle: 24 9% 10%;
+  --surface-elevated: 24 9% 13%;
+  --primary: 40 15% 95%;
+  --success: 156 68% 54%;
 }
 
-:root[data-palette="graphite"] {
-  --background: 220 20% 98%;
-  --surface-subtle: 220 16% 95%;
-  --info: 221 83% 53%;
+@theme inline {
+  --color-background: hsl(var(--background));
+  --color-surface-subtle: hsl(var(--surface-subtle));
+  --color-primary: hsl(var(--primary));
+  --color-success: hsl(var(--success));
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
 }
 ```
 
 > [!TIP]
-> Separating `.dark` from `data-palette` makes adding a new theme or `multi-tenant / white-label` brand a pure ~20-variable CSS override with zero changes to React components.
+> Separating `.dark` from `data-palette` and wrapping runtime tokens in `@theme inline` makes adding a new theme or `multi-tenant / white-label` brand a pure ~20-variable CSS override with zero changes to React components.
 
 ---
 
-## 2. Dependency Inversion via `Tailwind Preset`
+## 2. CSS-First Dependency Inversion (`@repo/ui/theme.css` + `@source`)
 
-To keep `@repo/ui` self-contained and agnostic of `apps/web`, the UI package exports its own `tailwind.config.ts` as a **Tailwind Preset**:
+To keep `@repo/ui` self-contained and agnostic of `apps/web`, the UI package exports a pure token-and-base stylesheet `@repo/ui/theme.css` (without `@import "tailwindcss";` inside it) and keeps its own Storybook entry (`packages/ui/src/styles/globals.css`) powered by `@tailwindcss/vite`.
 
-```typescript title="apps/web/tailwind.config.ts"
-import uiPreset from '@repo/ui/tailwind.config'
-import type { Config } from 'tailwindcss'
+In `apps/web`, PostCSS runs `@tailwindcss/postcss` and declares `@source` boundaries in its own entry CSS:
 
-const config: Config = {
-  presets: [uiPreset],
-  content: [
-    './src/**/*.{ts,tsx,mdx}',
-    '../../packages/ui/src/**/*.{ts,tsx}',
-  ],
-}
+```css title="apps/web/src/app/globals.css"
+@import "tailwindcss";
+@import "@repo/ui/theme.css";
 
-export default config
+@source "../";
+@source "../../content";
+@source "../../../../packages/ui/src";
 ```
 
+Both `apps/web/package.json` and `packages/ui/package.json` declare modern browser targets (`"browserslist": ["Chrome >= 111", "Edge >= 111", "Firefox >= 128", "Safari >= 16.4"]`) so `Lightning CSS` and `Next.js SWC` emit zero legacy polyfills for `@property` and `color-mix()`.
+
 This architecture provides three advantages:
-1. A single source of truth mapping CSS variables to utility classes (`bg-surface-subtle`, `text-warning`, `border-code-border`) across both `apps/web` and `Storybook 10`.
+1. A single CSS-first source of truth mapping CSS variables to utility classes (`bg-surface-subtle`, `text-warning`, `border-code-border`) across both `apps/web` and `Storybook 10`.
 2. Zero upward `../../apps/*` imports inside the shared design system package.
-3. Instant onboarding for any new frontend app in the monorepo via `presets: [uiPreset]`.
+3. Instant onboarding for any new frontend app in the monorepo via `@import "@repo/ui/theme.css";` + `@source`.
 
 ---
 

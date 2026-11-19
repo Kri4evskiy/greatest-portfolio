@@ -142,7 +142,7 @@ The repository is engineered according to the **Zero-Friction Onboarding** princ
 4. **State Separation:** `TanStack Query v5` (server cache) + `Zustand` (client UI state)
 5. **Browser Database:** `IndexedDB` (`idb-keyval` + TanStack Query Persister with 24h TTL)
 6. **Forms & End-to-End Validation:** `React Hook Form` + `Zod` (`packages/shared-schemas`)
-7. **UI System & Documentation:** `Tailwind CSS` + `shadcn/ui` (Radix UI) + `Storybook 10`
+7. **UI System & Documentation:** `Tailwind CSS v4` + `shadcn/ui` (Radix UI) + `Storybook 10`
 8. **Tables & Auto-Memoization:** `TanStack Table` (Tech Radar + ADR) & `React 19 Compiler` (boundary isolation `'use no memo'`)
 9. **Content & Visualization:** `MDX` + `WebP` (`<ArticleImageGrid />`) + interactive `D3.js` graphs
 10. **Core Backend:** `NestJS 12` (Native ESM, modular DI architecture)
@@ -171,7 +171,7 @@ greatest-portfolio/
 │   └── telemetry-ms/           # Telemetry & analytics microservice (@nestjs/microservices)
 ├── packages/
 │   ├── shared-schemas/         # Shared Zod schemas and TypeScript types for web and API (ESM)
-│   └── ui/                     # Notion Workfolio UI kit (Tailwind + Radix + Storybook 10)
+│   └── ui/                     # Notion Workfolio UI kit (Tailwind v4 + Radix + Storybook 10)
 ├── docker/                     # Optimized 3-stage Dockerfiles (turbo prune --docker)
 ├── scripts/                    # Automation scripts (bootstrap-env.mjs, dev-runner.mjs)
 ├── AGENTS.md                   # Root AI context router

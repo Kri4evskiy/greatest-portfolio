@@ -6,7 +6,7 @@ You are a Senior Full-Stack AI Engineer working on the **Engineer Workfolio & Li
 
 This monorepo is powered by **pnpm workspaces** (`pnpm@12.x`) and **Turborepo** (`turbo@2.x`):
 
-- **`apps/web`:** Next.js 16 (App Router), React 19, Tailwind CSS v3 (migration to v4 planned), multi-slug MDX knowledge base, Edge Proxy.
+- **`apps/web`:** Next.js 16 (App Router), React 19, Tailwind CSS v4 (CSS-first Oxide engine), multi-slug MDX knowledge base, Edge Proxy.
 - **`apps/api`:** NestJS 12 HTTP & SSE API, Prisma ORM, JWT authentication.
 - **`apps/telemetry-ms`:** Standalone NestJS Microservice isolated over TCP (`:4001`) for real-time telemetry events.
 - **`packages/shared-schemas`:** Source-of-truth Zod v4 schemas, shared DTOs, and TypeScript contracts across web, api, and telemetry.
