@@ -57,17 +57,12 @@ export function ThemeToggle() {
   const t = useTranslations('Header')
   const palette = useUIStore((s) => s.palette)
   const hasHydratedPalette = useUIStore((s) => s.hasHydratedPalette)
-  const hydratePaletteFromStorage = useUIStore((s) => s.hydratePaletteFromStorage)
   const setPalette = useUIStore((s) => s.setPalette)
 
   const [isOpen, setIsOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const popoverId = useId()
-
-  useEffect(() => {
-    hydratePaletteFromStorage()
-  }, [hydratePaletteFromStorage])
 
   useEffect(() => {
     if (!isOpen) return

@@ -77,7 +77,7 @@ interface UIState {
   expandKbAncestors: (pathKeys: readonly string[]) => void
   collapseAllKbFolders: () => void
   expandAllKbFolders: (pathKeys: readonly string[]) => void
-  hydratePaletteFromStorage: () => void
+  syncPaletteFromStorage: () => void
   setPalette: (palette: WorkfolioPalette) => void
 }
 
@@ -193,13 +193,13 @@ export const useUIStore = create<UIState>((set) => ({
       persistExpandedFoldersToSession(next)
       return { expandedKbFolders: next }
     }),
-  hydratePaletteFromStorage: () =>
+  syncPaletteFromStorage: () =>
     set((state) => {
-      if (state.hasHydratedPalette) {
-        return state
-      }
       const restored = readPaletteFromStorage()
       applyPaletteToDocument(restored)
+      if (state.hasHydratedPalette && state.palette === restored) {
+        return state
+      }
       return {
         palette: restored,
         hasHydratedPalette: true,
