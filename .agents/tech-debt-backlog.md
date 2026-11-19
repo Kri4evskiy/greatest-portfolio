@@ -3,7 +3,7 @@
 ## 📌 Текущая база (Production Baseline)
 
 Архитектурное ядро находится в продакшен-состоянии (подробности и 16 ADR лежат в `.agents/frontend/*`, `.agents/backend/*`, `.agents/architecture/*` и статьях базы знаний):
-- **Monorepo & DX:** `pnpm 12.21.0` + `Turborepo` + `Biome 2.6.4` + `Lefthook` · `@repo/shared-schemas` (`Zod v4`) + `@repo/ui` (`Storybook 10`) · Multi-stage `Docker` + `GitHub Actions CI/CD`.
+- **Monorepo & DX:** `pnpm 12.21.0` + `Turborepo` + `TypeScript 7` (native Go compiler) + `Biome 2.6.4` + `Lefthook` · `@repo/shared-schemas` (`Zod v4`) + `@repo/ui` (`Storybook 10`) · Multi-stage `Docker` + `GitHub Actions CI/CD`.
 - **Frontend (`apps/web`):** `Next.js 16` (`React 19 Compiler`) · архитектура `FSD-Modular` (`app` ➔ `widgets` ➔ `features` ➔ `entities` ➔ `shared`) · `next-intl` (`EN/UK/RU`) · `Zero-Eval HAST MDX Engine` (`remark-directive` `:::sandbox` + `remark-rehype` + `hast-util-to-jsx-runtime` + `mtimeMs` кэш + `Dual-Theme Shiki`) · `Cmd+K` SSG-индекс · `TanStack Query v5` (`IndexedDB`) · `D3.js` / `MCP` клиентские острова · `Edge Web Crypto JWT` + строгий `CSP`.
 - **Backend (`apps/api` & `apps/telemetry-ms`):** `NestJS 12 ESM` + `Prisma` (с In-Memory fallback) + `HttpOnly JWT` + `Helmet` + `@nestjs/throttler` + изолированный TCP-микросервис телеметрии (`:4001`) с `SSE`-стримингом.
 
@@ -81,7 +81,7 @@
 
 ### 4. Testing (`packages/*`, `apps/*`)
 
-- [ ] **Unit & Integration Tests (`Vitest`):** тесты Zod v4 схем (`@repo/shared-schemas`), Zustand-сторов и NestJS-сервисов + интеграция джобы `unit-tests` в Stage 1 CI (`turbo run test --affected`).
+- [ ] **Unit & Integration Tests (`Vitest`):** тесты Zod v4 схем (`@repo/shared-schemas`), Zustand-сторов и NestJS-сервисов + интеграция джобы `unit-tests` в Stage 1 CI (`turbo run test --affected`). _(Строго `Vitest`, без `Jest`/`ts-jest`: `ts-jest` ограничен `typescript <7` и завязан на legacy JS Compiler API, тогда как `Vitest` нативно совместим с `TypeScript 7`.)_
 - [ ] **E2E Playwright Suite:** проверка RBAC-флоу (`GuestPassModal` → `HttpOnly` кука → чтение `.mdx` → маскирование `<Redact />`) + джоба `e2e` после `build` в CI (и обновить карточку `playwright-vitest-ci` в `engineering-roadmap.ts`).
 
 ### 5. Backend AI & Model Context Protocol (`apps/api` — Future Milestone)
