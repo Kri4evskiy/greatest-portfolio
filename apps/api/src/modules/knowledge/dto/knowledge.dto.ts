@@ -4,4 +4,5 @@ export {
   ArticleReactionBodySchema,
   ArticleReactionInputSchema,
   type KnowledgeCategory,
+  type PaginatedArticleMetricsResponse,
 } from '@repo/shared-schemas'

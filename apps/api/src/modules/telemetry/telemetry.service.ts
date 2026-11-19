@@ -1,8 +1,15 @@
 import { randomUUID } from 'node:crypto'
 import { Inject, Injectable, Logger, MessageEvent } from '@nestjs/common'
 import { ClientProxy } from '@nestjs/microservices'
-import { TelemetryEvent, TelemetryEventSchema, TelemetryEventType, VisitorRoleType } from '@repo/shared-schemas'
+import {
+  type PaginatedSystemEventsResponse,
+  type TelemetryEvent,
+  TelemetryEventSchema,
+  type TelemetryEventType,
+  type VisitorRoleType,
+} from '@repo/shared-schemas'
 import { firstValueFrom, interval, map, merge, Observable, of, Subject, timeout } from 'rxjs'
+import type { CursorPaginationQueryDto } from '../../common/dto/pagination-query.dto.js'
 import { PrismaService } from '../../prisma/prisma.service.js'
 
 export const TELEMETRY_MS_CLIENT = 'TELEMETRY_MS_CLIENT'
@@ -48,6 +55,10 @@ export class TelemetryService {
     }
 
     return rawEvent
+  }
+
+  async getSystemEvents(query: CursorPaginationQueryDto): Promise<PaginatedSystemEventsResponse> {
+    return this.prisma.getCursorPaginatedSystemEvents(query)
   }
 
   async getMicroserviceStats(): Promise<{

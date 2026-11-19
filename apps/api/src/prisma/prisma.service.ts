@@ -1,7 +1,19 @@
 import { randomUUID } from 'node:crypto'
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common'
 import { PrismaPg } from '@prisma/adapter-pg'
-import type { ArticleMeta, KnowledgeCategory, Role, VisitorRoleType } from '@repo/shared-schemas'
+import {
+  type ArticleMeta,
+  type CursorPaginationQuery,
+  type KnowledgeCategory,
+  type OffsetPaginationQuery,
+  type PaginatedArticleMetricsResponse,
+  type PaginatedSystemEventsResponse,
+  type Role,
+  type SystemEventLogItem,
+  TelemetryEventTypeEnum,
+  type VisitorRoleType,
+  VisitorRoleTypeEnum,
+} from '@repo/shared-schemas'
 import { Pool } from 'pg'
 import { databaseConfig, extractPostgresSchema } from '../config/database.config.js'
 import { type Prisma, PrismaClient } from '../generated/prisma/client.js'
@@ -17,6 +29,26 @@ export interface StoredVisitorSession {
   expiresAt: Date
 }
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const MAX_MEMORY_SYSTEM_EVENTS = 200
+
+function buildOffsetMetricsPage(
+  items: ArticleMeta[],
+  total: number,
+  query: OffsetPaginationQuery,
+): PaginatedArticleMetricsResponse {
+  const consumed = query.offset + items.length
+  const hasMore = consumed < total
+  return {
+    items,
+    total,
+    limit: query.limit,
+    offset: query.offset,
+    hasMore,
+    nextOffset: hasMore ? consumed : null,
+  }
+}
+
 @Injectable()
 export class PrismaService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(PrismaService.name)
@@ -26,6 +58,7 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
 
   private readonly memorySessions = new Map<string, StoredVisitorSession>()
   private readonly memoryMetrics = new Map<string, ArticleMeta>()
+  private readonly memoryEvents: SystemEventLogItem[] = []
 
   constructor() {
     const now = new Date().toISOString()
@@ -175,6 +208,39 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return Array.from(this.memoryMetrics.values())
   }
 
+  async getPaginatedArticleMetrics(query: OffsetPaginationQuery): Promise<PaginatedArticleMetricsResponse> {
+    if (this.dbConnected && this.client) {
+      try {
+        const [rows, total] = await Promise.all([
+          this.client.articleMetrics.findMany({
+            orderBy: [{ viewsCount: 'desc' }, { slug: 'asc' }],
+            take: query.limit,
+            skip: query.offset,
+          }),
+          this.client.articleMetrics.count(),
+        ])
+        if (total > 0) {
+          const items: ArticleMeta[] = rows.map((r) => ({
+            slug: r.slug,
+            category: r.category as KnowledgeCategory,
+            viewsCount: r.viewsCount,
+            helpfulCount: r.helpfulCount,
+            updatedAt: r.updatedAt.toISOString(),
+          }))
+          return buildOffsetMetricsPage(items, total, query)
+        }
+      } catch (err) {
+        this.logger.warn(`Prisma getPaginatedArticleMetrics fallback: ${String(err)}`)
+      }
+    }
+
+    const sorted = Array.from(this.memoryMetrics.values()).sort(
+      (a, b) => b.viewsCount - a.viewsCount || a.slug.localeCompare(b.slug),
+    )
+    const items = sorted.slice(query.offset, query.offset + query.limit)
+    return buildOffsetMetricsPage(items, sorted.length, query)
+  }
+
   async incrementArticleView(slug: string, category: KnowledgeCategory): Promise<ArticleMeta> {
     if (this.dbConnected && this.client) {
       try {
@@ -253,7 +319,49 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return next
   }
 
+  private toPublicSystemEventItem(
+    id: string,
+    eventType: string,
+    payload: unknown,
+    createdAt: Date,
+  ): SystemEventLogItem | null {
+    const parsedType = TelemetryEventTypeEnum.safeParse(eventType)
+    if (!parsedType.success) {
+      return null
+    }
+
+    const record =
+      typeof payload === 'object' && payload !== null && !Array.isArray(payload)
+        ? (payload as Record<string, unknown>)
+        : null
+
+    const message =
+      typeof record?.message === 'string' && record.message.trim().length > 0 ? record.message : parsedType.data
+    const parsedRole = VisitorRoleTypeEnum.safeParse(record?.actorRole)
+    const actorRole = parsedRole.success ? parsedRole.data : undefined
+    const slug = typeof record?.slug === 'string' && record.slug.trim().length > 0 ? record.slug : undefined
+
+    return {
+      id,
+      type: parsedType.data,
+      message,
+      ...(actorRole ? { actorRole } : {}),
+      ...(slug ? { slug } : {}),
+      createdAt: createdAt.toISOString(),
+    }
+  }
+
   async logSystemEvent(eventType: string, payload: Record<string, unknown>): Promise<void> {
+    const now = new Date()
+    const eventId = typeof payload.id === 'string' && UUID_REGEX.test(payload.id) ? payload.id : randomUUID()
+    const inMemoryItem = this.toPublicSystemEventItem(eventId, eventType, payload, now)
+    if (inMemoryItem) {
+      this.memoryEvents.unshift(inMemoryItem)
+      if (this.memoryEvents.length > MAX_MEMORY_SYSTEM_EVENTS) {
+        this.memoryEvents.pop()
+      }
+    }
+
     if (!this.dbConnected || !this.client) {
       return
     }
@@ -267,6 +375,56 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
       })
     } catch (err) {
       this.logger.warn(`Prisma logSystemEvent fallback: ${String(err)}`)
+    }
+  }
+
+  async getCursorPaginatedSystemEvents(query: CursorPaginationQuery): Promise<PaginatedSystemEventsResponse> {
+    if (this.dbConnected && this.client) {
+      try {
+        const rows = await this.client.systemEventLog.findMany({
+          orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+          take: query.limit + 1,
+          ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+        })
+        const hasMore = rows.length > query.limit
+        const pageRows = hasMore ? rows.slice(0, query.limit) : rows
+        const items = pageRows
+          .map((row) => this.toPublicSystemEventItem(row.id, row.eventType, row.payload, row.createdAt))
+          .filter((item): item is SystemEventLogItem => item !== null)
+        const lastRow = pageRows.at(-1)
+        return {
+          items,
+          limit: query.limit,
+          hasMore,
+          nextCursor: hasMore && lastRow ? lastRow.id : null,
+        }
+      } catch (err) {
+        this.logger.warn(`Prisma getCursorPaginatedSystemEvents fallback: ${String(err)}`)
+      }
+    }
+
+    let startIndex = 0
+    if (query.cursor) {
+      const cursorIndex = this.memoryEvents.findIndex((item) => item.id === query.cursor)
+      if (cursorIndex === -1) {
+        return {
+          items: [],
+          limit: query.limit,
+          hasMore: false,
+          nextCursor: null,
+        }
+      }
+      startIndex = cursorIndex + 1
+    }
+
+    const sliced = this.memoryEvents.slice(startIndex, startIndex + query.limit + 1)
+    const hasMore = sliced.length > query.limit
+    const items = hasMore ? sliced.slice(0, query.limit) : sliced
+    return {
+      items,
+      limit: query.limit,
+      hasMore,
+      nextCursor: hasMore ? (items.at(-1)?.id ?? null) : null,
     }
   }
 }
