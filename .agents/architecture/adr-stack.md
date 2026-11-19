@@ -46,7 +46,7 @@
   - `Zustand` — микроскопический (~1 KB), не требует `Context Provider`'ов (нет лишних ререндеров дерева) и идеально хранит синхронный UI-стейт.
 - **Где применяется (Where):** В `apps/web`.
 - **Как реализовано (How):**
-  - **В Zustand:** состояние сайдбара базы знаний, активные настройки интерактивных графиков `D3.js`, состояние модалки микро-авторизации (`useUIStore`, `useAuthStore`).
+  - **В Zustand:** состояние сайдбара базы знаний, активная палитра (`default` / `graphite` / `sepia`), настройки интерактивных графиков `D3.js`, модалки авторизации и поиска (`useUIStore`), при этом `ThemeProvider` вызывает `useUIStore.getState().syncPaletteFromStorage()` императивно на mount/storage-событии без лишней подписки `useSyncExternalStore` на корневом провайдере.
   - **В TanStack Query:** хуки `useArticleMeta()`, `useVisitorProfile()`, мутации лайков/закладок с `onMutate` (Optimistic UI).
 
 ---
@@ -67,11 +67,13 @@
 
 ---
 
-## 7. UI-система и Документация: `Tailwind CSS` + `shadcn/ui` + `Storybook`
+## 7. UI-система и Документация: `Tailwind CSS v4` + `shadcn/ui` + `Storybook 10`
 
-- **Почему выбрали (Why):** В отличие от тяжелых UI-библиотек вроде MUI или AntD (которые тащат огромный runtime в бандл и сложно кастомизируются), `shadcn/ui` дает исходный код компонентов на базе безголовых примитивов `Radix UI` (полная доступность WAI-ARIA из коробки) и утилитарного `Tailwind CSS`. А `Storybook` позволяет разрабатывать и тестировать UI изолированно.
-- **Где применяется (Where):** Пакет `packages/ui`, который потребляется приложением `apps/web`.
-- **Как реализовано (How):** Все атомарные компоненты (`Button`, `Input`, `Badge`, `Card`, `Dialog`, `Tooltip`, `Tabs`, `Skeleton`, `Sidebar`) лежат в `packages/ui`, покрыты `.stories.tsx` файлами и доступны в интерактивном каталоге `Storybook`.
+- **Почему выбрали (Why):** В отличие от тяжелых UI-библиотек вроде MUI или AntD (которые тащат огромный runtime в бандл и сложно кастомизируются), `shadcn/ui` дает исходный код компонентов на базе безголовых примитивов `Radix UI` (полная доступность WAI-ARIA из коробки), а `Tailwind CSS v4` (Oxide / CSS-first `@theme inline`) с нативными платформенными фичами CSS (`@starting-style`, `@container`, Cascade Layers) устраняет необходимость в JS-аниматорах и legacy-конфигах. `Storybook 10` позволяет разрабатывать и визуально проверять компоненты изолированно.
+- **Где применяется (Where):** Пакет `packages/ui` (`@repo/ui/theme.css`), потребляемый приложением `apps/web` через Composition Root `apps/web/src/app/globals.css` (`@source`).
+- **Как реализовано (How):**
+  - 2D-матрица семантических HSL-токенов (`Light / Dark / System` × `Warm Paper / Graphite / Sepia`) с Zero-FOUC `<head>`-скриптом `PALETTE_INIT_SCRIPT` и self-hosted Zero-CLS шрифтами `Inter` + `JetBrains Mono` через `next/font/google` (`font-src 'self' data:`).
+  - Все `9/9` атомарных компонентов (`Badge`, `Button`, `Callout`, `Card`, `Dialog`, `Input`, `Skeleton`, `Tabs`, `Tooltip`) лежат в `packages/ui`, покрыты `.stories.tsx` и доступны в каталоге `Storybook 10` (`@tailwindcss/vite`).
 
 ---
 

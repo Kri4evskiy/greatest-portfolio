@@ -57,11 +57,11 @@ tldr:
 
 ### Живий 2D-перемикач оформлення та Zero-FOUC гідратація
 
-У хедері [`ThemeToggle`](apps/web/src/widgets/header/theme-toggle.tsx) відкриває компактний 2D-поповер для керування обома осями одночасно:
+У хедері [`ThemeToggle`](apps/web/src/widgets/header/theme-toggle.tsx) виступає чистим UI-контролом для керування обома ортогональними осями одночасно:
 - **Режим яскравості (`Color Mode`):** `Light`, `Dark` або `System` (через `next-themes` і клас `.dark`).
 - **Палітра (`Palette`):** `Warm Paper` (`default`), `Graphite` або `Sepia` (зберігається в `localStorage['workfolio-palette']` і синхронізується з `html[data-palette]` через `useUIStore`).
 
-Щоб при перезавантаженні сторінки з активною палітрою `Graphite` чи `Sepia` не виникав спалах базової палітри (FOUC), `LocaleRootLayout` вбудовує статичний скрипт `PALETTE_INIT_SCRIPT` безпосередньо в `<head>` до першого рендера й гідратації.
+Щоб при перезавантаженні сторінки з активною палітрою `Graphite` чи `Sepia` не виникав спалах базової палітри (FOUC), `LocaleRootLayout` вбудовує статичний скрипт `PALETTE_INIT_SCRIPT` безпосередньо в `<head>` до першого рендера, а кореневий `ThemeProvider` виконує клієнтську гідратацію та крос-вкладкову синхронізацію `storage` імперативно через `useUIStore.getState().syncPaletteFromStorage()` (без зайвої підписки `useSyncExternalStore` і ре-рендерів дерева).
 
 > [!TIP]
 > Розділення осей `.dark` і `data-palette` у зв'язці з `@theme inline` дозволяє підключити будь-яку нову тему або брендинг клієнта (`multi-tenant / white-label`) перевизначенням CSS-змінних без жодної правки в React-компонентах.
@@ -84,7 +84,7 @@ tldr:
 ```
 
 Усередині `theme.css` стилі розкладено по **CSS Cascade Layers**:
-1. **`@layer base`:** задає дефолтний `border-color: hsl(var(--border))`, `cursor: pointer` на активних кнопках, `scrollbar-gutter: stable` (прибирає зсув макета на 15px при відкритті модалок у Windows), `scrollbar-width: thin`, `scroll-padding-top: 5rem`, плавний скрол і `text-wrap: balance` / `text-wrap: pretty`.
+1. **`@layer base`:** задає дефолтний `border-color: hsl(var(--border))`, `cursor: pointer` на активних кнопках, `scrollbar-gutter: stable` (прибирає зсув макета на 15px при відкритті модалок у Windows), `scrollbar-width: thin`, `scroll-padding-top: 5rem`, плавний скрол (у зв'язці з `data-scroll-behavior="smooth"` на `<html>` у `LocaleRootLayout`) і `text-wrap: balance` / `text-wrap: pretty`.
 2. **`@layer components`:** ізолює `.shiki` і GPU-анімації входу `@starting-style` (`opacity` + `scale`) для `[data-dialog-overlay]` і `[data-dialog-content]`.
 3. **Unlayered override:** `@media (prefers-reduced-motion: reduce)` винесено *поза* шари — за специфікацією Cascade Layers позашарові правила завжди перекривають `@layer utilities` (`transition-*`, `animate-*`) без використання `!important`.
 
@@ -94,11 +94,11 @@ tldr:
 
 ## 3. Zero-CLS шрифти, `@container` queries та усвідомлені компроміси
 
-- **Локальні Zero-CLS веб-шрифти:** `LocaleRootLayout` підключає `Inter` і `JetBrains_Mono` (`subsets: ['latin', 'cyrillic']`, `display: 'swap'`) через `next/font/google` і зв'язує `--font-inter` / `--font-jetbrains-mono` із `--font-sans` та `--font-mono` в `@theme inline`. Next.js завантажує `.woff2` на етапі `next build` і віддає їх як власну статику (`0` зовнішніх запитів у рантаймі, `0` CLS).
+- **Локальні Zero-CLS веб-шрифти:** `LocaleRootLayout` підключає `Inter` і `JetBrains_Mono` (`subsets: ['latin', 'cyrillic']`, `display: 'swap'`) через `next/font/google` і зв'язує `--font-inter` / `--font-jetbrains-mono` із `--font-sans` та `--font-mono` в `@theme inline`. Next.js завантажує `.woff2` на етапі `next build` і віддає їх як власну статику `'self'` (`0` зовнішніх запитів у рантаймі, `0` CLS), що дозволяє звузити CSP `font-src` до `'self' data:`.
 - **Точкові Container Queries (`@container`):** базовий `Card` з `@repo/ui` вмикає `@container`, тому картки Бази Знань (`@xs:flex-row`, `@sm:text-lg`) і сітка MDX `<ArticleImageGrid />` (`@md:grid-cols-2`) адаптуються до ширини своєї реальної колонки (зокрема між сайдбаром і TOC), а не ширини вікна браузера.
 - **Усвідомлені компроміси (Trade-offs):**
   - **Radix Dialog + `@starting-style` замість нативного `<dialog>`:** `Radix UI Dialog` (на який переведено й `CommandPaletteModal`) забезпечує надійний focus-trap, `aria-modal` і scroll-lock у всіх браузерах, а нативні CSS-переходи входу реалізовано поверх нього через `@starting-style`.
-  - **Відкладені `CSS Anchor Positioning` і `light-dark()`:** їхня підтримка поки не покриває весь наш `browserslist` (`Safari 16.4+`, `Firefox 128+`), тоді як поточна матриця CSS-змінних і Radix уже працюють стабільно.
+  - **Відкладені `oklch()`, `CSS Anchor Positioning` і `light-dark()`:** нативне якоріння та `light-dark()` поки не покривають весь наш `browserslist` (`Safari 16.4+`, `Firefox 128+`), а канальний HSL (`H S% L%`) залишається наочним, сумісним із `hsl(var(--chart-*))` в SVG-графах `D3.js` і чудово працює з `color-mix()` у Tailwind v4.
 
 ---
 

@@ -10,7 +10,7 @@ publishedAt: "2026-11-13"
 order: 1
 tldr:
   - "In `apps/web/next.config.ts`, a full suite of security headers is enabled: CSP, HSTS (`63072000s`), `nosniff`, `Referrer-Policy`, and `frame-ancestors 'none'`."
-  - "CSP directives are calibrated to support the `next-themes` inline script and direct Server-Sent Events streaming without breaking isolation."
+  - "CSP directives are calibrated to support the `next-themes` + static allowlisted `PALETTE_INIT_SCRIPT` inline scripts, self-hosted `font-src 'self' data:`, and direct Server-Sent Events streaming without breaking isolation."
   - "Integrated `helmet` in `apps/api` with custom `crossOriginResourcePolicy: cross-origin` to eliminate browser SSE stream blocks."
   - "Authentication endpoints `POST /api/auth/guest-pass` and `POST /api/auth/login` are shielded by `@nestjs/throttler` (max 5 attempts per minute per IP)."
 ---
@@ -73,7 +73,7 @@ export function buildContentSecurityPolicy(
     `script-src ${scriptSrc}`,
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' blob: data: https:",
-    "font-src 'self' data: https:",
+    "font-src 'self' data:",
     `connect-src ${connectSrc}`,
     "frame-src 'self'",
     `frame-ancestors ${allowSameOriginFraming ? "'self'" : "'none'"}`,
@@ -276,7 +276,7 @@ Our implemented defense stack achieves an **A+** grade on industry auditing stan
 No production architecture is free of trade-offs. Below are the three conscious engineering decisions made in the current baseline and how their residual risks are mitigated:
 
 1. **Static `SSG` (`'unsafe-inline'`) vs. Per-Request `CSP Nonce`:**
-   - *Trade-off:* Eliminating `'unsafe-inline'` from `script-src` requires generating a cryptographic `nonce` on every HTTP request. In Next.js 16, reading per-request headers to inject a `nonce` forces all 137 routes out of **Static Site Generation (`SSG`)** into dynamic per-request `SSR`, sacrificing edge CDN caching and sub-20ms TTFB.
+   - *Trade-off:* Eliminating `'unsafe-inline'` from `script-src` requires generating a cryptographic `nonce` on every HTTP request. In Next.js 16, reading per-request headers to inject a `nonce` forces all 143 routes out of **Static Site Generation (`SSG`)** into dynamic per-request `SSR`, sacrificing edge CDN caching and sub-20ms TTFB.
    - *Mitigation:* Because the platform does not render untrusted user-generated HTML (all `.mdx` files are repository-controlled, compiled via our Zero-Eval HAST pipeline with raw HTML stripped, and URLs sanitized via `classifySafeMarkdownLink`), and session tokens live strictly in `HttpOnly` cookies (`document.cookie` is inaccessible), keeping `SSG` is the right pragmatic choice.
 2. **Public `Cmd+K` Discovery Index (`/search-index/[locale]`) vs. Protected Article Bodies:**
    - *Trade-off:* In `apps/web/src/proxy.ts`, the matcher (`'/((?!api|search-index|_next|_vercel|.*\\..*).*)'`) intentionally leaves `/search-index/[locale]` public so recruiters and engineers can search topics via `Cmd+K` directly from the landing page before requesting a `Guest Pass`.

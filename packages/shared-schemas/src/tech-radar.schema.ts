@@ -75,9 +75,9 @@ export const TECH_RADAR_ITEMS_RU: readonly TechRadarItem[] = [
     summary: 'Строгое разделение серверного кэша и синхронного клиентского UI-стейта.',
     adrWhy:
       'Смешивать данные из API и UI-состояние в одном глобальном сторе — антипаттерн. TanStack Query отвечает за кэш, инвалидацию и Optimistic UI, а микроскопический Zustand (~1 KB) — за синхронный UI без Context Provider.',
-    adrWhere: 'В приложении apps/web (src/store/* и src/hooks/*).',
+    adrWhere: 'В приложении apps/web (shared/store/* и доменные queries/*).',
     adrHow:
-      'В Zustand хранятся модалки, состояние сайдбара и фильтры D3.js; в TanStack Query — профиль сессии и метрики статей.',
+      'В Zustand хранятся модалки, состояние сайдбара, палитра (с императивной синхронизацией useUIStore.getState() в ThemeProvider) и фильтры D3.js; в TanStack Query — профиль сессии и метрики статей.',
   },
   {
     id: 'indexeddb-persister',
@@ -109,16 +109,17 @@ export const TECH_RADAR_ITEMS_RU: readonly TechRadarItem[] = [
   {
     id: 'tailwind-shadcn-storybook',
     adrNumber: 7,
-    name: 'Tailwind CSS + shadcn/ui + Storybook',
+    name: 'Tailwind CSS v4 + shadcn/ui + Storybook 10',
     category: 'Frontend',
     experienceYears: 4,
     level: 'Core',
-    summary: 'Дизайн-система в эстетике Notion Workfolio на базе Radix UI с документацией в Storybook.',
+    summary:
+      'CSS-first дизайн-система (@theme inline, 2D Mode × Palette) на базе Radix UI с Zero-CLS шрифтами и 9/9 историями в Storybook 10.',
     adrWhy:
-      'В отличие от тяжелых рантайм-библиотек (MUI/AntD), shadcn/ui дает полный контроль кода и доступность WAI-ARIA из коробки, а Storybook позволяет тестировать UI изолированно.',
-    adrWhere: 'Пакет packages/ui (@repo/ui), используемый в apps/web.',
+      'В отличие от тяжелых рантайм-библиотек (MUI/AntD), shadcn/ui дает полный контроль кода и доступность WAI-ARIA, Tailwind v4 с нативными @starting-style и @container убирает лишний JS-рантайм, а Storybook 10 изолированно проверяет UI.',
+    adrWhere: 'Пакет packages/ui (@repo/ui/theme.css), подключаемый в apps/web/src/app/globals.css через @source.',
     adrHow:
-      'Атомарные компоненты (Button, Input, Badge, Card, Dialog, Tabs, Callout) покрыты .stories.tsx в изолированном каталоге Storybook.',
+      '2D HSL-токены + Zero-CLS Inter/JetBrains Mono (next/font) + все 9/9 примитивов (Badge, Button, Callout, Card, Dialog, Input, Skeleton, Tabs, Tooltip) покрыты .stories.tsx в Storybook 10.',
   },
   {
     id: 'tanstack-table-redact',
@@ -300,9 +301,9 @@ export const TECH_RADAR_ITEMS_EN: readonly TechRadarItem[] = [
     summary: 'Strict separation of server cache state and synchronous client UI state.',
     adrWhy:
       'Mixing API cache and UI state in one global store is an anti-pattern. TanStack Query handles server cache, invalidation, and Optimistic UI, while Zustand (~1 KB) manages synchronous UI state without Context provider overhead.',
-    adrWhere: 'In apps/web (src/store/* and src/hooks/*).',
+    adrWhere: 'In apps/web (shared/store/* and domain queries/*).',
     adrHow:
-      'Zustand stores modals, sidebar state, and D3.js filters using atomic selectors; TanStack Query manages visitor session profiles and article metrics.',
+      'Zustand stores modals, sidebar state, palette (synced imperatively via useUIStore.getState() in ThemeProvider), and D3.js filters using atomic selectors; TanStack Query manages visitor session profiles and article metrics.',
   },
   {
     id: 'indexeddb-persister',
@@ -335,16 +336,17 @@ export const TECH_RADAR_ITEMS_EN: readonly TechRadarItem[] = [
   {
     id: 'tailwind-shadcn-storybook',
     adrNumber: 7,
-    name: 'Tailwind CSS + shadcn/ui + Storybook',
+    name: 'Tailwind CSS v4 + shadcn/ui + Storybook 10',
     category: 'Frontend',
     experienceYears: 4,
     level: 'Core',
-    summary: 'Notion Workfolio design system built on Radix UI primitives and documented in Storybook.',
+    summary:
+      'CSS-first design system (@theme inline, 2D Mode × Palette) built on Radix UI with Zero-CLS fonts and 9/9 stories in Storybook 10.',
     adrWhy:
-      'Unlike heavy runtime component libraries (MUI/AntD), shadcn/ui gives full source ownership and WAI-ARIA accessibility out of the box, while Storybook enables isolated visual testing.',
-    adrWhere: 'Shared package packages/ui (@repo/ui) consumed by apps/web.',
+      'Unlike heavy runtime libraries (MUI/AntD), shadcn/ui gives full source ownership and WAI-ARIA accessibility, Tailwind v4 native @starting-style and @container eliminate JS animation runtimes, and Storybook 10 enables isolated visual verification.',
+    adrWhere: 'Shared package packages/ui (@repo/ui/theme.css) wired into apps/web/src/app/globals.css via @source.',
     adrHow:
-      'Atomic components (Button, Input, Badge, Card, Dialog, Tabs, Callout) covered by .stories.tsx in Storybook 10.',
+      '2D HSL tokens + Zero-CLS Inter/JetBrains Mono (next/font) + all 9/9 primitives (Badge, Button, Callout, Card, Dialog, Input, Skeleton, Tabs, Tooltip) covered by .stories.tsx in Storybook 10.',
   },
   {
     id: 'tanstack-table-redact',
@@ -526,9 +528,9 @@ export const TECH_RADAR_ITEMS_UK: readonly TechRadarItem[] = [
     summary: 'Суворе розділення серверного кешу та синхронного клієнтського UI-стейту.',
     adrWhy:
       'Змішувати дані з API та UI-стан в одному глобальному сторі — антипатерн. TanStack Query відповідає за кеш, інвалідацію та Optimistic UI, а мікроскопічний Zustand (~1 KB) — за синхронний UI без Context Provider.',
-    adrWhere: 'У застосунку apps/web (src/store/* та src/hooks/*).',
+    adrWhere: 'У застосунку apps/web (shared/store/* та доменні queries/*).',
     adrHow:
-      'У Zustand зберігаються модалки, стан сайдбару та фільтри D3.js; у TanStack Query — профіль сесії та метрики статей.',
+      'У Zustand зберігаються модалки, стан сайдбару, палітра (з імперативною синхронізацією useUIStore.getState() у ThemeProvider) та фільтри D3.js; у TanStack Query — профіль сесії та метрики статей.',
   },
   {
     id: 'indexeddb-persister',
@@ -561,16 +563,17 @@ export const TECH_RADAR_ITEMS_UK: readonly TechRadarItem[] = [
   {
     id: 'tailwind-shadcn-storybook',
     adrNumber: 7,
-    name: 'Tailwind CSS + shadcn/ui + Storybook',
+    name: 'Tailwind CSS v4 + shadcn/ui + Storybook 10',
     category: 'Frontend',
     experienceYears: 4,
     level: 'Core',
-    summary: 'Дизайн-система в естетиці Notion Workfolio на базі Radix UI з документацією в Storybook.',
+    summary:
+      'CSS-first дизайн-система (@theme inline, 2D Mode × Palette) на базі Radix UI із Zero-CLS шрифтами та 9/9 історіями в Storybook 10.',
     adrWhy:
-      'На відміну від важких рантайм-бібліотек (MUI/AntD), shadcn/ui дає повний контроль коду та доступність WAI-ARIA з коробки, а Storybook дозволяє тестувати UI ізольовано.',
-    adrWhere: 'Пакет packages/ui (@repo/ui), що використовується в apps/web.',
+      'На відміну від важких рантайм-бібліотек (MUI/AntD), shadcn/ui дає повний контроль коду та доступність WAI-ARIA, Tailwind v4 з нативними @starting-style й @container прибирає зайвий JS-рантайм, а Storybook 10 ізольовано перевіряє UI.',
+    adrWhere: 'Пакет packages/ui (@repo/ui/theme.css), що підключається в apps/web/src/app/globals.css через @source.',
     adrHow:
-      'Атомарні компоненти (Button, Input, Badge, Card, Dialog, Tabs, Callout) покриті .stories.tsx в ізольованому каталозі Storybook.',
+      '2D HSL-токени + Zero-CLS Inter/JetBrains Mono (next/font) + усі 9/9 примітивів (Badge, Button, Callout, Card, Dialog, Input, Skeleton, Tabs, Tooltip) покриті .stories.tsx у Storybook 10.',
   },
   {
     id: 'tanstack-table-redact',

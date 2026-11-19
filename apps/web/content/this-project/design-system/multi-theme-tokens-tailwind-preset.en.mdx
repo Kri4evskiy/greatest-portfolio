@@ -57,11 +57,11 @@ Instead of coupling components to raw Tailwind palette classes (`slate-*`, `emer
 
 ### Live 2D Appearance Switcher & Zero-FOUC Hydration
 
-In the header, [`ThemeToggle`](apps/web/src/widgets/header/theme-toggle.tsx) opens a compact 2D Appearance popover controlling both orthogonal axes:
+In the header, [`ThemeToggle`](apps/web/src/widgets/header/theme-toggle.tsx) acts as a pure UI control opening a compact 2D Appearance popover over both orthogonal axes:
 - **Color Mode:** `Light`, `Dark`, or `System` (managed by `next-themes` via `.dark`).
 - **Palette Preset:** `Warm Paper` (`default`), `Graphite`, or `Sepia` (stored in `localStorage['workfolio-palette']` and synced to `html[data-palette]` via `useUIStore`).
 
-To prevent Flash of Unstyled Content (FOUC) when reloading with `Graphite` or `Sepia` active, `LocaleRootLayout` injects an allowlisted static `PALETTE_INIT_SCRIPT` directly in `<head>` before hydration.
+To prevent Flash of Unstyled Content (FOUC) when reloading with `Graphite` or `Sepia` active, `LocaleRootLayout` injects an allowlisted static `PALETTE_INIT_SCRIPT` directly in `<head>` before hydration, while `ThemeProvider` handles post-mount palette hydration and cross-tab `storage` synchronization imperatively via `useUIStore.getState().syncPaletteFromStorage()` (zero extra `useSyncExternalStore` subscriptions or root re-renders).
 
 > [!TIP]
 > Separating `.dark` from `data-palette` and wrapping runtime tokens in `@theme inline` makes adding a new theme or `multi-tenant / white-label` brand a pure CSS variable override with zero changes to React components.
@@ -84,7 +84,7 @@ In `apps/web`, [`globals.css`](apps/web/src/app/globals.css) acts as the **Compo
 ```
 
 Inside `theme.css`, rules are organized intentionally across **CSS Cascade Layers**:
-1. **`@layer base`:** Sets default `border-color: hsl(var(--border))`, active button `cursor: pointer`, `scrollbar-gutter: stable` (eliminates 15px layout shift when modals lock scrolling on Windows), `scrollbar-width: thin`, `scroll-padding-top: 5rem`, smooth scroll when motion is allowed, and `text-wrap: balance` / `text-wrap: pretty`.
+1. **`@layer base`:** Sets default `border-color: hsl(var(--border))`, active button `cursor: pointer`, `scrollbar-gutter: stable` (eliminates 15px layout shift when modals lock scrolling on Windows), `scrollbar-width: thin`, `scroll-padding-top: 5rem`, smooth scroll when motion is allowed (paired with `data-scroll-behavior="smooth"` on `<html>` in `LocaleRootLayout`), and `text-wrap: balance` / `text-wrap: pretty`.
 2. **`@layer components`:** Isolates `.shiki` dual-theme syntax rules and GPU-composited `@starting-style` entry animations (`opacity` + `scale`) for `[data-dialog-overlay]` and `[data-dialog-content]`.
 3. **Unlayered override:** `@media (prefers-reduced-motion: reduce)` sits intentionally *outside* `@layer` so it supersedes Tailwind's `@layer utilities` (`transition-*`, `animate-*`) without needing `!important`.
 
@@ -94,11 +94,11 @@ Both `apps/web/package.json` and `packages/ui/package.json` pin `"browserslist":
 
 ## 3. Zero-CLS Typography, `@container` Queries & Conscious Trade-offs
 
-- **Self-Hosted Zero-CLS Web Fonts:** `LocaleRootLayout` loads `Inter` and `JetBrains_Mono` (`latin` + `cyrillic` subsets, `display: 'swap'`) via `next/font/google`, exporting `--font-inter` and `--font-jetbrains-mono` mapped to `--font-sans` and `--font-mono` in `@theme inline`. Next.js downloads and bundles `.woff2` assets statically at build time (`0` external requests at runtime, `0` CLS).
+- **Self-Hosted Zero-CLS Web Fonts:** `LocaleRootLayout` loads `Inter` and `JetBrains_Mono` (`latin` + `cyrillic` subsets, `display: 'swap'`) via `next/font/google`, exporting `--font-inter` and `--font-jetbrains-mono` mapped to `--font-sans` and `--font-mono` in `@theme inline`. Next.js downloads and bundles `.woff2` assets statically under `'self'` at build time (`0` external requests at runtime, `0` CLS), allowing CSP `font-src` to stay locked down to `'self' data:`.
 - **Targeted Container Queries (`@container`):** `@repo/ui` `Card` declares `@container` so Knowledge Base article cards (`@xs:flex-row`, `@sm:text-lg`) and MDX `<ArticleImageGrid />` (`@md:grid-cols-2`) adapt to the width of their actual column—whether displayed full-width or squeezed between the sidebar and TOC.
 - **Conscious Modern Web Platform Trade-offs:**
   - **Radix Dialog + `@starting-style` vs raw `<dialog>`:** Keeping `@radix-ui/react-dialog` (and migrating `CommandPaletteModal` onto it) guarantees battle-tested focus trapping, `aria-modal`, and cross-browser scroll-locking, while layering modern CSS `@starting-style` transitions cleanly on top.
-  - **Deferring CSS Anchor Positioning & `light-dark()`:** Full cross-engine support still trails our `browserslist` baseline (`Safari 16.4+`, `Firefox 128+`), whereas our semantic CSS variable matrix + Radix positioning already cover every theme and popover reliably today.
+  - **Deferring `oklch()`, CSS Anchor Positioning & `light-dark()`:** Native anchor positioning and `light-dark()` still trail our `browserslist` baseline (`Safari 16.4+`, `Firefox 128+`), while channel-based HSL (`H S% L%`) keeps tokens human-readable, natively compatible with `hsl(var(--chart-*))` in D3 SVG nodes, and works with Tailwind v4 `color-mix()` opacity modifiers.
 
 ---
 

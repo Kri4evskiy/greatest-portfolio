@@ -10,7 +10,7 @@ publishedAt: "2026-11-13"
 order: 1
 tldr:
   - "У `apps/web/next.config.ts` активовано повний стек заголовків: CSP, HSTS (`63072000s`), `nosniff`, `Referrer-Policy` та `frame-ancestors 'none'`."
-  - "Політика CSP налаштована з підтримкою інлайн-скрипту теми `next-themes` і прямого стрімінгу Server-Sent Events без порушення ізоляції."
+  - "Політика CSP налаштована з підтримкою інлайн-скриптів `next-themes` + статичного allowlist-скрипта `PALETTE_INIT_SCRIPT`, self-hosted шрифтів `font-src 'self' data:` та прямого стрімінгу Server-Sent Events без порушення ізоляції."
   - "У `apps/api` інтегровано `helmet` з кастомним налаштуванням `crossOriginResourcePolicy: cross-origin`, що запобігає блокуванню SSE браузерами."
   - "Ендпоінти автентифікації `POST /api/auth/guest-pass` та `POST /api/auth/login` захищені лімітером `@nestjs/throttler` (не більше 5 спроб за хвилину на IP)."
 ---
@@ -73,7 +73,7 @@ export function buildContentSecurityPolicy(
     `script-src ${scriptSrc}`,
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' blob: data: https:",
-    "font-src 'self' data: https:",
+    "font-src 'self' data:",
     `connect-src ${connectSrc}`,
     "frame-src 'self'",
     `frame-ancestors ${allowSameOriginFraming ? "'self'" : "'none'"}`,
@@ -276,7 +276,7 @@ export class TelemetryController {
 Жодна продакшен-архітектура не обходиться без компромісів між безпекою, продуктивністю та UX. Нижче зафіксовані три усвідомлені інженерні рішення поточної реалізації та способи компенсації їхніх ризиків:
 
 1. **Статична генерація `SSG` (`'unsafe-inline'`) проти динамічного `CSP Nonce`:**
-   - *Компроміс:* Повна відмова від `'unsafe-inline'` у `script-src` вимагає генерації унікального криптографічного `nonce` на кожен HTTP-запит. У Next.js 16 використання `nonce` примусово вимикає **Static Site Generation (`SSG`)** і переводить усі 137 маршрутів у динамічний `SSR`, позбавляючи платформу CDN-кешування та віддачі сторінок за `15–20 мс`.
+   - *Компроміс:* Повна відмова від `'unsafe-inline'` у `script-src` вимагає генерації унікального криптографічного `nonce` на кожен HTTP-запит. У Next.js 16 використання `nonce` примусово вимикає **Static Site Generation (`SSG`)** і переводить усі 143 маршрути у динамічний `SSR`, позбавляючи платформу CDN-кешування та віддачі сторінок за `15–20 мс`.
    - *Компенсація ризику:* Застосунок не рендерить користувацький UGC-контент у HTML (усі `.mdx` статті живуть у репозиторії, компілюються через Zero-Eval HAST-пайплайн із вирізанням сирого HTML і перевіркою протоколів посилань через `classifySafeMarkdownLink`), а сесійний токен ізольований у `HttpOnly` куці (недоступній із `document.cookie`), тому збереження `SSG` є виправданим архітектурним вибором.
 2. **Публічний індекс діскавері `Cmd+K` (`/search-index/[locale]`) проти закритих тіл статей:**
    - *Компроміс:* У `apps/web/src/proxy.ts` маршрут `/search-index/[locale]` навмисно виключений з-під перевірки JWT (`matcher: ['/((?!api|search-index|_next|_vercel|.*\\..*).*)']`), щоб рекрутери й тімліди могли користуватися глобальним пошуком `Cmd+K` просто з головної сторінки до отримання `Guest Pass`.

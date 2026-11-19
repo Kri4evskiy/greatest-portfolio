@@ -49,7 +49,7 @@ export function buildContentSecurityPolicy(
     // Default fallback: Restrict all resources to current origin unless explicitly allowed
     "default-src 'self'",
 
-    // Scripts: 'unsafe-inline' preserves next-themes FOUC prevention & static RSC payloads
+    // Scripts: 'unsafe-inline' preserves next-themes, static allowlisted PALETTE_INIT_SCRIPT FOUC prevention & RSC payloads
     `script-src ${scriptSrc}`,
 
     // Styles: 'unsafe-inline' required for Tailwind CSS, CSS variables, and dynamic theme switching
@@ -58,8 +58,8 @@ export function buildContentSecurityPolicy(
     // Images: Allow local images, blobs, data-URIs, and secure HTTPS remote sources
     "img-src 'self' blob: data: https:",
 
-    // Fonts: Allow local fonts, data-URIs, and secure HTTPS fonts (e.g. Google Fonts / Geist)
-    "font-src 'self' data: https:",
+    // Fonts: Self-hosted next/font/google .woff2 assets + data-URIs only (zero external font CDNs at runtime)
+    "font-src 'self' data:",
 
     // Network Connections: REST API, SSE telemetry stream, and cloud observability (Sentry / PostHog)
     `connect-src ${connectSrc}`,
