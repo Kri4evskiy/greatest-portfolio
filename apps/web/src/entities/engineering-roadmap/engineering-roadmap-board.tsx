@@ -24,7 +24,7 @@ export function EngineeringRoadmapBoard({ items }: { items: readonly LocalizedRo
 
   const [activeFilter, setActiveFilter] = useState<FilterTab>('all')
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({
-    'notion-workfolio-ui-v2': true,
+    'prisma-7-migration': true,
   })
 
   const counts = useMemo(() => {

@@ -46,53 +46,187 @@ export interface EngineeringRoadmapItem {
 
 export const ENGINEERING_ROADMAP_ITEMS: readonly EngineeringRoadmapItem[] = [
   {
-    id: 'notion-workfolio-ui-v2',
+    id: 'prisma-7-migration',
     status: 'planned',
-    kind: 'ui-ux',
+    kind: 'tech-debt',
     priority: 'P1',
     effort: 'M',
     title: {
-      en: 'Notion Workfolio Authentic Visual Redesign (UI v2)',
-      uk: 'Візуальний редизайн в естетиці Notion Workfolio (UI v2)',
-      ru: 'Визуальный редизайн в эстетике Notion Workfolio (UI v2)',
+      en: 'Prisma 6.4.1 -> Prisma 7 Migration (Wasm Engine, Native ESM & Driver Adapters)',
+      uk: 'Міграція Prisma 6.4.1 -> Prisma 7 (Wasm-рушій, Native ESM і Driver Adapters)',
+      ru: 'Миграция Prisma 6.4.1 -> Prisma 7 (Wasm-движок, Native ESM и Driver Adapters)',
     },
     summary: {
-      en: 'Refine visual language closer to warm Notion Workfolio aesthetics: page cover & avatar header, softer paper/ink palette, cleaner borderless database views, and calmer typography.',
-      uk: 'Наблизити візуальну мову до автентичного Notion Workfolio: обкладинка й аватар сторінки, тепліша палітра паперу/чорнила, легкі таблиці без важких рамок і спокійніша типографіка.',
-      ru: 'Приблизить визуальный язык к теплой эстетике оригинального Notion Workfolio: обложка и аватар страницы, мягкая палитра бумаги/чернил, облегченные списки вместо тяжелых карточных рамок.',
+      en: 'Upgrade persistence layer in apps/api to Prisma 7 with prisma.config.ts, explicit prisma-client generator output, and @prisma/adapter-pg while preserving In-Memory fallback and TS 7 compatibility.',
+      uk: 'Оновити шар персистентності в apps/api до Prisma 7 із prisma.config.ts, явним output генератора prisma-client і @prisma/adapter-pg зі збереженням In-Memory fallback і сумісності з TS 7.',
+      ru: 'Обновить слой персистентности в apps/api до Prisma 7 с prisma.config.ts, явным output генератора prisma-client и @prisma/adapter-pg при сохранении In-Memory fallback и совместимости с TS 7.',
     },
     rationale: {
-      en: 'Architecture-first strategy: Phases 1–5 deliberately focused on multi-slug MDX routing, Cmd+K search, RBAC, and Mobile-First mechanics so UI v2 becomes a pure design-token and layout pass without rewriting state or routing.',
-      uk: 'Підхід Architecture-First: на етапах 1–5 ми свідомо закрили мультислаг-роутинг MDX, пошук Cmd+K, RBAC і Mobile-First механіку, щоб редизайн UI v2 ліг поверх готової логіки чисто через дизайн-токени.',
-      ru: 'Подход Architecture-First: на этапах 1–5 мы осознанно сфокусировались на мультислаг-роутинге MDX, поиске Cmd+K, RBAC и Mobile-First навигации, чтобы редизайн UI v2 лёг поверх готовой логики без переписывания ядра.',
+      en: 'Completes the modern toolchain upgrade immediately after TypeScript 7.0.2 and NestJS 12 native ESM, removing Rust query engine binaries and shrinking Docker runtime images.',
+      uk: 'Логічно завершує модернізацію стеку одразу після TypeScript 7.0.2 і NestJS 12 ESM, прибираючи Rust-бінарники та зменшуючи розмір Docker-образів.',
+      ru: 'Логично завершает модернизацию стека сразу после TypeScript 7.0.2 и NestJS 12 ESM, убирая Rust-бинарники и уменьшая размер Docker-образов.',
     },
     pros: {
       en: [
-        'Distinctive personal Notion-like identity instead of standard SaaS dashboard cards.',
-        'Zero risk of breaking routing, i18n, or MDX rendering because business logic is already isolated.',
+        'Rust-free Wasm core with native ESM alignment across NestJS 12 and TypeScript 7',
+        'Smaller API container footprint and explicit typed datasource config via prisma.config.ts',
       ],
       uk: [
-        'Впізнаваний авторський стиль у дусі Notion замість типових SaaS-карток.',
-        'Нульовий ризик зламати роутинг, i18n чи MDX-парсер завдяки вже ізольованій логіці.',
+        'Wasm-ядро без Rust-бінарників і повна сумісність із нативним ESM у NestJS 12 та TypeScript 7',
+        'Менший розмір Docker-контейнера API та явна типізована конфігурація в prisma.config.ts',
       ],
       ru: [
-        'Узнаваемый авторский стиль в духе Notion Workfolio вместо стандартных SaaS-карточек.',
-        'Нулевой риск сломать роутинг, i18n или MDX-движок благодаря уже изолированной бизнес-логике.',
+        'Wasm-ядро без Rust-бинарников и полная гармония с нативным ESM в NestJS 12 и TypeScript 7',
+        'Меньший размер Docker-образа API и явный типизированный конфиг в prisma.config.ts',
       ],
     },
     constraints: {
       en: [
-        'Requires careful contrast tuning across both Light (warm paper) and Dark (obsidian ink) themes.',
-        'Interactive D3.js and TanStack Table views must adapt to softer Notion-like borders without losing legibility on mobile.',
+        'Requires updating PrismaService and seed imports to generated client paths and wiring @prisma/adapter-pg',
+        'Must keep docker/api.Dockerfile prisma generate step and zero-DB In-Memory fallback intact',
       ],
       uk: [
-        'Потребує ретельного калібрування контрасту для світлої (теплий папір) і темної тем.',
-        'Графи D3.js і таблиця TanStack Table мають органічно вписатися в мінімалістичні рамки без втрати читабельності на смартфонах.',
+        'Потрібно оновити імпорти PrismaService та seed під згенерований клієнт і підключити @prisma/adapter-pg',
+        'Обов’язково зберегти крок генерації в docker/api.Dockerfile та автономний In-Memory режим без БД',
       ],
       ru: [
-        'Требует тонкой калибровки контраста одновременно для светлой («тёплая бумага») и тёмной темы.',
-        'Интерактивные графы D3.js и таблица TanStack Table должны вписаться в минималистичный стиль без потери читаемости на смартфонах.',
+        'Требуется обновить импорты в PrismaService и seed.ts под сгенерированный клиент и подключить @prisma/adapter-pg',
+        'Нужно сохранить шаг генерации в docker/api.Dockerfile и автономный In-Memory fallback без БД',
       ],
+    },
+  },
+  {
+    id: 'seo-og-error-boundaries',
+    status: 'planned',
+    kind: 'ui-ux',
+    priority: 'P1',
+    effort: 'S',
+    title: {
+      en: 'Production SEO (Sitemap / Robots), Dynamic OpenGraph Cards, Error Boundaries & Docker Secrets DX',
+      uk: 'Production SEO (Sitemap / Robots), динамічні OpenGraph-картки, Error Boundaries і Docker Secrets DX',
+      ru: 'Production SEO (Sitemap / Robots), динамические OpenGraph-карточки, Error Boundaries и Docker Secrets DX',
+    },
+    summary: {
+      en: 'Ship sitemap.ts (143 SSG routes with hreflang), robots.ts, dynamic 1200x630 opengraph-image.tsx / icon.tsx, localized [locale]/not-found.tsx & error.tsx, and clean docker-compose.yml fail-fast secret defaults.',
+      uk: 'Додати sitemap.ts (143 SSG-маршрути з hreflang), robots.ts, динамічні opengraph-image.tsx (1200x630) та icon.tsx, локалізовані not-found.tsx / error.tsx і коректний DX секретів у docker-compose.yml.',
+      ru: 'Добавить sitemap.ts (143 SSG-роута с hreflang), robots.ts, динамические opengraph-image.tsx (1200x630) и icon.tsx, локализованные not-found.tsx / error.tsx и исправить DX секретов в docker-compose.yml.',
+    },
+    rationale: {
+      en: 'Ensures crisp preview cards when sharing portfolio links in Telegram/LinkedIn, full multilingual search indexing, localized error recovery, and frictionless Docker Compose startup after strict fail-fast secret checks.',
+      uk: 'Забезпечує якісні прев’ю посилань у Telegram/LinkedIn, індексацію всіх локалей, локалізовані 404/Error-сторінки та безшовний старт Docker Compose після жорстких fail-fast перевірок.',
+      ru: 'Даёт красивые карточки-превью ссылок в Telegram/LinkedIn, полную индексацию 3 локалей, локализованные страницы ошибок и предсказуемый старт Docker Compose после ужесточения fail-fast секретов.',
+    },
+    pros: {
+      en: [
+        'Instant high-CTR social previews (OpenGraph 1200x630) and full EN/UA/RU SEO discoverability',
+        'Prevents NODE_ENV=production boot crashes on fresh docker compose up --build',
+      ],
+      uk: [
+        'Акуратні соцмережеві прев’ю (OpenGraph 1200x630) та повна EN/UA/RU пошукова індексація',
+        'Запобігає падінню контейнера API на старті docker compose up --build через порожні секрети',
+      ],
+      ru: [
+        'Аккуратные превью ссылок (OpenGraph 1200x630) и полная индексация EN/UA/RU маршрутов',
+        'Исключает падение контейнера API при docker compose up --build из-за дефолтных секретов',
+      ],
+    },
+    constraints: {
+      en: [
+        'Dynamic ImageResponse fonts and metadataBase URL must handle local/preview origins without hardcoded domains',
+      ],
+      uk: ['Шрифти ImageResponse та metadataBase мають коректно працювати і на localhost, і на прод-домені'],
+      ru: ['Шрифты в ImageResponse и metadataBase должны корректно работать как локально, так и на прод-домене'],
+    },
+  },
+  {
+    id: 'workfolio-ui-v2-redesign',
+    status: 'planned',
+    kind: 'ui-ux',
+    priority: 'P2',
+    effort: 'M',
+    title: {
+      en: 'Editorial Mobile-First Visual Redesign (Workfolio UI v2)',
+      uk: 'Авторський Mobile-First візуальний редизайн (Workfolio UI v2)',
+      ru: 'Авторский Mobile-First визуальный редизайн (Workfolio UI v2)',
+    },
+    summary: {
+      en: 'Craft a cohesive, distinctive editorial visual identity and calmer layout rhythm on top of the shipped Tailwind v4 2D token matrix, Zero-CLS typography, @container queries, and @starting-style transitions.',
+      uk: 'Переосмислити авторський візуальний стиль і типографічний ритм поверх готового фундаменту Tailwind v4: 2D-палітр, Zero-CLS шрифтів, @container-запитів і @starting-style переходів.',
+      ru: 'Переосмыслить авторский визуальный язык и композиционный ритм поверх уже готового фундамента Tailwind v4: 2D-палитр, Zero-CLS шрифтов, @container-запросов и @starting-style анимаций.',
+    },
+    rationale: {
+      en: 'With Tailwind v4, CSS-first palettes, Storybook 10 (9/9), and core MDX/Auth mechanics already shipped, UI v2 can focus 100% on visual craft, hierarchy, and mobile ergonomics without touching state or routing.',
+      uk: 'Коли Tailwind v4, 2D-палітри, Storybook 10 (9/9) та ядро MDX/Auth уже реалізовані, редизайн UI v2 сфокусується виключно на візуальній якості, ієрархії та мобільній ергономіці без переписування логіки.',
+      ru: 'Когда Tailwind v4, 2D-палитры, Storybook 10 (9/9) и ядро MDX/Auth уже готовы, UI v2 может на 100% сфокусироваться на визуальном вкусе, иерархии и мобильной эргономике без правок логики.',
+    },
+    pros: {
+      en: [
+        'Original editorial craftsmanship instead of generic template cards',
+        'Zero risk of breaking routing, i18n, or MDX rendering because business logic is already isolated',
+      ],
+      uk: [
+        'Оригінальний авторський дизайн замість шаблонних карток',
+        'Нульовий ризик зламати роутинг, i18n чи MDX-парсер завдяки вже ізольованій логіці',
+      ],
+      ru: [
+        'Самобытный авторский дизайн вместо типовых шаблонных карточек',
+        'Нулевой риск сломать роутинг, i18n или MDX-движок благодаря уже изолированной бизнес-логике',
+      ],
+    },
+    constraints: {
+      en: [
+        'Requires strict contrast tuning across all 6 Light/Dark x Warm Paper/Graphite/Sepia combinations',
+        'Interactive D3.js and TanStack Table views must remain scannable on 360px smartphones',
+      ],
+      uk: [
+        'Потребує ретельного калібрування контрасту для всіх 6 комбінацій Light/Dark x Warm Paper/Graphite/Sepia',
+        'Графи D3.js і таблиця TanStack Table мають лишатися зручними на екранах 360px',
+      ],
+      ru: [
+        'Требует калибровки контраста сразу для всех 6 комбинаций Light/Dark x Warm Paper/Graphite/Sepia',
+        'Интерактивные графы D3.js и таблица TanStack Table должны оставаться читаемыми на смартфонах 360px',
+      ],
+    },
+  },
+  {
+    id: 'v080-enterprise-ts7-tailwind4',
+    status: 'shipped',
+    kind: 'architecture',
+    priority: 'P1',
+    effort: 'L',
+    title: {
+      en: 'TypeScript 7, Tailwind CSS v4, 4-Layer NestJS 12 Enterprise & 2D Appearance (v0.7.0 – v0.8.0)',
+      uk: 'TypeScript 7, Tailwind CSS v4, 4-шаровий NestJS 12 Enterprise та 2D Appearance (v0.7.0 – v0.8.0)',
+      ru: 'TypeScript 7, Tailwind CSS v4, 4-слойный NestJS 12 Enterprise и 2D Appearance (v0.7.0 – v0.8.0)',
+    },
+    summary: {
+      en: 'Shipped FSD-Modular decomposition (apps/web), 4-layer NestJS 12 ESM architecture (common/config/migrations/modules), TypeScript 7.0.2, Tailwind v4.3.5 (@repo/ui/theme.css), 2D Appearance switcher, Zero-CLS Inter/JetBrains Mono fonts, @starting-style + @container, and 9/9 Storybook 10.',
+      uk: 'Реалізовано FSD-Modular декомпозицію (apps/web), 4-шарову архітектуру NestJS 12 ESM (common/config/migrations/modules), TypeScript 7.0.2, Tailwind v4.3.5 (@repo/ui/theme.css), 2D-перемикач палітр, Zero-CLS шрифти Inter/JetBrains Mono, @starting-style + @container та 9/9 Storybook 10.',
+      ru: 'Реализованы FSD-Modular декомпозиция (apps/web), 4-слойная архитектура NestJS 12 ESM (common/config/migrations/modules), TypeScript 7.0.2, Tailwind v4.3.5 (@repo/ui/theme.css), 2D-переключатель палитр, Zero-CLS шрифты Inter/JetBrains Mono, @starting-style + @container и 9/9 Storybook 10.',
+    },
+    rationale: {
+      en: 'Upgraded the entire compiler, design-system, and backend architecture baseline before new product features so builds stay fast, tokens scale cleanly, and zero legacy v3/v5 debt remains.',
+      uk: 'Оновили компілятор, дизайн-систему та бекенд-архітектуру до запуску нових продуктових фіч, щоб прибрати легасі v3/v5 і гарантувати масштабованість.',
+      ru: 'Обновили компилятор, дизайн-систему и бэкенд-архитектуру до новых продуктовых фич, чтобы убрать легаси v3/v5 и обеспечить чистый масштаб.',
+    },
+    pros: {
+      en: [
+        'Native TS 7 speed + CSS-first Tailwind v4 engine with zero runtime CSS-in-JS',
+        '6 instant CSS-variable theme combinations (Zero-FOUC + cross-tab sync) and 143 statically generated pages',
+      ],
+      uk: [
+        'Швидкість нативного TS 7 + CSS-first рушій Tailwind v4 без рантайм-CSS-in-JS',
+        '6 миттєвих комбінацій тем на CSS-змінних (Zero-FOUC + sync між вкладками) та 143 SSG-сторінки',
+      ],
+      ru: [
+        'Скорость нативного TS 7 + CSS-first движок Tailwind v4 без JS-рантайма стилей',
+        '6 мгновенных комбинаций тем на CSS-переменных (Zero-FOUC + sync вкладок) и 143 SSG-страницы',
+      ],
+    },
+    constraints: {
+      en: ['Vitest (not Jest/ts-jest) must be used for upcoming unit tests due to TS 7 compiler compatibility'],
+      uk: ['Для unit-тестів потрібен суворо Vitest (без Jest/ts-jest) через сумісність із TS 7'],
+      ru: ['Для будущих unit-тестов подходит строго Vitest (без Jest/ts-jest) из-за совместимости с TS 7'],
     },
   },
   {
@@ -102,32 +236,32 @@ export const ENGINEERING_ROADMAP_ITEMS: readonly EngineeringRoadmapItem[] = [
     priority: 'P1',
     effort: 'S',
     title: {
-      en: 'Strict HTTP Security Headers (CSP / HSTS) & Auth Rate Limiting',
-      uk: 'Суворі HTTP Security Headers (CSP / HSTS) та Rate Limiting авторизації',
-      ru: 'Строгие HTTP Security Headers (CSP / HSTS) и Rate Limiting авторизации',
+      en: 'Strict HTTP Security Headers (CSP / HSTS), Fail-Fast Secrets & Auth Rate Limiting',
+      uk: 'Суворі HTTP Security Headers (CSP / HSTS), Fail-Fast секрети та Rate Limiting авторизації',
+      ru: 'Строгие HTTP Security Headers (CSP / HSTS), Fail-Fast секреты и Rate Limiting авторизации',
     },
     summary: {
-      en: 'Configured scoped Content-Security-Policy & HSTS in Next.js + Helmet (CORP: cross-origin), trust proxy: 1, and @nestjs/throttler on auth endpoints.',
-      uk: 'Налаштовано scoped Content-Security-Policy та HSTS у Next.js + Helmet (CORP: cross-origin), trust proxy: 1 і @nestjs/throttler на ендпоінтах авторизації.',
-      ru: 'Настроены scoped Content-Security-Policy и HSTS в Next.js + Helmet (CORP: cross-origin), trust proxy: 1 и @nestjs/throttler на эндпоинтах авторизации.',
+      en: "Configured scoped CSP (including tightened font-src 'self' data:) & HSTS in Next.js, Helmet (CORP: cross-origin), @nestjs/throttler on auth endpoints, fail-fast Zod env secrets validation, and timingSafeEqual passcode checks.",
+      uk: "Налаштовано scoped CSP (включно з жорстким font-src 'self' data:) та HSTS у Next.js, Helmet (CORP: cross-origin), @nestjs/throttler, fail-fast валідацію секретів через Zod і timingSafeEqual перевірку пароля адміна.",
+      ru: "Настроены scoped CSP (включая зажатый font-src 'self' data:) и HSTS в Next.js, Helmet (CORP: cross-origin), @nestjs/throttler, fail-fast валидация секретов через Zod и timingSafeEqual проверка админ-ключа.",
     },
     rationale: {
-      en: 'HttpOnly SameSite=Lax JWT cookies block XSS token theft, while strict CSP headers and 5 req/min brute-force throttling protect auth endpoints and inline CV PDF rendering.',
-      uk: 'HttpOnly куки захищають JWT від крадіжки через XSS, а суворі CSP-заголовки та ліміт 5 req/min захищають авторизацію й безпечний вбудований рендер CV PDF.',
-      ru: 'HttpOnly куки защищают JWT от кражи через XSS, а строгие CSP-заголовки и лимит 5 req/min защищают авторизацию и безопасный встроенный рендер CV PDF.',
+      en: 'HttpOnly SameSite=Lax JWT cookies block XSS token theft, self-hosted next/font eliminates external font CDNs from CSP, and 5 req/min brute-force throttling + timing-safe hashing harden auth.',
+      uk: 'HttpOnly куки захищають JWT від крадіжки через XSS, self-hosted next/font прибирає зовнішні CDN із CSP, а ліміт 5 req/min і timing-safe хешування захищають авторизацію.',
+      ru: 'HttpOnly куки защищают JWT от XSS, self-hosted next/font убирает внешние CDN шрифтов из CSP, а лимит 5 req/min и timing-safe сравнение укрепляют авторизацию.',
     },
     pros: {
       en: [
-        'A+ HTTP security header posture with scoped self-only CV PDF embedding',
-        'Protects POST /api/auth/login & /guest-pass against brute-force with real proxy IP resolution',
+        "Hardened HTTP security headers with self-only CV PDF embedding and font-src 'self' data:",
+        'Blocks NODE_ENV=production boots with dev secrets and resolves real proxy IPs cleanly',
       ],
       uk: [
-        'Посилений захист HTTP-заголовків зі скоупінгом для вбудованого CV PDF',
-        'Захист POST /api/auth/login та /guest-pass від брутфорсу з коректним IP за проксі',
+        "Посилений захист HTTP-заголовків зі скоупінгом для CV PDF та font-src 'self' data:",
+        'Блокує запуск NODE_ENV=production із дефолтними секретами та коректно читає IP за проксі',
       ],
       ru: [
-        'Усиленная политика HTTP-заголовков со строгим скоупингом для встроенного CV PDF',
-        'Защита POST /api/auth/login и /guest-pass от брутфорса с корректным IP за прокси',
+        "Усиленная политика заголовков со скоупингом для CV PDF и font-src 'self' data:",
+        'Блокирует запуск NODE_ENV=production с дев-секретами и корректно читает IP за прокси',
       ],
     },
     constraints: {
@@ -189,39 +323,89 @@ export const ENGINEERING_ROADMAP_ITEMS: readonly EngineeringRoadmapItem[] = [
     priority: 'P2',
     effort: 'M',
     title: {
-      en: 'Playwright E2E RBAC Suite + GitHub Actions CI Pipeline',
-      uk: 'Playwright E2E тести RBAC + пайплайн GitHub Actions CI',
-      ru: 'Playwright E2E-тесты RBAC-флоу + пайплайн GitHub Actions CI',
+      en: 'Vitest Unit Suite + Playwright E2E RBAC Tests in GitHub Actions CI',
+      uk: 'Vitest Unit-тести + Playwright E2E тести RBAC у GitHub Actions CI',
+      ru: 'Vitest Unit-тесты + Playwright E2E-тесты RBAC в пайплайне GitHub Actions CI',
     },
     summary: {
-      en: 'Automate biome check, turbo typecheck, Vitest schema tests, and Playwright E2E verification of 1-Click Guest Pass -> HttpOnly Cookie -> MDX unlock on every PR.',
-      uk: 'Автоматизувати biome check, turbo typecheck, Vitest та E2E перевірку видачі гостьової куки і відкриття статей на кожен PR.',
-      ru: 'Автоматизировать biome check, turbo typecheck, Vitest и E2E-сценарий выдачи гостевой HttpOnly куки и разблокировки MDX-конспектов на каждый Pull Request.',
+      en: 'Extend the live GitHub Actions CI (Biome lint, Docker/audit security, TypeScript 7 typecheck, Turborepo build, Storybook 10) with Vitest unit tests and Playwright E2E coverage for 1-Click Guest Pass -> HttpOnly Cookie -> MDX unlock.',
+      uk: 'Доповнити активний GitHub Actions CI (Biome, Docker/audit security, TS 7 typecheck, build, Storybook 10) юніт-тестами на Vitest і Playwright E2E перевіркою видачі гостьової куки та відкриття статей.',
+      ru: 'Дополнить работающий GitHub Actions CI (Biome, Docker/audit security, TS 7 typecheck, build, Storybook 10) unit-тестами на Vitest и Playwright E2E-сценарием выдачи HttpOnly куки и открытия MDX-конспектов.',
     },
     rationale: {
-      en: 'During rapid architectural iteration (Phases 1–5), Lefthook pre-commit + strict tsc gave instant feedback; CI + E2E locks in regression safety as content scales past 100 notes.',
-      uk: 'На етапі активного проєктування швидкий зворотний зв’язок давали Lefthook + суворий tsc; тепер час зафіксувати стабільність у CI.',
-      ru: 'Во время быстрой сборки ядра мгновенную обратную связь обеспечивали Lefthook + строгий tsc; при росте базы за 100 статей критические пути нужно закрыть E2E в CI.',
+      en: 'Lint, security audit, TS 7 typecheck, Next.js build, and Storybook CI gates are already active; adding Vitest (native TS 7 compatible) and Playwright locks in runtime RBAC and Zod contract safety.',
+      uk: 'Гейти lint, security, TS 7 typecheck, build і Storybook у CI вже працюють; Vitest (сумісний із TS 7) та Playwright закриють поведінкові й RBAC-регресії.',
+      ru: 'Базовые гейты lint, security, TS 7 typecheck, build и Storybook в CI уже работают; добавление Vitest (совместим с TS 7) и Playwright закроет регрессии RBAC и Zod-контрактов.',
     },
     pros: {
       en: [
-        'Prevents regressions in Edge Proxy cookie redirects and i18n routing',
-        'Demonstrates production QA culture directly in the public repo',
+        'Prevents regressions in Edge Proxy cookie redirects, Zustand sync, and NestJS AuthService',
+        'Demonstrates full automated QA pyramid directly in the public repo',
       ],
       uk: [
-        'Унеможливлює регресії в Edge Proxy редіректах та i18n роутингу',
-        'Наочно демонструє культуру автотестування в публічному репозиторії',
+        'Унеможливлює регресії в Edge Proxy редіректах, Zustand і NestJS AuthService',
+        'Наочно демонструє повну піраміду автотестів у публічному репозиторії',
       ],
       ru: [
-        'Исключает регрессии в редиректах Edge Proxy и локализованных маршрутах',
-        'Наглядно показывает инженерную культуру тестирования в репозитории',
+        'Исключает регрессии в редиректах Edge Proxy, сторах Zustand и NestJS AuthService',
+        'Наглядно демонстрирует полную пирамиду автотестирования в репозитории',
       ],
     },
     constraints: {
-      en: ['GitHub Actions minutes budget requires caching pnpm store and Playwright browsers cleanly'],
-      uk: ['Потрібне кешування pnpm store та браузерів Playwright для економії хвилин GitHub Actions'],
+      en: ['Strict Vitest only (no Jest/ts-jest due to TypeScript 7 compatibility); CI must cache Playwright cleanly'],
+      uk: [
+        'Суворо Vitest (без Jest/ts-jest через сумісність із TypeScript 7); потрібне кешування браузерів Playwright',
+      ],
+      ru: ['Строго Vitest (без Jest/ts-jest из-за TypeScript 7); в CI нужно аккуратно кэшировать браузеры Playwright'],
+    },
+  },
+  {
+    id: 'telegram-bot-auth-knowledge-base',
+    status: 'evaluating',
+    kind: 'architecture',
+    priority: 'P2',
+    effort: 'M',
+    title: {
+      en: 'Next-Gen Auth & Telegram Bot Onboarding for Knowledge Base Access',
+      uk: 'Повноцінна БД-авторизація та доступ до Бази Знань через Telegram-бота',
+      ru: 'Полноценная БД-авторизация и доступ в Базу Знаний через Telegram-бота',
+    },
+    summary: {
+      en: 'Replace the open 1-click guest stub with PostgreSQL-backed hashed invite/nonce tokens (SHA-256 / Argon2id) paired with a lightweight Telegram Bot Deep Link flow (/start <nonce>) sending instant access confirmation to users.',
+      uk: 'Замінити відкриту 1-клік заглушку на БД-авторизацію з хешованими токенами (SHA-256 / Argon2id) та простим Telegram-ботом через Deep Link (/start <nonce>), що надсилає підтвердження доступу користувачу.',
+      ru: 'Заменить открытую 1-click заглушку на БД-авторизацию с хэшированными токенами (SHA-256 / Argon2id) и простым Telegram-ботом через Deep Link (/start <nonce>), который отправляет пользователю подтверждение доступа.',
+    },
+    rationale: {
+      en: 'Hands-on backend security & Bot API milestone: teaches cryptographic token hashing, anti-spam Deep Link handshakes (since Telegram bots cannot initiate messages by phone number), authenticated webhooks, and real-time SSE tab unlock.',
+      uk: 'Практичне вивчення бекенд-безпеки та Bot API: хешування токенів у БД, Deep Link /start <nonce> (оскільки бот не може писати першим за номером телефону), захист webhook і розблокування вкладки через SSE.',
+      ru: 'Практическая задача по бэкенд-безопасности и Bot API: хэширование токенов в БД, Deep Link /start <nonce> (так как Telegram-бот не может писать первым по номеру телефона), проверка webhook и моментальный вход через SSE.',
+    },
+    pros: {
+      en: [
+        'Demonstrates real-world webhook security (X-Telegram-Bot-Api-Secret-Token) + hashed single-use DB tokens',
+        'Keeps recruiter fallback (one-time invite code) and graceful dev fallback when BOT_TOKEN is unset',
+      ],
+      uk: [
+        'Практична демонстрація безпеки webhook (X-Telegram-Bot-Api-Secret-Token) + хешованих одноразових токенів у БД',
+        'Залишає запасний інвайт-код для рекрутерів без Telegram і graceful fallback без BOT_TOKEN',
+      ],
       ru: [
-        'Требуется грамотное кэширование pnpm store и бинарников браузеров, чтобы билд в GitHub Actions укладывался в 2 минуты',
+        'Живая демонстрация защиты webhook (X-Telegram-Bot-Api-Secret-Token) + хэшированных одноразовых токенов в БД',
+        'Сохраняет резервный инвайт-код для рекрутеров без Telegram и graceful fallback при пустом BOT_TOKEN',
+      ],
+    },
+    constraints: {
+      en: [
+        'Telegram API forbids bots from messaging uninitiated users by phone — requires Deep Link click or request_contact inside bot',
+        'Depends on live PostgreSQL persistence and short-lived TTL token cleanup',
+      ],
+      uk: [
+        'Telegram API забороняє боту писати першим за телефоном — потрібен клік по Deep Link або request_contact усередині бота',
+        'Потребує підключеної БД PostgreSQL і очищення прострочених nonce-токенів за TTL',
+      ],
+      ru: [
+        'Telegram API запрещает боту писать первым по номеру телефона — нужен переход по Deep Link или request_contact в боте',
+        'Требует подключённой БД PostgreSQL и очистки просроченных nonce-токенов по TTL',
       ],
     },
   },

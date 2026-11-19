@@ -2,13 +2,13 @@
 
 Этот документ описывает дизайн-систему проекта в `packages/ui` (`@repo/ui`) и визуальный язык приложения `apps/web`.
 
-## 1. Визуальный ориентир: Notion Workfolio Aesthetic (`https://www.notion.com/templates/workfolio`)
+## 1. Визуальный ориентир: Workfolio Editorial & Mobile-First Aesthetic
 
-Стартовая страница портфолио (CV) и База Знаний строятся в эстетике **Notion Workfolio** с инженерным уклоном:
+Стартовая страница портфолио (CV) и База Знаний строятся в редакционной **Mobile-First Workfolio** эстетике с инженерным уклоном:
 - **Чистая редакционная верстка (Editorial Minimalism):** Высококонтрастная типографика (`Inter` через `--font-inter` для UI и статей + `JetBrains Mono` через `--font-jetbrains-mono` для кода, версий, метрик и тегов — self-hosted Zero-CLS `next/font/google` с сабсетами `latin` + `cyrillic` и жесткой политикой CSP `font-src 'self' data:`), много воздуха, тонкие разделители (`border-border/60`), отсутствие дешевых кислотных градиентов и визуального шума.
-- **Структура в духе Notion-блоков и баз данных:**
+- **Модульная редакционная структура и таблицы данных:**
   - Четкая колонка контента (`max-w-4xl` на главной CV, `max-w-7xl` с сайдбаром в Базе знаний).
-  - Карточки проектов (Interactive Project Gallery), таймлайн опыта (Experience & Resume), callout-блоки с архитектурными заметками и интерактивная таблица стека в стиле базы данных Notion (`TanStack Table`).
+  - Карточки проектов (Interactive Project Gallery), таймлайн опыта (Experience & Resume), callout-блоки с архитектурными заметками и интерактивная таблица стека Tech Radar (`TanStack Table`).
   - Мгновенно считываемые статусы: бейдж доступности (`Available for Senior / Full-Stack roles`) и живой индикатор телеметрии (`SSE Live Stream`).
 
 ## 2. Архитектура пакета `packages/ui` (`Tailwind CSS v4`)

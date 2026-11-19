@@ -72,7 +72,7 @@ export function PageSectionNavigator() {
 
   return (
     <>
-      {/* Desktop Notion-style Floating Section Rail (xl: >= 1280px) */}
+      {/* Desktop Editorial Floating Section Rail (xl: >= 1280px) */}
       <aside
         aria-label={t('sectionNavTitle')}
         className="group/rail fixed right-4 top-1/2 z-30 hidden -translate-y-1/2 xl:block 2xl:right-6"

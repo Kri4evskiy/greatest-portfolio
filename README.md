@@ -12,7 +12,7 @@
 ![Biome](https://img.shields.io/badge/Biome-2.6-60A5FA?style=flat-square&logo=biome&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-Multi--Stage-2496ED?style=flat-square&logo=docker&logoColor=white)
 
-Production-grade Full-Stack monorepo featuring a personal portfolio (styled in **Notion Workfolio** aesthetics) and a protected interactive **Engineering Knowledge Base**, showcasing modern enterprise architecture (`Next.js 16`, `Tailwind CSS v4`, `NestJS 12 Native ESM`, `Prisma ORM`, `Microservices TCP + SSE`, `TanStack Query v5 + IndexedDB`, `D3.js`).
+Production-grade Full-Stack monorepo featuring a personal portfolio (styled in **Editorial Workfolio** aesthetics) and a protected interactive **Engineering Knowledge Base**, showcasing modern enterprise architecture (`Next.js 16`, `Tailwind CSS v4`, `NestJS 12 Native ESM`, `Prisma ORM`, `Microservices TCP + SSE`, `TanStack Query v5 + IndexedDB`, `D3.js`).
 
 ---
 
@@ -172,7 +172,7 @@ greatest-portfolio/
 │   └── telemetry-ms/           # Telemetry & analytics microservice (@nestjs/microservices)
 ├── packages/
 │   ├── shared-schemas/         # Shared Zod schemas and TypeScript types for web and API (ESM)
-│   └── ui/                     # Notion Workfolio UI kit (Tailwind v4 + Radix + Storybook 10)
+│   └── ui/                     # Workfolio UI kit (Tailwind v4 + Radix + Storybook 10)
 ├── docker/                     # Optimized 3-stage Dockerfiles (turbo prune --docker)
 ├── scripts/                    # Automation scripts (bootstrap-env.mjs, dev-runner.mjs)
 ├── AGENTS.md                   # Root AI context router

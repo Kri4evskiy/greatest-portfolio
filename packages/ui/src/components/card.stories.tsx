@@ -37,7 +37,7 @@ export const SubtleSurface: Story = {
   render: () => (
     <Card className="max-w-md" variant="subtle">
       <CardHeader>
-        <CardTitle>Subtle Notion Surface</CardTitle>
+        <CardTitle>Subtle Editorial Surface</CardTitle>
         <CardDescription>Uses --surface-subtle token for secondary recessed blocks.</CardDescription>
       </CardHeader>
     </Card>

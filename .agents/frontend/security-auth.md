@@ -1,4 +1,4 @@
-# 🔐 Фронтенд Security: Edge Middleware, RBAC UI и Микро-форма для Team Lead (`apps/web`)
+# 🔐 Фронтенд Security: Edge Proxy, RBAC UI и Микро-форма для Team Lead (`apps/web`)
 
 Этот документ описывает защиту клиентских и серверных маршрутов в `apps/web` и UX получения гостевого доступа.
 
@@ -14,7 +14,7 @@
 
 Мы не заставляем занятого тимлида придумывать пароли или подтверждать email. Микро-форма в хедере решает две задачи: защищает роут и демонстрирует инженерную связку в действии:
 - В модалке выводится прозрачный инженерный дисклеймер:
-  > _«Введи любое имя и выбери свою роль в 1 клик — это живое демо работы `React Hook Form` + `Zod` (`packages/shared-schemas`) + `NestJS JWT HttpOnly Cookies` + `Next.js Edge Middleware` + `RBAC` + `SSE Telemetry`.»_
+  > _«Введи любое имя и выбери свою роль в 1 клик — это живое демо работы `React Hook Form` + `Zod` (`packages/shared-schemas`) + `NestJS JWT HttpOnly Cookies` + `Next.js Edge Proxy` + `RBAC` + `SSE Telemetry`.»_
 - Поля формы:
   1. `Имя / Никнейм` (плюс кнопки быстрого заполнения в 1 клик: `Alex (Team Lead)`, `Maria (Tech Recruiter)`, `CTO Guest`).
   2. `Роль посетителя` (`TEAM_LEAD`, `RECRUITER`, `DEVELOPER`, `FOUNDER`).

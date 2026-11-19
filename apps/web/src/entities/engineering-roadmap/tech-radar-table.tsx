@@ -318,7 +318,7 @@ export function TechRadarTable({ items: localizedItems }: { items: readonly Tech
         )}
       </div>
 
-      {/* Desktop Notion Database Table View (>= md) */}
+      {/* Desktop Data Table View (>= md) */}
       <DesktopTechRadarDataTable data={filteredData} columns={columns} emptyResultLabel={t('emptyResult')} />
 
       <Dialog

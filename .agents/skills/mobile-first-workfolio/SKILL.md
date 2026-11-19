@@ -6,7 +6,7 @@ description: Architectural and UX guidelines for maintaining and extending the M
 
 # Mobile-First Workfolio & 3-Tier Second Brain Skill
 
-Use this skill whenever adding UI sections, Knowledge Base topics/articles, navigation controls, or planning the Notion Workfolio visual redesign in `apps/web`.
+Use this skill whenever adding UI sections, Knowledge Base topics/articles, navigation controls, or planning the Workfolio Editorial UI v2 visual redesign in `apps/web`.
 
 ## 1. Sticky Header & Ergonomic Section Navigation (`360px` First)
 

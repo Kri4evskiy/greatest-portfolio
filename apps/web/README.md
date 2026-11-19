@@ -1,6 +1,6 @@
 # 🌐 `@repo/web` — Фронтенд-приложение (Next.js 16 + React 19 + FSD-Modular)
 
-Публичное портфолио в эстетике **Notion Workfolio**, интерактивное CV (`/cv`), глобальный поиск `Cmd+K` и защищённая мультиязычная **База Знаний** (`/knowledge-base`). Приложение построено на **Next.js 16 (App Router)**, **React 19 Compiler**, **Tailwind CSS v4 (CSS-first Oxide)**, **Zero-CLS `next/font`**, **FSD-Modular**, **Zero-Eval HAST MDX Engine**, **next-intl (`EN / UK / RU`)**, **TanStack Query v5 + IndexedDB** и **Zustand**.
+Публичное портфолио в редакционной эстетике **Workfolio**, интерактивное CV (`/cv`), глобальный поиск `Cmd+K` и защищённая мультиязычная **База Знаний** (`/knowledge-base`). Приложение построено на **Next.js 16 (App Router)**, **React 19 Compiler**, **Tailwind CSS v4 (CSS-first Oxide)**, **Zero-CLS `next/font`**, **FSD-Modular**, **Zero-Eval HAST MDX Engine**, **next-intl (`EN / UK / RU`)**, **TanStack Query v5 + IndexedDB** и **Zustand**.
 
 ---
 

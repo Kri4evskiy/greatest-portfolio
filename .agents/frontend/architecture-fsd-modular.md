@@ -66,7 +66,7 @@ apps/web/src/
     │                           # Фундамент, не знающий о специфике бизнес-фичей
     ├── hooks/                  # Браузерные DOM/ScrollSpy UI-хуки (use-section-navigation.ts)
     ├── i18n/                   # navigation.ts, routing.ts, request.ts
-    ├── lib/                    # edge-jwt.ts, analytics.ts
+    ├── lib/                    # edge-jwt.ts, analytics.ts, palette.ts
     ├── providers/              # ThemeProvider, QueryProvider
     └── store/                  # useUIStore (Zustand)
 ```
