@@ -21,14 +21,18 @@
     3. Переключить генератор с `prisma-client-js` на `prisma-client` с явным полем `output` (`./generated/prisma`), подключить обязательный SQL driver adapter (`@prisma/adapter-pg` + `pg`) и обновить импорты в `PrismaService` и `src/migrations/scripts/seed.ts`.
     4. Сохранить 100% работоспособность **Graceful In-Memory Fallback** (когда `DATABASE_URL` отсутствует), строгую проверку типов в `TypeScript 7`, ESM-запуск в `NestJS 12` и сборку `docker/api.Dockerfile`.
 
-### Приоритет №2: Production SEO, OpenGraph, Локализованные Error/404 и `Docker Compose` Secrets DX
+### Приоритет №2: Production SEO (`robots.ts` / `sitemap.ts`), Локализованные Error/404 и Zero-Friction `Docker Compose` Demo
 
-- [ ] **SEO, Social Previews и границы ошибок (`apps/web/src/app`):**
-  1. `apps/web/src/app/robots.ts` и `sitemap.ts`: генерация правил индексации и карты всех **143 SSG-маршрутов** с `alternates.languages` (`hreflang` для `en` / `ua` / `ru`).
-  2. `opengraph-image.tsx` + `icon.tsx` + `metadataBase`: динамическая генерация брендированных OpenGraph-превью (`1200×630` через `ImageResponse`) для корректных карточек ссылок в Telegram, LinkedIn и Slack, а также favicon/app-icon.
-  3. Локализованные `apps/web/src/app/[locale]/not-found.tsx` и `error.tsx` в дополнение к root `global-error.tsx`.
-- [ ] **`docker-compose.yml` Fail-Fast Secrets DX:**
-  - Устранить гарантированное падение `docker compose up --build` после появления fail-fast проверки в `apps/api/src/config/app.config.ts` (`NODE_ENV: production` при пустом `JWT_SECRET` и дефолтном `ADMIN_SECRET_PASSCODE`): ввести явное требование секретов через `${JWT_SECRET:?...}` / автогенерацию dev-продового `.env` в `scripts/bootstrap-env.mjs` или отдельный профиль запуска и обновить инструкции в `README.md`.
+- [ ] **Технический SEO-минимум и границы ошибок (`apps/web/src/app`):**
+  1. `apps/web/src/app/robots.ts` и `sitemap.ts`: генерация правил индексации и карты всех **143 SSG-маршрутов** с `alternates.languages` (`hreflang` для `en` / `ua` / `ru`) + `metadataBase`.
+  2. Локализованные `apps/web/src/app/[locale]/not-found.tsx` и `error.tsx` в дополнение к root `global-error.tsx`.
+     _(Динамические `opengraph-image.tsx` / `icon.tsx` вынесены в отдельную задачу бэклога ниже — логично делать их в связке с `UI v2`, чтобы не перерисовывать карточку дважды.)_
+- [ ] **`docker-compose.yml` Zero-Friction Demo для тимлида vs Strict Production (`docker-compose.prod.yml`):**
+  - **Проблема сейчас:** в `docker-compose.yml` задан `NODE_ENV: production`, но не передан `JWT_SECRET` и оставлен дефолтный `ADMIN_SECRET_PASSCODE`, из-за чего `docker compose up --build` у тимлида (без `.env` и `pnpm install`) упадёт на fail-fast проверке в `apps/api/src/config/app.config.ts`.
+  - **Целевое разделение:**
+    1. `docker-compose.yml` (**Local Reviewer Demo**): явный opt-in флаг `WORKFOLIO_DEMO_MODE=true` с согласованным demo `JWT_SECRET` между `api` и `web`, явным предупреждением в логах при старте; основное ядро (CV + База Знаний + Guest Pass + SSE) поднимается одной командой без API-ключей, а внешние интеграции без ключей остаются **заблокированы через Capability Gating** с плашкой «нет API-ключа».
+    2. `docker-compose.prod.yml` (**Real Production**): demo-режим строго запрещён (`WORKFOLIO_DEMO_MODE` отсутствует), обязательные секреты форсируются уже на этапе парсинга Compose (`${JWT_SECRET:?Set JWT_SECRET (>=32 chars)}` и `${ADMIN_SECRET_PASSCODE:?...}`) + fail-fast проверкой в NestJS.
+    3. Обновить команды и пояснения в `README.md`.
 
 ### Приоритет №3: Внедрение Redis (Distributed Rate Limiting & Response Cache)
 
@@ -63,10 +67,15 @@
 ### 2. Security & Production Hardening (`apps/web`, `apps/api`)
 
 - [ ] **Access + Refresh JWT Rotation:** дополнить Edge HS256-верификацию парой короткоживущего `Access` (`15m`) + ротируемого `HttpOnly Refresh` (`7d`) токенов с хранением и отзывом сессий в `VisitorSession` (`PostgreSQL`). _(Готовая заготовка: при переходе `JwtRolesGuard` на глобальный `APP_GUARD` использовать `@Public()` из `common/decorators/public.decorator.ts` для открытых эндпоинтов.)_
-- [ ] **Next-Gen Auth & Telegram Bot Access для Базы Знаний (`apps/api`, `PostgreSQL`, `Telegram Bot API`):** заменить открытую 1-click демо-заглушку на полноценный сценарий регистрации и авторизации для реальных пользователей и рекрутеров:
-  1. _Хэширование и БД-состояние:_ хранение учётных записей/сессий в PostgreSQL через Prisma (`Argon2id`/`scrypt` для паролей/PIN, одноразовые `invite`/`auth-nonce` токены в БД в виде `SHA-256` хэшей с жёстким TTL).
-  2. _Поток Telegram Bot без спам-блокировки:_ по правилам Telegram Bot API бот **не может** сам написать пользователю первым по номеру телефона, поэтому регистрация строится через **Deep Link `https://t.me/<bot>?start=<nonce>`**: пользователь нажимает кнопку на сайте ➔ открывается бот с одноразовым `<nonce>` (при необходимости делится контактом через нативную кнопку Telegram `request_contact`) ➔ Telegram присылает update на защищённый webhook NestJS (проверка `X-Telegram-Bot-Api-Secret-Token` + лимит `@nestjs/throttler`) ➔ бот отправляет подтверждение с данными доступа прямо пользователю (и уведомление/кнопку Approve админу), а сайт мгновенно авторизует вкладку через SSE-стрим или polling и выставляет `HttpOnly` JWT-куку.
-  3. _Fallback для безтелеграмных рекрутеров:_ сохранение быстрого одноразового demo/recruiter invite-кода с лимитом попыток.
+- [ ] **Next-Gen Auth & Telegram Bot Access для Базы Знаний (`apps/api`, `PostgreSQL`, `Telegram Bot API`):** заменить открытую 1-click демо-заглушку на полноценную БД-авторизацию с хэшированными токенами и опциональной регистрацией через Telegram-бота:
+  1. _Инфраструктура и переменные окружения:_ создать бота в `@BotFather` (`/newbot`) ➔ `TELEGRAM_BOT_TOKEN`, 32+ символьный `TELEGRAM_WEBHOOK_SECRET`, опционально `TELEGRAM_ADMIN_CHAT_ID`; в `apps/api` использовать `grammy` (native ESM + TypeScript) или zero-dep `fetch` + модели сессий/токенов в PostgreSQL (`Prisma 7`).
+  2. _Антиспам-ограничение Telegram Bot API и обходные решения:_ бот **не имеет права** писать первым по номеру телефона или username (защита Telegram от спама). Рабочий прод-паттерн — **Deep Link `https://t.me/<bot>?start=<nonce>`**:
+     - `POST /api/auth/telegram/init`: генерирует 24-байтный `base64url` `nonce`, сохраняет в БД **только** его `SHA-256` хэш с TTL `10 мин` (и `sessionId`/`clientId`), а на UI показывает кнопку «Продолжить в Telegram» (+ QR-код для десктопа).
+     - Внутри Telegram пользователь жмёт `Start` (если нужна привязка телефона — бот показывает нативную кнопку `ReplyKeyboardMarkup` с `request_contact: true`; бэкенд **обязательно** проверяет `contact.user_id === message.from.id`, чтобы исключить подмену чужим контактом).
+     - Бот отправляет подтверждение доступа прямо в чат пользователя (опционально — инлайн-кнопки `[✅ Approve] [❌ Reject]` админу в `TELEGRAM_ADMIN_CHAT_ID`), а сайт через SSE/polling получает одноразовый `exchangeToken` и обменивает его через `POST /api/auth/telegram/exchange` на `HttpOnly` JWT-куку `kb_access_token`.
+     - _Fallback без Telegram:_ одноразовый invite-код (хранится как `SHA-256` / `Argon2id` / `scrypt` хэш в PostgreSQL с лимитом использований и TTL) для рекрутеров без Telegram.
+  3. _Локальная разработка Webhook vs Polling:_ Telegram требует публичный `HTTPS` для webhook. Решение: в `NODE_ENV=development` (при наличии `TELEGRAM_BOT_TOKEN`) бот работает через **Long Polling (`getUpdates`)**, а в `NODE_ENV=production` — через `POST /api/auth/telegram/webhook` с `crypto.timingSafeEqual` проверкой заголовка `X-Telegram-Bot-Api-Secret-Token` (при необходимости тестирования webhook локально — через `cloudflared tunnel` / `ngrok`).
+  4. _Приватность, Rate Limit и Capability Gating:_ номера телефонов никогда не логируются и не попадают в публичный SSE/`localStorage`; на `/init` и `/exchange` действует строгий `@nestjs/throttler`; если `TELEGRAM_BOT_TOKEN` не задан — кнопка в модалке остаётся видимой в состоянии `disabled` с явной плашкой _«Нет API-ключа для использования данного сервиса»_.
 - [ ] **Throttler ESM Upgrade Cleanup (`apps/api`):** периодически проверять обновления `@nestjs/throttler` и после перехода пакета на нативный ESM (`"type": "module"`) удалить временный CJS/ESM мост для `Reflector` из `apps/api/src/app.module.ts`.
 - [ ] **`next-themes` React 19 Dev Warning Cleanup (`apps/web`):** отслеживать upstream-фикс `pacocoursey/next-themes#385` под React 19 и удалить закомментированный блок подавления предупреждения из `apps/web/src/shared/providers/theme-provider.tsx`.
 
@@ -79,10 +88,21 @@
   - _Локальная разработка:_ легковесный `minio` сервис в `docker-compose` + graceful fallback на локальный статический файл `/cv/*.pdf`, когда S3 env-переменные не заданы.
 - [ ] **Nginx Reverse Proxy (`docker-compose.prod.yml` — Self-Hosted / VPS Learning Track):** настроить `Nginx` как единую точку входа (порты `80/443`, TLS) между внешними клиентами, фронтендом (`web:3000`) и бэкендом (`api:4000`) в качестве self-hosted/VPS альтернативы облачному Runbook (Vercel + Render):
   - отработать конфигурирование upstream-проксирования `/api/*` ➔ `api:4000`, отключение буферизации (`proxy_buffering off;`, `proxy_read_timeout`, `Connection ''`) для бесперебойных **SSE-стримов**, передачу `X-Forwarded-For` / `X-Real-IP` для `@nestjs/throttler` (`trust proxy: 1`), L7 rate limiting и базовую защиту заголовков.
-- [ ] **Dual-Mode Air-Gapped Local Environment («Тумблер офлайна»):** сохранить единый graceful-fallback режим для всех _будущих_ внешних интеграций (`Redis`, `S3/R2/MinIO`, `Sentry`, `PostHog`, `Telegram Bot API`), развивая уже работающий автономный runtime (`In-Memory Prisma`, `In-Memory Throttler`, self-hosted `.woff2` шрифты и локальный MDX/Shiki), и обеспечить предсказуемое поведение офлайн-сборки.
+- [ ] **Dual-Mode Air-Gapped Local Environment и Capability-Gated UI («Тумблер офлайна»):** развивать единый graceful-режим для всех _будущих_ внешних сервисов (`Redis`, `S3/R2/MinIO`, `Sentry`, `PostHog`, `Telegram Bot API`), не ломая уже автономное ядро (`In-Memory Prisma`, `In-Memory Throttler`, self-hosted `.woff2` шрифты, локальный MDX/Shiki):
+  - бэкенд отдаёт безопасные булевы флаги доступности интеграций (например, `{ telegramAuth, s3Storage, redisCache }` через `/api/health` или `/api/capabilities` — **никогда** не передавая сами ключи на клиент);
+  - если у интеграции (например, `TELEGRAM_BOT_TOKEN` или S3-ключей) не задан API-ключ, интерфейс **показывает** саму фичу, блокирует триггер (`disabled` / `aria-disabled`) и выводит локализованную плашку: _«Нет API-ключа для использования данного сервиса»_.
 - [ ] **Cross-Domain API Deployment (`NEXT_PUBLIC_API_URL`):** при выносе `apps/api` на отдельный домен добавить `NEXT_PUBLIC_API_URL` в `.env`, `.env.example`, `turbo.json` (`globalEnv`), перевести клиентские `fetch` / `EventSource` на `NEXT_PUBLIC_API_URL` с фолбэком на `''` и прокинуть домен в CSP `connect-src`.
 
-### 4. Backend AI & Model Context Protocol (`apps/api` — Future Milestone)
+### 4. Frontend SEO & Branded Social Cards (`apps/web` — в связке с `UI v2`)
+
+- [ ] **Dynamic OpenGraph Image, Twitter Card & App Icons (`opengraph-image.tsx` + `icon.tsx`):** вынесено в отдельную задачу после обновления дизайна `UI v2`, чтобы не перерисовывать карточку дважды.
+  - **Что нужно для реализации в Next.js 16:**
+    1. `apps/web/src/app/[locale]/opengraph-image.tsx` (и при желании `twitter-image.tsx`) на базе `next/og` (`ImageResponse` / Satori) размером `1200×630` PNG + экспортами `alt`, `size`, `contentType` — чтобы при отправке ссылки в **Telegram, LinkedIn, Slack или X** вместо пустой ссылки отображалась фирменная карточка-превью с именем, позицией и стеком.
+    2. `apps/web/src/app/icon.tsx` (`32×32`) + `apple-icon.tsx` (`180×180`) и корректный `metadataBase` (`new URL(process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000')`) в `layout.tsx`, иначе абсолютные `og:image` URL при деплое собираются с `localhost`.
+    3. _Нюанс Satori + Air-Gapped / CSS-токены:_ `ImageResponse` не поддерживает `var(--background)` / CSS-переменные и внешние Google Fonts в офлайне — цветовые константы нужно передавать инлайн-стилями (Satori subset flexbox), а шрифт `Inter` грузить локальным буфером `.ttf` / `.otf` / `.woff` через `node:fs/promises` (`.woff2` Satori не парсит!).
+    4. _2 уровня генерации:_ сначала корневая карточка для `/` и `/cv`, затем опционально `opengraph-image.tsx` внутри `/knowledge-base/[...slug]/` с `generateStaticParams` (автогенерация превью из `title`, `category` и `tags` каждой из 143 SSG-статей).
+
+### 5. Backend AI & Model Context Protocol (`apps/api` — Future Milestone)
 
 - [ ] **Read-Only шоукейс `@nestjs/mcp` (`$0` за токены, статус `evaluating`):** публичный MCP (`Streamable HTTP`) с 16 ADR, опытом CV и `TL;DR` статей для `Cursor` / `Claude Desktop` — строго **Read-Only**, строго после `@nestjs/throttler`, с лимитами Zod (`limit <= 16`, `.max(60)`) и соблюдением `<Redact />`. _(Готовая заготовка: `PaginationQueryDto` / `PaginationQuerySchema` в `common/dto/pagination-query.dto.ts` при необходимости пагинации списков.)_
 - [ ] _(Отложено / `deferred`)_ **Живой агент `@nestjs/ai`:** не нужен, пока поиск закрывает `Cmd+K` за $0/мес; при возврате — строго за `@UseGuards(JwtRolesGuard)` с `maxOutputTokens`.

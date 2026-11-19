@@ -102,40 +102,44 @@ export const ENGINEERING_ROADMAP_ITEMS: readonly EngineeringRoadmapItem[] = [
     priority: 'P1',
     effort: 'S',
     title: {
-      en: 'Production SEO (Sitemap / Robots), Dynamic OpenGraph Cards, Error Boundaries & Docker Secrets DX',
-      uk: 'Production SEO (Sitemap / Robots), динамічні OpenGraph-картки, Error Boundaries і Docker Secrets DX',
-      ru: 'Production SEO (Sitemap / Robots), динамические OpenGraph-карточки, Error Boundaries и Docker Secrets DX',
+      en: 'Production SEO (Sitemap / Robots), Localized Error Boundaries & Zero-Friction Docker Demo',
+      uk: 'Production SEO (Sitemap / Robots), локалізовані Error Boundaries і Zero-Friction Docker Demo',
+      ru: 'Production SEO (Sitemap / Robots), локализованные Error Boundaries и Zero-Friction Docker Demo',
     },
     summary: {
-      en: 'Ship sitemap.ts (143 SSG routes with hreflang), robots.ts, dynamic 1200x630 opengraph-image.tsx / icon.tsx, localized [locale]/not-found.tsx & error.tsx, and clean docker-compose.yml fail-fast secret defaults.',
-      uk: 'Додати sitemap.ts (143 SSG-маршрути з hreflang), robots.ts, динамічні opengraph-image.tsx (1200x630) та icon.tsx, локалізовані not-found.tsx / error.tsx і коректний DX секретів у docker-compose.yml.',
-      ru: 'Добавить sitemap.ts (143 SSG-роута с hreflang), robots.ts, динамические opengraph-image.tsx (1200x630) и icon.tsx, локализованные not-found.tsx / error.tsx и исправить DX секретов в docker-compose.yml.',
+      en: 'Ship sitemap.ts (143 SSG routes with hreflang), robots.ts, localized [locale]/not-found.tsx & error.tsx, and clean separation between 1-command Docker reviewer demo and strict production secrets (with OpenGraph image cards queued cleanly alongside UI v2).',
+      uk: 'Додати sitemap.ts (143 SSG-маршрути з hreflang), robots.ts, локалізовані not-found.tsx / error.tsx та чітко розділити 1-командне Docker Demo для рев’юера і суворі прод-секрети (динамічні OpenGraph-картки заплановані разом з UI v2).',
+      ru: 'Добавить sitemap.ts (143 SSG-роута с hreflang), robots.ts, локализованные not-found.tsx / error.tsx и разделить 1-командное Docker Demo для тимлида и строгие прод-секреты (а OpenGraph-карточки вынести в пару к UI v2).',
     },
     rationale: {
-      en: 'Ensures crisp preview cards when sharing portfolio links in Telegram/LinkedIn, full multilingual search indexing, localized error recovery, and frictionless Docker Compose startup after strict fail-fast secret checks.',
-      uk: 'Забезпечує якісні прев’ю посилань у Telegram/LinkedIn, індексацію всіх локалей, локалізовані 404/Error-сторінки та безшовний старт Docker Compose після жорстких fail-fast перевірок.',
-      ru: 'Даёт красивые карточки-превью ссылок в Telegram/LinkedIn, полную индексацию 3 локалей, локализованные страницы ошибок и предсказуемый старт Docker Compose после ужесточения fail-fast секретов.',
+      en: 'Delivers full EN/UA/RU search indexing, localized 404/Error recovery, and effortless docker compose up --build without API keys (via capability-gated disabled badges) while keeping strict fail-fast validation in docker-compose.prod.yml.',
+      uk: 'Забезпечує EN/UA/RU пошукову індексацію, локалізовані 404/Error-сторінки та безшовний docker compose up --build без API-ключів (із блокуванням зовнішніх інтеграцій через capability-плашки), зберігаючи жорсткий fail-fast у docker-compose.prod.yml.',
+      ru: 'Обеспечивает EN/UA/RU индексацию, локализованные 404/Error-страницы и лёгкий запуск docker compose up --build без API-ключей (с блокировкой внешних сервисов через плашку «нет API-ключа») при сохранении строгого fail-fast в docker-compose.prod.yml.',
     },
     pros: {
       en: [
-        'Instant high-CTR social previews (OpenGraph 1200x630) and full EN/UA/RU SEO discoverability',
-        'Prevents NODE_ENV=production boot crashes on fresh docker compose up --build',
+        'Full EN/UA/RU SEO sitemap coverage + 1-command Docker onboarding for reviewers with zero manual .env edits',
+        'Capability-gated UI cleanly disables external services missing API keys instead of crashing startup',
       ],
       uk: [
-        'Акуратні соцмережеві прев’ю (OpenGraph 1200x630) та повна EN/UA/RU пошукова індексація',
-        'Запобігає падінню контейнера API на старті docker compose up --build через порожні секрети',
+        'Повне EN/UA/RU SEO-покриття + запуск через Docker однією командою без ручного налаштування .env',
+        'Capability-gated UI акуратно блокує зовнішні сервіси без API-ключів замість падіння при старті',
       ],
       ru: [
-        'Аккуратные превью ссылок (OpenGraph 1200x630) и полная индексация EN/UA/RU маршрутов',
-        'Исключает падение контейнера API при docker compose up --build из-за дефолтных секретов',
+        'Полная EN/UA/RU индексация + запуск в Docker одной командой без ручного создания .env',
+        'Capability-gated UI честно отключает внешние сервисы без API-ключей вместо падения контейнера',
       ],
     },
     constraints: {
       en: [
-        'Dynamic ImageResponse fonts and metadataBase URL must handle local/preview origins without hardcoded domains',
+        'Dynamic 1200x630 opengraph-image.tsx (ImageResponse + local TTF font buffer) is deferred to pair cleanly with UI v2',
       ],
-      uk: ['Шрифти ImageResponse та metadataBase мають коректно працювати і на localhost, і на прод-домені'],
-      ru: ['Шрифты в ImageResponse и metadataBase должны корректно работать как локально, так и на прод-домене'],
+      uk: [
+        'Динамічні opengraph-image.tsx (1200x630, ImageResponse + локальний TTF-шрифт) відкладено до редизайну UI v2',
+      ],
+      ru: [
+        'Динамические карточки opengraph-image.tsx (1200x630, ImageResponse + локальный TTF-шрифт) запланированы в пару к UI v2',
+      ],
     },
   },
   {
