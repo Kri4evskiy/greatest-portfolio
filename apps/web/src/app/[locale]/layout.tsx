@@ -58,7 +58,12 @@ export default async function LocaleRootLayout({
   const messages = await getMessages()
 
   return (
-    <html lang={parsed.data} className={`${inter.variable} ${jetbrainsMono.variable}`} suppressHydrationWarning>
+    <html
+      lang={parsed.data}
+      data-scroll-behavior="smooth"
+      className={`${inter.variable} ${jetbrainsMono.variable}`}
+      suppressHydrationWarning
+    >
       <head>
         {/* biome-ignore lint/security/noDangerouslySetInnerHtml: Static allowlisted IIFE preventing FOUC for saved data-palette before hydration */}
         <script dangerouslySetInnerHTML={{ __html: PALETTE_INIT_SCRIPT }} />
