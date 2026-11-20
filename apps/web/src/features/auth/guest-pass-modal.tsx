@@ -18,6 +18,8 @@ import {
   DialogHeader,
   DialogTitle,
   Input,
+  ToggleGroup,
+  ToggleGroupItem,
 } from '@repo/ui'
 import { KeyRound, LockOpen, ShieldCheck, Sparkles, Terminal } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
@@ -182,36 +184,43 @@ export function GuestPassModal() {
 
           <div className="space-y-1.5">
             <span className="text-xs font-medium">{t('roleLabel')}</span>
-            <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
-              {VISITOR_ROLES.map((roleKey) => {
-                const isSelected = selectedVisitorType === roleKey
-                return (
-                  <button
-                    key={roleKey}
-                    type="button"
-                    onClick={() => setValue('visitorType', roleKey, { shouldValidate: true })}
-                    className={`rounded-md border px-2.5 py-1.5 text-left text-xs transition-colors ${
-                      isSelected
-                        ? 'border-primary bg-primary text-primary-foreground font-medium'
-                        : 'border-border bg-background hover:bg-accent text-foreground'
-                    }`}
-                  >
-                    {VISITOR_ROLE_LABELS[roleKey]}
-                  </button>
-                )
-              })}
-            </div>
+            <ToggleGroup
+              type="single"
+              variant="outline"
+              size="sm"
+              value={selectedVisitorType}
+              aria-label={t('roleLabel')}
+              onValueChange={(nextValue) => {
+                const matched = VISITOR_ROLES.find((roleKey) => roleKey === nextValue)
+                if (matched) {
+                  setValue('visitorType', matched, { shouldValidate: true })
+                }
+              }}
+              className="grid w-full grid-cols-2 gap-1.5 sm:grid-cols-3"
+            >
+              {VISITOR_ROLES.map((roleKey) => (
+                <ToggleGroupItem
+                  key={roleKey}
+                  value={roleKey}
+                  className="h-auto justify-start px-2.5 py-1.5 text-left text-xs font-normal data-[state=on]:font-medium"
+                >
+                  {VISITOR_ROLE_LABELS[roleKey]}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
           </div>
 
           <div className="pt-1">
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="sm"
               onClick={() => setShowAdminInput((prev) => !prev)}
-              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+              className="h-auto gap-1.5 px-1.5 py-1 text-xs font-normal text-muted-foreground hover:text-foreground"
             >
               <KeyRound className="h-3.5 w-3.5" />
               {showAdminInput ? t('hideAdmin') : t('showAdmin')}
-            </button>
+            </Button>
 
             {showAdminInput ? (
               <div className="mt-2 space-y-1">

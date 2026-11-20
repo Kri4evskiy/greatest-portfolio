@@ -1,7 +1,18 @@
 'use client'
 
 import type { TechCategory, TechRadarItem } from '@repo/shared-schemas'
-import { Badge, Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Input } from '@repo/ui'
+import {
+  Badge,
+  Button,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  Input,
+  ToggleGroup,
+  ToggleGroupItem,
+} from '@repo/ui'
 import {
   type ColumnDef,
   flexRender,
@@ -130,14 +141,16 @@ export function TechRadarTable({ items: localizedItems }: { items: readonly Tech
     {
       accessorKey: 'adrNumber',
       header: ({ column }) => (
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="sm"
           onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
-          className="flex items-center gap-1 font-mono text-xs font-semibold text-muted-foreground hover:text-foreground"
+          className="h-auto gap-1 px-1 py-0.5 font-mono text-xs font-semibold text-muted-foreground hover:bg-transparent hover:text-foreground"
         >
           <span>ADR #</span>
           <ArrowUpDown className="h-3 w-3" />
-        </button>
+        </Button>
       ),
       cell: ({ row }) => (
         <span className="font-mono text-xs text-muted-foreground">
@@ -180,14 +193,16 @@ export function TechRadarTable({ items: localizedItems }: { items: readonly Tech
     {
       accessorKey: 'experienceYears',
       header: ({ column }) => (
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="sm"
           onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
-          className="flex items-center gap-1 font-mono text-xs font-semibold text-muted-foreground hover:text-foreground"
+          className="h-auto gap-1 px-1 py-0.5 font-mono text-xs font-semibold text-muted-foreground hover:bg-transparent hover:text-foreground"
         >
           <span>{t('colExp')}</span>
           <ArrowUpDown className="h-3 w-3" />
-        </button>
+        </Button>
       ),
       cell: ({ row }) => (
         <span className="font-mono text-xs font-medium">
@@ -237,25 +252,30 @@ export function TechRadarTable({ items: localizedItems }: { items: readonly Tech
       </div>
 
       <div className="flex flex-col gap-3 rounded-lg border border-border bg-card p-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0">
-          {CATEGORIES.map((category) => {
-            const active = categoryFilter === category
-            return (
-              <button
-                key={category}
-                type="button"
-                onClick={() => setCategoryFilter(category)}
-                className={`shrink-0 rounded-md px-2.5 py-1 font-mono text-xs transition-colors ${
-                  active
-                    ? 'bg-primary text-primary-foreground font-medium'
-                    : 'bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground'
-                }`}
-              >
-                {category === 'ALL' ? t('allDomains') : category}
-              </button>
-            )
-          })}
-        </div>
+        <ToggleGroup
+          type="single"
+          variant="outline"
+          size="sm"
+          value={categoryFilter}
+          aria-label={t('colDomain')}
+          onValueChange={(nextValue) => {
+            const matched = CATEGORIES.find((cat) => cat === nextValue)
+            if (matched) {
+              setCategoryFilter(matched)
+            }
+          }}
+          className="-mx-1 flex flex-nowrap gap-1.5 overflow-x-auto px-1 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0"
+        >
+          {CATEGORIES.map((category) => (
+            <ToggleGroupItem
+              key={category}
+              value={category}
+              className="h-auto shrink-0 border-transparent bg-muted/60 px-2.5 py-1 font-mono text-xs font-normal text-muted-foreground hover:bg-muted hover:text-foreground data-[state=on]:border-primary data-[state=on]:bg-primary data-[state=on]:font-medium data-[state=on]:text-primary-foreground"
+            >
+              {category === 'ALL' ? t('allDomains') : category}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
 
         <div className="relative w-full sm:w-64">
           <Search className="pointer-events-none absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
@@ -263,7 +283,7 @@ export function TechRadarTable({ items: localizedItems }: { items: readonly Tech
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={t('searchPlaceholder')}
-            className="h-8 pl-8 text-xs"
+            className="h-8 pl-8 text-base sm:text-xs"
           />
         </div>
       </div>

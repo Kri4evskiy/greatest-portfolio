@@ -1,7 +1,7 @@
 'use client'
 
 import type { SupportedLocale } from '@repo/shared-schemas'
-import { Badge } from '@repo/ui'
+import { Badge, Button, Tabs, TabsContent, TabsList, TabsTrigger } from '@repo/ui'
 import {
   ArrowLeft,
   Award,
@@ -153,40 +153,32 @@ export function CvDocumentShowcase({ cvMeta, locale }: CvDocumentShowcaseProps) 
       </div>
 
       {/* Mode Switcher: Visual PDF Document vs Full Structured Web Resume */}
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="inline-flex rounded-xl border border-border bg-muted/40 p-1">
-          <button
-            type="button"
-            onClick={() => setViewMode('pdf')}
-            className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors sm:text-sm ${
-              viewMode === 'pdf'
-                ? 'bg-background text-foreground shadow-2xs'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            <FileText className="h-3.5 w-3.5 text-primary" />
-            <span>{t('tabPdfPreview')}</span>
-          </button>
+      <Tabs
+        value={viewMode}
+        onValueChange={(nextValue) => {
+          if (nextValue === 'pdf' || nextValue === 'structured') {
+            setViewMode(nextValue)
+          }
+        }}
+        className="space-y-6"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <TabsList className="h-auto rounded-xl border-border bg-muted/40 p-1">
+            <TabsTrigger value="pdf" className="gap-1.5 rounded-lg px-3 py-1.5 text-xs sm:text-sm">
+              <FileText className="h-3.5 w-3.5 text-primary" />
+              <span>{t('tabPdfPreview')}</span>
+            </TabsTrigger>
 
-          <button
-            type="button"
-            onClick={() => setViewMode('structured')}
-            className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors sm:text-sm ${
-              viewMode === 'structured'
-                ? 'bg-background text-foreground shadow-2xs'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            <LayoutList className="h-3.5 w-3.5 text-primary" />
-            <span>{t('tabStructuredCv')}</span>
-          </button>
+            <TabsTrigger value="structured" className="gap-1.5 rounded-lg px-3 py-1.5 text-xs sm:text-sm">
+              <LayoutList className="h-3.5 w-3.5 text-primary" />
+              <span>{t('tabStructuredCv')}</span>
+            </TabsTrigger>
+          </TabsList>
+
+          <span className="hidden font-mono text-[11px] text-muted-foreground md:inline">{t('mobileViewerHint')}</span>
         </div>
 
-        <span className="hidden font-mono text-[11px] text-muted-foreground md:inline">{t('mobileViewerHint')}</span>
-      </div>
-
-      {viewMode === 'pdf' ? (
-        <div className="space-y-4">
+        <TabsContent value="pdf" className="mt-0 space-y-4">
           {/* Mobile Helper Banner (< md): Native Fullscreen / Download for Multi-Page PDFs */}
           <div className="flex flex-col gap-2.5 rounded-xl border border-primary/25 bg-primary/5 p-3.5 text-xs md:hidden">
             <p className="leading-relaxed text-foreground/90">{t('mobilePdfBanner')}</p>
@@ -200,14 +192,16 @@ export function CvDocumentShowcase({ cvMeta, locale }: CvDocumentShowcaseProps) 
                 <ExternalLink className="h-3.5 w-3.5" />
                 <span>{t('openFullscreenBtn')}</span>
               </a>
-              <button
+              <Button
                 type="button"
+                variant="outline"
+                size="sm"
                 onClick={() => setViewMode('structured')}
-                className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-3 py-1.5 font-mono text-xs font-medium text-foreground"
+                className="h-auto gap-1.5 px-3 py-1.5 font-mono text-xs"
               >
                 <LayoutList className="h-3.5 w-3.5 text-primary" />
                 <span>{t('tabStructuredCv')}</span>
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -234,137 +228,139 @@ export function CvDocumentShowcase({ cvMeta, locale }: CvDocumentShowcaseProps) 
               </div>
             </object>
           </div>
-        </div>
-      ) : (
-        /* Full Structured Web / ATS Resume (All 6 Roles, Skills, Courses, Education) */
-        <article className="space-y-8 rounded-2xl border border-border bg-card p-5 shadow-xs sm:p-8">
-          {/* Summary */}
-          <section className="space-y-2 border-b border-border/60 pb-6">
-            <h2 className="font-mono text-xs font-semibold uppercase tracking-wider text-primary">
-              {t('summaryHeading')}
-            </h2>
-            <p className="text-sm leading-relaxed text-foreground/90 sm:text-base">{tHero('description')}</p>
-          </section>
+        </TabsContent>
 
-          {/* Hard Skills */}
-          <section className="space-y-3 border-b border-border/60 pb-6">
-            <h2 className="font-mono text-xs font-semibold uppercase tracking-wider text-primary">
-              {t('hardSkillsHeading')}
-            </h2>
-            <div className="grid gap-3 sm:grid-cols-2">
-              {AUTHOR_SKILL_GROUPS.map((group) => (
-                <div key={group.id} className="rounded-xl border border-border/70 bg-muted/20 p-3.5">
-                  <div className="font-mono text-[11px] font-semibold text-foreground">
-                    {pickLocalized(group.label, locale)}
-                  </div>
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {group.skills.map((skill) => (
-                      <Badge key={skill} variant="outline" className="bg-background font-mono text-[10px]">
-                        {skill}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          {/* All 6 Commercial Roles Expanded */}
-          <section className="space-y-4 border-b border-border/60 pb-6">
-            <div className="flex items-center gap-2">
-              <Briefcase className="h-4 w-4 text-primary" />
+        <TabsContent value="structured" className="mt-0">
+          {/* Full Structured Web / ATS Resume (All 6 Roles, Skills, Courses, Education) */}
+          <article className="space-y-8 rounded-2xl border border-border bg-card p-5 shadow-xs sm:p-8">
+            {/* Summary */}
+            <section className="space-y-2 border-b border-border/60 pb-6">
               <h2 className="font-mono text-xs font-semibold uppercase tracking-wider text-primary">
-                {t('experienceHeading')}
+                {t('summaryHeading')}
               </h2>
-            </div>
+              <p className="text-sm leading-relaxed text-foreground/90 sm:text-base">{tHero('description')}</p>
+            </section>
 
-            <div className="space-y-5">
-              {COMMERCIAL_EXPERIENCE.map((role) => {
-                const points = role.highlights[locale] ?? role.highlights.en
-                return (
-                  <div key={role.id} className="rounded-xl border border-border/70 bg-background p-4 sm:p-5">
-                    <div className="flex flex-col justify-between gap-1.5 sm:flex-row sm:items-start">
-                      <div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h3 className="text-base font-bold text-foreground">{role.company}</h3>
-                          <Badge variant="secondary" className="font-mono text-[10px]">
-                            {pickLocalized(role.domain, locale)}
-                          </Badge>
-                        </div>
-                        <p className="text-xs font-medium text-primary">{pickLocalized(role.engagement, locale)}</p>
-                        {role.projects.length > 0 ? (
-                          <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">
-                            {role.projects.join(' / ')}
-                          </p>
-                        ) : null}
-                      </div>
-
-                      <Badge variant="outline" className="w-fit shrink-0 font-mono text-xs">
-                        {pickLocalized(role.period, locale)}
-                      </Badge>
+            {/* Hard Skills */}
+            <section className="space-y-3 border-b border-border/60 pb-6">
+              <h2 className="font-mono text-xs font-semibold uppercase tracking-wider text-primary">
+                {t('hardSkillsHeading')}
+              </h2>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {AUTHOR_SKILL_GROUPS.map((group) => (
+                  <div key={group.id} className="rounded-xl border border-border/70 bg-muted/20 p-3.5">
+                    <div className="font-mono text-[11px] font-semibold text-foreground">
+                      {pickLocalized(group.label, locale)}
                     </div>
-
-                    <ul className="mt-3 space-y-1.5 text-xs leading-relaxed text-muted-foreground sm:text-sm">
-                      {points.map((pt) => (
-                        <li key={pt} className="flex items-start gap-2">
-                          <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-success" />
-                          <span>{pt}</span>
-                        </li>
-                      ))}
-                    </ul>
-
-                    <div className="mt-3 flex flex-wrap gap-1.5 border-t border-border/50 pt-2.5">
-                      {role.technologies.map((tech) => (
-                        <Badge key={tech} variant="outline" className="font-mono text-[10px]">
-                          {tech}
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {group.skills.map((skill) => (
+                        <Badge key={skill} variant="outline" className="bg-background font-mono text-[10px]">
+                          {skill}
                         </Badge>
                       ))}
                     </div>
                   </div>
-                )
-              })}
-            </div>
-          </section>
-
-          {/* Education, Courses & Spoken Languages */}
-          <section className="grid gap-4 sm:grid-cols-3">
-            <div className="rounded-xl border border-border/70 bg-muted/20 p-4">
-              <div className="flex items-center gap-1.5 font-mono text-[11px] font-semibold uppercase tracking-wider text-primary">
-                <GraduationCap className="h-4 w-4" />
-                <span>{t('educationHeading')}</span>
-              </div>
-              <div className="mt-2 text-sm font-semibold text-foreground">
-                {pickLocalized(AUTHOR_PROFILE.education.degree, locale)}
-              </div>
-              <div className="mt-0.5 text-xs text-muted-foreground">
-                {pickLocalized(AUTHOR_PROFILE.education.institution, locale)}
-              </div>
-            </div>
-
-            <div className="rounded-xl border border-border/70 bg-muted/20 p-4">
-              <div className="flex items-center gap-1.5 font-mono text-[11px] font-semibold uppercase tracking-wider text-primary">
-                <Award className="h-4 w-4" />
-                <span>{t('coursesHeading')}</span>
-              </div>
-              <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
-                {AUTHOR_PROFILE.courses.map((course) => (
-                  <li key={course}>• {course}</li>
                 ))}
-              </ul>
-            </div>
+              </div>
+            </section>
 
-            <div className="rounded-xl border border-border/70 bg-muted/20 p-4">
-              <div className="flex items-center gap-1.5 font-mono text-[11px] font-semibold uppercase tracking-wider text-primary">
-                <Languages className="h-4 w-4" />
-                <span>{t('languagesHeading')}</span>
+            {/* All 6 Commercial Roles Expanded */}
+            <section className="space-y-4 border-b border-border/60 pb-6">
+              <div className="flex items-center gap-2">
+                <Briefcase className="h-4 w-4 text-primary" />
+                <h2 className="font-mono text-xs font-semibold uppercase tracking-wider text-primary">
+                  {t('experienceHeading')}
+                </h2>
               </div>
-              <div className="mt-2 text-xs font-medium leading-relaxed text-foreground">
-                {pickLocalized(AUTHOR_PROFILE.spokenLanguages, locale)}
+
+              <div className="space-y-5">
+                {COMMERCIAL_EXPERIENCE.map((role) => {
+                  const points = role.highlights[locale] ?? role.highlights.en
+                  return (
+                    <div key={role.id} className="rounded-xl border border-border/70 bg-background p-4 sm:p-5">
+                      <div className="flex flex-col justify-between gap-1.5 sm:flex-row sm:items-start">
+                        <div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="text-base font-bold text-foreground">{role.company}</h3>
+                            <Badge variant="secondary" className="font-mono text-[10px]">
+                              {pickLocalized(role.domain, locale)}
+                            </Badge>
+                          </div>
+                          <p className="text-xs font-medium text-primary">{pickLocalized(role.engagement, locale)}</p>
+                          {role.projects.length > 0 ? (
+                            <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">
+                              {role.projects.join(' / ')}
+                            </p>
+                          ) : null}
+                        </div>
+
+                        <Badge variant="outline" className="w-fit shrink-0 font-mono text-xs">
+                          {pickLocalized(role.period, locale)}
+                        </Badge>
+                      </div>
+
+                      <ul className="mt-3 space-y-1.5 text-xs leading-relaxed text-muted-foreground sm:text-sm">
+                        {points.map((pt) => (
+                          <li key={pt} className="flex items-start gap-2">
+                            <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-success" />
+                            <span>{pt}</span>
+                          </li>
+                        ))}
+                      </ul>
+
+                      <div className="mt-3 flex flex-wrap gap-1.5 border-t border-border/50 pt-2.5">
+                        {role.technologies.map((tech) => (
+                          <Badge key={tech} variant="outline" className="font-mono text-[10px]">
+                            {tech}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
-            </div>
-          </section>
-        </article>
-      )}
+            </section>
+
+            {/* Education, Courses & Spoken Languages */}
+            <section className="grid gap-4 sm:grid-cols-3">
+              <div className="rounded-xl border border-border/70 bg-muted/20 p-4">
+                <div className="flex items-center gap-1.5 font-mono text-[11px] font-semibold uppercase tracking-wider text-primary">
+                  <GraduationCap className="h-4 w-4" />
+                  <span>{t('educationHeading')}</span>
+                </div>
+                <div className="mt-2 text-sm font-semibold text-foreground">
+                  {pickLocalized(AUTHOR_PROFILE.education.degree, locale)}
+                </div>
+                <div className="mt-0.5 text-xs text-muted-foreground">
+                  {pickLocalized(AUTHOR_PROFILE.education.institution, locale)}
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-border/70 bg-muted/20 p-4">
+                <div className="flex items-center gap-1.5 font-mono text-[11px] font-semibold uppercase tracking-wider text-primary">
+                  <Award className="h-4 w-4" />
+                  <span>{t('coursesHeading')}</span>
+                </div>
+                <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
+                  {AUTHOR_PROFILE.courses.map((course) => (
+                    <li key={course}>• {course}</li>
+                  ))}
+                </ul>
+              </div>
+
+              <div className="rounded-xl border border-border/70 bg-muted/20 p-4">
+                <div className="flex items-center gap-1.5 font-mono text-[11px] font-semibold uppercase tracking-wider text-primary">
+                  <Languages className="h-4 w-4" />
+                  <span>{t('languagesHeading')}</span>
+                </div>
+                <div className="mt-2 text-xs font-medium leading-relaxed text-foreground">
+                  {pickLocalized(AUTHOR_PROFILE.spokenLanguages, locale)}
+                </div>
+              </div>
+            </section>
+          </article>
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }

@@ -1,6 +1,6 @@
 'use client'
 
-import { Badge } from '@repo/ui'
+import { Badge, Button, ToggleGroup, ToggleGroupItem } from '@repo/ui'
 import {
   CheckCircle2,
   ChevronDown,
@@ -124,19 +124,27 @@ export function EngineeringRoadmapBoard({ items }: { items: readonly LocalizedRo
       </div>
 
       {/* Mobile-First Horizontal Scrollable Filter Tabs */}
-      <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+      <ToggleGroup
+        type="single"
+        variant="outline"
+        size="sm"
+        value={activeFilter}
+        aria-label={t('title')}
+        onValueChange={(nextValue) => {
+          const matched = filterTabs.find((tab) => tab.id === nextValue)
+          if (matched) {
+            setActiveFilter(matched.id)
+          }
+        }}
+        className="flex flex-nowrap items-center gap-1.5 overflow-x-auto pb-1"
+      >
         {filterTabs.map((tab) => {
           const isActive = activeFilter === tab.id
           return (
-            <button
+            <ToggleGroupItem
               key={tab.id}
-              type="button"
-              onClick={() => setActiveFilter(tab.id)}
-              className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
-                isActive
-                  ? 'border-primary bg-primary text-primary-foreground shadow-xs'
-                  : 'border-border bg-card text-muted-foreground hover:border-primary/40 hover:text-foreground'
-              }`}
+              value={tab.id}
+              className="h-auto shrink-0 gap-1.5 rounded-lg bg-card px-3 py-1.5 text-xs text-muted-foreground hover:border-primary/40 hover:bg-card hover:text-foreground data-[state=on]:shadow-xs"
             >
               <span>{tab.label}</span>
               <span
@@ -146,10 +154,10 @@ export function EngineeringRoadmapBoard({ items }: { items: readonly LocalizedRo
               >
                 {counts[tab.id]}
               </span>
-            </button>
+            </ToggleGroupItem>
           )
         })}
-      </div>
+      </ToggleGroup>
 
       {/* Cards List */}
       <div className="space-y-3">
@@ -186,16 +194,18 @@ export function EngineeringRoadmapBoard({ items }: { items: readonly LocalizedRo
               <p className="mt-1 text-xs leading-relaxed text-muted-foreground sm:text-sm">{item.summary}</p>
 
               <div className="mt-3">
-                <button
+                <Button
                   type="button"
+                  variant="outline"
+                  size="sm"
                   aria-expanded={isExpanded}
                   onClick={() => toggleExpanded(item.id)}
-                  className="inline-flex items-center gap-1.5 rounded-md border border-border/80 bg-muted/30 px-2.5 py-1 font-mono text-[11px] font-medium text-foreground transition-colors hover:border-primary/40 hover:bg-muted"
+                  className="h-auto gap-1.5 border-border/80 bg-muted/30 px-2.5 py-1 font-mono text-[11px] font-medium hover:border-primary/40 hover:bg-muted"
                 >
                   <Scale className="h-3 w-3 text-primary" />
                   <span>{isExpanded ? t('hideArgumentsBtn') : t('showArgumentsBtn')}</span>
                   {isExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
-                </button>
+                </Button>
               </div>
 
               {isExpanded ? (

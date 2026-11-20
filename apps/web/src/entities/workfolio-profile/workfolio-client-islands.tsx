@@ -66,31 +66,39 @@ export function HeroActionRow({ ctaUnlocked, ctaLocked, ctaCvPdf, ctaTechRadar, 
         <ArrowUpRight className="h-4 w-4 shrink-0" />
       </Button>
 
-      <Link
-        href="/cv"
-        className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md border border-primary/30 bg-primary/5 px-4 text-sm font-medium text-foreground transition-colors hover:border-primary hover:bg-primary/10 sm:w-auto"
+      <Button
+        asChild
+        variant="outline"
+        size="lg"
+        className="w-full justify-center gap-2 border-primary/30 bg-primary/5 px-4 text-foreground hover:border-primary hover:bg-primary/10 sm:w-auto"
       >
-        <FileDown className="h-4 w-4 shrink-0 text-primary" />
-        <span>{ctaCvPdf}</span>
-      </Link>
+        <Link href="/cv">
+          <FileDown className="h-4 w-4 shrink-0 text-primary" />
+          <span>{ctaCvPdf}</span>
+        </Link>
+      </Button>
 
-      <button
+      <Button
         type="button"
+        variant="outline"
+        size="lg"
         onClick={() => scrollToSection('tech-radar')}
-        className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md border border-border bg-background px-4 text-sm font-medium transition-colors hover:bg-accent sm:w-auto"
+        className="w-full justify-center gap-2 px-4 sm:w-auto"
       >
         <Cpu className="h-4 w-4 shrink-0 text-primary" />
         <span>{ctaTechRadar}</span>
-      </button>
+      </Button>
 
-      <button
+      <Button
         type="button"
+        variant="outline"
+        size="lg"
         onClick={() => scrollToSection('roadmap')}
-        className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md border border-border bg-background px-4 text-sm font-medium transition-colors hover:bg-accent sm:w-auto"
+        className="w-full justify-center gap-2 px-4 sm:w-auto"
       >
         <Compass className="h-4 w-4 shrink-0 text-primary" />
         <span>{ctaRoadmap}</span>
-      </button>
+      </Button>
     </div>
   )
 }
@@ -144,15 +152,16 @@ export function EarlierRolesDisclosure({ showLabel, hideLabel, children }: Earli
 
   return (
     <div className="space-y-3">
-      <button
+      <Button
         type="button"
+        variant="outline"
         aria-expanded={showEarlierRoles}
         onClick={() => setShowEarlierRoles((prev) => !prev)}
-        className="flex w-full items-center justify-between rounded-xl border border-dashed border-border bg-muted/30 px-4 py-2.5 text-left font-mono text-xs font-medium text-foreground transition-colors hover:border-primary/40 hover:bg-muted/60"
+        className="h-auto w-full justify-between whitespace-normal rounded-xl border-dashed bg-muted/30 px-4 py-2.5 text-left font-mono text-xs font-medium text-foreground hover:border-primary/40 hover:bg-muted/60"
       >
         <span>{showEarlierRoles ? hideLabel : showLabel}</span>
-        {showEarlierRoles ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-      </button>
+        {showEarlierRoles ? <ChevronUp className="h-4 w-4 shrink-0" /> : <ChevronDown className="h-4 w-4 shrink-0" />}
+      </Button>
 
       {showEarlierRoles ? <div className="space-y-3">{children}</div> : null}
     </div>

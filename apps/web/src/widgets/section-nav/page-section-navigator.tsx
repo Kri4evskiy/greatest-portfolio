@@ -1,8 +1,9 @@
 'use client'
 
+import { Button, Popover, PopoverContent, PopoverTrigger } from '@repo/ui'
 import { ArrowUp, ChevronUp, ListTree, X } from 'lucide-react'
 import { useTranslations } from 'next-intl'
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import {
   useActiveWorkfolioSection,
   useSectionNavigation,
@@ -34,33 +35,6 @@ export function PageSectionNavigator() {
   const activeSection = useActiveWorkfolioSection()
   const { scrollToSection, scrollToTop } = useSectionNavigation()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-  const mobileMenuRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (!isMobileMenuOpen) return
-
-    const handlePointerDown = (event: MouseEvent | TouchEvent) => {
-      if (mobileMenuRef.current && !mobileMenuRef.current.contains(event.target as Node)) {
-        setIsMobileMenuOpen(false)
-      }
-    }
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setIsMobileMenuOpen(false)
-      }
-    }
-
-    document.addEventListener('mousedown', handlePointerDown)
-    document.addEventListener('touchstart', handlePointerDown, { passive: true })
-    document.addEventListener('keydown', handleKeyDown)
-
-    return () => {
-      document.removeEventListener('mousedown', handlePointerDown)
-      document.removeEventListener('touchstart', handlePointerDown)
-      document.removeEventListener('keydown', handleKeyDown)
-    }
-  }, [isMobileMenuOpen])
 
   const activeLabel = t(`nav.${SECTION_TRANSLATION_KEYS[activeSection]}`)
   const activeIndex = SECTION_INDICES[activeSection]
@@ -89,15 +63,18 @@ export function PageSectionNavigator() {
               const stepNum = SECTION_INDICES[sectionId]
 
               return (
-                <button
+                <Button
                   key={sectionId}
                   type="button"
+                  variant="ghost"
+                  size="sm"
+                  aria-label={label}
+                  aria-current={isActive ? 'location' : undefined}
                   onClick={() => handleSelectSection(sectionId)}
-                  title={label}
-                  className={`flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-left text-xs transition-colors ${
+                  className={`h-auto justify-start gap-2.5 rounded-lg px-2 py-1.5 text-left text-xs ${
                     isActive
-                      ? 'bg-primary/10 font-semibold text-foreground'
-                      : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'
+                      ? 'bg-primary/10 font-semibold text-foreground hover:bg-primary/15'
+                      : 'font-normal text-muted-foreground hover:bg-muted/70 hover:text-foreground'
                   }`}
                 >
                   <span
@@ -109,41 +86,71 @@ export function PageSectionNavigator() {
                   <span className="hidden max-w-[148px] truncate group-hover/rail:inline min-[1480px]:inline">
                     {label}
                   </span>
-                </button>
+                </Button>
               )
             })}
           </nav>
 
           <div className="mt-1.5 border-t border-border/60 pt-1.5">
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="sm"
+              aria-label={t('scrollToTop')}
               onClick={scrollToTop}
-              title={t('scrollToTop')}
-              className="flex w-full items-center justify-center gap-1.5 rounded-lg px-2 py-1 font-mono text-[10px] text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground group-hover/rail:justify-start min-[1480px]:justify-start"
+              className="h-auto w-full justify-center gap-1.5 rounded-lg px-2 py-1 font-mono text-[10px] font-normal text-muted-foreground hover:bg-muted/70 hover:text-foreground group-hover/rail:justify-start min-[1480px]:justify-start"
             >
               <ArrowUp className="h-3 w-3 shrink-0" />
               <span className="hidden group-hover/rail:inline min-[1480px]:inline">{t('scrollToTop')}</span>
-            </button>
+            </Button>
           </div>
         </div>
       </aside>
 
       {/* Mobile & Tablet Thumb-Friendly Floating Pill Navigator (< 1280px) */}
-      <div ref={mobileMenuRef} className="fixed bottom-4 right-4 z-40 xl:hidden">
-        {isMobileMenuOpen ? (
-          <div className="mb-2 w-64 rounded-xl border border-border bg-card/95 p-2 shadow-xl backdrop-blur-md">
+      <div className="fixed bottom-4 right-4 z-40 xl:hidden">
+        <Popover open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              type="button"
+              variant="outline"
+              aria-label={t('sectionNavTitle')}
+              className="h-10 gap-2 rounded-full border-border bg-card/95 px-3.5 text-xs font-medium text-foreground shadow-lg backdrop-blur-md transition-transform active:scale-95"
+            >
+              <ListTree className="h-3.5 w-3.5 text-primary" />
+              <span className="font-mono text-[10px] text-muted-foreground">{activeIndex}</span>
+              <span className="max-w-[120px] truncate">{activeLabel}</span>
+              {isMobileMenuOpen ? (
+                <X className="h-3.5 w-3.5 text-muted-foreground" />
+              ) : (
+                <ChevronUp className="h-3.5 w-3.5 text-muted-foreground" />
+              )}
+            </Button>
+          </PopoverTrigger>
+
+          <PopoverContent
+            side="top"
+            align="end"
+            sideOffset={8}
+            className="w-64 rounded-xl border-border bg-card/95 p-2 shadow-xl backdrop-blur-md xl:hidden"
+          >
             <div className="mb-1.5 flex items-center justify-between border-b border-border/60 px-2.5 pb-1.5">
               <span className="font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                 {t('sectionNavTitle')}
               </span>
-              <button
+              <Button
                 type="button"
-                onClick={scrollToTop}
-                className="inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground hover:bg-muted hover:text-foreground"
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  scrollToTop()
+                  setIsMobileMenuOpen(false)
+                }}
+                className="h-auto gap-1 rounded-sm px-1.5 py-0.5 font-mono text-[10px] font-normal text-muted-foreground hover:bg-muted hover:text-foreground"
               >
                 <ArrowUp className="h-3 w-3" />
                 <span>{t('scrollToTop')}</span>
-              </button>
+              </Button>
             </div>
 
             <nav className="flex flex-col gap-1">
@@ -153,12 +160,14 @@ export function PageSectionNavigator() {
                 const stepNum = SECTION_INDICES[sectionId]
 
                 return (
-                  <button
+                  <Button
                     key={sectionId}
                     type="button"
+                    variant={isActive ? 'default' : 'ghost'}
+                    size="sm"
                     onClick={() => handleSelectSection(sectionId)}
-                    className={`flex min-h-10 items-center justify-between rounded-lg px-3 py-2 text-left text-xs transition-colors ${
-                      isActive ? 'bg-primary text-primary-foreground font-semibold' : 'text-foreground hover:bg-muted'
+                    className={`h-auto min-h-10 w-full justify-between rounded-lg px-3 py-2 text-left text-xs ${
+                      isActive ? 'font-semibold' : 'font-normal text-foreground hover:bg-muted'
                     }`}
                   >
                     <span className="truncate">{label}</span>
@@ -169,31 +178,12 @@ export function PageSectionNavigator() {
                     >
                       {stepNum}
                     </span>
-                  </button>
+                  </Button>
                 )
               })}
             </nav>
-          </div>
-        ) : null}
-
-        <div className="flex justify-end">
-          <button
-            type="button"
-            aria-expanded={isMobileMenuOpen}
-            aria-label={t('sectionNavTitle')}
-            onClick={() => setIsMobileMenuOpen((prev) => !prev)}
-            className="inline-flex h-10 items-center gap-2 rounded-full border border-border bg-card/95 px-3.5 text-xs font-medium text-foreground shadow-lg backdrop-blur-md transition-transform active:scale-95"
-          >
-            <ListTree className="h-3.5 w-3.5 text-primary" />
-            <span className="font-mono text-[10px] text-muted-foreground">{activeIndex}</span>
-            <span className="max-w-[120px] truncate">{activeLabel}</span>
-            {isMobileMenuOpen ? (
-              <X className="h-3.5 w-3.5 text-muted-foreground" />
-            ) : (
-              <ChevronUp className="h-3.5 w-3.5 text-muted-foreground" />
-            )}
-          </button>
-        </div>
+          </PopoverContent>
+        </Popover>
       </div>
     </>
   )
