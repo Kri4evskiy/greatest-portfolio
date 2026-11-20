@@ -77,21 +77,27 @@ export function WorkfolioHeader() {
         </div>
 
         <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
-          <button
-            type="button"
-            aria-label={t('searchAria')}
-            title={t('searchAria')}
-            onMouseEnter={() => prefetchKnowledgeSearchIndex(locale)}
-            onFocus={() => prefetchKnowledgeSearchIndex(locale)}
-            onClick={() => openCommandPalette('')}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-muted/30 text-muted-foreground transition-colors hover:border-primary/40 hover:bg-accent hover:text-foreground lg:w-auto lg:gap-2 lg:px-2.5"
-          >
-            <Search className="h-3.5 w-3.5 shrink-0" />
-            <span className="hidden text-xs lg:inline">{t('searchPlaceholder')}</span>
-            <kbd className="hidden rounded-sm border border-border bg-background px-1 py-0.5 font-mono text-[10px] xl:inline">
-              ⌘K
-            </kbd>
-          </button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                aria-label={t('searchAria')}
+                onMouseEnter={() => prefetchKnowledgeSearchIndex(locale)}
+                onFocus={() => prefetchKnowledgeSearchIndex(locale)}
+                onClick={() => openCommandPalette('')}
+                className="h-8 w-8 bg-muted/30 px-0 font-normal text-muted-foreground hover:border-primary/40 hover:text-foreground lg:w-auto lg:gap-2 lg:px-2.5"
+              >
+                <Search className="h-3.5 w-3.5 shrink-0" />
+                <span className="hidden text-xs lg:inline">{t('searchPlaceholder')}</span>
+                <kbd className="hidden rounded-sm border border-border bg-background px-1 py-0.5 font-mono text-[10px] xl:inline">
+                  ⌘K
+                </kbd>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">{t('searchAria')}</TooltipContent>
+          </Tooltip>
 
           <ThemeToggle />
           <LanguageSwitcher />
@@ -169,27 +175,40 @@ export function WorkfolioHeader() {
             </Button>
           )}
 
-          <Link
-            href="/cv"
-            title={t('cvButtonTitle')}
-            className={`inline-flex h-8 items-center gap-1 rounded-md border px-2 font-mono text-xs font-medium transition-colors sm:px-2.5 ${
-              isOnCvPage
-                ? 'border-primary bg-primary text-primary-foreground shadow-2xs'
-                : 'border-border bg-background text-foreground hover:border-primary/40 hover:bg-accent'
-            }`}
-          >
-            <FileDown className="h-3.5 w-3.5 shrink-0" />
-            <span>CV</span>
-          </Link>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                asChild
+                variant={isOnCvPage ? 'default' : 'outline'}
+                size="sm"
+                className={`h-8 gap-1 px-2 font-mono text-xs sm:px-2.5 ${
+                  isOnCvPage ? 'shadow-2xs' : 'hover:border-primary/40'
+                }`}
+              >
+                <Link href="/cv" aria-current={isOnCvPage ? 'page' : undefined}>
+                  <FileDown className="h-3.5 w-3.5 shrink-0" />
+                  <span>CV</span>
+                </Link>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">{t('cvButtonTitle')}</TooltipContent>
+          </Tooltip>
 
-          <button
-            type="button"
-            onClick={() => scrollToSection('tech-radar')}
-            className="hidden h-8 items-center gap-1 rounded-md border border-border px-2 font-mono text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground sm:inline-flex sm:px-2.5"
-          >
-            <FileText className="h-3.5 w-3.5 shrink-0" />
-            <span>ADR</span>
-          </button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => scrollToSection('tech-radar')}
+                className="hidden h-8 gap-1 bg-transparent px-2 font-mono text-xs font-normal text-muted-foreground hover:text-foreground sm:inline-flex sm:px-2.5"
+              >
+                <FileText className="h-3.5 w-3.5 shrink-0" />
+                <span>ADR</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">{t('nav.techRadar')}</TooltipContent>
+          </Tooltip>
         </div>
       </div>
 
