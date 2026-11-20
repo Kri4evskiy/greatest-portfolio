@@ -2,8 +2,8 @@
 
 ## 📌 Текущая база (Production Baseline)
 
-Архитектурное ядро находится в продакшен-состоянии (`v0.8.0`; подробности и 16 ADR лежат в `.agents/frontend/*`, `.agents/backend/*`, `.agents/architecture/*` и статьях базы знаний):
-- **Monorepo & DX:** `pnpm 12.21.0` + `Turborepo` + `TypeScript 7.0.2` (native Go compiler) + `Biome 2.6.4` + `Lefthook` · `@repo/shared-schemas` (`Zod v4`) + `@repo/ui` (`Tailwind CSS v4.3.5` + `Storybook 10` (100% coverage)) · Multi-stage `Docker` + `GitHub Actions CI/CD`.
+Архитектурное ядро находится в продакшен-состоянии (`v0.8.1`; подробности и 16 ADR лежат в `.agents/frontend/*`, `.agents/backend/*`, `.agents/architecture/*` и статьях базы знаний):
+- **Monorepo & DX:** `pnpm 12.21.0` + `Turborepo` + `TypeScript 7.0.2` (native Go compiler) + `Biome 2.6.4` + `Lefthook` · `@repo/shared-schemas` (`Zod v4`) + `@repo/ui` (`Tailwind CSS v4.3.5` + `Storybook 10` (100% coverage, 11/11 компонентов)) · Multi-stage `Docker` + `GitHub Actions CI/CD`.
 - **Frontend (`apps/web`):** `Next.js 16.4.6` (`React 19 Compiler`) · архитектура `FSD-Modular` (`app` ➔ `widgets` ➔ `features` ➔ `entities` ➔ `shared`) · `next-intl` (`EN/UK/RU`, `167` SSG-роутов) · 2D Appearance (`Mode × Palette` + Zero-FOUC `PALETTE_INIT_SCRIPT` + cross-tab sync в `ThemeProvider` через `uiStore.getState().actions.syncPaletteFromStorage()`) · self-hosted Zero-CLS `Inter` + `JetBrains Mono` (`next/font/google`) · `@starting-style` + `@container` · `Zero-Eval HAST MDX Engine` (`remark-directive` `:::sandbox` + `remark-rehype` + `hast-util-to-jsx-runtime` + `mtimeMs` кэш + `Dual-Theme Shiki`) · `KnowledgeDirectoryExplorer` (инкрементальный `Show more` разделов по 6, свёртывание подтем `> 6` и Топ-10 `#тегов` с поиском) · `Cmd+K` SSG-индекс · `TanStack Query v5` (`IndexedDB`) · `D3.js` клиентские острова · `Edge Web Crypto JWT` + строгий `CSP` (`font-src 'self' data:`).
 - **Backend (`apps/api` & `apps/telemetry-ms`):** `NestJS 12 ESM` (4-компонентная Enterprise-структура `common`/`config`/`migrations`/`modules`, fail-fast Zod env validation & timing-safe auth) + `Prisma 7` (`7.10.1`, Rust-free Wasm + Native ESM + `@prisma/adapter-pg`, с In-Memory fallback и CLI `prisma:seed`) + общие Zod-схемы Offset/Cursor пагинации (`@repo/shared-schemas`) и эндпоинты `GET /api/knowledge/metrics/paginated` / `GET /api/telemetry/events` + `HttpOnly JWT` + `Helmet` + `@nestjs/throttler` + изолированный TCP-микросервис телеметрии (`:4001`) с `SSE`-стримингом.
 
@@ -14,15 +14,22 @@
 ### Приоритет №1: Production SEO (`robots.ts` / `sitemap.ts`), Локализованные Error/404 и Zero-Friction `Docker Compose` Demo
 
 - [ ] **Технический SEO-минимум и границы ошибок (`apps/web/src/app`):**
-  1. `apps/web/src/app/robots.ts` и `sitemap.ts`: генерация правил индексации и карты всех **167 SSG-роутов** с `alternates.languages` (`hreflang` для `en` / `ua` / `ru`) + `metadataBase`.
-  2. Локализованные `apps/web/src/app/[locale]/not-found.tsx` и `error.tsx` в дополнение к root `global-error.tsx`.
-     _(Динамические `opengraph-image.tsx` / `icon.tsx` вынесены в отдельную задачу бэклога ниже — логично делать их в связке с `UI v2`, чтобы не перерисовывать карточку дважды.)_
+  1. `apps/web/src/app/robots.ts` и `sitemap.ts` (100% SSG на этапе `next build`, `0 KB` клиентского JS; файлы с точкой автоматически пропускаются Edge Proxy `matcher` в `src/proxy.ts` без лишних проверок JWT):
+     - Единый резолвер базового URL (`process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'`) + `metadataBase` в `apps/web/src/app/[locale]/layout.tsx`.
+     - В `robots.ts`: `allow: '/'`, `disallow: ['/api/']`, ссылка на `${siteUrl}/sitemap.xml`.
+     - В `sitemap.ts`: генерация карты всех **167 SSG-роутов** (публичные `/`, `/cv`, `/knowledge-base` + все статьи через серверный `getAllKnowledgeSlugs()`) с полной матрицей `alternates.languages` (`hreflang` для `en` / `ua` / `ru`, где `DEFAULT_LOCALE = 'en'` мапится без префикса с `localePrefix: 'as-needed'`).
+  2. Локализованные границы ошибок внутри `LocaleRootLayout` (с сохранением `WorkfolioHeader`, 2D-темы `Mode × Palette`, `Cmd+K` и `WorkfolioFooter`):
+     - `apps/web/src/app/[locale]/not-found.tsx` (чистый **React Server Component** на `getTranslations('NotFound')` и примитивах `@repo/ui` `Card`, `Badge`, `Button`) + catch-all роут `apps/web/src/app/[locale]/[...rest]/page.tsx`, вызывающий `notFound()` для всех неизвестных путей внутри локали.
+     - `apps/web/src/app/[locale]/error.tsx` (клиентский предохранитель `'use client'` с `{ error, reset }`, `useTranslations('ErrorPage')` и кнопками повтора / возврата на главную из `@repo/ui`, в дополнение к root `global-error.tsx`).
+     - Переводы `NotFound` и `ErrorPage` в `apps/web/messages/{en,ru,uk}.json`.
+       _(Динамические `opengraph-image.tsx` / `icon.tsx` вынесены в отдельную задачу бэклога ниже — логично делать их в связке с `UI v2`, чтобы не перерисовывать карточку дважды.)_
 - [ ] **`docker-compose.yml` Zero-Friction Demo для тимлида vs Strict Production (`docker-compose.prod.yml`):**
-  - **Проблема сейчас:** в `docker-compose.yml` задан `NODE_ENV: production`, но не передан `JWT_SECRET` и оставлен дефолтный `ADMIN_SECRET_PASSCODE`, из-за чего `docker compose up --build` у тимлида (без `.env` и `pnpm install`) упадёт на fail-fast проверке в `apps/api/src/config/app.config.ts`.
+  - **Проблема сейчас:** в `docker-compose.yml` задан `NODE_ENV: production`, но `JWT_SECRET: ${JWT_SECRET:-}` пустой и оставлен дефолтный `ADMIN_SECRET_PASSCODE`, из-за чего `docker compose up --build` у тимлида (без `.env` и `pnpm install`) падает на fail-fast проверке в `apps/api/src/config/app.config.ts`.
   - **Целевое разделение:**
-    1. `docker-compose.yml` (**Local Reviewer Demo**): явный opt-in флаг `WORKFOLIO_DEMO_MODE=true` с согласованным demo `JWT_SECRET` между `api` и `web`, явным предупреждением в логах при старте; основное ядро (CV + База Знаний + Guest Pass + SSE) поднимается одной командой без API-ключей, а внешние интеграции без ключей остаются **заблокированы через Capability Gating** с плашкой «нет API-ключа».
-    2. `docker-compose.prod.yml` (**Real Production**): demo-режим строго запрещён (`WORKFOLIO_DEMO_MODE` отсутствует), обязательные секреты форсируются уже на этапе парсинга Compose (`${JWT_SECRET:?Set JWT_SECRET (>=32 chars)}` и `${ADMIN_SECRET_PASSCODE:?...}`) + fail-fast проверкой в NestJS.
-    3. Обновить команды и пояснения в `README.md`.
+    1. `apps/api/src/config/app.config.ts`: добавить в `AppEnvSchema` опциональный булев флаг `WORKFOLIO_DEMO_MODE` (`'true' | 'false'`). При `isProduction && !isDemoMode` сохраняется жёсткий fail-fast на дефолтные/пустые `JWT_SECRET` и `ADMIN_SECRET_PASSCODE`; при `isProduction && isDemoMode` разрешается запуск с согласованным demo-секретом (`>= 32` символов) и выводится заметный `console.warn('[WORKFOLIO DEMO MODE] Running with reviewer demo credentials...')`.
+    2. `docker-compose.yml` (**Local Reviewer Demo**): передавать `WORKFOLIO_DEMO_MODE: "true"` и единый непустой demo `JWT_SECRET` (`>= 32` символов) в `api` и `web`, чтобы `docker compose up --build` поднимал весь стек (CV + База Знаний + Edge JWT Guest Pass + PostgreSQL + SSE) одной командой без `.env`, а внешние интеграции без ключей оставались **заблокированы через Capability Gating** с плашкой «нет API-ключа».
+    3. `docker-compose.prod.yml` (**Real Production**): `WORKFOLIO_DEMO_MODE` отсутствует, обязательные секреты форсируются уже на этапе парсинга Compose (`${JWT_SECRET:?Set JWT_SECRET (>=32 chars)}` и `${ADMIN_SECRET_PASSCODE:?Set non-default ADMIN_SECRET_PASSCODE}`) + fail-fast проверкой в NestJS, а порт `postgres` не публикуется наружу из `backend-network`.
+    4. Синхронизировать команды и описание режимов в `README.md`, `SECURITY.md` и `.agents/architecture/docker-deploy.md`.
 
 ### Приоритет №2: Внедрение Redis (Distributed Rate Limiting & Response Cache)
 
