@@ -296,26 +296,22 @@
 @keyframes ui-popper-in {
   from {
     opacity: 0;
-    scale: 0.94;
-    translate: var(--ui-enter-x, 0px) var(--ui-enter-y, 0px);
+    transform: translate3d(var(--ui-enter-x, 0px), var(--ui-enter-y, 0px), 0) scale(0.94);
   }
   to {
     opacity: 1;
-    scale: 1;
-    translate: 0 0;
+    transform: translate3d(0, 0, 0) scale(1);
   }
 }
 
 @keyframes ui-popper-out {
   from {
     opacity: 1;
-    scale: 1;
-    translate: 0 0;
+    transform: translate3d(0, 0, 0) scale(1);
   }
   to {
     opacity: 0;
-    scale: 0.95;
-    translate: var(--ui-enter-x, 0px) var(--ui-enter-y, 0px);
+    transform: translate3d(var(--ui-enter-x, 0px), var(--ui-enter-y, 0px), 0) scale(0.95);
   }
 }
 

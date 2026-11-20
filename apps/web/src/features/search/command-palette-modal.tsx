@@ -306,7 +306,7 @@ export function CommandPaletteModal({ locale }: CommandPaletteModalProps) {
             onChange={(e) => updateQuery(e.target.value)}
             onKeyDown={handleInputKeyDown}
             placeholder={t('cmdPlaceholder')}
-            className="min-w-0 flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-hidden"
+            className="min-w-0 flex-1 bg-transparent text-base text-foreground placeholder:text-muted-foreground focus:outline-hidden sm:text-sm"
           />
           {query ? (
             <Button

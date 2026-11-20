@@ -1,7 +1,7 @@
 'use client'
 
 import { DEFAULT_LOCALE, SupportedLocaleEnum } from '@repo/shared-schemas'
-import { Badge } from '@repo/ui'
+import { Badge, Button, Tooltip, TooltipContent, TooltipTrigger } from '@repo/ui'
 import {
   BookOpen,
   ChevronDown,
@@ -52,15 +52,14 @@ function KnowledgeTreeItem({ node, depth, pathname, closeOnSelect, onSelectLeaf 
   if (node.type === 'article') {
     const href = `/knowledge-base/${node.article.routePath}`
     const isActive = pathname === href
-    return (
+    const linkElement = (
       <Link
         href={href}
         prefetch={false}
-        title={node.article.title}
         onClick={() => {
           if (closeOnSelect) onSelectLeaf()
         }}
-        className={`group flex items-center gap-2 rounded-md px-2 py-1.5 text-xs transition-colors ${
+        className={`group flex min-w-0 items-center gap-2 rounded-md px-2 py-1.5 text-xs transition-colors ${
           isActive
             ? 'bg-primary/10 font-medium text-primary'
             : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'
@@ -73,6 +72,19 @@ function KnowledgeTreeItem({ node, depth, pathname, closeOnSelect, onSelectLeaf 
         />
         <span className="truncate">{node.article.sidebarLabel}</span>
       </Link>
+    )
+
+    if (closeOnSelect) {
+      return linkElement
+    }
+
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>{linkElement}</TooltipTrigger>
+        <TooltipContent side="right" align="center" sideOffset={8}>
+          {node.article.title}
+        </TooltipContent>
+      </Tooltip>
     )
   }
 
@@ -100,7 +112,7 @@ function KnowledgeTreeItem({ node, depth, pathname, closeOnSelect, onSelectLeaf 
   return (
     <div className="space-y-0.5">
       <div
-        className={`group flex items-center justify-between gap-1 rounded-md pr-1.5 py-0.5 transition-colors ${
+        className={`group flex items-start justify-between gap-1 rounded-md py-0.5 pr-1.5 transition-colors ${
           isExactFolderActive
             ? 'bg-primary/10 font-semibold text-primary'
             : isInsideBranch
@@ -109,17 +121,19 @@ function KnowledgeTreeItem({ node, depth, pathname, closeOnSelect, onSelectLeaf 
         }`}
       >
         {/* Arrow button: expands/collapses the tree branch in-place */}
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="icon-sm"
           aria-expanded={isExpanded}
           aria-label={`Toggle ${node.label}`}
           onClick={() => toggleFolder(node.pathKey)}
-          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-sm hover:bg-muted"
+          className="mt-[1px] h-6 w-6 shrink-0 rounded-sm text-current hover:bg-muted"
         >
           <ChevronRight
             className={`h-3.5 w-3.5 shrink-0 transition-transform duration-150 ${isExpanded ? 'rotate-90' : ''}`}
           />
-        </button>
+        </Button>
 
         {/* Clicking the Topic or Subtopic name BOTH expands the branch AND opens its Topic/Subtopic hub with tabs */}
         <Link
@@ -131,11 +145,11 @@ function KnowledgeTreeItem({ node, depth, pathname, closeOnSelect, onSelectLeaf 
             }
             if (closeOnSelect) onSelectLeaf()
           }}
-          className="flex min-w-0 flex-1 items-center gap-1.5 py-1 text-left"
+          className="flex min-w-0 flex-1 items-start gap-1.5 py-1 text-left"
         >
-          {renderLevelIcon()}
+          <span className="mt-0.5 shrink-0">{renderLevelIcon()}</span>
           <span
-            className={`truncate ${
+            className={`min-w-0 flex-1 wrap-break-word leading-snug ${
               depth === 0 ? 'text-[13px] font-semibold tracking-tight text-foreground' : 'text-xs font-medium'
             }`}
           >
@@ -143,7 +157,7 @@ function KnowledgeTreeItem({ node, depth, pathname, closeOnSelect, onSelectLeaf 
           </span>
         </Link>
 
-        <span className="shrink-0 rounded-sm bg-muted/80 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+        <span className="mt-1 shrink-0 rounded-sm bg-muted/80 px-1.5 py-0.5 font-mono text-[10px] leading-none text-muted-foreground">
           {node.articleCount}
         </span>
       </div>
@@ -218,93 +232,112 @@ export function KnowledgeSidebar({
     }
   }, [pathname, allFolderKeys, expandKbAncestors])
 
-  const renderTreeContent = (closeOnSelect: boolean) => (
-    <div className="space-y-3 rounded-xl border border-border bg-card p-3 shadow-xs">
-      <button
-        type="button"
-        onMouseEnter={() => prefetchKnowledgeSearchIndex(locale)}
-        onFocus={() => prefetchKnowledgeSearchIndex(locale)}
-        onClick={() => {
-          if (closeOnSelect) setIsMobileOpen(false)
-          openCommandPalette('')
-        }}
-        className="flex w-full items-center justify-between gap-2 rounded-lg border border-border/80 bg-muted/30 px-2.5 py-1.5 text-left text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:bg-muted hover:text-foreground"
-      >
-        <span className="flex min-w-0 items-center gap-2 truncate">
-          <Search className="h-3.5 w-3.5 shrink-0 text-primary" />
-          <span className="truncate">{t('sidebarSearchTrigger')}</span>
-        </span>
-        <kbd className="shrink-0 rounded-sm border border-border bg-background px-1.5 py-0.5 font-mono text-[10px]">
-          ⌘K
-        </kbd>
-      </button>
+  const toggleAllLabel = hasAnyExpanded ? t('collapseAllTree') : t('expandAllTree')
 
-      <div className="flex items-center gap-1 border-b border-border/60 pb-2.5">
-        <Link
-          href="/knowledge-base"
+  const renderTreeContent = (closeOnSelect: boolean) => {
+    const toggleAllButton = (
+      <Button
+        type="button"
+        variant="outline"
+        size="icon-sm"
+        aria-label={toggleAllLabel}
+        onClick={() => {
+          if (hasAnyExpanded) {
+            collapseAllKbFolders()
+          } else {
+            expandAllKbFolders(allFolderKeys)
+          }
+        }}
+        className="h-7 w-7 shrink-0 border-border/60 bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground"
+      >
+        {hasAnyExpanded ? <ChevronsDownUp className="h-3.5 w-3.5" /> : <ChevronsUpDown className="h-3.5 w-3.5" />}
+      </Button>
+    )
+
+    return (
+      <div className="space-y-3 rounded-xl border border-border bg-card p-3 shadow-xs">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onMouseEnter={() => prefetchKnowledgeSearchIndex(locale)}
+          onFocus={() => prefetchKnowledgeSearchIndex(locale)}
           onClick={() => {
             if (closeOnSelect) setIsMobileOpen(false)
+            openCommandPalette('')
           }}
-          className={`flex min-w-0 flex-1 items-center justify-between rounded-md px-2.5 py-1.5 text-xs font-semibold transition-colors ${
-            pathname === '/knowledge-base' ? 'bg-primary text-primary-foreground' : 'text-foreground hover:bg-muted'
-          }`}
+          className="h-auto w-full justify-between gap-2 rounded-lg border-border/80 bg-muted/30 px-2.5 py-1.5 text-left text-xs font-normal text-muted-foreground hover:border-primary/40 hover:bg-muted hover:text-foreground"
         >
-          <span className="flex items-center gap-2 truncate">
-            <BookOpen className="h-3.5 w-3.5 shrink-0" />
-            <span className="truncate">{t('sidebarOverview')}</span>
+          <span className="flex min-w-0 items-center gap-2">
+            <Search className="h-3.5 w-3.5 shrink-0 text-primary" />
+            <span className="truncate">{t('sidebarSearchTrigger')}</span>
           </span>
-          <span
-            className={`ml-2 shrink-0 rounded-sm px-1.5 py-0.5 font-mono text-[10px] ${
-              pathname === '/knowledge-base'
-                ? 'bg-primary-foreground/20 text-primary-foreground'
-                : 'bg-muted text-muted-foreground'
+          <kbd className="shrink-0 rounded-sm border border-border bg-background px-1.5 py-0.5 font-mono text-[10px]">
+            ⌘K
+          </kbd>
+        </Button>
+
+        <div className="flex items-center gap-1 border-b border-border/60 pb-2.5">
+          <Link
+            href="/knowledge-base"
+            onClick={() => {
+              if (closeOnSelect) setIsMobileOpen(false)
+            }}
+            className={`flex min-w-0 flex-1 items-center justify-between rounded-md px-2.5 py-1.5 text-xs font-semibold transition-colors ${
+              pathname === '/knowledge-base' ? 'bg-primary text-primary-foreground' : 'text-foreground hover:bg-muted'
             }`}
           >
-            {totalArticles}
-          </span>
-        </Link>
+            <span className="flex min-w-0 items-center gap-2">
+              <BookOpen className="h-3.5 w-3.5 shrink-0" />
+              <span className="truncate">{t('sidebarOverview')}</span>
+            </span>
+            <span
+              className={`ml-2 shrink-0 rounded-sm px-1.5 py-0.5 font-mono text-[10px] ${
+                pathname === '/knowledge-base'
+                  ? 'bg-primary-foreground/20 text-primary-foreground'
+                  : 'bg-muted text-muted-foreground'
+              }`}
+            >
+              {totalArticles}
+            </span>
+          </Link>
 
-        <button
-          type="button"
-          title={hasAnyExpanded ? t('collapseAllTree') : t('expandAllTree')}
-          aria-label={hasAnyExpanded ? t('collapseAllTree') : t('expandAllTree')}
-          onClick={() => {
-            if (hasAnyExpanded) {
-              collapseAllKbFolders()
-            } else {
-              expandAllKbFolders(allFolderKeys)
-            }
-          }}
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border/60 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-        >
-          {hasAnyExpanded ? <ChevronsDownUp className="h-3.5 w-3.5" /> : <ChevronsUpDown className="h-3.5 w-3.5" />}
-        </button>
+          {closeOnSelect ? (
+            toggleAllButton
+          ) : (
+            <Tooltip>
+              <TooltipTrigger asChild>{toggleAllButton}</TooltipTrigger>
+              <TooltipContent side="right">{toggleAllLabel}</TooltipContent>
+            </Tooltip>
+          )}
+        </div>
+
+        <nav aria-label={t('sidebarNavTitle')} className="space-y-1">
+          {tree.map((rootNode) => (
+            <KnowledgeTreeItem
+              key={rootNode.pathKey}
+              node={rootNode}
+              depth={0}
+              pathname={pathname}
+              closeOnSelect={closeOnSelect}
+              onSelectLeaf={() => setIsMobileOpen(false)}
+            />
+          ))}
+        </nav>
       </div>
-
-      <nav aria-label={t('sidebarNavTitle')} className="space-y-1">
-        {tree.map((rootNode) => (
-          <KnowledgeTreeItem
-            key={rootNode.pathKey}
-            node={rootNode}
-            depth={0}
-            pathname={pathname}
-            closeOnSelect={closeOnSelect}
-            onSelectLeaf={() => setIsMobileOpen(false)}
-          />
-        ))}
-      </nav>
-    </div>
-  )
+    )
+  }
 
   return (
     <aside className="w-full shrink-0 md:sticky md:top-20 md:w-64 lg:w-72">
       {/* Mobile collapsible navigation trigger — closed by default so content starts immediately */}
       <div className="md:hidden">
-        <button
+        <Button
           type="button"
+          variant="outline"
           aria-expanded={isMobileOpen}
           onClick={() => setIsMobileOpen((prev) => !prev)}
-          className="flex w-full items-center justify-between rounded-xl border border-border bg-card px-3.5 py-2.5 text-left text-xs font-medium text-foreground shadow-xs transition-colors hover:bg-accent/50"
+          className="h-auto w-full justify-between rounded-xl border-border bg-card px-3.5 py-2.5 text-left text-xs font-medium text-foreground shadow-xs hover:bg-accent/50"
         >
           <span className="flex items-center gap-2 font-mono uppercase tracking-wider text-muted-foreground">
             <PanelLeft className="h-3.5 w-3.5 text-primary" />
@@ -318,13 +351,15 @@ export function KnowledgeSidebar({
               className={`h-4 w-4 text-muted-foreground transition-transform ${isMobileOpen ? 'rotate-180' : ''}`}
             />
           </span>
-        </button>
+        </Button>
 
         {isMobileOpen ? <div className="mt-2">{renderTreeContent(true)}</div> : null}
       </div>
 
       {/* Desktop sticky sidebar rail (>= md) */}
-      <div className="hidden max-h-[calc(100dvh-6rem)] overflow-y-auto md:block">{renderTreeContent(false)}</div>
+      <div className="hidden max-h-[calc(100dvh-6rem)] overflow-y-auto overscroll-contain md:block">
+        {renderTreeContent(false)}
+      </div>
     </aside>
   )
 }
