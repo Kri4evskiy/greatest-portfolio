@@ -11,7 +11,7 @@ export async function WorkfolioFooter({ locale }: { locale: SupportedLocale }) {
 
   return (
     <footer className="mt-16 border-t border-border/70 bg-surface-subtle sm:mt-20">
-      <div className="mx-auto max-w-6xl space-y-6 px-4 pb-20 pt-8 sm:px-6 xl:pb-10">
+      <div className="mx-auto max-w-[84rem] space-y-6 px-4 pb-20 pt-8 sm:px-6 xl:pb-10">
         {/* Top Row: Personal Contact Identity + Direct Links */}
         <div className="flex flex-col justify-between gap-4 border-b border-border/60 pb-6 md:flex-row md:items-center">
           <div className="space-y-1">

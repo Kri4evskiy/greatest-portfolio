@@ -7,7 +7,7 @@
 Стартовая страница портфолио (CV) и База Знаний строятся в редакционной **Mobile-First Workfolio** эстетике с инженерным уклоном:
 - **Чистая редакционная верстка (Editorial Minimalism):** Высококонтрастная типографика (`Inter` через `--font-inter` для UI и статей + `JetBrains Mono` через `--font-jetbrains-mono` для кода, версий, метрик и тегов — self-hosted Zero-CLS `next/font/google` с сабсетами `latin` + `cyrillic` и жесткой политикой CSP `font-src 'self' data:`), много воздуха, тонкие разделители (`border-border/60`), отсутствие дешевых кислотных градиентов и визуального шума.
 - **Модульная редакционная структура и таблицы данных:**
-  - Четкая колонка контента (`max-w-4xl` на главной CV, `max-w-7xl` с сайдбаром в Базе знаний).
+  - Четкая колонка контента (`max-w-7xl` на главной и CV, `max-w-[84rem]` в Header/Footer, `max-w-[90rem]` с сайдбаром в Базе знаний).
   - Карточки проектов (Interactive Project Gallery), таймлайн опыта (Experience & Resume), callout-блоки с архитектурными заметками и интерактивная таблица стека Tech Radar (`TanStack Table`).
   - Мгновенно считываемые статусы: бейдж доступности (`Available for Senior / Full-Stack roles`) и живой индикатор телеметрии (`SSE Live Stream`).
 

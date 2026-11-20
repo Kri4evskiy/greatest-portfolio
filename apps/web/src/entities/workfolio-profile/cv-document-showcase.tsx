@@ -46,7 +46,7 @@ export function CvDocumentShowcase({ cvMeta, locale }: CvDocumentShowcaseProps) 
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
+    <div className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
       {/* Top Navigation & Primary Download Bar */}
       <div className="rounded-2xl border border-border bg-card p-4 shadow-xs sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 pb-3.5">

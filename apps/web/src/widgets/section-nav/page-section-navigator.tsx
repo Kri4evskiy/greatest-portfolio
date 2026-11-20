@@ -52,7 +52,7 @@ export function PageSectionNavigator() {
         className="group/rail fixed right-4 top-1/2 z-30 hidden -translate-y-1/2 xl:block 2xl:right-6"
       >
         <div className="rounded-xl border border-border/70 bg-card/90 p-2 shadow-xs backdrop-blur-md transition-all duration-200 hover:border-border hover:bg-card hover:shadow-lg">
-          <div className="mb-1.5 hidden px-2 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground group-hover/rail:block min-[1480px]:block">
+          <div className="mb-1.5 hidden px-2 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground group-hover/rail:block min-[1560px]:block">
             {t('sectionNavTitle')}
           </div>
 
@@ -83,9 +83,7 @@ export function PageSectionNavigator() {
                     }`}
                   />
                   <span className="font-mono text-[10px] opacity-75">{stepNum}</span>
-                  <span className="hidden max-w-[148px] truncate group-hover/rail:inline min-[1480px]:inline">
-                    {label}
-                  </span>
+                  <span className="hidden max-w-37 truncate group-hover/rail:inline min-[1600px]:inline">{label}</span>
                 </Button>
               )
             })}
@@ -98,10 +96,10 @@ export function PageSectionNavigator() {
               size="sm"
               aria-label={t('scrollToTop')}
               onClick={scrollToTop}
-              className="h-auto w-full justify-center gap-1.5 rounded-lg px-2 py-1 font-mono text-[10px] font-normal text-muted-foreground hover:bg-muted/70 hover:text-foreground group-hover/rail:justify-start min-[1480px]:justify-start"
+              className="h-auto w-full justify-center gap-1.5 rounded-lg px-2 py-1 font-mono text-[10px] font-normal text-muted-foreground hover:bg-muted/70 hover:text-foreground group-hover/rail:justify-start min-[1560px]:justify-start"
             >
               <ArrowUp className="h-3 w-3 shrink-0" />
-              <span className="hidden group-hover/rail:inline min-[1480px]:inline">{t('scrollToTop')}</span>
+              <span className="hidden group-hover/rail:inline min-[1560px]:inline">{t('scrollToTop')}</span>
             </Button>
           </div>
         </div>

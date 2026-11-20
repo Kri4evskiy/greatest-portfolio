@@ -47,7 +47,7 @@ export function WorkfolioHeader() {
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-border/70 bg-background/90 backdrop-blur-md">
-      <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-2 px-3 sm:px-6">
+      <div className="mx-auto flex h-14 max-w-[84rem] items-center justify-between gap-2 px-3 sm:px-6">
         <div className="flex min-w-0 items-center gap-2 text-sm">
           <Link
             href="/"

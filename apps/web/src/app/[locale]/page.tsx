@@ -20,7 +20,7 @@ export default async function WorkfolioHomePage({ params }: { params: Promise<{ 
 
   return (
     <>
-      <div className="mx-auto max-w-5xl space-y-12 px-4 py-6 sm:space-y-16 sm:px-6">
+      <div className="mx-auto max-w-7xl space-y-12 px-4 py-6 sm:space-y-16 sm:px-6 xl:pr-24 min-[1440px]:pr-6">
         <WorkfolioHeroSection locale={resolvedLocale} />
         <WorkfolioProjectsSection locale={resolvedLocale} />
         <WorkfolioExperienceSection locale={resolvedLocale} />
