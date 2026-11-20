@@ -109,9 +109,9 @@ export const ENGINEERING_ROADMAP_ITEMS: readonly EngineeringRoadmapItem[] = [
       ru: 'Переосмыслить авторский визуальный язык и композиционный ритм поверх уже готового фундамента Tailwind v4: 2D-палитр, Zero-CLS шрифтов, @container-запросов и @starting-style анимаций.',
     },
     rationale: {
-      en: 'With Tailwind v4, CSS-first palettes, Storybook 10 (10/10), and core MDX/Auth mechanics already shipped, UI v2 can focus 100% on visual craft, hierarchy, and mobile ergonomics without touching state or routing.',
-      uk: 'Коли Tailwind v4, 2D-палітри, Storybook 10 (10/10) та ядро MDX/Auth уже реалізовані, редизайн UI v2 сфокусується виключно на візуальній якості, ієрархії та мобільній ергономіці без переписування логіки.',
-      ru: 'Когда Tailwind v4, 2D-палитры, Storybook 10 (10/10) и ядро MDX/Auth уже готовы, UI v2 может на 100% сфокусироваться на визуальном вкусе, иерархии и мобильной эргономике без правок логики.',
+      en: 'With Tailwind v4, CSS-first palettes, Storybook 10 (100% coverage), and core MDX/Auth mechanics already shipped, UI v2 can focus 100% on visual craft, hierarchy, and mobile ergonomics without touching state or routing.',
+      uk: 'Коли Tailwind v4, 2D-палітри, Storybook 10 (100% покриття) та ядро MDX/Auth уже реалізовані, редизайн UI v2 сфокусується виключно на візуальній якості, ієрархії та мобільній ергономіці без переписування логіки.',
+      ru: 'Когда Tailwind v4, 2D-палитры, Storybook 10 (100% покрытие) и ядро MDX/Auth уже готовы, UI v2 может на 100% сфокусироваться на визуальном вкусе, иерархии и мобильной эргономике без правок логики.',
     },
     pros: {
       en: [

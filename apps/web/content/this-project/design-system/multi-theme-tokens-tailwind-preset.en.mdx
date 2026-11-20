@@ -11,7 +11,7 @@ order: 1
 tldr:
   - "Defines a full 2D semantic HSL token matrix (`Light / Dark / System` × `Warm Paper / Graphite / Sepia`) in `packages/ui/src/styles/theme.css` exposed via `@theme inline` and controlled live in `ThemeToggle` with a Zero-FOUC `<head>` init script (`PALETTE_INIT_SCRIPT`)."
   - "Uses Tailwind CSS v4 Cascade Layers cleanly: Baseline UX (`scrollbar-gutter: stable`, `text-wrap: balance/pretty`) in `@layer base`, `.shiki` + `@starting-style` dialog entry and Radix-Popper-synchronized CSS `@keyframes` (`Popover`, `Tooltip`) in `@layer components`, and unlayered `prefers-reduced-motion: reduce` above utilities."
-  - "Enforces Dependency Inversion (`@repo/ui/theme.css` ➔ `apps/web/src/app/globals.css` with `@source`), pins modern `browserslist` targets, bundles self-hosted `Inter` + `JetBrains Mono` via `next/font/google`, and adopts targeted `@container` queries across `9/9` Storybook-documented primitives."
+  - "Enforces Dependency Inversion (`@repo/ui/theme.css` ➔ `apps/web/src/app/globals.css` with `@source`), pins modern `browserslist` targets, bundles self-hosted `Inter` + `JetBrains Mono` via `next/font/google`, and adopts targeted `@container` queries with 100% Storybook 10 coverage."
 ---
 
 ## 1. Two-Dimensional Semantic Token Matrix (`Mode` × `Palette`)
@@ -104,10 +104,10 @@ Both `apps/web/package.json` and `packages/ui/package.json` pin `"browserslist":
 
 ## 4. Responsive Data Views & 100% Storybook Coverage
 
-For information-dense components, rather than squeezing wide tables onto `360px` screens, the UI switches representation patterns by breakpoint, while every primitive in `packages/ui` (`9/9`: `Badge`, `Button`, `Callout`, `Card`, `Dialog`, `Input`, `Skeleton`, `Tabs`, `Tooltip`) ships with isolated `*.stories.tsx` documentation in **Storybook 10**:
+For information-dense components, rather than squeezing wide tables onto `360px` screens, the UI switches representation patterns by breakpoint, while every primitive in `packages/ui/src/components/*` (such as `Button`, `Dialog`, `Popover`, `Tabs`, `ToggleGroup`, `Tooltip`, etc.) ships with isolated `*.stories.tsx` documentation in **Storybook 10** (100% coverage):
 
 | Component | Smartphones (`< md`) | Tablets & Desktop (`>= md`) |
 | :--- | :--- | :--- |
 | **`TechRadarTable`** | Stacked card list (`md:hidden`) with direct `ADR` action buttons | Full 6-column `TanStack Table` (`hidden md:block`) with sorting and filtering |
 | **`D3.js` / `SVG` Graphs** | Horizontal scroll container `overflow-x-auto` with `min-w-[540px]` | Full-width interactive vector simulation |
-| **`Storybook 10` (`@repo/ui`)** | Viewport presets for `360px` and `768px` contrast verification | Live toolbar switcher for `Warm Paper / Dark / Graphite / Sepia` (`9/9` primitives) |
+| **`Storybook 10` (`@repo/ui`)** | Viewport presets for `360px` and `768px` contrast verification | Live toolbar switcher for `Warm Paper / Dark / Graphite / Sepia` (100% coverage) |

@@ -1,6 +1,16 @@
 'use client'
 
-import { Button, Popover, PopoverContent, PopoverTrigger, Tooltip, TooltipContent, TooltipTrigger } from '@repo/ui'
+import {
+  Button,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+  ToggleGroup,
+  ToggleGroupItem,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@repo/ui'
 import { Check, Monitor, Moon, Sun } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useTheme } from 'next-themes'
@@ -122,27 +132,26 @@ export function ThemeToggle() {
             <div className="font-mono text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
               {t('appearance.modeLabel')}
             </div>
-            <div className="grid grid-cols-3 gap-1 rounded-lg border border-border/70 bg-surface-subtle p-1">
-              {MODE_OPTIONS.map(({ id, labelKey, Icon }) => {
-                const isActive = activeMode === id
-                return (
-                  <button
-                    key={id}
-                    type="button"
-                    aria-pressed={isActive}
-                    onClick={() => handleSelectMode(id)}
-                    className={`flex items-center justify-center gap-1 rounded-md px-2 py-1.5 text-[11px] font-medium transition-colors ${
-                      isActive
-                        ? 'bg-background text-foreground shadow-2xs'
-                        : 'text-muted-foreground hover:text-foreground'
-                    }`}
-                  >
-                    <Icon className="h-3 w-3 shrink-0" />
-                    <span>{t(`appearance.${labelKey}`)}</span>
-                  </button>
-                )
-              })}
-            </div>
+            <ToggleGroup
+              type="single"
+              variant="segmented"
+              size="sm"
+              value={activeMode ?? ''}
+              aria-label={t('appearance.modeLabel')}
+              onValueChange={(nextValue) => {
+                if (nextValue === 'light' || nextValue === 'dark' || nextValue === 'system') {
+                  handleSelectMode(nextValue)
+                }
+              }}
+              className="grid w-full grid-cols-3"
+            >
+              {MODE_OPTIONS.map(({ id, labelKey, Icon }) => (
+                <ToggleGroupItem key={id} value={id} className="gap-1 px-2 text-[11px]">
+                  <Icon className="h-3 w-3 shrink-0" />
+                  <span>{t(`appearance.${labelKey}`)}</span>
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
           </div>
 
           {/* Axis 2: Semantic Palette */}
@@ -150,20 +159,26 @@ export function ThemeToggle() {
             <div className="font-mono text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
               {t('appearance.paletteLabel')}
             </div>
-            <div className="space-y-1">
+            <ToggleGroup
+              type="single"
+              orientation="vertical"
+              variant="outline"
+              value={activePalette}
+              aria-label={t('appearance.paletteLabel')}
+              onValueChange={(nextValue) => {
+                if (nextValue === 'default' || nextValue === 'graphite' || nextValue === 'sepia') {
+                  handleSelectPalette(nextValue)
+                }
+              }}
+              className="flex w-full flex-col gap-1"
+            >
               {PALETTE_SWATCHES.map((item) => {
                 const isActive = activePalette === item.id
                 return (
-                  <button
+                  <ToggleGroupItem
                     key={item.id}
-                    type="button"
-                    aria-pressed={isActive}
-                    onClick={() => handleSelectPalette(item.id)}
-                    className={`flex w-full items-center justify-between gap-2 rounded-lg border px-2.5 py-1.5 text-left transition-colors ${
-                      isActive
-                        ? 'border-primary/40 bg-accent text-accent-foreground'
-                        : 'border-transparent text-foreground hover:border-border/70 hover:bg-muted/50'
-                    }`}
+                    value={item.id}
+                    className="h-auto w-full justify-between gap-2 whitespace-normal rounded-lg border-transparent bg-transparent px-2.5 py-1.5 text-left font-normal text-foreground hover:border-border/70 hover:bg-muted/50 hover:text-foreground data-[state=on]:border-primary/40 data-[state=on]:bg-accent data-[state=on]:text-accent-foreground"
                   >
                     <span className="flex min-w-0 items-center gap-2.5">
                       <span
@@ -183,10 +198,10 @@ export function ThemeToggle() {
                       </span>
                     </span>
                     {isActive ? <Check className="h-3.5 w-3.5 shrink-0 text-primary" /> : null}
-                  </button>
+                  </ToggleGroupItem>
                 )
               })}
-            </div>
+            </ToggleGroup>
           </div>
         </div>
       </PopoverContent>

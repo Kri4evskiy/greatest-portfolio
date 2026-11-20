@@ -73,7 +73,7 @@
 - **Где применяется (Where):** Пакет `packages/ui` (`@repo/ui/theme.css`), потребляемый приложением `apps/web` через Composition Root `apps/web/src/app/globals.css` (`@source`).
 - **Как реализовано (How):**
   - 2D-матрица семантических HSL-токенов (`Light / Dark / System` × `Warm Paper / Graphite / Sepia`) с Zero-FOUC `<head>`-скриптом `PALETTE_INIT_SCRIPT` и self-hosted Zero-CLS шрифтами `Inter` + `JetBrains Mono` через `next/font/google` (`font-src 'self' data:`).
-  - Все `9/9` атомарных компонентов (`Badge`, `Button`, `Callout`, `Card`, `Dialog`, `Input`, `Skeleton`, `Tabs`, `Tooltip`) лежат в `packages/ui`, покрыты `.stories.tsx` и доступны в каталоге `Storybook 10` (`@tailwindcss/vite`).
+  - Все атомарные примитивы `@repo/ui` лежат в `packages/ui`, имеют 100% покрытие `.stories.tsx` в `Storybook 10` (`@tailwindcss/vite`) — актуальный каталог поддерживается в `.agents/frontend/ui-storybook.md`.
 
 ---
 

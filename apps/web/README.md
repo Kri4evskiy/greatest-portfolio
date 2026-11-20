@@ -106,7 +106,7 @@ apps/web/
    - `useUIStore` (`Zustand`) отвечает исключительно за синхронное UI-состояние: открытие `GuestPassModal` / `CommandPaletteModal`, фильтр `TechRadarTable`, инспектор ADR и раскрытые ветки `KnowledgeSidebar` (с SSR-безопасной гидратацией из `sessionStorage`).
 4. **Интеграция с монорепозиторием (`@repo/shared-schemas`, `@repo/ui`, `apps/api`):**
    - `@repo/shared-schemas` (`Zod v4`) — единый источник контрактов: `GuestPassFormSchema` (валидация формы `React Hook Form` на клиенте и `ZodValidationPipe` на бэкенде), `SessionProfileSchema`, `ArticleMetaSchema`, `TelemetryEventSchema`, `KnowledgeCategoryEnum` и константы `KB_ACCESS_COOKIE_NAME`.
-   - `@repo/ui` — дизайн-система на **Tailwind CSS v4** + **Radix UI** со 100% покрытием всех 10/10 компонентов в Storybook 10.
+   - `@repo/ui` — дизайн-система на **Tailwind CSS v4** + **Radix UI** со 100% покрытием всех компонентов в Storybook 10.
    - Связь с `apps/api` идёт через same-origin `/api/*` rewrites в `next.config.ts` (`API_INTERNAL_URL`), что позволяет бесшовно передавать `HttpOnly` cookie `kb_access_token` и держать `EventSource` на `/api/telemetry/stream`.
 5. **CSS-first Tailwind CSS v4, 2D Appearance (`Mode × Palette`), Zero-CLS шрифты и осознанные Modern Web trade-offs:**
    - **Composition Root + инверсия зависимостей:** `apps/web/src/app/globals.css` запускает движок `@tailwindcss/postcss`, импортирует чистый контракт дизайн-системы `@repo/ui/theme.css` (`@theme inline`, `@custom-variant dark`) и объявляет границы сканирования `@source` для `src/`, `content/` и `packages/ui/src`.

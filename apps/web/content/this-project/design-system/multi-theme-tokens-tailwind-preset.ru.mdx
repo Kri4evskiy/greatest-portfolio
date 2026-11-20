@@ -11,7 +11,7 @@ order: 1
 tldr:
   - "Полная 2D-матрица семантических HSL-токенов (`Light / Dark / System` × `Warm Paper / Graphite / Sepia`) описана в `packages/ui/src/styles/theme.css` через `@theme inline` и управляется из `ThemeToggle` с Zero-FOUC скриптом в `<head>` (`PALETTE_INIT_SCRIPT`)."
   - "Слои каскада Tailwind CSS v4 разделены осознанно: Baseline-правила (`scrollbar-gutter: stable`, `text-wrap: balance/pretty`) живут в `@layer base`, `.shiki` + `@starting-style` для `Dialog` и синхронизированные с Radix Popper CSS `@keyframes` для `Popover` и `Tooltip` — в `@layer components`, а `prefers-reduced-motion: reduce` — вне слоёв без `!important`."
-  - "Инверсия зависимостей (`@repo/ui/theme.css` ➔ `apps/web/src/app/globals.css` с `@source`), современные таргеты `browserslist`, локальные Zero-CLS шрифты `Inter` + `JetBrains Mono` через `next/font/google`, точечные `@container` queries и `9/9` историй в Storybook 10."
+  - "Инверсия зависимостей (`@repo/ui/theme.css` ➔ `apps/web/src/app/globals.css` с `@source`), современные таргеты `browserslist`, локальные Zero-CLS шрифты `Inter` + `JetBrains Mono` через `next/font/google`, точечные `@container` queries и 100% покрытие в Storybook 10."
 ---
 
 ## 1. Двумерная матрица семантических токенов (`Mode` × `Palette`)
@@ -104,10 +104,10 @@ tldr:
 
 ## 4. Адаптивные представления плотных данных и 100% покрытие Storybook
 
-В компонентах с высокой плотностью информации вместо горизонтального сжимания таблиц на узких экранах (`360px`) применяется смена паттерна отображения, а все `9/9` примитивов `@repo/ui` (`Badge`, `Button`, `Callout`, `Card`, `Dialog`, `Input`, `Skeleton`, `Tabs`, `Tooltip`) задокументированы в **Storybook 10**:
+В компонентах с высокой плотностью информации вместо горизонтального сжимания таблиц на узких экранах (`360px`) применяется смена паттерна отображения, а каждый примитив из `packages/ui/src/components/*` (`Button`, `Dialog`, `Popover`, `Tabs`, `ToggleGroup`, `Tooltip` и др.) задокументирован в **Storybook 10** (100% покрытие):
 
 | Компонент | Смартфоны (`< md`) | Планшеты и десктоп (`>= md`) |
 | :--- | :--- | :--- |
 | **`TechRadarTable`** | Стек карточек (`md:hidden`) с быстрым переходом к `ADR` | 6-колоночная таблица `TanStack Table` (`hidden md:block`) с сортировкой и фильтрами |
 | **`D3.js` / `SVG` графы** | Горизонтальный скролл-контейнер `overflow-x-auto` с `min-w-[540px]` | Полная интерактивная векторная сцена на всю ширину колонки |
-| **`Storybook 10` (`@repo/ui`)** | Проверка контраста и переносов во вьюпортах `360px` и `768px` | Интерактивное переключение тем `Warm Paper / Dark / Graphite / Sepia` (`9/9` компонентов) |
+| **`Storybook 10` (`@repo/ui`)** | Проверка контраста и переносов во вьюпортах `360px` и `768px` | Интерактивное переключение тем `Warm Paper / Dark / Graphite / Sepia` (100% покрытие) |

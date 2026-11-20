@@ -114,12 +114,12 @@ export const TECH_RADAR_ITEMS_RU: readonly TechRadarItem[] = [
     experienceYears: 4,
     level: 'Core',
     summary:
-      'CSS-first дизайн-система (@theme inline, 2D Mode × Palette) на базе Radix UI с Zero-CLS шрифтами и 9/9 историями в Storybook 10.',
+      'CSS-first дизайн-система (@theme inline, 2D Mode × Palette) на базе Radix UI с Zero-CLS шрифтами и 100% покрытием в Storybook 10.',
     adrWhy:
       'В отличие от тяжелых рантайм-библиотек (MUI/AntD), shadcn/ui дает полный контроль кода и доступность WAI-ARIA, Tailwind v4 с нативными @starting-style и @container убирает лишний JS-рантайм, а Storybook 10 изолированно проверяет UI.',
     adrWhere: 'Пакет packages/ui (@repo/ui/theme.css), подключаемый в apps/web/src/app/globals.css через @source.',
     adrHow:
-      '2D HSL-токены + Zero-CLS Inter/JetBrains Mono (next/font) + все 9/9 примитивов (Badge, Button, Callout, Card, Dialog, Input, Skeleton, Tabs, Tooltip) покрыты .stories.tsx в Storybook 10.',
+      '2D HSL-токены + Zero-CLS Inter/JetBrains Mono (next/font) + все примитивы @repo/ui имеют 100% покрытие .stories.tsx в Storybook 10.',
   },
   {
     id: 'tanstack-table-redact',
@@ -341,12 +341,12 @@ export const TECH_RADAR_ITEMS_EN: readonly TechRadarItem[] = [
     experienceYears: 4,
     level: 'Core',
     summary:
-      'CSS-first design system (@theme inline, 2D Mode × Palette) built on Radix UI with Zero-CLS fonts and 9/9 stories in Storybook 10.',
+      'CSS-first design system (@theme inline, 2D Mode × Palette) built on Radix UI with Zero-CLS fonts and 100% Storybook 10 coverage.',
     adrWhy:
       'Unlike heavy runtime libraries (MUI/AntD), shadcn/ui gives full source ownership and WAI-ARIA accessibility, Tailwind v4 native @starting-style and @container eliminate JS animation runtimes, and Storybook 10 enables isolated visual verification.',
     adrWhere: 'Shared package packages/ui (@repo/ui/theme.css) wired into apps/web/src/app/globals.css via @source.',
     adrHow:
-      '2D HSL tokens + Zero-CLS Inter/JetBrains Mono (next/font) + all 9/9 primitives (Badge, Button, Callout, Card, Dialog, Input, Skeleton, Tabs, Tooltip) covered by .stories.tsx in Storybook 10.',
+      '2D HSL tokens + Zero-CLS Inter/JetBrains Mono (next/font) + all @repo/ui primitives have 100% .stories.tsx coverage in Storybook 10.',
   },
   {
     id: 'tanstack-table-redact',
@@ -568,12 +568,12 @@ export const TECH_RADAR_ITEMS_UK: readonly TechRadarItem[] = [
     experienceYears: 4,
     level: 'Core',
     summary:
-      'CSS-first дизайн-система (@theme inline, 2D Mode × Palette) на базі Radix UI із Zero-CLS шрифтами та 9/9 історіями в Storybook 10.',
+      'CSS-first дизайн-система (@theme inline, 2D Mode × Palette) на базі Radix UI із Zero-CLS шрифтами та 100% покриттям у Storybook 10.',
     adrWhy:
       'На відміну від важких рантайм-бібліотек (MUI/AntD), shadcn/ui дає повний контроль коду та доступність WAI-ARIA, Tailwind v4 з нативними @starting-style й @container прибирає зайвий JS-рантайм, а Storybook 10 ізольовано перевіряє UI.',
     adrWhere: 'Пакет packages/ui (@repo/ui/theme.css), що підключається в apps/web/src/app/globals.css через @source.',
     adrHow:
-      '2D HSL-токени + Zero-CLS Inter/JetBrains Mono (next/font) + усі 9/9 примітивів (Badge, Button, Callout, Card, Dialog, Input, Skeleton, Tabs, Tooltip) покриті .stories.tsx у Storybook 10.',
+      '2D HSL-токени + Zero-CLS Inter/JetBrains Mono (next/font) + усі примітиви @repo/ui мають 100% покриття .stories.tsx у Storybook 10.',
   },
   {
     id: 'tanstack-table-redact',

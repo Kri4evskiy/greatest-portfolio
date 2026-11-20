@@ -1,7 +1,7 @@
 'use client'
 
 import { getKnowledgeFormatLabel, type SupportedLocale } from '@repo/shared-schemas'
-import { Badge, Dialog, DialogContent, DialogDescription, DialogTitle } from '@repo/ui'
+import { Badge, Button, Dialog, DialogContent, DialogDescription, DialogTitle } from '@repo/ui'
 import {
   ArrowRight,
   BookOpen,
@@ -65,6 +65,8 @@ export function CommandPaletteModal({ locale }: CommandPaletteModalProps) {
     getCachedKnowledgeSearchIndex(locale),
   )
   const inputRef = useRef<HTMLInputElement | null>(null)
+  const listContainerRef = useRef<HTMLDivElement | null>(null)
+  const shouldScrollActiveRef = useRef(false)
 
   const items = indexPayload?.items ?? []
   const topTags = indexPayload?.topTags ?? []
@@ -190,6 +192,14 @@ export function CommandPaletteModal({ locale }: CommandPaletteModalProps) {
 
   const safeActiveIndex = filteredEntries.length === 0 ? 0 : Math.min(activeIndex, filteredEntries.length - 1)
 
+  // Keep keyboard navigation focus-in-view without disturbing mouse hover
+  useEffect(() => {
+    if (!isOpen || !shouldScrollActiveRef.current) return
+    shouldScrollActiveRef.current = false
+    const activeEl = listContainerRef.current?.querySelector<HTMLElement>(`[data-palette-index="${safeActiveIndex}"]`)
+    activeEl?.scrollIntoView({ block: 'nearest' })
+  }, [safeActiveIndex, isOpen])
+
   const updateQuery = useCallback((nextQuery: string) => {
     setQuery(nextQuery)
     setActiveIndex(0)
@@ -249,9 +259,11 @@ export function CommandPaletteModal({ locale }: CommandPaletteModalProps) {
 
     if (event.key === 'ArrowDown') {
       event.preventDefault()
+      shouldScrollActiveRef.current = true
       setActiveIndex((safeActiveIndex + 1) % filteredEntries.length)
     } else if (event.key === 'ArrowUp') {
       event.preventDefault()
+      shouldScrollActiveRef.current = true
       setActiveIndex((safeActiveIndex - 1 + filteredEntries.length) % filteredEntries.length)
     } else if (event.key === 'Enter') {
       event.preventDefault()
@@ -281,7 +293,7 @@ export function CommandPaletteModal({ locale }: CommandPaletteModalProps) {
         <DialogDescription className="sr-only">{t('cmdHintNavigate')}</DialogDescription>
 
         {/* Search Input Header */}
-        <div className="flex items-center gap-2.5 border-b border-border px-3.5 py-3 sm:px-4">
+        <div className="flex shrink-0 items-center gap-2.5 border-b border-border px-3.5 py-3 sm:px-4">
           {isLoadingIndex ? (
             <Loader2 className="h-4 w-4 shrink-0 animate-spin text-primary" />
           ) : (
@@ -297,51 +309,58 @@ export function CommandPaletteModal({ locale }: CommandPaletteModalProps) {
             className="min-w-0 flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-hidden"
           />
           {query ? (
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="icon-sm"
               onClick={() => updateQuery('')}
-              className="rounded-sm p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+              className="h-6 w-6 text-muted-foreground hover:text-foreground"
               aria-label="Clear search"
             >
               <X className="h-3.5 w-3.5" />
-            </button>
+            </Button>
           ) : null}
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="sm"
             onClick={closePalette}
-            className="rounded-sm border border-border bg-muted/60 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground hover:text-foreground"
+            className="h-6 bg-muted/60 px-1.5 font-mono text-[10px] text-muted-foreground hover:text-foreground"
           >
             ESC
-          </button>
+          </Button>
         </div>
 
         {/* Quick #Tag Chips */}
         {topTags.length > 0 ? (
-          <div className="flex items-center gap-1.5 overflow-x-auto border-b border-border/60 bg-muted/20 px-3.5 py-2 sm:px-4">
+          <div className="flex shrink-0 flex-wrap items-center gap-1.5 border-b border-border/60 bg-muted/20 px-3.5 py-2.5 sm:px-4">
             <Hash className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
             {topTags.slice(0, 10).map(({ tag }) => {
               const tagQuery = `#${tag}`
               const isSelectedTag = query.trim().toLowerCase() === tagQuery
               return (
-                <button
+                <Button
                   key={tag}
                   type="button"
+                  variant={isSelectedTag ? 'default' : 'outline'}
+                  size="sm"
+                  aria-pressed={isSelectedTag}
                   onClick={() => updateQuery(isSelectedTag ? '' : tagQuery)}
-                  className={`shrink-0 rounded-md border px-2 py-0.5 font-mono text-[11px] transition-colors ${
+                  className={`h-6 shrink-0 rounded-md px-2 font-mono text-[11px] font-normal ${
                     isSelectedTag
-                      ? 'border-primary bg-primary text-primary-foreground'
+                      ? ''
                       : 'border-border/80 bg-background text-muted-foreground hover:border-primary/40 hover:text-foreground'
                   }`}
                 >
                   #{tag}
-                </button>
+                </Button>
               )
             })}
           </div>
         ) : null}
 
         {/* Results List */}
-        <div className="flex-1 overflow-y-auto p-2 sm:p-2.5">
+        <div ref={listContainerRef} className="min-h-0 flex-1 overflow-y-auto p-2 sm:p-2.5">
           {filteredEntries.length === 0 ? (
             <div className="py-10 text-center text-xs text-muted-foreground sm:text-sm">{t('cmdEmpty')}</div>
           ) : (
@@ -362,6 +381,7 @@ export function CommandPaletteModal({ locale }: CommandPaletteModalProps) {
                     {entry.kind === 'quick-action' ? (
                       <button
                         type="button"
+                        data-palette-index={idx}
                         onMouseEnter={() => setActiveIndex(idx)}
                         onClick={() => executeEntry(entry)}
                         className={`flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-xs transition-colors sm:text-sm ${
@@ -387,6 +407,7 @@ export function CommandPaletteModal({ locale }: CommandPaletteModalProps) {
                     ) : (
                       <button
                         type="button"
+                        data-palette-index={idx}
                         onMouseEnter={() => setActiveIndex(idx)}
                         onClick={() => executeEntry(entry)}
                         className={`flex w-full flex-col gap-1 rounded-lg px-3 py-2.5 text-left transition-colors ${
@@ -458,7 +479,7 @@ export function CommandPaletteModal({ locale }: CommandPaletteModalProps) {
         </div>
 
         {/* Keyboard Hints Footer */}
-        <div className="flex items-center justify-between border-t border-border bg-muted/30 px-4 py-2 font-mono text-[10px] text-muted-foreground">
+        <div className="flex shrink-0 items-center justify-between border-t border-border bg-muted/30 px-4 py-2 font-mono text-[10px] text-muted-foreground">
           <div className="flex items-center gap-3">
             <span>{t('cmdHintNavigate')}</span>
             <span>{t('cmdHintOpen')}</span>
