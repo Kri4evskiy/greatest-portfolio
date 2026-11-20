@@ -24,7 +24,7 @@ export function EngineeringRoadmapBoard({ items }: { items: readonly LocalizedRo
 
   const [activeFilter, setActiveFilter] = useState<FilterTab>('all')
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({
-    'prisma-7-migration': true,
+    'seo-og-error-boundaries': true,
   })
 
   const counts = useMemo(() => {
@@ -61,7 +61,9 @@ export function EngineeringRoadmapBoard({ items }: { items: readonly LocalizedRo
     { id: 'evaluating', label: t('statusEvaluating') },
     { id: 'deferred', label: t('statusDeferred') },
     { id: 'shipped', label: t('statusShipped') },
-  ]
+  ].filter(
+    (tab): tab is { id: FilterTab; label: string } => tab.id === 'all' || counts[tab.id as RoadmapItemStatus] > 0,
+  )
 
   const getKindLabel = (kind: RoadmapItemKind): string => {
     switch (kind) {

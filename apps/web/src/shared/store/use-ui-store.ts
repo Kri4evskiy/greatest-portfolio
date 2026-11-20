@@ -56,7 +56,6 @@ export interface UIState {
   selectedAdrItem: TechRadarItem | null
   techRadarCategoryFilter: TechCategory | 'ALL'
   techRadarSearch: string
-  isKbSidebarOpen: boolean
   expandedKbFolders: Record<string, boolean>
   hasHydratedKbFolders: boolean
   palette: WorkfolioPalette
@@ -72,8 +71,6 @@ export interface UIActions {
   closeAdrInspector: () => void
   setTechRadarCategoryFilter: (category: TechCategory | 'ALL') => void
   setTechRadarSearch: (search: string) => void
-  toggleKbSidebar: () => void
-  setKbSidebarOpen: (open: boolean) => void
   hydrateKbFoldersFromSession: () => void
   toggleKbFolder: (pathKey: string) => void
   expandKbAncestors: (pathKeys: readonly string[]) => void
@@ -97,7 +94,6 @@ const initialState: UIState = {
   selectedAdrItem: null,
   techRadarCategoryFilter: 'ALL',
   techRadarSearch: '',
-  isKbSidebarOpen: true,
   expandedKbFolders: DEFAULT_EXPANDED_FOLDERS,
   hasHydratedKbFolders: false,
   palette: 'default',
@@ -142,14 +138,6 @@ const useUIStoreBase = create<UIStore>((set) => ({
     setTechRadarSearch: (search) =>
       set({
         techRadarSearch: search,
-      }),
-    toggleKbSidebar: () =>
-      set((state) => ({
-        isKbSidebarOpen: !state.isKbSidebarOpen,
-      })),
-    setKbSidebarOpen: (open) =>
-      set({
-        isKbSidebarOpen: open,
       }),
     hydrateKbFoldersFromSession: () =>
       set((state) => {
@@ -241,7 +229,6 @@ export const useCommandPaletteInitialQuery = () => useUIStoreBase((s) => s.comma
 export const useSelectedAdrItem = () => useUIStoreBase((s) => s.selectedAdrItem)
 export const useTechRadarCategoryFilter = () => useUIStoreBase((s) => s.techRadarCategoryFilter)
 export const useTechRadarSearch = () => useUIStoreBase((s) => s.techRadarSearch)
-export const useIsKbSidebarOpen = () => useUIStoreBase((s) => s.isKbSidebarOpen)
 export const useExpandedKbFolders = () => useUIStoreBase((s) => s.expandedKbFolders)
 export const usePalette = () => useUIStoreBase((s) => s.palette)
 export const useHasHydratedPalette = () => useUIStoreBase((s) => s.hasHydratedPalette)

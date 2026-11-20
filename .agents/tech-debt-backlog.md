@@ -11,17 +11,7 @@
 
 ## 🔥 Приоритетная очередь разработки (Next Up)
 
-### Приоритет №1: Апгрейд `Prisma ORM` с v6 (`6.4.1`) до `Prisma 7` (`apps/api`, `docker/api.Dockerfile`)
-
-- [x] **Миграция слоя персистентности на `Prisma 7` (Rust-free Wasm + Native ESM — выполнено на `7.10.1`):**
-  - **Зачем:** переход на нативный ESM без Rust-бинарников, уменьшение холодного старта и размера Docker-образов, полная актуализация стека следом за `TypeScript 7.0.2` и `Tailwind CSS v4.3.5`.
-  - **Ключевые шаги (`apps/api`):**
-    1. Обновлены `prisma`, `@prisma/client` до `7.10.1`, подключены `@prisma/adapter-pg@7.10.1`, `pg`, `@types/pg`, из `pnpm-workspace.yaml` `allowBuilds` удалён неиспользуемый `@prisma/client`.
-    2. URL-конфигурация БД перенесена из `prisma/schema.prisma` (`url` / `directUrl`) в `apps/api/prisma.config.ts` (`defineConfig`, нативный `loadEnvFile` для `.env`, `DIRECT_URL || DATABASE_URL || placeholder` для автономного `prisma generate`).
-    3. Генератор переключён на `prisma-client` (`output = "../src/generated/prisma"`, `moduleFormat = "esm"`, `importFileExtension = "js"`), `PrismaService` переведён на композицию (`PrismaClient` + `PrismaPg` + `Pool`, eager-проверка `SELECT 1`), обновлён `src/migrations/scripts/seed.ts`.
-    4. Сохранена 100% работоспособность **Graceful In-Memory Fallback**, строгий typecheck в `TypeScript 7.0.2`, ESM-запуск `NestJS 12` и упрощена сборка `docker/api.Dockerfile` (удалены `/tmp/.prisma` и runtime `openssl`).
-
-### Приоритет №2: Production SEO (`robots.ts` / `sitemap.ts`), Локализованные Error/404 и Zero-Friction `Docker Compose` Demo
+### Приоритет №1: Production SEO (`robots.ts` / `sitemap.ts`), Локализованные Error/404 и Zero-Friction `Docker Compose` Demo
 
 - [ ] **Технический SEO-минимум и границы ошибок (`apps/web/src/app`):**
   1. `apps/web/src/app/robots.ts` и `sitemap.ts`: генерация правил индексации и карты всех **167 SSG-роутов** с `alternates.languages` (`hreflang` для `en` / `ua` / `ru`) + `metadataBase`.
@@ -34,7 +24,7 @@
     2. `docker-compose.prod.yml` (**Real Production**): demo-режим строго запрещён (`WORKFOLIO_DEMO_MODE` отсутствует), обязательные секреты форсируются уже на этапе парсинга Compose (`${JWT_SECRET:?Set JWT_SECRET (>=32 chars)}` и `${ADMIN_SECRET_PASSCODE:?...}`) + fail-fast проверкой в NestJS.
     3. Обновить команды и пояснения в `README.md`.
 
-### Приоритет №3: Внедрение Redis (Distributed Rate Limiting & Response Cache)
+### Приоритет №2: Внедрение Redis (Distributed Rate Limiting & Response Cache)
 
 - [ ] **Архитектурное внедрение Redis (`apps/api`, `docker-compose.yml`):**
   - **Зачем:**
@@ -47,16 +37,16 @@
     - _Архитектурная развилка:_ прямое подключение `ioredis` + `@nest-lab/throttler-storage-redis` + `@nestjs/cache-manager` в `apps/api` либо выделение пакета `packages/redis` (`@repo/cache`) для переиспользования между `apps/api` и `apps/telemetry-ms`.
   - **Спецификация:** `.agents/backend/security-jwt.md` (Секция 4).
 
-### Приоритет №4: Автоматическое тестирование (`Vitest` + `Playwright` в CI)
+### Приоритет №3: Автоматическое тестирование (`Vitest` + `Playwright` в CI)
 
 - [ ] **Unit & Integration Tests (`Vitest`):** тесты Zod v4 схем (`@repo/shared-schemas`), Zustand-сторов (`uiStore` / `use-ui-store.ts`, `palette.ts`) и NestJS-сервисов (`AuthService`, `app.config.ts`) + интеграция джобы `unit-tests` в Stage 1 CI (`turbo run test --affected`). _(Строго `Vitest`, без `Jest`/`ts-jest`: `ts-jest` ограничен `typescript <7` и завязан на legacy JS Compiler API, тогда как `Vitest` нативно совместим с `TypeScript 7`.)_
 - [ ] **E2E Playwright Suite:** проверка RBAC-флоу (`GuestPassModal` → `HttpOnly` кука → чтение `.mdx` → маскирование `<Redact />`) + джоба `e2e` после `build` в CI (и синхронизация карточки `playwright-vitest-ci` в `engineering-roadmap.ts`).
 
-### Приоритет №5: Переосмысление визуального дизайна (Mobile-First Editorial `UI v2`)
+### Приоритет №4: Переосмысление визуального дизайна (Mobile-First Editorial `UI v2`)
 
 - [ ] **Авторский редизайн Workfolio (`UI v2`):** глубокое визуальное и типографическое переосмысление интерфейса поверх уже готового фундамента (`Tailwind CSS v4`, 2D-палитры `Warm Paper / Graphite / Sepia`, Zero-CLS шрифты `Inter` + `JetBrains Mono`, `@starting-style`, `@container` и опциональные `View Transitions`), строго следуя `.agents/frontend/*` (Mobile-First с опорой на `360px`, чистая иерархия, продуманные карточки и таблицы без визуального шума).
 
-### Приоритет №6 (Full-Stack Backend Track): DB-Backed Knowledge Base CMS (`NestJS Entities` + `Prisma 7` + `R2/MinIO` + Server-Side Pagination)
+### Приоритет №5 (Full-Stack Backend Track): DB-Backed Knowledge Base CMS (`NestJS Entities` + `Prisma 7` + `R2/MinIO` + Server-Side Pagination)
 
 - [ ] **Полноценный CMS-бэкенд для Базы Знаний с реальной пагинацией из БД и объектным хранением `.mdx`:**
   1. **Цель и контекст (результаты аудита диска):** перенести каталог и выдачу Базы Знаний на реальные SQL-запросы к PostgreSQL через NestJS 12, чтобы кнопки `Показать ещё разделы`, `Показать ещё` внутри подтем (`4+` карточек) и фильтрация/поиск `#тегов` выполняли настоящие запросы на бэкенд, а `.mdx`-тела статей и медиафайлы хранились в `Cloudflare R2` / `MinIO` без пересборки всего фронтенда при добавлении новых заметок. _(Фактический аудит репозитория: текущие `.mdx` в `apps/web/content` занимают лишь ~699 KB; основной объём диска съедает локальный кэш `.turbo` — ~6.4 GB — и общий `node_modules` ~1.22 GB, поэтому `.turbo` достаточно периодически очищать.)_
@@ -106,9 +96,9 @@
 ### 3. Observability, Cloud Storage & Self-Hosted Learning Track
 
 - [ ] **Live Sentry & PostHog SDK:** заменить обёртки-заглушки на реальные транспорты `@sentry/nextjs`, `@sentry/nestjs` и `posthog-js`, включаемые при наличии ключей в `.env`.
-- [ ] **Neon.tech Cloud Database Migration:** подключить боевой `DATABASE_URL` от Neon.tech PostgreSQL, прогнать `prisma migrate deploy` и сид (`pnpm --filter @repo/api prisma:seed` / `src/migrations/scripts/seed.ts`). _(Готовая заготовка: при добавлении админ-таблицы логов `SystemEventLog` / `VisitorSession` использовать `PaginationQueryDto` из `common/dto/pagination-query.dto.ts`.)_
+- [ ] **Neon.tech Cloud Database Migration:** подключить боевой `DATABASE_URL` от Neon.tech PostgreSQL, прогнать `prisma migrate deploy` и сид (`pnpm --filter @repo/api prisma:seed` / `src/migrations/scripts/seed.ts`).
 - [ ] **S3-compatible Object Storage (`Cloudflare R2` + локальный `MinIO` — Backend Learning & Showcase):** освоить и внедрить в `apps/api` интеграцию через `@aws-sdk/client-s3`:
-  - _Зачем:_ практическое изучение работы с приватными объектными бакетами (`R2` / `MinIO`), IAM least-privilege ключами, генерацией краткоживущих **Presigned URLs** и безопасным бэкенд-стримингом/проксированием PDF-резюме и загружаемых ассетов с проверкой MIME-типов и размеров файлов. Единый `StorageService` / бакет обслуживает как CV (`/cv/*.pdf`), так и тела `.mdx`-статей + медиа-ассеты Базы Знаний для **Приоритета №6**.
+  - _Зачем:_ практическое изучение работы с приватными объектными бакетами (`R2` / `MinIO`), IAM least-privilege ключами, генерацией краткоживущих **Presigned URLs** и безопасным бэкенд-стримингом/проксированием PDF-резюме и загружаемых ассетов с проверкой MIME-типов и размеров файлов. Единый `StorageService` / бакет обслуживает как CV (`/cv/*.pdf`), так и тела `.mdx`-статей + медиа-ассеты Базы Знаний для **Приоритета №5**.
   - _Локальная разработка:_ легковесный `minio` сервис в `docker-compose` + graceful fallback на локальный статический файл `/cv/*.pdf` и локальные `apps/web/content/*.mdx`, когда S3 env-переменные не заданы.
 - [ ] **Nginx Reverse Proxy (`docker-compose.prod.yml` — Self-Hosted / VPS Learning Track):** настроить `Nginx` как единую точку входа (порты `80/443`, TLS) между внешними клиентами, фронтендом (`web:3000`) и бэкендом (`api:4000`) в качестве self-hosted/VPS альтернативы облачному Runbook (Vercel + Render):
   - отработать конфигурирование upstream-проксирования `/api/*` ➔ `api:4000`, отключение буферизации (`proxy_buffering off;`, `proxy_read_timeout`, `Connection ''`) для бесперебойных **SSE-стримов**, передачу `X-Forwarded-For` / `X-Real-IP` для `@nestjs/throttler` (`trust proxy: 1`), L7 rate limiting и базовую защиту заголовков.
@@ -128,7 +118,7 @@
 
 ### 5. Backend AI & Model Context Protocol (`apps/api` — Future Milestone)
 
-- [ ] **Read-Only шоукейс `@nestjs/mcp` (`$0` за токены, статус `evaluating`):** публичный MCP (`Streamable HTTP`) с 16 ADR, опытом CV и `TL;DR` статей для `Cursor` / `Claude Desktop` — строго **Read-Only**, строго после `@nestjs/throttler`, с лимитами Zod (`limit <= 16`, `.max(60)`) и соблюдением `<Redact />`. _(Готовая заготовка: `PaginationQueryDto` / `PaginationQuerySchema` в `common/dto/pagination-query.dto.ts` при необходимости пагинации списков.)_
+- [ ] **Read-Only шоукейс `@nestjs/mcp` (`$0` за токены, статус `evaluating`):** публичный MCP (`Streamable HTTP`) с 16 ADR, опытом CV и `TL;DR` статей для `Cursor` / `Claude Desktop` — строго **Read-Only**, строго после `@nestjs/throttler`, с лимитами Zod (`limit <= 16`, `.max(60)`) и соблюдением `<Redact />`.
 - [ ] _(Отложено / `deferred`)_ **Живой агент `@nestjs/ai`:** не нужен, пока поиск закрывает `Cmd+K` за $0/мес; при возврате — строго за `@UseGuards(JwtRolesGuard)` с `maxOutputTokens`.
 
 ---
