@@ -57,8 +57,8 @@ Instead of coupling components to raw Tailwind palette classes (`slate-*`, `emer
 
 ### Live 2D Appearance Switcher & Zero-FOUC Hydration
 
-In the header, [`ThemeToggle`](apps/web/src/widgets/header/theme-toggle.tsx) acts as a pure UI control opening a compact 2D Appearance popover over both orthogonal axes:
-- **Color Mode:** `Light`, `Dark`, or `System` (managed by `next-themes` via `.dark`).
+In the header, [`ThemeToggle`](apps/web/src/widgets/header/theme-toggle.tsx) is composed from `@repo/ui` primitives (`Button`, `Tooltip` + `Popover`) and acts as a pure UI control over both orthogonal axes:
+- **Theme (`Light / Dark / System`):** managed by `next-themes` via `.dark`.
 - **Palette Preset:** `Warm Paper` (`default`), `Graphite`, or `Sepia` (stored in `localStorage['workfolio-palette']` and synced to `html[data-palette]` via `useUIStore`).
 
 To prevent Flash of Unstyled Content (FOUC) when reloading with `Graphite` or `Sepia` active, `LocaleRootLayout` injects an allowlisted static `PALETTE_INIT_SCRIPT` directly in `<head>` before hydration, while `ThemeProvider` handles post-mount palette hydration and cross-tab `storage` synchronization imperatively via `useUIStore.getState().syncPaletteFromStorage()` (zero extra `useSyncExternalStore` subscriptions or root re-renders).

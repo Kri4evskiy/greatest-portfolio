@@ -1,5 +1,6 @@
 import '../globals.css'
 import { DEFAULT_LOCALE, SUPPORTED_LOCALES, SupportedLocaleEnum } from '@repo/shared-schemas'
+import { TooltipProvider } from '@repo/ui'
 import type { Metadata } from 'next'
 import { Inter, JetBrains_Mono } from 'next/font/google'
 import { notFound } from 'next/navigation'
@@ -75,15 +76,17 @@ export default async function LocaleRootLayout({
         <NextIntlClientProvider locale={parsed.data} messages={messages}>
           <ThemeProvider>
             <QueryProvider>
-              <div className="flex min-h-screen flex-col">
-                <WorkfolioHeader />
-                <Suspense fallback={null}>
-                  <GuestPassModal />
-                </Suspense>
-                <CommandPaletteModal locale={parsed.data} />
-                <main className="flex-1">{children}</main>
-                <WorkfolioFooter locale={parsed.data} />
-              </div>
+              <TooltipProvider delayDuration={300} skipDelayDuration={200}>
+                <div className="flex min-h-screen flex-col">
+                  <WorkfolioHeader />
+                  <Suspense fallback={null}>
+                    <GuestPassModal />
+                  </Suspense>
+                  <CommandPaletteModal locale={parsed.data} />
+                  <main className="flex-1">{children}</main>
+                  <WorkfolioFooter locale={parsed.data} />
+                </div>
+              </TooltipProvider>
             </QueryProvider>
           </ThemeProvider>
         </NextIntlClientProvider>

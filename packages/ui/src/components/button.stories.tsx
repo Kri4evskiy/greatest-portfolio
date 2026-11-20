@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react'
+import { Sun } from 'lucide-react'
 import { Badge } from './badge'
 import { Button } from './button'
 
@@ -53,4 +54,12 @@ export const Outline: Story = {
     variant: 'outline',
     size: 'sm',
   },
+}
+
+export const IconSmall: Story = {
+  render: () => (
+    <Button variant="outline" size="icon-sm" aria-label="Theme settings">
+      <Sun className="h-3.5 w-3.5" />
+    </Button>
+  ),
 }

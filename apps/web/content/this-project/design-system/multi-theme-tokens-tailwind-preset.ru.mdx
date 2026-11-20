@@ -57,8 +57,8 @@ tldr:
 
 ### Живой 2D-переключатель оформления и Zero-FOUC гидратация
 
-В хедере [`ThemeToggle`](apps/web/src/widgets/header/theme-toggle.tsx) выступает чистым UI-контролом для управления обеими ортогональными осями одновременно:
-- **Режим яркости (`Color Mode`):** `Light`, `Dark` или `System` (через `next-themes` и класс `.dark`).
+В хедере [`ThemeToggle`](apps/web/src/widgets/header/theme-toggle.tsx) собран на примитивах `@repo/ui` (`Button`, `Tooltip` + `Popover`) и выступает чистым UI-контролом для управления обеими ортогональными осями одновременно:
+- **Тема (`Light / Dark / System`):** через `next-themes` и класс `.dark`.
 - **Палитра (`Palette`):** `Warm Paper` (`default`), `Graphite` или `Sepia` (хранится в `localStorage['workfolio-palette']` и синхронизируется с `html[data-palette]` через `useUIStore`).
 
 Чтобы при перезагрузке страницы с активной палитрой `Graphite` или `Sepia` не возникала белая/цветная вспышка (FOUC), `LocaleRootLayout` встраивает статический скрипт `PALETTE_INIT_SCRIPT` прямо в `<head>` до первой отрисовки, а корневой `ThemeProvider` выполняет клиентскую гидратацию и кросс-вкладочную синхронизацию `storage` императивно через `useUIStore.getState().syncPaletteFromStorage()` (без лишней подписки `useSyncExternalStore` и ре-рендеров дерева).

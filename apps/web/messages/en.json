@@ -20,7 +20,7 @@
     "themeToggle": "Appearance: theme & palette",
     "appearance": {
       "title": "Appearance",
-      "modeLabel": "Color Mode",
+      "modeLabel": "Theme",
       "modeLight": "Light",
       "modeDark": "Dark",
       "modeSystem": "System",
