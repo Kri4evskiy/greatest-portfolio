@@ -14,7 +14,7 @@
 ## 2. Архитектура пакета `packages/ui` (`Tailwind CSS v4`)
 
 - Основан на `Tailwind CSS v4` (CSS-first конфигурация в `packages/ui/src/styles/theme.css`, экспортируемая как `@repo/ui/theme.css` с `@theme inline` и `@custom-variant dark`) + `shadcn/ui` (безголовые примитивы `Radix UI` с полной поддержкой `WAI-ARIA` и клавиатурной навигации).
-- Поддерживает нативные CSS-платформенные паттерны без лишнего JS-рантайма: GPU-анимации входа `@starting-style` для `Dialog` в `@layer components`, unlayered `prefers-reduced-motion: reduce`, Baseline-правила в `@layer base` (`scrollbar-gutter: stable`, `scroll-padding-top: 5rem`, `text-wrap: balance/pretty`) и `@container` queries (включая `Card`).
+- Поддерживает нативные CSS-платформенные паттерны без лишнего JS-рантайма: GPU-анимации входа `@starting-style` для `Dialog`, `Popover` и `Tooltip` в `@layer components`, unlayered `prefers-reduced-motion: reduce`, Baseline-правила в `@layer base` (`scrollbar-gutter: stable`, `scroll-padding-top: 5rem`, `text-wrap: balance/pretty`) и `@container` queries (включая `Card`).
 - Полный набор базовых компонентов (`10/10`):
   - `Badge`, `Button` (включая компактный `size="icon-sm"` для контролов хедера), `Callout`, `Card`, `Dialog` (используется в модалке Guest Pass, ADR-инспекторе и `CommandPaletteModal`), `Input`, `Popover` (`@radix-ui/react-popover`), `Skeleton`, `Tabs`, `Tooltip` (`'use client'` + `Portal`, единый `TooltipProvider` в корневом `LocaleRootLayout`).
 - Все компоненты экспортируются из `packages/ui/src/index.ts` и не содержат бизнес-логики конкретного приложения. Фиксируется единый `browserslist` (`Chrome >= 111`, `Edge >= 111`, `Firefox >= 128`, `Safari >= 16.4`) в `packages/ui/package.json` и `apps/web/package.json`.

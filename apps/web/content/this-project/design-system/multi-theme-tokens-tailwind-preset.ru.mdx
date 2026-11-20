@@ -10,7 +10,7 @@ publishedAt: "2026-11-10"
 order: 1
 tldr:
   - "Полная 2D-матрица семантических HSL-токенов (`Light / Dark / System` × `Warm Paper / Graphite / Sepia`) описана в `packages/ui/src/styles/theme.css` через `@theme inline` и управляется из `ThemeToggle` с Zero-FOUC скриптом в `<head>` (`PALETTE_INIT_SCRIPT`)."
-  - "Слои каскада Tailwind CSS v4 разделены осознанно: Baseline-правила (`scrollbar-gutter: stable`, `text-wrap: balance/pretty`) живут в `@layer base`, `.shiki` и `@starting-style` анимации диалогов — в `@layer components`, а `prefers-reduced-motion: reduce` — вне слоёв без `!important`."
+  - "Слои каскада Tailwind CSS v4 разделены осознанно: Baseline-правила (`scrollbar-gutter: stable`, `text-wrap: balance/pretty`) живут в `@layer base`, `.shiki` и `@starting-style` анимации входа (`Dialog`, `Popover`, `Tooltip`) — в `@layer components`, а `prefers-reduced-motion: reduce` — вне слоёв без `!important`."
   - "Инверсия зависимостей (`@repo/ui/theme.css` ➔ `apps/web/src/app/globals.css` с `@source`), современные таргеты `browserslist`, локальные Zero-CLS шрифты `Inter` + `JetBrains Mono` через `next/font/google`, точечные `@container` queries и `9/9` историй в Storybook 10."
 ---
 
@@ -85,7 +85,7 @@ tldr:
 
 Внутри `theme.css` стили разложены по **CSS Cascade Layers**:
 1. **`@layer base`:** задаёт дефолтный `border-color: hsl(var(--border))`, `cursor: pointer` на активних кнопках, `scrollbar-gutter: stable` (убирает сдвиг макета на 15px при открытии модалок на Windows), `scrollbar-width: thin`, `scroll-padding-top: 5rem`, плавный скролл (в связке с `data-scroll-behavior="smooth"` на `<html>` в `LocaleRootLayout`) и `text-wrap: balance` / `text-wrap: pretty`.
-2. **`@layer components`:** изолирует `.shiki` и GPU-анимации входа `@starting-style` (`opacity` + `scale`) для `[data-dialog-overlay]` и `[data-dialog-content]`.
+2. **`@layer components`:** изолирует `.shiki` и GPU-анимации входа `@starting-style` (`opacity` + `scale`) для `[data-dialog-overlay]`, `[data-dialog-content]`, `[data-popover-content]` и `[data-tooltip-content]`.
 3. **Unlayered override:** `@media (prefers-reduced-motion: reduce)` вынесен *вне* слоёв — по спецификации Cascade Layers неслоёвые правила всегда перекрывают `@layer utilities` (`transition-*`, `animate-*`) без использования `!important`.
 
 Оба пакета (`apps/web/package.json` и `packages/ui/package.json`) фиксируют современные таргеты `"browserslist": ["Chrome >= 111", "Edge >= 111", "Firefox >= 128", "Safari >= 16.4"]`, запрещая `Lightning CSS` и `Next.js SWC` генерировать лишние полифилы под `@property` и `color-mix()`.

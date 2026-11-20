@@ -287,7 +287,7 @@
   }
 }
 
-/* Shiki v4 Zero-JS Dual Theme CSS Variables & Native @starting-style Dialog Entry */
+/* Shiki v4 Zero-JS Dual Theme CSS Variables & Native @starting-style Entry Transitions */
 @layer components {
   .shiki,
   .shiki span {
@@ -325,6 +325,32 @@
     [data-dialog-content] {
       opacity: 0;
       scale: 0.97;
+    }
+  }
+
+  [data-popover-content] {
+    transition:
+      opacity 140ms cubic-bezier(0.16, 1, 0.3, 1),
+      scale 140ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  @starting-style {
+    [data-popover-content] {
+      opacity: 0;
+      scale: 0.96;
+    }
+  }
+
+  [data-tooltip-content] {
+    transition:
+      opacity 110ms ease-out,
+      scale 110ms ease-out;
+  }
+
+  @starting-style {
+    [data-tooltip-content] {
+      opacity: 0;
+      scale: 0.96;
     }
   }
 }
