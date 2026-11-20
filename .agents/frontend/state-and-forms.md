@@ -11,7 +11,8 @@
 
 ## 2. Браузерная БД `IndexedDB` + `TanStack Query Persister`
 
-- Для реализации стандарта **Offline-First** `QueryClient` подключается к `PersistQueryClientProvider` (`@tanstack/react-query-persist-client`) с асинхронным адаптером на базе `idb-keyval` (хранилище `IndexedDB` с именем `greatest-portfolio-cache`).
+- Для реализации стандарта **Offline-First** используется синглтон `getQueryClient()` в `apps/web/src/shared/providers/query-provider.tsx` (изолированный инстанс на каждый SSR/SSG-рендер на сервере и единый `browserQueryClient` в браузере) совместно с однократным восстановлением из `IndexedDB` (`greatest-portfolio-query-cache`) через низкоуровневые `persistQueryClientRestore` / `persistQueryClientSubscribe` и `IsRestoringProvider` (`@tanstack/react-query-persist-client` + `idb-keyval`).
+- Такой паттерн обязателен для Next.js 16 с `next/root-params`, где `app/[locale]/layout.tsx` является корневым layout: при переключении локали (`[locale]`) `QueryProvider` перемонтируется, но кэш в памяти и флаг завершения первичной гидратации сохраняются без сброса `isRestoring` в `true` и без hydration mismatch при холодном старте.
 - Политика жизни кэша: `gcTime: 1000 * 60 * 60 * 24` (24 часа) и `maxAge: 1000 * 60 * 60 * 24` (24 часа).
 - Когда Team Lead повторно открывает прочитанную статью или переключает вкладки даже с отключенной сетью в Chrome DevTools (`Offline`), метаданные и клиентский кэш отдаются из `IndexedDB` за `0 мс`.
 

@@ -17,7 +17,7 @@ tldr:
 
 ## 1. Offline-First Caching in Browser `IndexedDB`
 
-To make repeat navigation across articles and the technology matrix happen in **0ms** (even in `Offline` airplane mode), we wired `PersistQueryClientProvider` from `@tanstack/react-query-persist-client` with an asynchronous `idb-keyval` storage adapter.
+To make repeat navigation across articles and the technology matrix happen in **0ms** (even in `Offline` airplane mode), we wired a browser-singleton `QueryClient` in `QueryProvider` with one-time `persistQueryClientRestore` / `persistQueryClientSubscribe` (`@tanstack/react-query-persist-client`) over an asynchronous `idb-keyval` adapter — keeping cached auth and article state instant even across `[locale]` root-layout transitions in Next.js 16.
 
 Unlike synchronous `LocalStorage` (which blocks the main thread during JSON serialization and is capped at 5 MB), `IndexedDB` operates asynchronously and persists the `TanStack Query v5` cache with a `gcTime: 24h` policy.
 

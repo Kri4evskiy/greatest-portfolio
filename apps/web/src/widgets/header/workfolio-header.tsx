@@ -1,7 +1,8 @@
 'use client'
 
 import { DEFAULT_LOCALE, SupportedLocaleEnum } from '@repo/shared-schemas'
-import { Badge, Button } from '@repo/ui'
+import { Badge, Button, Tooltip, TooltipContent, TooltipTrigger } from '@repo/ui'
+import { useIsRestoring } from '@tanstack/react-query'
 import { FileDown, FileText, Lock, LockOpen, LogOut, Search, ShieldAlert } from 'lucide-react'
 import { useLocale, useTranslations } from 'next-intl'
 import { useLogoutMutation, useVisitorProfile } from '@/features/auth/queries/use-visitor-profile'
@@ -24,7 +25,9 @@ export function WorkfolioHeader() {
   const pathname = usePathname()
   const router = useRouter()
   const { scrollToSection, scrollToTop } = useSectionNavigation()
-  const { data: profile } = useVisitorProfile()
+  const { data: profile, isPending: isProfilePending } = useVisitorProfile()
+  const isRestoring = useIsRestoring()
+  const isSessionChecking = isRestoring || (isProfilePending && profile === undefined)
   const logoutMutation = useLogoutMutation()
   const openGuestPassModal = useUIStore((s) => s.openGuestPassModal)
   const openCommandPalette = useUIStore((s) => s.openCommandPalette)
@@ -113,23 +116,42 @@ export function WorkfolioHeader() {
                   {currentRole}
                 </Badge>
               </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                title={t('logoutTitle', { name: profile?.displayName ?? 'Guest' })}
-                onClick={() => {
-                  void logoutMutation.mutateAsync().then(() => {
-                    if (isInsideKnowledgeBase) {
-                      router.push('/')
-                    }
-                  })
-                }}
-                className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
-              >
-                <LogOut className="h-3.5 w-3.5" />
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={t('logoutTitle', { name: profile?.displayName ?? 'Guest' })}
+                    onClick={() => {
+                      void logoutMutation.mutateAsync().then(() => {
+                        if (isInsideKnowledgeBase) {
+                          router.push('/')
+                        }
+                      })
+                    }}
+                    className="text-muted-foreground hover:text-foreground"
+                  >
+                    <LogOut className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  {t('logoutTitle', { name: profile?.displayName ?? 'Guest' })}
+                </TooltipContent>
+              </Tooltip>
             </div>
+          ) : isSessionChecking && isInsideKnowledgeBase ? (
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={handleKnowledgeBaseClick}
+              className="h-8 gap-1 px-2.5 text-xs sm:gap-1.5 sm:px-3"
+            >
+              <LockOpen className="h-3.5 w-3.5 shrink-0 text-success" />
+              <span className="sm:hidden">{t('knowledgeBaseShort')}</span>
+              <span className="hidden sm:inline">{t('knowledgeBase')}</span>
+            </Button>
           ) : (
             <Button
               type="button"
@@ -172,7 +194,7 @@ export function WorkfolioHeader() {
         </div>
       </div>
 
-      {!isUnlocked && isInsideKnowledgeBase ? (
+      {!isSessionChecking && !isUnlocked && isInsideKnowledgeBase ? (
         <div className="border-t border-warning/30 bg-warning/10 px-4 py-1 text-center text-xs text-warning">
           <ShieldAlert className="mr-1 inline h-3.5 w-3.5" />
           {t('guestBanner')}

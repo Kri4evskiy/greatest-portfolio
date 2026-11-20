@@ -17,7 +17,7 @@ tldr:
 
 ## 1. Offline-First кэширование в браузерной БД `IndexedDB`
 
-Чтобы повторные переходы по статьям и таблице технологий происходили за **0 мс** (даже при полной потере сети в режиме `Offline`), мы подключили `PersistQueryClientProvider` из `@tanstack/react-query-persist-client` с асинхронным адаптером `idb-keyval`.
+Чтобы повторные переходы по статьям и таблице технологий происходили за **0 мс** (даже при полной потере сети в режиме `Offline`), мы подключили браузерный синглтон `QueryClient` в `QueryProvider` с однократным восстановлением `persistQueryClientRestore` / `persistQueryClientSubscribe` (`@tanstack/react-query-persist-client`) поверх асинхронного адаптера `idb-keyval` — кэш профиля и метрик не сбрасывается даже при смене локали `[locale]` в Next.js 16.
 
 В отличие от синхронного `LocalStorage` (который блокирует основной поток рендера при сериализации JSON и ограничен 5 МБ), `IndexedDB` работает асинхронно и хранит кэш `TanStack Query v5` с политикой `gcTime: 24h`.
 
