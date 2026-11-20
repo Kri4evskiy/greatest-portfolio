@@ -30,7 +30,7 @@ import type {
   MdxArticleFrontmatter,
 } from '@/entities/knowledge-content'
 import { Link } from '@/shared/i18n/navigation'
-import { useUIStore } from '@/shared/store/use-ui-store'
+import { useUIActions } from '@/shared/store/use-ui-store'
 
 const NOTE_FORMATS: readonly KnowledgeNoteFormat[] = ['cheat-sheet', 'deep-dive', 'adr']
 const MAX_VISIBLE_TAGS = 10
@@ -74,7 +74,7 @@ interface KnowledgeDirectoryExplorerProps {
 export function KnowledgeDirectoryExplorer({ tree, articles, tags, locale }: KnowledgeDirectoryExplorerProps) {
   const t = useTranslations('KnowledgeBase')
   const searchParams = useSearchParams()
-  const openCommandPalette = useUIStore((s) => s.openCommandPalette)
+  const { openCommandPalette } = useUIActions()
 
   const urlTag = searchParams.get('tag')?.trim().toLowerCase() ?? null
   const [selectedFormat, setSelectedFormat] = useState<KnowledgeNoteFormat | 'ALL'>('ALL')

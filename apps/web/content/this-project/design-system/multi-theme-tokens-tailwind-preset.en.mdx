@@ -59,9 +59,9 @@ Instead of coupling components to raw Tailwind palette classes (`slate-*`, `emer
 
 In the header, [`ThemeToggle`](apps/web/src/widgets/header/theme-toggle.tsx) is composed from `@repo/ui` primitives (`Button`, `Tooltip` + `Popover`) and acts as a pure UI control over both orthogonal axes:
 - **Theme (`Light / Dark / System`):** managed by `next-themes` via `.dark`.
-- **Palette Preset:** `Warm Paper` (`default`), `Graphite`, or `Sepia` (stored in `localStorage['workfolio-palette']` and synced to `html[data-palette]` via `useUIStore`).
+- **Palette Preset:** `Warm Paper` (`default`), `Graphite`, or `Sepia` (stored in `localStorage['workfolio-palette']` and synced to `html[data-palette]` via `@/shared/store/use-ui-store`).
 
-To prevent Flash of Unstyled Content (FOUC) when reloading with `Graphite` or `Sepia` active, `LocaleRootLayout` injects an allowlisted static `PALETTE_INIT_SCRIPT` directly in `<head>` before hydration, while `ThemeProvider` handles post-mount palette hydration and cross-tab `storage` synchronization imperatively via `useUIStore.getState().syncPaletteFromStorage()` (zero extra `useSyncExternalStore` subscriptions or root re-renders).
+To prevent Flash of Unstyled Content (FOUC) when reloading with `Graphite` or `Sepia` active, `LocaleRootLayout` injects an allowlisted static `PALETTE_INIT_SCRIPT` directly in `<head>` before hydration, while `ThemeProvider` handles post-mount palette hydration and cross-tab `storage` synchronization imperatively via `uiStore.getState().actions.syncPaletteFromStorage()` (zero extra `useSyncExternalStore` subscriptions or root re-renders).
 
 > [!TIP]
 > Separating `.dark` from `data-palette` and wrapping runtime tokens in `@theme inline` makes adding a new theme or `multi-tenant / white-label` brand a pure CSS variable override with zero changes to React components.

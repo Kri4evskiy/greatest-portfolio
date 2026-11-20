@@ -10,7 +10,7 @@ import { prefetchKnowledgeSearchIndex } from '@/features/search/search-index-cli
 import { useSectionNavigation } from '@/shared/hooks/use-section-navigation'
 import { Link, usePathname, useRouter } from '@/shared/i18n/navigation'
 import { trackEvent } from '@/shared/lib/analytics'
-import { useUIStore } from '@/shared/store/use-ui-store'
+import { useUIActions } from '@/shared/store/use-ui-store'
 import { LanguageSwitcher } from './language-switcher'
 import { ThemeToggle } from './theme-toggle'
 
@@ -29,8 +29,7 @@ export function WorkfolioHeader() {
   const isRestoring = useIsRestoring()
   const isSessionChecking = isRestoring || (isProfilePending && profile === undefined)
   const logoutMutation = useLogoutMutation()
-  const openGuestPassModal = useUIStore((s) => s.openGuestPassModal)
-  const openCommandPalette = useUIStore((s) => s.openCommandPalette)
+  const { openGuestPassModal, openCommandPalette } = useUIActions()
 
   const currentRole = profile?.role ?? 'GUEST'
   const isUnlocked = currentRole === 'USER' || currentRole === 'ADMIN'

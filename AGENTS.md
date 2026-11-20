@@ -38,7 +38,7 @@
 
 1. Никогда не используй `any` или `@ts-ignore` (у нас строгий TypeScript: `strict: true`, `noUncheckedIndexedAccess: true`).
 2. Никогда не ставь `ESLint` или `Prettier` — проект использует исключительно `Biome.js`.
-3. Никогда не храни серверные данные API в `Zustand` (для этого есть `TanStack Query` + `IndexedDB Persister`).
+3. Никогда не храни серверные данные API или auth/JWT в `Zustand` (для API есть `TanStack Query` + `IndexedDB Persister`); все Zustand-сторы обязаны следовать стандарту из `.agents/frontend/state-and-forms.md` (раздельные `State` + `actions`, приватный базовый стор без прямого экспорта, явные `use*` атомарные хуки + `use<Domain>Actions()`, без `createSelectors` `.use.field()` под `React 19 Compiler` и без top-level чтения `localStorage`).
 4. Никогда не храни JWT-токены в `LocalStorage` (только `HttpOnly, Secure, SameSite=Lax Cookies`).
 5. Никогда не добавляй секцию `"pnpm"` (например, `onlyBuiltDependencies`) в `package.json` — в `pnpm 12+` все настройки воркспейса и `allowBuilds` живут строго в `pnpm-workspace.yaml`.
 6. Никогда не нарушай границы слоёв `FSD-Modular` в `apps/web/src` (`app` ➔ `widgets` ➔ `features` ➔ `entities` ➔ `shared`), не создавай плоские папки `src/components`, `src/data`, `src/hooks` или `src/lib`, а серверные хуки `TanStack Query` размещай строго в доменных подпапках `queries/` (браузерные DOM-хуки живут в `shared/hooks/`).

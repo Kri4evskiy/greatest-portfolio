@@ -6,8 +6,20 @@
 
 - **Серверный стейт (`TanStack Query v5`):** Любые данные, приходящие из `apps/api` (профиль текущей сессии `/api/auth/me`, метрики статей `/api/knowledge/metrics`, отправка реакции `helpful`).
 - **Клиентский UI-стейт (`Zustand`):** Только синхронное состояние интерфейса, не принадлежащее серверу:
-  - `useUIStore`: открыта ли модалка `Guest Pass`, выбранная технология в `ADR Inspector`, свернут ли сайдбар Базы Знаний, активная палитра `palette` (с императивным вызывом `useUIStore.getState().syncPaletteFromStorage()` в `ThemeProvider` без лишней подписки на стор), активный фильтр/режим симуляции на графе `D3.js`.
-  - **ЗАПРЕЩЕНО** сохранять ответы `fetch` / `axios` внутри `Zustand`.
+  - [`apps/web/src/shared/store/use-ui-store.ts`](../../apps/web/src/shared/store/use-ui-store.ts): модалки `Guest Pass` и `Cmd+K`, выбранная технология в `ADR Inspector` и фильтры `Tech Radar`, состояние открытых веток сайдбара Базы Знаний (`expandedKbFolders`), активная палитра `palette` (с императивным вызовом `uiStore.getState().actions.syncPaletteFromStorage()` в `ThemeProvider` без лишней подписки на стор).
+  - **ЗАПРЕЩЕНО** сохранять ответы `fetch` / `axios` или JWT-токены внутри `Zustand`.
+
+### Стандарт написания Zustand-сторов (Обязательно для всех новых сторов)
+
+1. **Разделение `State` и `actions`:** описывай `interface DomainState` (данные) и `interface DomainActions` (мутаторы) раздельно (`type DomainStore = DomainState & { actions: DomainActions }`). Объект `actions` создаётся один раз при инициализации стора, имеет стабильную ссылку и не вызывает ре-рендеров при смене полей состояния.
+2. **Приватный базовый стор:** `const useDomainStoreBase = create<DomainStore>(...)` **никогда не экспортируется** напрямую — на уровне TypeScript исключается случайный вызов `useStore()` без селектора (подписка на весь стор).
+3. **Экспорт только явных атомарных хуков и `use<Domain>Actions()`:**
+   - для каждого поля состояния экспортируй точечный хук: `export const usePalette = () => useUIStoreBase((s) => s.palette)`;
+   - для экшенов экспортируй единый хук: `export const useUIActions = () => useUIStoreBase((s) => s.actions)`;
+   - для императивных вызовов вне React-компонентов (провайдеры, `storage`-слушатели, unit-тесты) экспортируй non-hook хендл: `export const uiStore: Pick<StoreApi<UIStore>, 'getState' | 'subscribe'> = { getState: useUIStoreBase.getState, subscribe: useUIStoreBase.subscribe }`.
+4. **Совместимость с `React 19 Compiler` и Next.js SSR/SSG:**
+   - **НЕ используй `createSelectors` (`store.use.field()`):** при включённом `babel-plugin-react-compiler` динамический вызов хуков через свойство объекта не соответствует статическому правилу `use*` и может ломать авто-мемоизацию / Rules of Hooks.
+   - **НЕ читай `localStorage` / `sessionStorage` на top-level модуля** при инициализации `initialState`: в Next.js App Router (SSR/SSG) это приведёт к `ReferenceError` на сервере или `Hydration Mismatch` — гидратацию браузерного хранилища выполняй строго после монтирования через экшены (`syncPaletteFromStorage`, `hydrateKbFoldersFromSession`) или `<head>` Zero-FOUC скрипт.
 
 ## 2. Браузерная БД `IndexedDB` + `TanStack Query Persister`
 

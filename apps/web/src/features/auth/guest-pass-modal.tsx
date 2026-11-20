@@ -26,7 +26,7 @@ import { useEffect, useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { useRouter } from '@/shared/i18n/navigation'
 import { trackEvent } from '@/shared/lib/analytics'
-import { useUIStore } from '@/shared/store/use-ui-store'
+import { useIsGuestPassModalOpen, usePendingRedirectPath, useUIActions } from '@/shared/store/use-ui-store'
 import { useIssueGuestPassMutation } from './queries/use-visitor-profile'
 
 const ONE_CLICK_PRESETS: ReadonlyArray<{
@@ -67,10 +67,9 @@ export function GuestPassModal() {
   const t = useTranslations('GuestPassModal')
   const router = useRouter()
   const searchParams = useSearchParams()
-  const isOpen = useUIStore((s) => s.isGuestPassModalOpen)
-  const pendingRedirectPath = useUIStore((s) => s.pendingRedirectPath)
-  const openModal = useUIStore((s) => s.openGuestPassModal)
-  const closeModal = useUIStore((s) => s.closeGuestPassModal)
+  const isOpen = useIsGuestPassModalOpen()
+  const pendingRedirectPath = usePendingRedirectPath()
+  const { openGuestPassModal: openModal, closeGuestPassModal: closeModal } = useUIActions()
 
   const [showAdminInput, setShowAdminInput] = useState(false)
   const issuePassMutation = useIssueGuestPassMutation()

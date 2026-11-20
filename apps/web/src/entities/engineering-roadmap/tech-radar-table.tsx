@@ -14,7 +14,12 @@ import { ArrowUpDown, BookOpenCheck, Compass, Layers, Search, Sparkles } from 'l
 import { useTranslations } from 'next-intl'
 import { useState } from 'react'
 import { trackEvent } from '@/shared/lib/analytics'
-import { useUIStore } from '@/shared/store/use-ui-store'
+import {
+  useSelectedAdrItem,
+  useTechRadarCategoryFilter,
+  useTechRadarSearch,
+  useUIActions,
+} from '@/shared/store/use-ui-store'
 
 const CATEGORIES: ReadonlyArray<TechCategory | 'ALL'> = [
   'ALL',
@@ -95,13 +100,15 @@ function DesktopTechRadarDataTable({ data, columns, emptyResultLabel }: DesktopT
 export function TechRadarTable({ items: localizedItems }: { items: readonly TechRadarItem[] }) {
   const t = useTranslations('TechRadar')
 
-  const categoryFilter = useUIStore((s) => s.techRadarCategoryFilter)
-  const searchQuery = useUIStore((s) => s.techRadarSearch)
-  const selectedAdrItem = useUIStore((s) => s.selectedAdrItem)
-  const setCategoryFilter = useUIStore((s) => s.setTechRadarCategoryFilter)
-  const setSearchQuery = useUIStore((s) => s.setTechRadarSearch)
-  const openAdrInspector = useUIStore((s) => s.openAdrInspector)
-  const closeAdrInspector = useUIStore((s) => s.closeAdrInspector)
+  const categoryFilter = useTechRadarCategoryFilter()
+  const searchQuery = useTechRadarSearch()
+  const selectedAdrItem = useSelectedAdrItem()
+  const {
+    setTechRadarCategoryFilter: setCategoryFilter,
+    setTechRadarSearch: setSearchQuery,
+    openAdrInspector,
+    closeAdrInspector,
+  } = useUIActions()
 
   const activeDialogItem = selectedAdrItem
     ? (localizedItems.find((item) => item.id === selectedAdrItem.id) ?? selectedAdrItem)

@@ -64,4 +64,4 @@
 1. **Next.js Local Version-Matched Docs (`nextjs.org/docs/app/guides/ai-agents`):** При работе с API Next.js сверяться с локальной документацией пакета в `apps/web/node_modules/next/dist/docs/` и соблюдать асинхронные контракты (`await params`, `await searchParams`, `await cookies()`).
 2. **Eliminate Waterfalls (`async-*`):** Запускать независимые запросы параллельно через `Promise.all`, использовать `React.cache()` для чтения MDX на сервере.
 3. **Bundle Optimization (`bundle-*`):** Грузить тяжелые клиентские модули (`D3.js` графы, модалки ADR) через `next/dynamic`, настраивать `optimizePackageImports` в `next.config.ts` и минимизировать сериализацию пропсов на границе `RSC -> Client Component`.
-4. **Re-render Hygiene (`rerender-*`):** Использовать только атомарные селекторы в `Zustand` (`useUIStore((s) => s.field)`) и `useRef` для транзиентных значений в `D3.js`.
+4. **Re-render Hygiene (`rerender-*`):** В `Zustand` не экспортировать базовый хук напрямую — использовать явные атомарные хуки (`usePalette()`, `useExpandedKbFolders()`), `useUIActions()` и `useRef` для транзиентных значений в `D3.js` (см. `.agents/frontend/state-and-forms.md`).

@@ -20,7 +20,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { KnowledgeTreeFolderNode, KnowledgeTreeNode } from '@/entities/knowledge-content'
 import { prefetchKnowledgeSearchIndex } from '@/features/search/search-index-client'
 import { Link, usePathname } from '@/shared/i18n/navigation'
-import { useUIStore } from '@/shared/store/use-ui-store'
+import { useExpandedKbFolders, useUIActions } from '@/shared/store/use-ui-store'
 
 function collectAllFolderKeys(nodes: readonly KnowledgeTreeNode[]): string[] {
   const keys: string[] = []
@@ -45,8 +45,8 @@ interface KnowledgeTreeItemProps {
 }
 
 function KnowledgeTreeItem({ node, depth, pathname, closeOnSelect, onSelectLeaf }: KnowledgeTreeItemProps) {
-  const expandedFolders = useUIStore((s) => s.expandedKbFolders)
-  const toggleFolder = useUIStore((s) => s.toggleKbFolder)
+  const expandedFolders = useExpandedKbFolders()
+  const { toggleKbFolder: toggleFolder } = useUIActions()
 
   // Level 3 (or deepest leaf): Article inside a Subtopic
   if (node.type === 'article') {
@@ -178,12 +178,14 @@ export function KnowledgeSidebar({
   const parsedLocale = SupportedLocaleEnum.safeParse(rawLocale)
   const locale = parsedLocale.success ? parsedLocale.data : DEFAULT_LOCALE
   const pathname = usePathname()
-  const expandedFolders = useUIStore((s) => s.expandedKbFolders)
-  const hydrateKbFoldersFromSession = useUIStore((s) => s.hydrateKbFoldersFromSession)
-  const expandKbAncestors = useUIStore((s) => s.expandKbAncestors)
-  const collapseAllKbFolders = useUIStore((s) => s.collapseAllKbFolders)
-  const expandAllKbFolders = useUIStore((s) => s.expandAllKbFolders)
-  const openCommandPalette = useUIStore((s) => s.openCommandPalette)
+  const expandedFolders = useExpandedKbFolders()
+  const {
+    hydrateKbFoldersFromSession,
+    expandKbAncestors,
+    collapseAllKbFolders,
+    expandAllKbFolders,
+    openCommandPalette,
+  } = useUIActions()
   const [isMobileOpen, setIsMobileOpen] = useState(false)
 
   const allFolderKeys = useMemo(() => collectAllFolderKeys(tree), [tree])

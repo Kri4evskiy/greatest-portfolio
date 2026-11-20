@@ -24,7 +24,7 @@ import { useVisitorProfile } from '@/features/auth/queries/use-visitor-profile'
 import { useSectionNavigation } from '@/shared/hooks/use-section-navigation'
 import { useRouter } from '@/shared/i18n/navigation'
 import { trackEvent } from '@/shared/lib/analytics'
-import { useUIStore } from '@/shared/store/use-ui-store'
+import { useCommandPaletteInitialQuery, useIsCommandPaletteOpen, useUIActions } from '@/shared/store/use-ui-store'
 import {
   getCachedKnowledgeSearchIndex,
   type KnowledgeSearchPayload,
@@ -55,11 +55,9 @@ export function CommandPaletteModal({ locale }: CommandPaletteModalProps) {
   const { scrollToSection } = useSectionNavigation()
   const { data: profile } = useVisitorProfile()
 
-  const isOpen = useUIStore((s) => s.isCommandPaletteOpen)
-  const initialQuery = useUIStore((s) => s.commandPaletteInitialQuery)
-  const openPalette = useUIStore((s) => s.openCommandPalette)
-  const closePalette = useUIStore((s) => s.closeCommandPalette)
-  const openGuestPassModal = useUIStore((s) => s.openGuestPassModal)
+  const isOpen = useIsCommandPaletteOpen()
+  const initialQuery = useCommandPaletteInitialQuery()
+  const { openCommandPalette: openPalette, closeCommandPalette: closePalette, openGuestPassModal } = useUIActions()
 
   const [query, setQuery] = useState('')
   const [activeIndex, setActiveIndex] = useState(0)

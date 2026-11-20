@@ -1,5 +1,5 @@
 import type { TechCategory, TechRadarItem } from '@repo/shared-schemas'
-import { create } from 'zustand'
+import { create, type StoreApi } from 'zustand'
 import {
   applyPaletteToDocument,
   persistPaletteToStorage,
@@ -48,7 +48,7 @@ function persistExpandedFoldersToSession(folders: Record<string, boolean>): void
   }
 }
 
-interface UIState {
+export interface UIState {
   isGuestPassModalOpen: boolean
   pendingRedirectPath: string | null
   isCommandPaletteOpen: boolean
@@ -61,7 +61,9 @@ interface UIState {
   hasHydratedKbFolders: boolean
   palette: WorkfolioPalette
   hasHydratedPalette: boolean
+}
 
+export interface UIActions {
   openGuestPassModal: (redirectPath?: string | null) => void
   closeGuestPassModal: () => void
   openCommandPalette: (initialQuery?: string) => void
@@ -81,9 +83,13 @@ interface UIState {
   setPalette: (palette: WorkfolioPalette) => void
 }
 
+export type UIStore = UIState & {
+  actions: UIActions
+}
+
 const DEFAULT_EXPANDED_FOLDERS: Record<string, boolean> = {}
 
-export const useUIStore = create<UIState>((set) => ({
+const initialState: UIState = {
   isGuestPassModalOpen: false,
   pendingRedirectPath: null,
   isCommandPaletteOpen: false,
@@ -96,121 +102,146 @@ export const useUIStore = create<UIState>((set) => ({
   hasHydratedKbFolders: false,
   palette: 'default',
   hasHydratedPalette: false,
+}
 
-  openGuestPassModal: (redirectPath = null) =>
-    set({
-      isGuestPassModalOpen: true,
-      pendingRedirectPath: redirectPath ?? null,
-    }),
-  closeGuestPassModal: () =>
-    set({
-      isGuestPassModalOpen: false,
-    }),
-  openCommandPalette: (initialQuery = '') =>
-    set({
-      isCommandPaletteOpen: true,
-      commandPaletteInitialQuery: initialQuery,
-    }),
-  closeCommandPalette: () =>
-    set({
-      isCommandPaletteOpen: false,
-      commandPaletteInitialQuery: '',
-    }),
-  openAdrInspector: (item) =>
-    set({
-      selectedAdrItem: item,
-    }),
-  closeAdrInspector: () =>
-    set({
-      selectedAdrItem: null,
-    }),
-  setTechRadarCategoryFilter: (category) =>
-    set({
-      techRadarCategoryFilter: category,
-    }),
-  setTechRadarSearch: (search) =>
-    set({
-      techRadarSearch: search,
-    }),
-  toggleKbSidebar: () =>
-    set((state) => ({
-      isKbSidebarOpen: !state.isKbSidebarOpen,
-    })),
-  setKbSidebarOpen: (open) =>
-    set({
-      isKbSidebarOpen: open,
-    }),
-  hydrateKbFoldersFromSession: () =>
-    set((state) => {
-      if (state.hasHydratedKbFolders) {
-        return state
-      }
-      const restored = readExpandedFoldersFromSession()
-      return {
-        hasHydratedKbFolders: true,
-        expandedKbFolders: {
-          ...restored,
-          ...state.expandedKbFolders,
-        },
-      }
-    }),
-  toggleKbFolder: (pathKey) =>
-    set((state) => {
-      const next: Record<string, boolean> = {
-        ...state.expandedKbFolders,
-        [pathKey]: !(state.expandedKbFolders[pathKey] ?? false),
-      }
-      persistExpandedFoldersToSession(next)
-      return { expandedKbFolders: next }
-    }),
-  expandKbAncestors: (pathKeys) =>
-    set((state) => {
-      let changed = false
-      const next = { ...state.expandedKbFolders }
-      for (const key of pathKeys) {
-        if (!next[key]) {
-          next[key] = true
-          changed = true
+// Keep base hook private so components cannot subscribe to the whole store without a selector.
+const useUIStoreBase = create<UIStore>((set) => ({
+  ...initialState,
+  actions: {
+    openGuestPassModal: (redirectPath = null) =>
+      set({
+        isGuestPassModalOpen: true,
+        pendingRedirectPath: redirectPath ?? null,
+      }),
+    closeGuestPassModal: () =>
+      set({
+        isGuestPassModalOpen: false,
+      }),
+    openCommandPalette: (initialQuery = '') =>
+      set({
+        isCommandPaletteOpen: true,
+        commandPaletteInitialQuery: initialQuery,
+      }),
+    closeCommandPalette: () =>
+      set({
+        isCommandPaletteOpen: false,
+        commandPaletteInitialQuery: '',
+      }),
+    openAdrInspector: (item) =>
+      set({
+        selectedAdrItem: item,
+      }),
+    closeAdrInspector: () =>
+      set({
+        selectedAdrItem: null,
+      }),
+    setTechRadarCategoryFilter: (category) =>
+      set({
+        techRadarCategoryFilter: category,
+      }),
+    setTechRadarSearch: (search) =>
+      set({
+        techRadarSearch: search,
+      }),
+    toggleKbSidebar: () =>
+      set((state) => ({
+        isKbSidebarOpen: !state.isKbSidebarOpen,
+      })),
+    setKbSidebarOpen: (open) =>
+      set({
+        isKbSidebarOpen: open,
+      }),
+    hydrateKbFoldersFromSession: () =>
+      set((state) => {
+        if (state.hasHydratedKbFolders) {
+          return state
         }
-      }
-      if (!changed) {
-        return state
-      }
-      persistExpandedFoldersToSession(next)
-      return { expandedKbFolders: next }
-    }),
-  collapseAllKbFolders: () =>
-    set(() => {
-      persistExpandedFoldersToSession({})
-      return { expandedKbFolders: {} }
-    }),
-  expandAllKbFolders: (pathKeys) =>
-    set(() => {
-      const next: Record<string, boolean> = {}
-      for (const key of pathKeys) {
-        next[key] = true
-      }
-      persistExpandedFoldersToSession(next)
-      return { expandedKbFolders: next }
-    }),
-  syncPaletteFromStorage: () =>
-    set((state) => {
-      const restored = readPaletteFromStorage()
-      applyPaletteToDocument(restored)
-      if (state.hasHydratedPalette && state.palette === restored) {
-        return state
-      }
-      return {
-        palette: restored,
+        const restored = readExpandedFoldersFromSession()
+        return {
+          hasHydratedKbFolders: true,
+          expandedKbFolders: {
+            ...restored,
+            ...state.expandedKbFolders,
+          },
+        }
+      }),
+    toggleKbFolder: (pathKey) =>
+      set((state) => {
+        const next: Record<string, boolean> = {
+          ...state.expandedKbFolders,
+          [pathKey]: !(state.expandedKbFolders[pathKey] ?? false),
+        }
+        persistExpandedFoldersToSession(next)
+        return { expandedKbFolders: next }
+      }),
+    expandKbAncestors: (pathKeys) =>
+      set((state) => {
+        let changed = false
+        const next = { ...state.expandedKbFolders }
+        for (const key of pathKeys) {
+          if (!next[key]) {
+            next[key] = true
+            changed = true
+          }
+        }
+        if (!changed) {
+          return state
+        }
+        persistExpandedFoldersToSession(next)
+        return { expandedKbFolders: next }
+      }),
+    collapseAllKbFolders: () =>
+      set(() => {
+        persistExpandedFoldersToSession({})
+        return { expandedKbFolders: {} }
+      }),
+    expandAllKbFolders: (pathKeys) =>
+      set(() => {
+        const next: Record<string, boolean> = {}
+        for (const key of pathKeys) {
+          next[key] = true
+        }
+        persistExpandedFoldersToSession(next)
+        return { expandedKbFolders: next }
+      }),
+    syncPaletteFromStorage: () =>
+      set((state) => {
+        const restored = readPaletteFromStorage()
+        applyPaletteToDocument(restored)
+        if (state.hasHydratedPalette && state.palette === restored) {
+          return state
+        }
+        return {
+          palette: restored,
+          hasHydratedPalette: true,
+        }
+      }),
+    setPalette: (palette) => {
+      applyPaletteToDocument(palette)
+      persistPaletteToStorage(palette)
+      set({
+        palette,
         hasHydratedPalette: true,
-      }
-    }),
-  setPalette: (palette) => {
-    applyPaletteToDocument(palette)
-    persistPaletteToStorage(palette)
-    set({
-      palette,
-      hasHydratedPalette: true,
-    })
+      })
+    },
   },
 }))
+
+/** Imperative store handle for non-React contexts (e.g. ThemeProvider mount/storage sync, tests). */
+export const uiStore: Pick<StoreApi<UIStore>, 'getState' | 'subscribe'> = {
+  getState: useUIStoreBase.getState,
+  subscribe: useUIStoreBase.subscribe,
+}
+
+export const useUIActions = () => useUIStoreBase((s) => s.actions)
+export const useIsGuestPassModalOpen = () => useUIStoreBase((s) => s.isGuestPassModalOpen)
+export const usePendingRedirectPath = () => useUIStoreBase((s) => s.pendingRedirectPath)
+export const useIsCommandPaletteOpen = () => useUIStoreBase((s) => s.isCommandPaletteOpen)
+export const useCommandPaletteInitialQuery = () => useUIStoreBase((s) => s.commandPaletteInitialQuery)
+export const useSelectedAdrItem = () => useUIStoreBase((s) => s.selectedAdrItem)
+export const useTechRadarCategoryFilter = () => useUIStoreBase((s) => s.techRadarCategoryFilter)
+export const useTechRadarSearch = () => useUIStoreBase((s) => s.techRadarSearch)
+export const useIsKbSidebarOpen = () => useUIStoreBase((s) => s.isKbSidebarOpen)
+export const useExpandedKbFolders = () => useUIStoreBase((s) => s.expandedKbFolders)
+export const usePalette = () => useUIStoreBase((s) => s.palette)
+export const useHasHydratedPalette = () => useUIStoreBase((s) => s.hasHydratedPalette)

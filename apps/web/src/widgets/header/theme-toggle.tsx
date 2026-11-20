@@ -7,7 +7,7 @@ import { useTheme } from 'next-themes'
 import { useState } from 'react'
 import { trackEvent } from '@/shared/lib/analytics'
 import type { WorkfolioPalette } from '@/shared/lib/palette'
-import { useUIStore } from '@/shared/store/use-ui-store'
+import { useHasHydratedPalette, usePalette, useUIActions } from '@/shared/store/use-ui-store'
 
 type ThemeModeOption = 'light' | 'dark' | 'system'
 
@@ -56,9 +56,9 @@ const MODE_OPTIONS: readonly {
 export function ThemeToggle() {
   const { theme, setTheme } = useTheme()
   const t = useTranslations('Header')
-  const palette = useUIStore((s) => s.palette)
-  const hasHydratedPalette = useUIStore((s) => s.hasHydratedPalette)
-  const setPalette = useUIStore((s) => s.setPalette)
+  const palette = usePalette()
+  const hasHydratedPalette = useHasHydratedPalette()
+  const { setPalette } = useUIActions()
 
   const [popoverOpen, setPopoverOpen] = useState(false)
   const [tooltipOpen, setTooltipOpen] = useState(false)

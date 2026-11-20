@@ -59,9 +59,9 @@ tldr:
 
 В хедере [`ThemeToggle`](apps/web/src/widgets/header/theme-toggle.tsx) собран на примитивах `@repo/ui` (`Button`, `Tooltip` + `Popover`) и выступает чистым UI-контролом для управления обеими ортогональными осями одновременно:
 - **Тема (`Light / Dark / System`):** через `next-themes` и класс `.dark`.
-- **Палитра (`Palette`):** `Warm Paper` (`default`), `Graphite` или `Sepia` (хранится в `localStorage['workfolio-palette']` и синхронизируется с `html[data-palette]` через `useUIStore`).
+- **Палитра (`Palette`):** `Warm Paper` (`default`), `Graphite` или `Sepia` (хранится в `localStorage['workfolio-palette']` и синхронизируется с `html[data-palette]` через `@/shared/store/use-ui-store`).
 
-Чтобы при перезагрузке страницы с активной палитрой `Graphite` или `Sepia` не возникала белая/цветная вспышка (FOUC), `LocaleRootLayout` встраивает статический скрипт `PALETTE_INIT_SCRIPT` прямо в `<head>` до первой отрисовки, а корневой `ThemeProvider` выполняет клиентскую гидратацию и кросс-вкладочную синхронизацию `storage` императивно через `useUIStore.getState().syncPaletteFromStorage()` (без лишней подписки `useSyncExternalStore` и ре-рендеров дерева).
+Чтобы при перезагрузке страницы с активной палитрой `Graphite` или `Sepia` не возникала белая/цветная вспышка (FOUC), `LocaleRootLayout` встраивает статический скрипт `PALETTE_INIT_SCRIPT` прямо в `<head>` до первой отрисовки, а корневой `ThemeProvider` выполняет клиентскую гидратацию и кросс-вкладочную синхронизацию `storage` императивно через `uiStore.getState().actions.syncPaletteFromStorage()` (без лишней подписки `useSyncExternalStore` и ре-рендеров дерева).
 
 > [!TIP]
 > Разделение осей `.dark` и `data-palette` в связке с `@theme inline` позволяет подключить любую новую тему или брендинг клиента (`multi-tenant / white-label`) переопределением CSS-переменных без единой правки в React-компонентах.

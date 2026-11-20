@@ -17,7 +17,7 @@ import { useVisitorProfile } from '@/features/auth/queries/use-visitor-profile'
 import { useSectionNavigation } from '@/shared/hooks/use-section-navigation'
 import { Link, useRouter } from '@/shared/i18n/navigation'
 import { trackEvent } from '@/shared/lib/analytics'
-import { useUIStore } from '@/shared/store/use-ui-store'
+import { useUIActions } from '@/shared/store/use-ui-store'
 
 interface HeroActionRowProps {
   ctaUnlocked: string
@@ -31,7 +31,7 @@ export function HeroActionRow({ ctaUnlocked, ctaLocked, ctaCvPdf, ctaTechRadar, 
   const router = useRouter()
   const { scrollToSection } = useSectionNavigation()
   const { data: profile } = useVisitorProfile()
-  const openGuestPassModal = useUIStore((s) => s.openGuestPassModal)
+  const { openGuestPassModal } = useUIActions()
 
   const isUnlocked = profile?.role === 'USER' || profile?.role === 'ADMIN'
 
@@ -105,7 +105,7 @@ interface CaseStudyReadButtonProps {
 export function CaseStudyReadButton({ category, slug, readUnlockedLabel, readLockedLabel }: CaseStudyReadButtonProps) {
   const router = useRouter()
   const { data: profile } = useVisitorProfile()
-  const openGuestPassModal = useUIStore((s) => s.openGuestPassModal)
+  const { openGuestPassModal } = useUIActions()
 
   const isUnlocked = profile?.role === 'USER' || profile?.role === 'ADMIN'
 

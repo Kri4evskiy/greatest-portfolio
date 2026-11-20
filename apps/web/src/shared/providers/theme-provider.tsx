@@ -3,7 +3,7 @@
 import { ThemeProvider as NextThemesProvider } from 'next-themes'
 import { type ReactNode, useEffect } from 'react'
 import { PALETTE_STORAGE_KEY } from '@/shared/lib/palette'
-import { useUIStore } from '@/shared/store/use-ui-store'
+import { uiStore } from '@/shared/store/use-ui-store'
 
 // Suppress the React 19 false-positive development warning for next-themes script injection.
 // React 19 warns when rendering an inline <script> tag inside client components, but next-themes
@@ -22,7 +22,7 @@ import { useUIStore } from '@/shared/store/use-ui-store'
 export function ThemeProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const syncPalette = () => {
-      useUIStore.getState().syncPaletteFromStorage()
+      uiStore.getState().actions.syncPaletteFromStorage()
     }
 
     syncPalette()

@@ -68,7 +68,7 @@ apps/web/src/
     ├── i18n/                   # navigation.ts, routing.ts, request.ts
     ├── lib/                    # edge-jwt.ts, analytics.ts, palette.ts
     ├── providers/              # ThemeProvider, QueryProvider
-    └── store/                  # useUIStore (Zustand)
+    └── store/                  # Zustand (use-ui-store: actions + атомарные use* хуки + uiStore)
 ```
 
 ### Золотое правило зависимостей FSD-Modular:

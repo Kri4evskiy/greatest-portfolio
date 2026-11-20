@@ -49,7 +49,7 @@ description: Official Vercel Engineering React & Next.js Best Practices (vercel-
 
 ### Priority 5: Re-render Optimization (`rerender-*`) — MEDIUM
 
-- **`rerender-derived-state`:** В `Zustand` подписывайся через атомарные селекторы (`useUIStore((s) => s.isGuestPassModalOpen)`), никогда не деструктурируй весь стор (`const { ... } = useUIStore()`).
+- **`rerender-derived-state`:** В `Zustand` не экспортируй базовый хук напрямую — подписывайся только через явные атомарные хуки (`usePalette()`, `useIsGuestPassModalOpen()`) и `useUIActions()`, никогда не вызывай весь стор целиком и не используй `createSelectors` `.use.field()` при включённом `React 19 Compiler`.
 - **`rerender-use-ref-transient-values`:** Часто меняющиеся значения (координаты курсора на графе `D3.js`, таймеры анимации) храни в `useRef`, а не в `useState`.
 - **`rerender-simple-expression-in-memo`:** Не оборачивай примитивные выражения (`const isAdmin = role === 'ADMIN'`) в `useMemo`.
 

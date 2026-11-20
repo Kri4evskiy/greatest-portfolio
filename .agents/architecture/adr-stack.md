@@ -46,7 +46,7 @@
   - `Zustand` — микроскопический (~1 KB), не требует `Context Provider`'ов (нет лишних ререндеров дерева) и идеально хранит синхронный UI-стейт.
 - **Где применяется (Where):** В `apps/web`.
 - **Как реализовано (How):**
-  - **В Zustand:** состояние сайдбара базы знаний, активная палитра (`default` / `graphite` / `sepia`), настройки интерактивных графиков `D3.js`, модалки авторизации и поиска (`useUIStore`), при этом `ThemeProvider` вызывает `useUIStore.getState().syncPaletteFromStorage()` императивно на mount/storage-событии без лишней подписки `useSyncExternalStore` на корневом провайдере.
+  - **В Zustand:** состояние сайдбара базы знаний, активная палитра (`default` / `graphite` / `sepia`), настройки интерактивных графиков `D3.js`, модалки авторизации и поиска (`use-ui-store.ts`: приватный стор с раздельными `actions`, явные `use*` атомарные хуки + `useUIActions()` для совместимости с `React 19 Compiler`), при этом `ThemeProvider` вызывает `uiStore.getState().actions.syncPaletteFromStorage()` императивно на mount/storage-событии без лишней подписки `useSyncExternalStore` на корневом провайдере.
   - **В TanStack Query:** хуки `useArticleMeta()`, `useVisitorProfile()`, мутации лайков/закладок с `onMutate` (Optimistic UI).
 
 ---
