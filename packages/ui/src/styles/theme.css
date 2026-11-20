@@ -228,6 +228,11 @@
     scroll-padding-top: 5rem;
   }
 
+  /* Release reserved gutter while Radix Dialog locks body scroll so fixed overlays span 100% width without a right-edge strip */
+  html:has(body[data-scroll-locked]) {
+    scrollbar-gutter: auto;
+  }
+
   @media (prefers-reduced-motion: no-preference) {
     html {
       scroll-behavior: smooth;
