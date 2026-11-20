@@ -65,7 +65,7 @@ Structural patterns define how modules, third-party drivers, and UI layers compo
 | **8. Composite** | Composes objects into recursive tree hierarchies where leaf nodes and branches are treated uniformly. | Recursive 3-tier Knowledge Base tree (`KnowledgeTreeNode`: `Topic ➔ Subtopic ➔ Article`) and `HAST` AST nodes. |
 | **9. Decorator** | Attaches cross-cutting metadata or behavior to classes, methods, or components without mutating their core code. | NestJS `@Roles('ADMIN')`, `@Public()`, `@Throttle()` metadata decorators and Radix UI `asChild` slot composition. |
 | **10. Facade** | Provides a clean, unified entry point over a complex subsystem of multiple libraries or steps. | `uiStore.getState().actions` & `useUIActions()` hiding `localStorage`, DOM `data-palette` attribute sync, and Zustand state behind one call. |
-| **11. Flyweight** | Minimizes memory footprint by sharing immutable intrinsic state across hundreds of fine-grained objects. | Shared `Shiki` syntax highlighter grammar instance and file `mtimeMs` in-memory HAST cache across 167 SSG routes. |
+| **11. Flyweight** | Minimizes memory footprint by sharing immutable intrinsic state across hundreds of fine-grained objects. | Shared `Shiki` syntax highlighter grammar instance and file `mtimeMs` in-memory HAST cache across all localized SSG routes. |
 | **12. Proxy** | Intercepts access to a target resource to enforce authentication, caching, routing, or lazy initialization. | `apps/web/src/proxy.ts` (Next.js 16 Edge Proxy verifying `HS256` `HttpOnly` JWT cookies via Web Crypto in `< 0.2ms` before rendering `/knowledge-base`). |
 
 ```typescript title="apps/api/src/prisma/prisma.service.ts — Adapter + Facade in Prisma 7"
