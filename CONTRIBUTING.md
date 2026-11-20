@@ -73,6 +73,9 @@ pnpm run typecheck
 
 # Full production build
 pnpm run build
+
+# Prune old local Turborepo cache archives (pass -- --all for a full reset)
+pnpm run clean-cache
 ```
 
 ---

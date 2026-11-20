@@ -109,20 +109,21 @@ docker compose up --build -d
 
 ## 🛠️ Monorepo Commands (Root Directory)
 
-| Command                            | Description                                                                          |
-| :--------------------------------- | :----------------------------------------------------------------------------------- |
-| `pnpm install`                     | Installs all `apps/*` and `packages/*` dependencies + triggers `setup`               |
-| `pnpm run setup`                   | Syncs `.env`, builds `@repo/shared-schemas`, and generates `Prisma Client`           |
-| `pnpm run dev`                     | **Adaptive runner:** Turborepo with automatic graceful fallback to `pnpm workspaces` |
-| `pnpm run dev:pnpm`                | Force runs all services via `pnpm --parallel` (bypassing `turbo.exe`)                |
-| `pnpm run dev:turbo`               | Explicitly runs via `Turborepo` (`turbo run dev`)                                    |
-| `pnpm run build`                   | Production build across all packages and apps via `Turborepo`                        |
-| `pnpm run build:pnpm`              | Builds the monorepo directly via `pnpm -r build` in topological dependency order     |
-| `pnpm run typecheck`               | Strict TypeScript validation (`tsc --noEmit`) across all packages via `Turborepo`    |
-| `pnpm run typecheck:pnpm`          | Typechecks packages directly via `pnpm -r typecheck`                                 |
-| `pnpm run lint`                    | Blazing fast linting and formatting verification via `Biome.js` (Rust)               |
-| `pnpm run lint:fix`                | Automatically fixes linting and formatting issues via `Biome.js`                     |
-| `pnpm --filter @repo/ui storybook` | Starts the interactive `Storybook` component showcase on port `6006`                 |
+| Command                            | Description                                                                                                                  |
+| :--------------------------------- | :--------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm install`                     | Installs all `apps/*` and `packages/*` dependencies + triggers `setup`                                                       |
+| `pnpm run setup`                   | Syncs `.env`, builds `@repo/shared-schemas`, and generates `Prisma Client`                                                   |
+| `pnpm run dev`                     | **Adaptive runner:** Turborepo with automatic graceful fallback to `pnpm workspaces`                                         |
+| `pnpm run dev:pnpm`                | Force runs all services via `pnpm --parallel` (bypassing `turbo.exe`)                                                        |
+| `pnpm run dev:turbo`               | Explicitly runs via `Turborepo` (`turbo run dev`)                                                                            |
+| `pnpm run build`                   | Production build across all packages and apps via `Turborepo`                                                                |
+| `pnpm run build:pnpm`              | Builds the monorepo directly via `pnpm -r build` in topological dependency order                                             |
+| `pnpm run clean-cache`             | Prunes old local `.turbo/cache` archives while preserving recent cache hits (supports `--all`, `--keep=N`, `--keep-heavy=N`) |
+| `pnpm run typecheck`               | Strict TypeScript validation (`tsc --noEmit`) across all packages via `Turborepo`                                            |
+| `pnpm run typecheck:pnpm`          | Typechecks packages directly via `pnpm -r typecheck`                                                                         |
+| `pnpm run lint`                    | Blazing fast linting and formatting verification via `Biome.js` (Rust)                                                       |
+| `pnpm run lint:fix`                | Automatically fixes linting and formatting issues via `Biome.js`                                                             |
+| `pnpm --filter @repo/ui storybook` | Starts the interactive `Storybook` component showcase on port `6006`                                                         |
 
 ### 🛡️ DX Resilience & Windows Smart App Control (SAC)
 

@@ -10,6 +10,7 @@
   "scripts": {
     "build": "turbo run build",
     "build:pnpm": "pnpm -r build",
+    "clean-cache": "node scripts/clean-cache.mjs",
     "dev": "node scripts/dev-runner.mjs",
     "dev:turbo": "turbo run dev",
     "dev:pnpm": "pnpm --filter @repo/web --filter @repo/api --filter @repo/telemetry-ms --parallel dev",
