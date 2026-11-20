@@ -57,9 +57,9 @@ export const ENGINEERING_ROADMAP_ITEMS: readonly EngineeringRoadmapItem[] = [
       ru: 'Production SEO (Sitemap / Robots), локализованные Error Boundaries и Zero-Friction Docker Demo',
     },
     summary: {
-      en: 'Ship sitemap.ts (167 SSG routes with hreflang), robots.ts, localized [locale]/not-found.tsx & error.tsx, and clean separation between 1-command Docker reviewer demo and strict production secrets (with OpenGraph image cards queued cleanly alongside UI v2).',
-      uk: 'Додати sitemap.ts (167 SSG-маршрутів з hreflang), robots.ts, локалізовані not-found.tsx / error.tsx та чітко розділити 1-командне Docker Demo для рев’юера і суворі прод-секрети (динамічні OpenGraph-картки заплановані разом з UI v2).',
-      ru: 'Добавить sitemap.ts (167 SSG-роутов с hreflang), robots.ts, локализованные not-found.tsx / error.tsx и разделить 1-командное Docker Demo для тимлида и строгие прод-секреты (а OpenGraph-карточки вынести в пару к UI v2).',
+      en: 'Ship sitemap.ts (173 SSG routes with hreflang), robots.ts, localized [locale]/not-found.tsx & error.tsx, and clean separation between 1-command Docker reviewer demo and strict production secrets (with OpenGraph image cards queued cleanly alongside UI v2).',
+      uk: 'Додати sitemap.ts (173 SSG-маршрути з hreflang), robots.ts, локалізовані not-found.tsx / error.tsx та чітко розділити 1-командне Docker Demo для рев’юера і суворі прод-секрети (динамічні OpenGraph-картки заплановані разом з UI v2).',
+      ru: 'Добавить sitemap.ts (173 SSG-роута с hreflang), robots.ts, локализованные not-found.tsx / error.tsx и разделить 1-командное Docker Demo для тимлида и строгие прод-секреты (а OpenGraph-карточки вынести в пару к UI v2).',
     },
     rationale: {
       en: 'Delivers full EN/UA/RU search indexing, localized 404/Error recovery, and effortless docker compose up --build without API keys (via capability-gated disabled badges) while keeping strict fail-fast validation in docker-compose.prod.yml.',

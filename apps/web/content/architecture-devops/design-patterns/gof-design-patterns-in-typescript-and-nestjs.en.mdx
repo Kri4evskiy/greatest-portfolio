@@ -1,0 +1,115 @@
+---
+title: "23 GoF Design Patterns in Modern TypeScript 7, Next.js 16 & NestJS 12"
+sidebarLabel: "23 GoF Design Patterns"
+metricSlug: "gof-design-patterns-in-typescript-and-nestjs"
+summary: "Complete reference of all 23 Gang of Four (Creational, Structural, Behavioral) design patterns mapped to real production code in our TypeScript 7, Next.js 16, NestJS 12, and Prisma 7 monorepo."
+category: "architecture-devops"
+format: "cheat-sheet"
+tags: ["typescript", "architecture", "nestjs", "patterns"]
+readingTime: "9 min"
+publishedAt: "2026-11-21"
+order: 2
+tldr:
+  - "Covers all 23 classic Gang of Four (GoF) patterns grouped into Creational (5), Structural (7), and Behavioral (11) with interview-ready summaries and real monorepo mappings."
+  - "In modern TypeScript, first-class functions, union types, and closures replace boilerplate OOP class hierarchies for Strategy, Command, Observer, and Factory."
+  - "Maps key patterns directly to our stack: Adapter (`@prisma/adapter-pg`), Proxy (`src/proxy.ts` Edge JWT), Composite/Visitor (Zero-Eval HAST MDX AST), and Chain of Responsibility (NestJS Guards & Pipes)."
+---
+
+## 1. GoF Patterns in Idiomatic TypeScript vs Classic Java/C++ OOP
+
+Classic Gang of Four (GoF) patterns were written in 1994 for nominal class-based languages (`C++`, `Smalltalk`). In modern **TypeScript 7** (`strict: true`), structural typing, closures, discriminated unions, and ECMAScript modules eliminate 70% of classic ceremony while keeping the architectural intent intact.
+
+<Callout title="Golden Rule for Technical Interviews" variant="info">
+Never introduce a 4-file abstract class hierarchy when a typed higher-order function or discriminated union solves the problem. Use **classes** when managing stateful lifecycle or NestJS Dependency Injection tokens; use **structural types & pure functions** everywhere else.
+</Callout>
+
+---
+
+## 2. Creational Patterns (5) — Object & Instance Lifecycle
+
+Creational patterns decouple **how** dependencies and state containers are instantiated from the code that consumes them.
+
+| Pattern | Core Intent (1-Sentence Interview Answer) | Real Monorepo / TypeScript Implementation |
+| :--- | :--- | :--- |
+| **1. Factory** | Creates objects or instances without exposing concrete instantiation logic to the caller. | `createOffsetPaginatedResponseSchema(ItemSchema)` in `@repo/shared-schemas` — generic Zod schema factory returning typed pagination envelopes. |
+| **2. Abstract Factory** | Produces families of related objects (`Light`/`Dark` × `Warm Paper`/`Graphite`/`Sepia` tokens or storage drivers) without coupling to concrete implementations. | Multi-axis 2D theme/palette token resolution and NestJS dynamic module factories (`useFactory`). |
+| **3. Builder** | Constructs complex objects step-by-step with fluent method chaining and compile-time type narrowing. | Immutable Zod schema chaining (`z.string().trim().min(2).max(50)`) and SQL/Prisma query composition. |
+| **4. Prototype** | Creates new objects by cloning and overriding a pre-configured baseline template instead of building from scratch. | Layered `tsconfig.base.json` inheritance and cloning base `RequestInit` / immutable state snapshots. |
+| **5. Singleton** | Ensures a resource has at most one instance per execution context (`Browser Window` or `NestJS DI Container`). | `getQueryClient()` browser singleton in `query-provider.tsx` (preserving `0ms` cache across `[locale]` switches) and `@Injectable()` `PrismaService`. |
+
+```typescript title="apps/web/src/shared/providers/query-provider.tsx — Browser Singleton Pattern"
+let browserQueryClient: QueryClient | undefined
+
+export function getQueryClient(): QueryClient {
+  if (typeof window === 'undefined') {
+    // SSR / RSC: always isolate a fresh instance per request to prevent cross-request data leaks
+    return makeQueryClient()
+  }
+  if (!browserQueryClient) {
+    browserQueryClient = makeQueryClient()
+  }
+  return browserQueryClient
+}
+```
+
+---
+
+## 3. Structural Patterns (7) — Composition & Boundaries
+
+Structural patterns define how modules, third-party drivers, and UI layers compose across architectural boundaries (`FSD-Modular` on the frontend, `Enterprise 4-Layer` on the backend).
+
+| Pattern | Core Intent (1-Sentence Interview Answer) | Real Monorepo / TypeScript Implementation |
+| :--- | :--- | :--- |
+| **6. Adapter** | Bridges two incompatible interfaces so they can work together without modifying either side. | `@prisma/adapter-pg` (`PrismaPg`) adapting a `pg.Pool` driver into the Rust-free **Prisma 7** Wasm client in `PrismaService`. |
+| **7. Bridge** | Separates a high-level abstraction from its low-level platform implementation so both vary independently. | `analytics.ts` / telemetry client abstracting domain events away from transport engines (`PostHog`, `Sentry`, or console no-op). |
+| **8. Composite** | Composes objects into recursive tree hierarchies where leaf nodes and branches are treated uniformly. | Recursive 3-tier Knowledge Base tree (`KnowledgeTreeNode`: `Topic ➔ Subtopic ➔ Article`) and `HAST` AST nodes. |
+| **9. Decorator** | Attaches cross-cutting metadata or behavior to classes, methods, or components without mutating their core code. | NestJS `@Roles('ADMIN')`, `@Public()`, `@Throttle()` metadata decorators and Radix UI `asChild` slot composition. |
+| **10. Facade** | Provides a clean, unified entry point over a complex subsystem of multiple libraries or steps. | `uiStore.getState().actions` & `useUIActions()` hiding `localStorage`, DOM `data-palette` attribute sync, and Zustand state behind one call. |
+| **11. Flyweight** | Minimizes memory footprint by sharing immutable intrinsic state across hundreds of fine-grained objects. | Shared `Shiki` syntax highlighter grammar instance and file `mtimeMs` in-memory HAST cache across 167 SSG routes. |
+| **12. Proxy** | Intercepts access to a target resource to enforce authentication, caching, routing, or lazy initialization. | `apps/web/src/proxy.ts` (Next.js 16 Edge Proxy verifying `HS256` `HttpOnly` JWT cookies via Web Crypto in `< 0.2ms` before rendering `/knowledge-base`). |
+
+```typescript title="apps/api/src/prisma/prisma.service.ts — Adapter + Facade in Prisma 7"
+const pool = new pg.Pool({ connectionString: databaseUrl, max: 10 })
+// Adapter pattern: PrismaPg adapts node-postgres (pg.Pool) to Prisma 7 Wasm Query Compiler
+const adapter = new PrismaPg(pool)
+this.client = new PrismaClient({ adapter })
+```
+
+---
+
+## 4. Behavioral Patterns (11) — Communication, State & Algorithms
+
+Behavioral patterns govern data flow, asynchronous event streams, AST transformations, and fallback execution strategies.
+
+| Pattern | Core Intent (1-Sentence Interview Answer) | Real Monorepo / TypeScript Implementation |
+| :--- | :--- | :--- |
+| **13. Chain of Responsibility** | Passes a request sequentially through a pipeline of handlers where each stage can validate, transform, or short-circuit. | NestJS HTTP pipeline: `Helmet` ➔ `ThrottlerGuard` ➔ `JwtRolesGuard` ➔ `ZodValidationPipe` ➔ `Controller`. |
+| **14. Command** | Encapsulates an action and its parameters as a serializable object for queuing, keyboard shortcuts, or undo/redo. | `CommandPaletteModal` (`Cmd+K`) action descriptors and declarative Zustand `UIActions` (`openGuestPassModal(redirectPath)`). |
+| **15. Interpreter** | Evaluates sentences or directives of a domain-specific language (DSL) using a formal grammar representation. | Custom MDX `remark-directive` parser transforming `:::sandbox{name="..."}` blocks into live interactive React islands. |
+| **16. Iterator** | Traverses elements of a collection or paginated dataset sequentially without exposing internal storage details. | Cursor-based pagination (`GET /api/telemetry/events?cursor=...`, `take: limit + 1`) and tree walkers. |
+| **17. Mediator** | Reduces chaotic `N×N` direct coupling between components by routing coordination through a central hub. | Root `ThemeProvider` + `useUIStore` coordinating `WorkfolioHeader`, `GuestPassModal`, `CommandPaletteModal`, and cross-tab `storage` events. |
+| **18. Memento** | Captures and externalizes an object's internal state snapshot so it can be restored later without breaking encapsulation. | `TanStack Query` + `IndexedDB Persister` serializing query cache snapshots across browser reloads and offline sessions. |
+| **19. Observer** | Defines a `1:N` subscription mechanism so dependents are notified automatically whenever state or stream data changes. | NestJS `RxJS Subject` powering `@Sse('stream')` live telemetry and React 19 `useSyncExternalStore` in `useActiveWorkfolioSection`. |
+| **20. State** | Allows an entity to alter its behavior and UI transitions deterministically when its internal state machine changes. | Discriminated union state machines in `CodeExecutionSandbox` (`'idle' | 'running' | 'completed'`) and RBAC roles (`'GUEST' | 'USER' | 'ADMIN'`). |
+| **21. Strategy** | Defines a family of interchangeable algorithms behind a common contract and selects the active one at runtime. | **Graceful In-Memory Fallback Strategy** in `PrismaService` & `KnowledgeService` (PostgreSQL when `DATABASE_URL` is healthy, zero-crash In-Memory Map when offline). |
+| **22. Template Method** | Defines the invariant skeleton of an algorithm while letting concrete steps override specific hooks. | Unified `unified().use(remarkParse).use(remarkGfm).use(remarkDirective).use(remarkRehype)` MDX compilation pipeline. |
+| **23. Visitor** | Separates an algorithm from the object structure it operates on, traversing heterogeneous nodes without modifying their classes. | `unist-util-visit` AST visitors walking `MDAST` / `HAST` trees to extract `h2`/`h3` TOC anchors, inject dual-theme Shiki tokens, and sanitize links. |
+
+```typescript title="apps/web/src/entities/knowledge-content/mdx-compiler.ts — Visitor + Strategy over HAST AST"
+// Visitor pattern: traverses heterogeneous HAST nodes without mutating node classes
+visit(tree, 'element', (node) => {
+  if (node.tagName === 'h2' || node.tagName === 'h3') {
+    const id = slugifyHeading(extractNodeText(node))
+    node.properties = { ...node.properties, id }
+    headings.push({ id, text: extractNodeText(node), level: node.tagName === 'h2' ? 2 : 3 })
+  }
+})
+```
+
+---
+
+## 5. Quick Anti-Pattern Checklist: When NOT to Use GoF Classes
+
+1. **Class-heavy `Strategy` or `Command` with a single `execute()` method:** In TypeScript, replace `interface SortStrategy { sort(a: Item, b: Item): number }` with a typed function `(a: Item, b: Item) => number` or a `Record<StrategyKey, HandlerFn>` lookup table.
+2. **Manual `Singleton` class with `private constructor()` for stateless helpers:** Standard ES modules (`export function verifyEdgeJwtHs256()`) are already evaluated once per bundle. Reserve explicit singletons for stateful runtime connections (`QueryClient`, `pg.Pool`).
+3. **Deep inheritance trees (`Template Method` via `extends BaseController`):** Prefer **composition** (`NestJS Guards/Interceptors/Pipes` or React custom hooks) over multi-level class inheritance.

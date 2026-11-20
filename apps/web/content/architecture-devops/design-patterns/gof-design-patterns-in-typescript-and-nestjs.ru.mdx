@@ -1,0 +1,115 @@
+---
+title: "23 паттерна проектирования GoF в современном TypeScript 7, Next.js 16 и NestJS 12"
+sidebarLabel: "23 паттерна GoF в TS"
+metricSlug: "gof-design-patterns-in-typescript-and-nestjs"
+summary: "Полная шпаргалка по всем 23 классическим паттернам Банды Четырёх (Порождающие, Структурные, Поведенческие) на реальных примерах кода из нашего монорепозитория на TypeScript 7, Next.js 16, NestJS 12 и Prisma 7."
+category: "architecture-devops"
+format: "cheat-sheet"
+tags: ["typescript", "architecture", "nestjs", "patterns"]
+readingTime: "9 мин"
+publishedAt: "2026-11-21"
+order: 2
+tldr:
+  - "Справочник по всем 23 паттернам GoF: Порождающие (5), Структурные (7) и Поведенческие (11) с краткими формулировками для собеседований и маппингом на код проекта."
+  - "В современном TypeScript функции высшего порядка, замыкания и размеченные объединения (Discriminated Unions) заменяют громоздкие иерархии классов для Strategy, Command, Observer и Factory."
+  - "Реальные примеры из нашего стека: Adapter (`@prisma/adapter-pg`), Proxy (`src/proxy.ts` Edge JWT), Composite/Visitor (Zero-Eval HAST MDX AST) и Chain of Responsibility (Guards и Pipes в NestJS)."
+---
+
+## 1. Паттерны GoF в идиоматичном TypeScript против классического ООП (Java/C++)
+
+Классическая книга «Банды Четырёх» (GoF, 1994) писалась для языков с номинативной типизацией (`C++`, `Smalltalk`). В современном **TypeScript 7** (`strict: true`) структурная типизация, замыкания, `Discriminated Unions` и ES-модули убирают 70% шаблонного ООП-бойлерплейта, сохраняя саму архитектурную идею каждого паттерна.
+
+<Callout title="Золотое правило для технических собеседований" variant="info">
+Никогда не городите иерархию из 4 абстрактных классов там, где задачу решает типизированная функция высшего порядка или `Record<Key, Handler>`. Используйте **классы** для управления жизненным циклом соединений и DI-токенами в `NestJS`, а **чистые функции и структурные типы** — во всех остальных случаях.
+</Callout>
+
+---
+
+## 2. Порождающие паттерны (Creational — 5) — Создание и жизненный цикл
+
+Порождающие паттерны отделяют логику **создания и конфигурации** объектов от кода, который их использует.
+
+| Паттерн | Суть в 1 предложении (для собеседования) | Где и как работает в нашем монорепозитории |
+| :--- | :--- | :--- |
+| **1. Factory (Фабрика)** | Создаёт объекты или схемы без раскрытия конкретной логики конструирования вызывающему коду. | `createOffsetPaginatedResponseSchema(ItemSchema)` в `@repo/shared-schemas` — generic-фабрика Zod-схем пагинации. |
+| **2. Abstract Factory (Абстрактная фабрика)** | Создаёт семейства взаимосвязанных объектов (`Light`/`Dark` × `Warm Paper`/`Graphite`/`Sepia` или драйверы хранилищ) без привязки к конкретным классам. | Матрица 2D-тем оформления и асинхронные фабрики модулей NestJS (`useFactory`). |
+| **3. Builder (Строитель)** | Пошагово конструирует сложный объект или запрос через цепочку методов (fluent interface) с сужением типов. | Цепочки валидации Zod (`z.string().trim().min(2).max(50)`) и декларативная сборка фильтров Prisma. |
+| **4. Prototype (Прототип)** | Создаёт новые объекты путём клонирования и точечного переопределения базового шаблона. | Каскадное наследование `tsconfig.base.json` и клонирование базовых иммутабельных конфигураций запроса. |
+| **5. Singleton (Одиночка)** | Гарантирует не более одного экземпляра ресурса в рамках контекста выполнения (`Browser Window` или `NestJS DI Container`). | Браузерный синглтон `getQueryClient()` в `query-provider.tsx` (сохраняет кэш за `0ms` при смене `[locale]`) и `@Injectable()` `PrismaService`. |
+
+```typescript title="apps/web/src/shared/providers/query-provider.tsx — Браузерный Singleton с защитой SSR"
+let browserQueryClient: QueryClient | undefined
+
+export function getQueryClient(): QueryClient {
+  if (typeof window === 'undefined') {
+    // На сервере (SSR / RSC) всегда создаём изолированный инстанс на каждый запрос
+    return makeQueryClient()
+  }
+  if (!browserQueryClient) {
+    browserQueryClient = makeQueryClient()
+  }
+  return browserQueryClient
+}
+```
+
+---
+
+## 3. Структурные паттерны (Structural — 7) — Композиция и границы слоёв
+
+Структурные паттерны отвечают за стыковку модулей, сторонних драйверов и слоёв архитектуры (`FSD-Modular` на фронтенде, `Enterprise 4-Layer` на бэкенде).
+
+| Паттерн | Суть в 1 предложении (для собеседования) | Где и как работает в нашем монорепозитории |
+| :--- | :--- | :--- |
+| **6. Adapter (Адаптер)** | Связывает два несовместимых интерфейса без изменения их исходного кода. | `@prisma/adapter-pg` (`PrismaPg`), адаптирующий пул `pg.Pool` под Rust-free Wasm-движок **Prisma 7** в `PrismaService`. |
+| **7. Bridge (Мост)** | Отделяет высокоуровневую абстракцию от низкоуровневого транспорта, позволяя менять их независимо. | Клиент телеметрии `analytics.ts`, отделяющий доменные события от конкретного транспорта (`PostHog`, `Sentry` или dev-консоль). |
+| **8. Composite (Компоновщик)** | Объединяет объекты в рекурсивное дерево, позволяя одинаково работать с отдельными листьями и ветками. | 3-уровневое дерево Базы Знаний (`KnowledgeTreeNode`: `Раздел ➔ Подтема ➔ Статья`) и узлы `HAST` AST. |
+| **9. Decorator (Декоратор)** | Динамически добавляет метаданные или поведение классам, методам и UI-примитивам без изменения их ядра. | Декораторы `@Roles('ADMIN')`, `@Public()`, `@Throttle()` в NestJS и композиция слотов `asChild` в Radix UI (`@repo/ui`). |
+| **10. Facade (Фасад)** | Предоставляет простой унифицированный интерфейс поверх сложной подсистемы из нескольких библиотек. | `uiStore.getState().actions` и `useUIActions()`, скрывающие запись в `localStorage`, синхронизацию `html[data-palette]` и стейт Zustand за одним вызовом. |
+| **11. Flyweight (Приспособленец)** | Экономит память, разделяя общее неизменяемое состояние между сотнями мелких объектов. | Единый экземпляр грамматик `Shiki` и in-memory кэш скомпилированных HAST-деревьев по `mtimeMs` для 167 SSG-роутов. |
+| **12. Proxy (Заместитель)** | Перехватывает обращение к целевому объекту или маршруту для проверки прав, кэширования или ленивой загрузки. | `apps/web/src/proxy.ts` (Edge Proxy в Next.js 16, проверяющий `HS256` подпись `HttpOnly` JWT-куки через Web Crypto за `< 0.2ms` до отдачи `/knowledge-base`). |
+
+```typescript title="apps/api/src/prisma/prisma.service.ts — Паттерн Adapter + Facade в Prisma 7"
+const pool = new pg.Pool({ connectionString: databaseUrl, max: 10 })
+// Паттерн Adapter: PrismaPg адаптирует драйвер node-postgres (pg.Pool) к Wasm-ядру Prisma 7
+const adapter = new PrismaPg(pool)
+this.client = new PrismaClient({ adapter })
+```
+
+---
+
+## 4. Поведенческие паттерны (Behavioral — 11) — Потоки данных и алгоритмы
+
+Поведенческие паттерны управляют маршрутизацией запросов, реактивными потоками, обходом AST-деревьев и стратегиями деградации.
+
+| Паттерн | Суть в 1 предложении (для собеседования) | Где и как работает в нашем монорепозитории |
+| :--- | :--- | :--- |
+| **13. Chain of Responsibility (Цепочка обязанностей)** | Передаёт запрос последовательно по цепочке обработчиков, где каждый шаг может провалидировать или прервать выполнение. | HTTP-конвейер NestJS: `Helmet` ➔ `ThrottlerGuard` ➔ `JwtRolesGuard` ➔ `ZodValidationPipe` ➔ `Controller`. |
+| **14. Command (Команда)** | Инкапсулирует действие и его аргументы в объект для очереди, хоткеев или логирования. | Дескрипторы команд в `CommandPaletteModal` (`Cmd+K`) и атомарные экшены `useUIActions()`. |
+| **15. Interpreter (Интерпретатор)** | Разбирает и выполняет выражения предметно-ориентированного языка (DSL) по правилам грамматики. | Парсер директив `remark-directive`, превращающий блоки `:::sandbox{name="..."}` в интерактивные клиентские острова. |
+| **16. Iterator (Итератор)** | Последовательно обходит элементы коллекции или курсорной выборки без раскрытия внутреннего устройства хранилища. | Cursor-пагинация (`GET /api/telemetry/events?cursor=...` с `take: limit + 1`) и обход дерева навигации. |
+| **17. Mediator (Посредник)** | Убирает прямую связность «все со всеми» (`N×N`), координируя взаимодействие виджетов через центральный узел. | Связка `ThemeProvider` + `useUIStore`, координирующая `WorkfolioHeader`, `GuestPassModal`, `CommandPaletteModal` и кросс-вкладочный `storage`. |
+| **18. Memento (Снимок / Хранитель)** | Сохраняет внешний снимок состояния объекта для последующего восстановления без нарушения инкапсуляции. | `TanStack Query` + `IndexedDB Persister`, сериализующий кэш запросов между перезагрузками вкладки и в офлайне. |
+| **19. Observer (Наблюдатель)** | Реализует подписку `1:N`, автоматически уведомляя всех подписчиков при появлении нового события. | Поток `RxJS Subject` в `@Sse('stream')` микросервиса телеметрии и `useSyncExternalStore` в ScrollSpy-навигации. |
+| **20. State (Состояние)** | Меняет поведение и доступные переходы компонента в зависимости от текущего состояния конечного автомата. | Конечные автоматы на `Discriminated Unions` в `CodeExecutionSandbox` (`'idle' | 'running' | 'completed'`) и ролях RBAC (`'GUEST' | 'USER' | 'ADMIN'`). |
+| **21. Strategy (Стратегия)** | Определяет семейство взаимозаменяемых алгоритмов за единым контрактом и выбирает нужный в рантайме. | **Graceful In-Memory Fallback Strategy** в `PrismaService` и `KnowledgeService` (PostgreSQL при живом коннекте, автоматический переход на `Map` в памяти без падения при офлайне). |
+| **22. Template Method (Шаблонный метод)** | Задаёт неизменный скелет алгоритма, позволяя переопределять отдельные шаги конвейера. | Конвейер компиляции MDX: `unified().use(remarkParse).use(remarkGfm).use(remarkDirective).use(remarkRehype)`. |
+| **23. Visitor (Посетитель)** | Отделяет алгоритм обхода от структуры гетерогенного дерева узлов, не меняя классы самих узлов. | AST-визиторы `unist-util-visit`, обходящие дерево `MDAST` / `HAST` для сборки оглавления `h2`/`h3`, подсветки `Shiki` и санитизации ссылок. |
+
+```typescript title="apps/web/src/entities/knowledge-content/mdx-compiler.ts — Паттерн Visitor над деревом HAST AST"
+// Паттерн Visitor: обходит разнородные узлы HAST-дерева без изменения классов самих узлов
+visit(tree, 'element', (node) => {
+  if (node.tagName === 'h2' || node.tagName === 'h3') {
+    const id = slugifyHeading(extractNodeText(node))
+    node.properties = { ...node.properties, id }
+    headings.push({ id, text: extractNodeText(node), level: node.tagName === 'h2' ? 2 : 3 })
+  }
+})
+```
+
+---
+
+## 5. Чек-лист антипаттернов: когда классы GoF в TypeScript НЕ нужны
+
+1. **Тяжёлые классы `Strategy` или `Command` с единственным методом `execute()`:** в TypeScript вместо `interface SortStrategy { sort(a: Item, b: Item): number }` используйте функциональный тип `(a: Item, b: Item) => number` или словарь обработчиков `Record<StrategyKey, HandlerFn>`.
+2. **Ручной класс `Singleton` с `private constructor()` для функций без состояния:** обычные ES-модули (`export function verifyEdgeJwtHs256()`) уже вычисляются один раз при загрузке бандла. Явный синглтон нужен только для объектов с живым состоянием или пулом соединений (`QueryClient`, `pg.Pool`).
+3. **Глубокое наследование (`Template Method` через `extends BaseController`):** всегда предпочитайте **композицию** (пайплайн `Guards / Interceptors / Pipes` в NestJS или кастомные хуки в React) многоуровневому наследованию классов.

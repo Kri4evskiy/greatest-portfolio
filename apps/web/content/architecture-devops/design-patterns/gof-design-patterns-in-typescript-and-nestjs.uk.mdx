@@ -1,0 +1,115 @@
+---
+title: "23 патерни проєктування GoF у сучасному TypeScript 7, Next.js 16 та NestJS 12"
+sidebarLabel: "23 патерни GoF у TS"
+metricSlug: "gof-design-patterns-in-typescript-and-nestjs"
+summary: "Повна шпаргалка з усіх 23 класичних патернів Банди Чотирьох (Твірні, Структурні, Поведінкові) на реальних прикладах коду з нашого монорепозиторію на TypeScript 7, Next.js 16, NestJS 12 та Prisma 7."
+category: "architecture-devops"
+format: "cheat-sheet"
+tags: ["typescript", "architecture", "nestjs", "patterns"]
+readingTime: "9 хв"
+publishedAt: "2026-11-21"
+order: 2
+tldr:
+  - "Довідник з усіх 23 патернів GoF: Твірні (5), Структурні (7) та Поведінкові (11) зі стислими формулюваннями для співбесід і мапінгом на код проєкту."
+  - "У сучасному TypeScript функції вищого порядку, замикання та розмічені об'єднання (Discriminated Unions) замінюють громіздкі ієрархії класів для Strategy, Command, Observer і Factory."
+  - "Реальні приклади з нашого стека: Adapter (`@prisma/adapter-pg`), Proxy (`src/proxy.ts` Edge JWT), Composite/Visitor (Zero-Eval HAST MDX AST) і Chain of Responsibility (Guards та Pipes у NestJS)."
+---
+
+## 1. Патерни GoF в ідіоматичному TypeScript проти класичного ООП (Java/C++)
+
+Класична книга «Банди Чотирьох» (GoF, 1994) створювалася для мов із номінативною типізацією (`C++`, `Smalltalk`). У сучасному **TypeScript 7** (`strict: true`) структурна типізація, замикання, `Discriminated Unions` та ES-модулі прибирають 70% шаблонного ООП-бойлерплейту, зберігаючи саму архітектурну суть кожного патерна.
+
+<Callout title="Золоте правило для технічних співбесід" variant="info">
+Ніколи не будуйте ієрархію з 4 абстрактних класів там, де задачу вирішує типізована функція вищого порядку або `Record<Key, Handler>`. Використовуйте **класи** для керування життєвим циклом з'єднань і DI-токенами в `NestJS`, а **чисті функції та структурні типи** — у всіх інших випадках.
+</Callout>
+
+---
+
+## 2. Твірні патерни (Creational — 5) — Створення та життєвий цикл
+
+Твірні патерни відокремлюють логіку **створення та конфігурації** об'єктів від коду, який їх використовує.
+
+| Патерн | Суть в 1 реченні (для співбесіди) | Де і як працює в нашому монорепозиторії |
+| :--- | :--- | :--- |
+| **1. Factory (Фабрика)** | Створює об'єкти або схеми без розкриття конкретної логіки конструювання клієнтському коду. | `createOffsetPaginatedResponseSchema(ItemSchema)` у `@repo/shared-schemas` — generic-фабрика Zod-схем пагінації. |
+| **2. Abstract Factory (Абстрактна фабрика)** | Створює сімейства взаємопов'язаних об'єктів (`Light`/`Dark` × `Warm Paper`/`Graphite`/`Sepia` або драйвери сховищ) без прив'язки до конкретних класів. | Матриця 2D-тем оформлення та асинхронні фабрики модулів NestJS (`useFactory`). |
+| **3. Builder (Будівельник)** | Покроково конструює складний об'єкт або запит через ланцюжок методів (fluent interface) зі звуженням типів. | Ланцюжки валідації Zod (`z.string().trim().min(2).max(50)`) і декларативна побудова фільтрів Prisma. |
+| **4. Prototype (Прототип)** | Створює нові об'єкти шляхом клонування і точкового перевизначення базового шаблону. | Каскадне успадкування `tsconfig.base.json` і клонування базових імутабельних конфігурацій запиту. |
+| **5. Singleton (Одинак)** | Гарантує не більше одного екземпляра ресурсу в межах контексту виконання (`Browser Window` або `NestJS DI Container`). | Браузерний синглтон `getQueryClient()` у `query-provider.tsx` (зберігає кеш за `0ms` під час зміни `[locale]`) та `@Injectable()` `PrismaService`. |
+
+```typescript title="apps/web/src/shared/providers/query-provider.tsx — Браузерний Singleton із захистом SSR"
+let browserQueryClient: QueryClient | undefined
+
+export function getQueryClient(): QueryClient {
+  if (typeof window === 'undefined') {
+    // На сервері (SSR / RSC) завжди створюємо ізольований інстанс на кожен запит
+    return makeQueryClient()
+  }
+  if (!browserQueryClient) {
+    browserQueryClient = makeQueryClient()
+  }
+  return browserQueryClient
+}
+```
+
+---
+
+## 3. Структурні патерни (Structural — 7) — Композиція та межі шарів
+
+Структурні патерни відповідають за стикування модулів, сторонніх драйверів і шарів архітектури (`FSD-Modular` на фронтенді, `Enterprise 4-Layer` на бекенді).
+
+| Патерн | Суть в 1 реченні (для співбесіди) | Де і як працює в нашому монорепозиторії |
+| :--- | :--- | :--- |
+| **6. Adapter (Адаптер)** | Пов'язує два несумісні інтерфейси без зміни їхнього вихідного коду. | `@prisma/adapter-pg` (`PrismaPg`), що адаптує пул `pg.Pool` під Rust-free Wasm-рушій **Prisma 7** у `PrismaService`. |
+| **7. Bridge (Міст)** | Відокремлює високорівневу абстракцію від низькорівневого транспорту, дозволяючи змінювати їх незалежно. | Клієнт телеметрії `analytics.ts`, що відділяє доменні події від конкретного транспорту (`PostHog`, `Sentry` або dev-консоль). |
+| **8. Composite (Компонувальник)** | Об'єднує об'єкти в рекурсивне дерево, дозволяючи однаково працювати з окремими листками та гілками. | 3-рівневе дерево Бази Знань (`KnowledgeTreeNode`: `Розділ ➔ Підтема ➔ Стаття`) та вузли `HAST` AST. |
+| **9. Decorator (Декоратор)** | Динамічно додає метадані або поведінку класам, методам і UI-примітивам без зміни їхнього ядра. | Декоратори `@Roles('ADMIN')`, `@Public()`, `@Throttle()` у NestJS і композиція слотів `asChild` у Radix UI (`@repo/ui`). |
+| **10. Facade (Фасад)** | Надає простий уніфікований інтерфейс поверх складної підсистеми з кількох бібліотек. | `uiStore.getState().actions` та `useUIActions()`, що приховують запис у `localStorage`, синхронізацію `html[data-palette]` і стейт Zustand за одним викликом. |
+| **11. Flyweight (Легковаговик)** | Економить пам'ять, розділяючи спільний незмінний стан між сотнями дрібних об'єктів. | Єдиний екземпляр граматик `Shiki` та in-memory кеш скомпільованих HAST-дерев за `mtimeMs` для 167 SSG-маршрутів. |
+| **12. Proxy (Замісник)** | Перехоплює звернення до цільового об'єкта або маршруту для перевірки прав, кешування чи лінивого завантаження. | `apps/web/src/proxy.ts` (Edge Proxy у Next.js 16, що перевіряє `HS256` підпис `HttpOnly` JWT-куки через Web Crypto за `< 0.2ms` до віддачі `/knowledge-base`). |
+
+```typescript title="apps/api/src/prisma/prisma.service.ts — Патерн Adapter + Facade у Prisma 7"
+const pool = new pg.Pool({ connectionString: databaseUrl, max: 10 })
+// Патерн Adapter: PrismaPg адаптує драйвер node-postgres (pg.Pool) до Wasm-ядра Prisma 7
+const adapter = new PrismaPg(pool)
+this.client = new PrismaClient({ adapter })
+```
+
+---
+
+## 4. Поведінкові патерни (Behavioral — 11) — Потоки даних та алгоритми
+
+Поведінкові патерни керують маршрутизацією запитів, реактивними потоками, обходом AST-дерев і стратегіями деградації.
+
+| Патерн | Суть в 1 реченні (для співбесіди) | Де і як працює в нашому монорепозиторії |
+| :--- | :--- | :--- |
+| **13. Chain of Responsibility (Ланцюжок обов'язків)** | Передає запит послідовно ланцюжком обробників, де кожен крок може провалідувати або перервати виконання. | HTTP-конвеєр NestJS: `Helmet` ➔ `ThrottlerGuard` ➔ `JwtRolesGuard` ➔ `ZodValidationPipe` ➔ `Controller`. |
+| **14. Command (Команда)** | Інкапсулює дію та її аргументи в об'єкт для черги, хоткеїв або логування. | Дескриптори команд у `CommandPaletteModal` (`Cmd+K`) та атомарні екшени `useUIActions()`. |
+| **15. Interpreter (Інтерпретатор)** | Розбирає та виконує вирази предметно-орієнтованої мови (DSL) за правилами граматики. | Парсер директив `remark-directive`, що перетворює блоки `:::sandbox{name="..."}` на інтерактивні клієнтські острови. |
+| **16. Iterator (Ітератор)** | Послідовно обходить елементи колекції або курсорної вибірки без розкриття внутрішньої будови сховища. | Cursor-пагінація (`GET /api/telemetry/events?cursor=...` із `take: limit + 1`) та обхід дерева навігації. |
+| **17. Mediator (Посередник)** | Прибирає пряму зв'язність «всі з усіма» (`N×N`), координуючи взаємодію віджетів через центральний вузол. | Зв'язка `ThemeProvider` + `useUIStore`, що координує `WorkfolioHeader`, `GuestPassModal`, `CommandPaletteModal` і крос-вкладковий `storage`. |
+| **18. Memento (Знімок)** | Зберігає зовнішній знімок стану об'єкта для подальшого відновлення без порушення інкапсуляції. | `TanStack Query` + `IndexedDB Persister`, що серіалізує кеш запитів між перезавантаженнями вкладки та в офлайні. |
+| **19. Observer (Спостерігач)** | Реалізує підписку `1:N`, автоматично сповіщаючи всіх підписників при появі нової події. | Потік `RxJS Subject` у `@Sse('stream')` мікросервісу телеметрії та `useSyncExternalStore` у ScrollSpy-навігації. |
+| **20. State (Стан)** | Змінює поведінку та доступні переходи компонента залежно від поточного стану скінченного автомата. | Скінченні автомати на `Discriminated Unions` у `CodeExecutionSandbox` (`'idle' | 'running' | 'completed'`) та ролях RBAC (`'GUEST' | 'USER' | 'ADMIN'`). |
+| **21. Strategy (Стратегія)** | Визначає сімейство взаємозамінних алгоритмів за єдиним контрактом і обирає потрібний у рантаймі. | **Graceful In-Memory Fallback Strategy** у `PrismaService` та `KnowledgeService` (PostgreSQL за живого конекту, автоматичний перехід на `Map` у пам'яті без падіння в офлайні). |
+| **22. Template Method (Шаблонний метод)** | Задає незмінний скелет алгоритму, дозволяючи перевизначати окремі кроки конвеєра. | Конвеєр компіляції MDX: `unified().use(remarkParse).use(remarkGfm).use(remarkDirective).use(remarkRehype)`. |
+| **23. Visitor (Відвідувач)** | Відокремлює алгоритм обходу від структури гетерогенного дерева вузлів, не змінюючи класи самих вузлів. | AST-візитори `unist-util-visit`, що обходять дерево `MDAST` / `HAST` для збирання змісту `h2`/`h3`, підсвічування `Shiki` та санітизації посилань. |
+
+```typescript title="apps/web/src/entities/knowledge-content/mdx-compiler.ts — Патерн Visitor над деревом HAST AST"
+// Патерн Visitor: обходить різнорідні вузли HAST-дерева без зміни класів самих вузлів
+visit(tree, 'element', (node) => {
+  if (node.tagName === 'h2' || node.tagName === 'h3') {
+    const id = slugifyHeading(extractNodeText(node))
+    node.properties = { ...node.properties, id }
+    headings.push({ id, text: extractNodeText(node), level: node.tagName === 'h2' ? 2 : 3 })
+  }
+})
+```
+
+---
+
+## 5. Чек-лист антипатернів: коли класи GoF у TypeScript НЕ потрібні
+
+1. **Важкі класи `Strategy` або `Command` з єдиним методом `execute()`:** у TypeScript замість `interface SortStrategy { sort(a: Item, b: Item): number }` використовуйте функціональний тип `(a: Item, b: Item) => number` або словник обробників `Record<StrategyKey, HandlerFn>`.
+2. **Ручний клас `Singleton` із `private constructor()` для функцій без стану:** звичайні ES-модулі (`export function verifyEdgeJwtHs256()`) вже обчислюються один раз під час завантаження бандла. Явний синглтон потрібен лише для об'єктів із живим станом або пулом з'єднань (`QueryClient`, `pg.Pool`).
+3. **Глибоке успадкування (`Template Method` через `extends BaseController`):** завжди віддавайте перевагу **композиції** (пайплайн `Guards / Interceptors / Pipes` у NestJS або кастомні хуки в React) над багаторівневим успадкуванням класів.
