@@ -7,7 +7,18 @@ import {
   type KnowledgeNoteFormat,
   type SupportedLocale,
 } from '@repo/shared-schemas'
-import { Badge, Card, CardContent, CardDescription, CardHeader, CardTitle } from '@repo/ui'
+import {
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+  Input,
+  ToggleGroup,
+  ToggleGroupItem,
+} from '@repo/ui'
 import {
   ArrowRight,
   ChevronDown,
@@ -49,18 +60,21 @@ interface TagFilterPillProps {
 /** Shared #tag pill button rendered in both the collapsed Top-10 bar and searchable drawer. */
 function TagFilterPill({ tag, count, active, onToggle }: TagFilterPillProps) {
   return (
-    <button
+    <Button
       type="button"
+      variant={active ? 'default' : 'outline'}
+      size="sm"
+      aria-pressed={active}
       onClick={() => onToggle(tag)}
-      className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 font-mono text-[11px] transition-colors ${
+      className={`h-auto gap-1 rounded-md px-2 py-0.5 font-mono text-[11px] font-normal ${
         active
-          ? 'border-primary bg-primary text-primary-foreground'
+          ? ''
           : 'border-border/80 bg-background text-muted-foreground hover:border-primary/40 hover:text-foreground'
       }`}
     >
       <span>#{tag}</span>
       <span className="opacity-70">({count})</span>
-    </button>
+    </Button>
   )
 }
 
@@ -141,49 +155,55 @@ export function KnowledgeDirectoryExplorer({ tree, articles, tags, locale }: Kno
       <div className="space-y-3 rounded-xl border border-border bg-card p-4 shadow-xs">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           {/* Format Filter Pills */}
-          <div className="flex flex-wrap items-center gap-1.5">
-            <button
-              type="button"
-              onClick={() => setSelectedFormat('ALL')}
-              className={`rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors ${
-                selectedFormat === 'ALL'
-                  ? 'border-primary bg-primary text-primary-foreground'
-                  : 'border-border bg-muted/30 text-muted-foreground hover:text-foreground'
-              }`}
+          <ToggleGroup
+            type="single"
+            variant="outline"
+            size="sm"
+            value={selectedFormat}
+            aria-label={t('filterFormatAll')}
+            onValueChange={(nextValue) => {
+              if (!nextValue || nextValue === 'ALL') {
+                setSelectedFormat('ALL')
+                return
+              }
+              const matched = NOTE_FORMATS.find((fmt) => fmt === nextValue)
+              if (matched) {
+                setSelectedFormat(matched)
+              }
+            }}
+            className="flex flex-wrap items-center gap-1.5"
+          >
+            <ToggleGroupItem
+              value="ALL"
+              className="h-auto rounded-lg bg-muted/30 px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground"
             >
               {t('filterFormatAll')}
-            </button>
-            {NOTE_FORMATS.map((fmt) => {
-              const active = selectedFormat === fmt
-              return (
-                <button
-                  key={fmt}
-                  type="button"
-                  onClick={() => setSelectedFormat(active ? 'ALL' : fmt)}
-                  className={`rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors ${
-                    active
-                      ? 'border-primary bg-primary text-primary-foreground'
-                      : 'border-border bg-muted/30 text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  {getKnowledgeFormatLabel(fmt, locale)}
-                </button>
-              )
-            })}
-          </div>
+            </ToggleGroupItem>
+            {NOTE_FORMATS.map((fmt) => (
+              <ToggleGroupItem
+                key={fmt}
+                value={fmt}
+                className="h-auto rounded-lg bg-muted/30 px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground"
+              >
+                {getKnowledgeFormatLabel(fmt, locale)}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
 
           {/* Quick Command Palette Button */}
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="sm"
             onClick={() => openCommandPalette('')}
-            className="inline-flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/30 px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:bg-muted hover:text-foreground"
+            className="h-auto justify-between gap-3 rounded-lg bg-muted/30 px-3 py-1.5 text-xs font-normal text-muted-foreground hover:border-primary/40 hover:bg-muted hover:text-foreground"
           >
             <span className="flex items-center gap-1.5">
               <Search className="h-3.5 w-3.5 text-primary" />
               <span>{t('sidebarSearchTrigger')}</span>
             </span>
             <kbd className="rounded-sm border border-border bg-background px-1.5 py-0.5 font-mono text-[10px]">⌘K</kbd>
-          </button>
+          </Button>
         </div>
 
         {/* #Tag Pills */}
@@ -208,11 +228,13 @@ export function KnowledgeDirectoryExplorer({ tree, articles, tags, locale }: Kno
                 : null}
 
               {hiddenTagsCount > 0 ? (
-                <button
+                <Button
                   type="button"
+                  variant="outline"
+                  size="sm"
                   aria-expanded={showAllTags}
                   onClick={toggleShowAllTags}
-                  className="inline-flex items-center gap-1 rounded-md border border-dashed border-primary/40 bg-primary/5 px-2 py-0.5 font-mono text-[11px] font-medium text-primary transition-colors hover:border-primary hover:bg-primary/10"
+                  className="h-auto gap-1 rounded-md border-dashed border-primary/40 bg-primary/5 px-2 py-0.5 font-mono text-[11px] font-medium text-primary hover:border-primary hover:bg-primary/10 hover:text-primary"
                 >
                   {showAllTags ? (
                     <>
@@ -225,21 +247,23 @@ export function KnowledgeDirectoryExplorer({ tree, articles, tags, locale }: Kno
                       <ChevronDown className="h-3 w-3 text-primary" />
                     </>
                   )}
-                </button>
+                </Button>
               ) : null}
 
               {isFiltering ? (
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="sm"
                   onClick={() => {
                     setSelectedFormat('ALL')
                     setSelectedTag(null)
                   }}
-                  className="ml-auto inline-flex items-center gap-1 rounded-md px-2 py-0.5 font-mono text-[11px] text-primary hover:underline"
+                  className="ml-auto h-auto gap-1 rounded-md px-2 py-0.5 font-mono text-[11px] font-normal text-primary hover:bg-transparent hover:text-primary hover:underline"
                 >
                   <RotateCcw className="h-3 w-3" />
                   <span>{t('clearFilters')}</span>
-                </button>
+                </Button>
               ) : null}
             </div>
 
@@ -247,27 +271,29 @@ export function KnowledgeDirectoryExplorer({ tree, articles, tags, locale }: Kno
               <div className="space-y-2.5 rounded-lg border border-border/70 bg-muted/20 p-3">
                 <div className="relative flex items-center">
                   <Search className="pointer-events-none absolute left-2.5 h-3.5 w-3.5 text-muted-foreground" />
-                  <input
+                  <Input
                     type="text"
                     value={tagSearchQuery}
                     onChange={(e) => setTagSearchQuery(e.target.value)}
                     placeholder={t('searchTagsPlaceholder')}
                     aria-label={t('searchTagsPlaceholder')}
-                    className="w-full rounded-md border border-border bg-background py-1.5 pl-8 pr-8 font-mono text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
+                    className="h-8 pl-8 pr-8 font-mono text-base sm:text-xs"
                   />
                   {tagSearchQuery.length > 0 ? (
-                    <button
+                    <Button
                       type="button"
+                      variant="ghost"
+                      size="icon-sm"
                       aria-label={t('clearFilters')}
                       onClick={() => setTagSearchQuery('')}
-                      className="absolute right-2 rounded-sm p-0.5 text-muted-foreground hover:text-foreground"
+                      className="absolute right-1 h-6 w-6 text-muted-foreground hover:text-foreground"
                     >
                       <X className="h-3.5 w-3.5" />
-                    </button>
+                    </Button>
                   ) : null}
                 </div>
 
-                <div className="max-h-48 overflow-y-auto pr-1">
+                <div className="max-h-48 overflow-y-auto overscroll-contain pr-1">
                   {filteredAllTags.length === 0 ? (
                     <p className="py-2 text-center font-mono text-xs text-muted-foreground">{t('noMatchingTags')}</p>
                   ) : (
@@ -453,11 +479,13 @@ export function KnowledgeDirectoryExplorer({ tree, articles, tags, locale }: Kno
 
                     {hiddenSubtopicsCount > 0 ? (
                       <div className="mt-3 flex justify-center border-t border-border/50 pt-3">
-                        <button
+                        <Button
                           type="button"
+                          variant="outline"
+                          size="sm"
                           aria-expanded={isTopicExpanded}
                           onClick={() => toggleTopicExpanded(topic.pathKey)}
-                          className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background/80 px-3 py-1.5 font-mono text-xs font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:bg-muted/50 hover:text-foreground"
+                          className="h-auto gap-1.5 rounded-lg bg-background/80 px-3 py-1.5 font-mono text-xs font-medium text-muted-foreground hover:border-primary/40 hover:bg-muted/50 hover:text-foreground"
                         >
                           {isTopicExpanded ? (
                             <>
@@ -470,7 +498,7 @@ export function KnowledgeDirectoryExplorer({ tree, articles, tags, locale }: Kno
                               <span>{t('showMoreSubtopics', { count: hiddenSubtopicsCount })}</span>
                             </>
                           )}
-                        </button>
+                        </Button>
                       </div>
                     ) : null}
                   </>
@@ -487,25 +515,29 @@ export function KnowledgeDirectoryExplorer({ tree, articles, tags, locale }: Kno
 
               <div className="flex flex-wrap items-center gap-2">
                 {remainingTopicsCount > 0 ? (
-                  <button
+                  <Button
                     type="button"
+                    variant="outline"
+                    size="sm"
                     onClick={() => setVisibleTopicsCount((prev) => Math.min(tree.length, prev + TOPICS_LOAD_STEP))}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-primary/40 bg-primary/10 px-3.5 py-1.5 font-mono text-xs font-medium text-primary transition-colors hover:border-primary hover:bg-primary/15"
+                    className="h-auto gap-1.5 rounded-lg border-primary/40 bg-primary/10 px-3.5 py-1.5 font-mono text-xs font-medium text-primary hover:border-primary hover:bg-primary/15 hover:text-primary"
                   >
                     <ChevronDown className="h-3.5 w-3.5" />
                     <span>{t('showMoreTopics', { count: nextTopicsBatchCount })}</span>
-                  </button>
+                  </Button>
                 ) : null}
 
                 {canCollapseTopics ? (
-                  <button
+                  <Button
                     type="button"
+                    variant="outline"
+                    size="sm"
                     onClick={() => setVisibleTopicsCount(INITIAL_VISIBLE_TOPICS)}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-1.5 font-mono text-xs font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:bg-muted/50 hover:text-foreground"
+                    className="h-auto gap-1.5 rounded-lg bg-background px-3 py-1.5 font-mono text-xs font-medium text-muted-foreground hover:border-primary/40 hover:bg-muted/50 hover:text-foreground"
                   >
                     <ChevronUp className="h-3.5 w-3.5 text-primary" />
                     <span>{t('showLessTopics')}</span>
-                  </button>
+                  </Button>
                 ) : null}
               </div>
             </div>

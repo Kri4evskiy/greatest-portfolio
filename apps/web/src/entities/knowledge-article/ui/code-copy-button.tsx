@@ -1,5 +1,6 @@
 'use client'
 
+import { Button } from '@repo/ui'
 import { Check, Copy } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useState } from 'react'
@@ -21,11 +22,13 @@ export function CodeCopyButton({ code }: { code: string }) {
   }
 
   return (
-    <button
+    <Button
       type="button"
+      variant="outline"
+      size="sm"
       onClick={() => void handleCopy()}
       aria-label={copied ? t('copiedCode') : t('copyCode')}
-      className="inline-flex items-center gap-1 rounded-sm border border-code-border bg-background/80 px-2 py-0.5 font-mono text-[10px] font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:bg-accent hover:text-foreground"
+      className="h-auto gap-1 rounded-sm border-code-border bg-background/80 px-2 py-0.5 font-mono text-[10px] font-medium text-muted-foreground hover:border-primary/40 hover:bg-accent hover:text-foreground"
     >
       {copied ? (
         <>
@@ -38,6 +41,6 @@ export function CodeCopyButton({ code }: { code: string }) {
           <span>{t('copyCode')}</span>
         </>
       )}
-    </button>
+    </Button>
   )
 }

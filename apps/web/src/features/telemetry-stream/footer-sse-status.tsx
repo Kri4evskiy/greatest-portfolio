@@ -1,5 +1,6 @@
 'use client'
 
+import { Tooltip, TooltipContent, TooltipTrigger } from '@repo/ui'
 import { Activity, Radio, Server } from 'lucide-react'
 import { useTelemetryStream } from './use-telemetry-stream'
 
@@ -18,9 +19,12 @@ export function FooterSseStatus({ waitingLabel }: { waitingLabel: string }) {
         {latestEvent ? (
           <>
             <Activity className="h-3.5 w-3.5 shrink-0 text-success" />
-            <span className="truncate font-mono text-[11px]" title={latestEvent.message}>
-              {latestEvent.message}
-            </span>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="truncate font-mono text-[11px]">{latestEvent.message}</span>
+              </TooltipTrigger>
+              <TooltipContent side="top">{latestEvent.message}</TooltipContent>
+            </Tooltip>
           </>
         ) : (
           <>

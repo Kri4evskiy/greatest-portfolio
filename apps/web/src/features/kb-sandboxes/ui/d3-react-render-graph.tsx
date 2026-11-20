@@ -1,6 +1,6 @@
 'use client'
 
-import { Badge, Button } from '@repo/ui'
+import { Badge, Button, Tooltip, TooltipContent, TooltipTrigger } from '@repo/ui'
 import * as d3 from 'd3'
 import { Cpu, RefreshCw, Sparkles } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
@@ -189,19 +189,24 @@ export function ReactRenderGraphD3() {
             <Sparkles className="h-3 w-3" />
             React 19 (Compiler + use())
           </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            onClick={() => {
-              pulseCounterRef.current += 1
-              setTriggerCount((c) => c + 1)
-            }}
-            className="h-7 px-2"
-            title="Пересчитать цикл рендера"
-          >
-            <RefreshCw className="h-3.5 w-3.5" />
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                size="icon-sm"
+                variant="ghost"
+                aria-label="Пересчитать цикл рендера"
+                onClick={() => {
+                  pulseCounterRef.current += 1
+                  setTriggerCount((c) => c + 1)
+                }}
+                className="h-7 w-7"
+              >
+                <RefreshCw className="h-3.5 w-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">Пересчитать цикл рендера</TooltipContent>
+          </Tooltip>
         </div>
       </div>
 

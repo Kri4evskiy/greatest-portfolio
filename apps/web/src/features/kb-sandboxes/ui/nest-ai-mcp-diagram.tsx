@@ -1,7 +1,7 @@
 'use client'
 
 import { DEFAULT_LOCALE, type SupportedLocale, SupportedLocaleEnum } from '@repo/shared-schemas'
-import { Badge } from '@repo/ui'
+import { Badge, ToggleGroup, ToggleGroupItem } from '@repo/ui'
 import { Cpu, ShieldCheck, Sparkles, Terminal } from 'lucide-react'
 import { useLocale } from 'next-intl'
 import { useState } from 'react'
@@ -253,38 +253,38 @@ export function NestAiMcpDiagram({ defaultMode = 'mcp' }: { defaultMode?: Diagra
           <p className="text-[11px] text-muted-foreground">{UI_LABELS.clickHint[locale]}</p>
         </div>
 
-        <div className="inline-flex rounded-lg border border-border bg-muted/40 p-0.5">
-          <button
-            type="button"
-            onClick={() => {
+        <ToggleGroup
+          type="single"
+          variant="segmented"
+          size="xs"
+          value={mode}
+          aria-label={UI_LABELS.headerTitle[locale]}
+          onValueChange={(nextValue) => {
+            if (nextValue === 'mcp') {
               setMode('mcp')
               setSelectedIndex(2)
-            }}
-            className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 font-mono text-[11px] font-medium transition-colors ${
-              mode === 'mcp'
-                ? 'bg-primary text-primary-foreground shadow-xs'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
+            } else if (nextValue === 'ai') {
+              setMode('ai')
+              setSelectedIndex(1)
+            }
+          }}
+          className="rounded-lg border-border bg-muted/40 p-0.5"
+        >
+          <ToggleGroupItem
+            value="mcp"
+            className="h-auto gap-1.5 rounded-md px-2.5 py-1 font-mono text-[11px] data-[state=on]:bg-primary data-[state=on]:text-primary-foreground data-[state=on]:shadow-xs"
           >
             <Terminal className="h-3 w-3 shrink-0" />
             <span>{UI_LABELS.mcpTab[locale]}</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setMode('ai')
-              setSelectedIndex(1)
-            }}
-            className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 font-mono text-[11px] font-medium transition-colors ${
-              mode === 'ai'
-                ? 'bg-primary text-primary-foreground shadow-xs'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
+          </ToggleGroupItem>
+          <ToggleGroupItem
+            value="ai"
+            className="h-auto gap-1.5 rounded-md px-2.5 py-1 font-mono text-[11px] data-[state=on]:bg-primary data-[state=on]:text-primary-foreground data-[state=on]:shadow-xs"
           >
             <Sparkles className="h-3 w-3 shrink-0" />
             <span>{UI_LABELS.aiTab[locale]}</span>
-          </button>
-        </div>
+          </ToggleGroupItem>
+        </ToggleGroup>
       </div>
 
       <div className="mt-3 overflow-x-auto">
