@@ -10,7 +10,7 @@ publishedAt: "2026-11-10"
 order: 1
 tldr:
   - "Повна 2D-матриця семантичних HSL-токенів (`Light / Dark / System` × `Warm Paper / Graphite / Sepia`) описана в `packages/ui/src/styles/theme.css` через `@theme inline` і керується з `ThemeToggle` із Zero-FOUC скриптом у `<head>` (`PALETTE_INIT_SCRIPT`)."
-  - "Шари каскаду Tailwind CSS v4 розділено усвідомлено: Baseline-правила (`scrollbar-gutter: stable`, `text-wrap: balance/pretty`) живуть у `@layer base`, `.shiki` і `@starting-style` анімації входу (`Dialog`, `Popover`, `Tooltip`) — у `@layer components`, а `prefers-reduced-motion: reduce` — поза шарами без `!important`."
+  - "Шари каскаду Tailwind CSS v4 розділено усвідомлено: Baseline-правила (`scrollbar-gutter: stable`, `text-wrap: balance/pretty`) живуть у `@layer base`, `.shiki` + `@starting-style` для `Dialog` і синхронізовані з Radix Popper CSS `@keyframes` для `Popover` і `Tooltip` — у `@layer components`, а `prefers-reduced-motion: reduce` — поза шарами без `!important`."
   - "Інверсія залежностей (`@repo/ui/theme.css` ➔ `apps/web/src/app/globals.css` із `@source`), сучасні таргети `browserslist`, локальні Zero-CLS шрифти `Inter` + `JetBrains Mono` через `next/font/google`, точкові `@container` queries та `9/9` історій у Storybook 10."
 ---
 
@@ -85,7 +85,7 @@ tldr:
 
 Усередині `theme.css` стилі розкладено по **CSS Cascade Layers**:
 1. **`@layer base`:** задає дефолтний `border-color: hsl(var(--border))`, `cursor: pointer` на активних кнопках, `scrollbar-gutter: stable` (прибирає зсув макета на 15px при відкритті модалок у Windows), `scrollbar-width: thin`, `scroll-padding-top: 5rem`, плавний скрол (у зв'язці з `data-scroll-behavior="smooth"` на `<html>` у `LocaleRootLayout`) і `text-wrap: balance` / `text-wrap: pretty`.
-2. **`@layer components`:** ізолює `.shiki` і GPU-анімації входу `@starting-style` (`opacity` + `scale`) для `[data-dialog-overlay]`, `[data-dialog-content]`, `[data-popover-content]` і `[data-tooltip-content]`.
+2. **`@layer components`:** ізолює `.shiki`, GPU-анімації входу `@starting-style` (`opacity` + `scale`) для `[data-dialog-overlay]` / `[data-dialog-content]` і чисті CSS `@keyframes` (`ui-popper-in` / `ui-popper-out` через `data-state`, `data-side` і `--radix-popper-transform-origin`) для `[data-popover-content]` і `[data-tooltip-content]` — синхронізовані з Radix Popper `isPositioned` (`animation: none` під час заміру) та виходом `<Presence>`.
 3. **Unlayered override:** `@media (prefers-reduced-motion: reduce)` винесено *поза* шари — за специфікацією Cascade Layers позашарові правила завжди перекривають `@layer utilities` (`transition-*`, `animate-*`) без використання `!important`.
 
 Обидва пакети (`apps/web/package.json` і `packages/ui/package.json`) фіксують сучасні таргети `"browserslist": ["Chrome >= 111", "Edge >= 111", "Firefox >= 128", "Safari >= 16.4"]`, щоб `Lightning CSS` і `Next.js SWC` не генерували зайві поліфіли під `@property` і `color-mix()`.

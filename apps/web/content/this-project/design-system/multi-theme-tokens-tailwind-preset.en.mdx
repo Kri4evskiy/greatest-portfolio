@@ -10,7 +10,7 @@ publishedAt: "2026-11-10"
 order: 1
 tldr:
   - "Defines a full 2D semantic HSL token matrix (`Light / Dark / System` × `Warm Paper / Graphite / Sepia`) in `packages/ui/src/styles/theme.css` exposed via `@theme inline` and controlled live in `ThemeToggle` with a Zero-FOUC `<head>` init script (`PALETTE_INIT_SCRIPT`)."
-  - "Uses Tailwind CSS v4 Cascade Layers cleanly: Baseline UX (`scrollbar-gutter: stable`, `text-wrap: balance/pretty`) in `@layer base`, `.shiki` + `@starting-style` overlay transitions (`Dialog`, `Popover`, `Tooltip`) in `@layer components`, and unlayered `prefers-reduced-motion: reduce` above utilities."
+  - "Uses Tailwind CSS v4 Cascade Layers cleanly: Baseline UX (`scrollbar-gutter: stable`, `text-wrap: balance/pretty`) in `@layer base`, `.shiki` + `@starting-style` dialog entry and Radix-Popper-synchronized CSS `@keyframes` (`Popover`, `Tooltip`) in `@layer components`, and unlayered `prefers-reduced-motion: reduce` above utilities."
   - "Enforces Dependency Inversion (`@repo/ui/theme.css` ➔ `apps/web/src/app/globals.css` with `@source`), pins modern `browserslist` targets, bundles self-hosted `Inter` + `JetBrains Mono` via `next/font/google`, and adopts targeted `@container` queries across `9/9` Storybook-documented primitives."
 ---
 
@@ -85,7 +85,7 @@ In `apps/web`, [`globals.css`](apps/web/src/app/globals.css) acts as the **Compo
 
 Inside `theme.css`, rules are organized intentionally across **CSS Cascade Layers**:
 1. **`@layer base`:** Sets default `border-color: hsl(var(--border))`, active button `cursor: pointer`, `scrollbar-gutter: stable` (eliminates 15px layout shift when modals lock scrolling on Windows), `scrollbar-width: thin`, `scroll-padding-top: 5rem`, smooth scroll when motion is allowed (paired with `data-scroll-behavior="smooth"` on `<html>` in `LocaleRootLayout`), and `text-wrap: balance` / `text-wrap: pretty`.
-2. **`@layer components`:** Isolates `.shiki` dual-theme syntax rules and GPU-composited `@starting-style` entry animations (`opacity` + `scale`) for `[data-dialog-overlay]`, `[data-dialog-content]`, `[data-popover-content]`, and `[data-tooltip-content]`.
+2. **`@layer components`:** Isolates `.shiki` dual-theme syntax rules, GPU-composited `@starting-style` entry animations (`opacity` + `scale`) for `[data-dialog-overlay]` / `[data-dialog-content]`, and pure CSS `@keyframes` (`ui-popper-in` / `ui-popper-out` using `data-state`, `data-side`, and `--radix-popper-transform-origin`) for `[data-popover-content]` and `[data-tooltip-content]` — synchronized with Radix Popper `isPositioned` (`animation: none` while measuring off-screen) and `<Presence>` exit timing.
 3. **Unlayered override:** `@media (prefers-reduced-motion: reduce)` sits intentionally *outside* `@layer` so it supersedes Tailwind's `@layer utilities` (`transition-*`, `animate-*`) without needing `!important`.
 
 Both `apps/web/package.json` and `packages/ui/package.json` pin `"browserslist": ["Chrome >= 111", "Edge >= 111", "Firefox >= 128", "Safari >= 16.4"]` so `Lightning CSS` and `Next.js SWC` emit zero legacy polyfills for `@property` and `color-mix()`.

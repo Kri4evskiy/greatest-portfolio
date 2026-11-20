@@ -287,7 +287,33 @@
   }
 }
 
-/* Shiki v4 Zero-JS Dual Theme CSS Variables & Native @starting-style Entry Transitions */
+/* Shiki v4 Zero-JS Dual Theme CSS Variables, @starting-style Dialog & Radix Popper Keyframes */
+@keyframes ui-popper-in {
+  from {
+    opacity: 0;
+    scale: 0.94;
+    translate: var(--ui-enter-x, 0px) var(--ui-enter-y, 0px);
+  }
+  to {
+    opacity: 1;
+    scale: 1;
+    translate: 0 0;
+  }
+}
+
+@keyframes ui-popper-out {
+  from {
+    opacity: 1;
+    scale: 1;
+    translate: 0 0;
+  }
+  to {
+    opacity: 0;
+    scale: 0.95;
+    translate: var(--ui-enter-x, 0px) var(--ui-enter-y, 0px);
+  }
+}
+
 @layer components {
   .shiki,
   .shiki span {
@@ -328,29 +354,50 @@
     }
   }
 
-  [data-popover-content] {
-    transition:
-      opacity 140ms cubic-bezier(0.16, 1, 0.3, 1),
-      scale 140ms cubic-bezier(0.16, 1, 0.3, 1);
-  }
-
-  @starting-style {
-    [data-popover-content] {
-      opacity: 0;
-      scale: 0.96;
-    }
+  [data-popover-content],
+  [data-tooltip-content] {
+    transform-origin: var(--radix-popper-transform-origin, center);
+    --ui-enter-offset: 6px;
   }
 
   [data-tooltip-content] {
-    transition:
-      opacity 110ms ease-out,
-      scale 110ms ease-out;
+    --ui-enter-offset: 4px;
   }
 
-  @starting-style {
-    [data-tooltip-content] {
-      opacity: 0;
-      scale: 0.96;
-    }
+  [data-popover-content][data-side="bottom"],
+  [data-tooltip-content][data-side="bottom"] {
+    --ui-enter-y: calc(var(--ui-enter-offset) * -1);
+  }
+
+  [data-popover-content][data-side="top"],
+  [data-tooltip-content][data-side="top"] {
+    --ui-enter-y: var(--ui-enter-offset);
+  }
+
+  [data-popover-content][data-side="right"],
+  [data-tooltip-content][data-side="right"] {
+    --ui-enter-x: calc(var(--ui-enter-offset) * -1);
+  }
+
+  [data-popover-content][data-side="left"],
+  [data-tooltip-content][data-side="left"] {
+    --ui-enter-x: var(--ui-enter-offset);
+  }
+
+  [data-popover-content][data-state="open"] {
+    animation: ui-popper-in 220ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  [data-popover-content][data-state="closed"] {
+    animation: ui-popper-out 150ms cubic-bezier(0.4, 0, 1, 1) forwards;
+  }
+
+  [data-tooltip-content][data-state="delayed-open"],
+  [data-tooltip-content][data-state="instant-open"] {
+    animation: ui-popper-in 180ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  [data-tooltip-content][data-state="closed"] {
+    animation: ui-popper-out 130ms cubic-bezier(0.4, 0, 1, 1) forwards;
   }
 }
