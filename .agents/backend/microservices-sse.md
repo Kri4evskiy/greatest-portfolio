@@ -14,6 +14,6 @@
 ## 2. Эндпоинт Server-Sent Events в `apps/api` (`GET /api/telemetry/stream`)
 
 - Реализован в `TelemetryController` через декоратор `@Sse('stream')`, возвращающий `Observable<MessageEvent>` из `RxJS`.
-- Объединяет (`merge` в RxJS) два потока:
+- Объединяет (`merge` в RxJS, обёрнутый в `takeUntil(this.shutdown$)` для мгновенного завершения при `SIGTERM` в `onModuleDestroy()`) два потока:
   1. **Поток живых действий пользователей (`Subject`):** Мгновенно пушит события `GUEST_PASS_ISSUED`, `ARTICLE_VIEWED`, `ARTICLE_HELPFUL` всем открытым вкладкам сайта.
   2. **Пульс сервера (`interval(15000)`):** Каждые 15 секунд отправляет событие `SYSTEM_HEARTBEAT` с временем аптайма и статусом соединения с микросервисом, которое отображается в живом индикаторе в футере портфолио.

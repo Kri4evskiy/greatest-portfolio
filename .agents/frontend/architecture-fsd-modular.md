@@ -88,8 +88,17 @@ apps/web/src/
 
 ---
 
-## 3. Чеклист при добавлении новых модулей (`apps/web/src`)
+## 3. Внутренняя анатомия слайса (`features/<slice>/`, `entities/<slice>/`) и Чеклист
 
-1. Размещай новый модуль строго в его слое (`widgets/`, `features/`, `entities/`, `shared/`).
-2. Серверные хуки `TanStack Query` размещай в подпапке `queries/` соответствующей фичи или сущности (`features/auth/queries/`, `entities/knowledge-article/queries/`), а чистые браузерные DOM-хуки — в `shared/hooks/`.
-3. **Верификация:** прогоняй `pnpm biome check --write .`, `pnpm turbo typecheck` и `pnpm turbo build`.
+Чтобы файлы внутри слайса не превращались в монолиты со смешанной ответственностью, соблюдай разделение по подпапкам:
+- **`ui/`** — React-компоненты отображения (Server или Client Components).
+- **`queries/`** — **ИСКЛЮЧИТЕЛЬНО** серверные хуки `TanStack Query` (`useQuery`, `useMutation`, `useInfiniteQuery`) и функции `fetch`. **ЗАПРЕЩЕНО** размещать внутри `queries/*` низкоуровневую работу с `BroadcastChannel`, `localStorage`, `sessionStorage` или сложные алгоритмы трансформации — выноси их в `lib/`.
+- **`lib/`** — чистые доменные хелперы, парсеры, валидаторы и кросс-вкладочные синхронизаторы (например, `features/auth/lib/auth-cross-tab-sync.ts`, `entities/knowledge-content/lib/*`).
+- **`shared/hooks/`** — чистые браузерные DOM / UI хуки (`ScrollSpy`, `ResizeObserver`), не привязанные к серверному API.
+
+### Чеклист при добавлении новых модулей (`apps/web/src`):
+
+1. Размещай новый модуль строго в его слое (`widgets/`, `features/`, `entities/`, `shared/`) и соответствующей подпапке (`ui/`, `queries/`, `lib/`).
+2. Если добавляешь File-Based Metadata роут в `src/app/` без расширения файла в URL (`icon.tsx`, `apple-icon.tsx`, `opengraph-image.tsx`, `manifest.ts`), **обязательно** проверь `matcher` в `apps/web/src/proxy.ts`, чтобы `next-intl` не перехватывал его как локаль.
+3. **Синхронизация дерева:** обнови ASCII-дерево в этом файле и в `apps/web/README.md`.
+4. **Верификация:** прогоняй `pnpm biome check --write .`, `pnpm turbo typecheck` и `pnpm turbo build`.

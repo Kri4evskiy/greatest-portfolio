@@ -5,6 +5,7 @@
 ## 1. Защита роутов на уровне Next.js Edge Proxy (`src/proxy.ts`)
 
 - Edge Proxy (`src/proxy.ts`) перехватывает все запросы к `/knowledge-base` и `/knowledge-base/:path*`.
+- **Правило `matcher` в `src/proxy.ts`:** регулярное выражение `matcher: ['/((?!api|search-index|icon|apple-icon|_next|_vercel|.*opengraph-image.*|.*\\..*).*)']` исключает статические файлы с точкой (`.*\\..*`: `/robots.txt`, `/sitemap.xml`) и специальные File-Based Metadata роуты Next.js 16 без расширения в URL (`icon`, `apple-icon`, `opengraph-image`). При добавлении любого нового мета-файла в `src/app/` (например, `manifest.ts`) его путь **обязательно** нужно добавить в `matcher`, иначе `next-intl` перехватит его как локаль.
 - Проверяет наличие и структуру куки `kb_access_token` (`HttpOnly` JWT, выписанный бэкендом `apps/api`).
 - Если куки нет или токен истек:
   - При прямом заходе по URL `/knowledge-base/...` делает безопасный редирект на `/?unlock=knowledge-base&redirect=/knowledge-base/...`.
@@ -20,6 +21,6 @@
   2. `Роль посетителя` (`TEAM_LEAD`, `RECRUITER`, `DEVELOPER`, `FOUNDER`).
   3. Скрывающийся спойлер `I am the owner (Admin Passcode)` для получения роли `ADMIN`.
 - После успешного `POST /api/auth/guest-pass`:
-  1. Бэкенд выставляет `Set-Cookie: kb_access_token=...; HttpOnly; SameSite=Lax`.
-  2. Инвалидируется запрос `useVisitorProfile()`, иконка замка в хедере плавно меняется с `🔒` на `🔓`.
+  1. Бэкенд выставляет `Set-Cookie: kb_access_token=...; HttpOnly; SameSite=Lax` (`secure: isProduction && !isDemoMode`).
+  2. Инвалидируется запрос `useVisitorProfile()`, вызывается `broadcastAuthSessionChange()` из `features/auth/lib/auth-cross-tab-sync.ts` (синхронизирующий все соседние вкладки через `BroadcastChannel`), и иконка замка в хедере плавно меняется с `🔒` на `🔓`.
   3. В SSE-стрим улетает событие о выдаче пропуска, а пользователь бесшовно переходит в `/knowledge-base`.

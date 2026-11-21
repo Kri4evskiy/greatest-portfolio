@@ -69,3 +69,8 @@
 - `SupportedLocaleEnum = z.enum(['en', 'uk', 'ru'])`
 - `DEFAULT_LOCALE = 'en'`
 - `LOCALE_METADATA`: словарь кодов, коротких меток (`EN`, `UA`, `RU`) и нативных названий языков.
+
+### 7. Контракты Offset и Cursor пагинации (`pagination.schema.ts`)
+
+- `OffsetPaginationQuerySchema` (`limit`, `offset`) и фабрика `createOffsetPaginatedResponseSchema(ItemSchema)` (используется в `PaginatedArticleMetricsResponseSchema` для `GET /api/knowledge/metrics/paginated`).
+- `CursorPaginationQuerySchema` (`limit`, `cursor`, `eventType`) и фабрика `createCursorPaginatedResponseSchema(ItemSchema)` (используется в `PaginatedSystemEventsResponseSchema` для `GET /api/telemetry/events`).

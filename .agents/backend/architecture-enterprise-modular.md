@@ -57,17 +57,20 @@ apps/api/src/
 
 ---
 
-## 2. Границы ответственности слоёв
+## 2. Границы ответственности слоёв и запрет горизонтальных связей
 
-1. **`common/`** — переиспользуемые сквозные механизмы NestJS (гарды, пайпы, фильтры, интерцепторы, middleware, общие декораторы и DTO), не привязанные к конкретному бизнес-домену.
+1. **`common/`** — переиспользуемые сквозные механизмы NestJS (гарды, пайпы, фильтры, интерцепторы, middleware, общие декораторы, DTO и `utils`), не привязанные к конкретному бизнес-домену.
+   - **Правило изоляции внутри `common/`:** соседние инфраструктурные папки (`filters/`, `middleware/`, `interceptors/`, `guards/`, `pipes/`) **НЕ должны импортировать друг друга напрямую**. Любые общие типы запроса (например, `RequestWithCorrelationId`), константы заголовков (`REQUEST_ID_HEADER`) и чистые функции-валидаторы выносятся в `common/utils/*` (`request-id.util.ts`).
 2. **`config/`** — единая точка чтения и Zod-валидации `process.env` при старте процесса. Прямое чтение `process.env` внутри сервисов и модулей запрещено.
 3. **`migrations/`** — скрипты сидирования и версионирования данных БД (`pnpm --filter @repo/api prisma:seed`).
 4. **`modules/<domain>/`** — изолированные доменные модули. Доменные гарды, декораторы и DTO живут внутри своего модуля (`modules/auth/guards/`, `modules/auth/decorators/`, `modules/auth/dto/`).
+5. **Правило `Graceful Shutdown` для потоков и сокетов:** любой сервис, создающий бесконечные RxJS-потоки (`@Sse`, `interval`, `Subject`) или внешние пулы/TCP-клиенты, обязан реализовывать `OnModuleDestroy` и завершать потоки через `takeUntil(this.shutdown$)`, чтобы при `SIGTERM` контейнер останавливался за `< 200 мс`.
 
 ---
 
 ## 3. Чеклист при добавлении новых модулей
 
-1. Размещай доменную логику в `modules/<domain>/`, а сквозные гарды, интерцепторы, пайпы и фильтры — в `common/`.
+1. Размещай доменную логику в `modules/<domain>/`, сквозные механизмы — в `common/`, а чистые переиспользуемые хелперы — в `common/utils/`.
 2. Новые env-переменные добавляй в Zod-схему в `config/app.config.ts` или `config/database.config.ts`.
-3. Верификация: `pnpm biome check --write .`, `pnpm turbo typecheck`, `pnpm turbo build --filter=@repo/api`.
+3. **Синхронизация документации:** при изменении структуры папок или эндпоинтов сразу обновляй `apps/api/README.md`, `.agents/backend/development.md` и этот файл.
+4. Верификация: `pnpm biome check --write .`, `pnpm turbo typecheck`, `pnpm turbo build --filter=@repo/api`.
