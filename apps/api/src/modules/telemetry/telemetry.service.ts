@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { Inject, Injectable, Logger, MessageEvent } from '@nestjs/common'
+import { Inject, Injectable, Logger, MessageEvent, OnModuleDestroy } from '@nestjs/common'
 import { ClientProxy } from '@nestjs/microservices'
 import {
   type PaginatedSystemEventsResponse,
@@ -8,22 +8,34 @@ import {
   type TelemetryEventType,
   type VisitorRoleType,
 } from '@repo/shared-schemas'
-import { firstValueFrom, interval, map, merge, Observable, of, Subject, timeout } from 'rxjs'
+import { firstValueFrom, interval, map, merge, Observable, of, Subject, takeUntil, timeout } from 'rxjs'
 import type { CursorPaginationQueryDto } from '../../common/dto/pagination-query.dto.js'
 import { PrismaService } from '../../prisma/prisma.service.js'
 
 export const TELEMETRY_MS_CLIENT = 'TELEMETRY_MS_CLIENT'
 
 @Injectable()
-export class TelemetryService {
+export class TelemetryService implements OnModuleDestroy {
   private readonly logger = new Logger(TelemetryService.name)
   private readonly events$ = new Subject<TelemetryEvent>()
+  private readonly shutdown$ = new Subject<void>()
   private readonly recentEvents: TelemetryEvent[] = []
 
   constructor(
     @Inject(TELEMETRY_MS_CLIENT) private readonly telemetryClient: ClientProxy,
     @Inject(PrismaService) private readonly prisma: PrismaService,
   ) {}
+
+  async onModuleDestroy(): Promise<void> {
+    this.shutdown$.next()
+    this.shutdown$.complete()
+    this.events$.complete()
+    try {
+      await this.telemetryClient.close()
+    } catch {
+      // Ignore TCP close errors on shutdown
+    }
+  }
 
   async publishEvent(input: {
     type: TelemetryEventType
@@ -108,6 +120,7 @@ export class TelemetryService {
     )
 
     return merge(of(welcomeEvent), this.events$.asObservable(), heartbeat$).pipe(
+      takeUntil(this.shutdown$),
       map((event) => ({
         id: event.id,
         type: 'message',

@@ -55,7 +55,7 @@ apps/web/src/
 │
 ├── features/                   # [Слой 3: User Scenarios & Interactions]
 │   │                           # Интерактивные фичи с действиями пользователя
-│   ├── auth/                   # GuestPassModal + queries/use-visitor-profile
+│   ├── auth/                   # GuestPassModal + lib/auth-cross-tab-sync.ts + queries/use-visitor-profile
 │   ├── search/                 # CommandPaletteModal, useSearchIndex, search-client
 │   ├── telemetry-stream/       # FooterSseStatus, useTelemetryStream hook
 │   └── kb-sandboxes/           # Интерактивные песочницы в статьях (Zod, JWT, SSE, Redis)

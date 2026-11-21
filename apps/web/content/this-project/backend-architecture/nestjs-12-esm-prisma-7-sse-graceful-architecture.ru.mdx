@@ -1,0 +1,111 @@
+---
+title: "Архитектура Бэкенда NestJS 12 ESM: 4-слойная декомпозиция, Prisma 7 Wasm, Graceful SSE Shutdown и X-Request-Id"
+sidebarLabel: "NestJS 12 ESM и Prisma 7"
+summary: "Инженерный справочник по устройству бэкенда apps/api и микросервиса apps/telemetry-ms: 4-компонентная Enterprise-структура, жизненный цикл HTTP/SSE-запроса, защита от Log Injection в X-Request-Id, Rust-free Prisma 7 с In-Memory фолбэком и Graceful Shutdown."
+category: "this-project"
+format: "deep-dive"
+tags: ["nestjs", "prisma", "backend", "microservices", "sse", "security", "architecture"]
+readingTime: "8 мин"
+publishedAt: "2026-11-21"
+order: 1
+tldr:
+  - "Исходный код `apps/api/src` разделён на 4 изолированных слоя (`common`, `config`, `migrations`, `modules`) с отказом от `class-validator` в пользу единых контрактов `Zod v4` из `@repo/shared-schemas` и жёстким лимитом тела запроса `100kb`."
+  - "Каждый запрос получает валидированный корреляционный заголовок `X-Request-Id` (`resolveCorrelationRequestId` с защитой от CRLF / Log Injection), который пробрасывается в логи и ответы ошибок `SentryExceptionFilter`."
+  - "`PrismaService` построен на Rust-free `Prisma 7` (`@prisma/adapter-pg` + `pg.Pool`) с автоматическим откатом на `In-Memory` хранилище, а `enableShutdownHooks()` + RxJS `takeUntil(this.shutdown$)` завершают бесконечные `SSE`-стримы при `SIGTERM` за `< 200 мс`."
+---
+
+## 1. Четырёхслойная Enterprise-структура (`common`, `config`, `migrations`, `modules`)
+
+Чтобы бэкенд `apps/api` (работающий на нативном ESM `"type": "module"` в Node.js 22+) оставался модульным по мере добавления новых подсистем, кодовая база разделена на 4 функциональных контура:
+
+| Слой в `apps/api/src/` | Зона ответственности | Ключевые модули |
+| :--- | :--- | :--- |
+| **`common/`** | Сквозные механизмы фреймворка (`Cross-Cutting Concerns`), не привязанные к бизнес-доменам | `middleware/logging.middleware.ts`, `utils/request-id.util.ts`, `interceptors/timeout.interceptor.ts`, `filters/sentry-exception.filter.ts`, `pipes/zod-validation.pipe.ts`, `decorators/` (`@Public`, `@SkipTimeout`) |
+| **`config/`** | Fail-Fast валидация `process.env` при старте процесса (прямое чтение `process.env` в сервисах запрещено) | `app.config.ts` (`loadAppConfig`, `WORKFOLIO_DEMO_MODE`), `database.config.ts` |
+| **`migrations/` & `prisma/`** | Доступ к данным (`Prisma 7` + `@prisma/adapter-pg`), In-Memory фолбэк и CLI-сидирование | `prisma.service.ts`, `migrations/scripts/seed.ts`, `seed-data.ts` |
+| **`modules/`** | Изолированные доменные модули со своими контроллерами, сервисами, гардами и DTO | `auth/` (`JwtRolesGuard`, `AuthService`), `knowledge/` (метрики и Offset-пагинация), `telemetry/` (TCP-клиент `:4001`, `@Sse('stream')` и Cursor-пагинация) |
+
+---
+
+## 2. Жизненный цикл HTTP-запроса, `100kb` Body Limit и защита `X-Request-Id` от Log Injection
+
+Любой запрос к `apps/api` проходит через 6 детерминированных барьеров:
+
+```text
+Входящий HTTP-запрос
+  │
+  ▼ 1. Express Hardening (main.ts): JSON/URL-encoded limit 100kb ➔ helmet() ➔ cookieParser() ➔ CORS
+  ▼ 2. LoggingMiddleware ('{*path}'): resolveCorrelationRequestId() ➔ заголовок ответа X-Request-Id
+  ▼ 3. Guards: глобальный ThrottlerGuard (100 req/min; 5 req/min на auth) ➔ JwtRolesGuard (HttpOnly cookie)
+  ▼ 4. Interceptors: LoggingInterceptor ➔ TimeoutInterceptor (15s; пропускает @Sse() и @SkipTimeout())
+  ▼ 5. Pipes: ZodValidationPipe(Schema) — валидация Body / Query / Param по схемам @repo/shared-schemas
+  ▼ 6. Controller ➔ Service ➔ Prisma 7 / TCP :4001 (или SentryExceptionFilter с возвратом requestId)
+```
+
+### Защита от DoS на парсинге JSON и от CRLF Log Injection
+1. **Ограничение `100kb` на размер тела запроса (`apps/api/src/main.ts`):**
+   По умолчанию Express разрешает отправку больших JSON-тел, что позволяет вызвать пиковую нагрузку на CPU и сборщик мусора V8 одним POST-запросом. В `main.ts` установлен жёсткий порог `app.useBodyParser('json', { limit: '100kb' })`.
+2. **Валидация `X-Request-Id` в `apps/api/src/common/utils/request-id.util.ts`:**
+   Если сервер без проверки логирует клиентский заголовок `X-Request-Id`, злоумышленник может передать в нём символы перевода строки (`\r\n`) и внедрить фальшивые записи в серверный лог (**Log Injection**). Хелпер `resolveCorrelationRequestId()` принимает внешний ID только при соответствии строгому шаблону `/^[A-Za-z0-9_-]{8,64}$/`, иначе генерирует новый `randomUUID()`:
+
+```typescript title="apps/api/src/common/utils/request-id.util.ts"
+export const REQUEST_ID_HEADER = 'X-Request-Id'
+const SAFE_REQUEST_ID_REGEX = /^[A-Za-z0-9_-]{8,64}$/
+
+export type RequestWithCorrelationId = Request & { requestId?: string }
+
+export function resolveCorrelationRequestId(incomingHeaderValue?: string): string {
+  const trimmed = incomingHeaderValue?.trim()
+  return trimmed && SAFE_REQUEST_ID_REGEX.test(trimmed) ? trimmed : randomUUID()
+}
+```
+
+Этот `requestId` возвращается клиенту в HTTP-заголовке `X-Request-Id` (открытом через `exposedHeaders` в CORS), пишется в лог времени ответа и при любой ошибке включается в JSON-ответ `SentryExceptionFilter`.
+
+---
+
+## 3. Почему `ZodValidationPipe` вместо `class-validator` и как работают Offset / Cursor пагинации
+
+В классических проектах на NestJS DTO описывают дважды: на бэкенде через декораторы `class-validator` и на фронтенде через `Zod`. В нашем монорепозитории действует принцип **Single Source of Truth**:
+
+- Все контракты (`GuestPassFormSchema`, `OffsetPaginationQuerySchema`, `CursorPaginationQuerySchema`, `ArticleReactionInputSchema`) описаны один раз на **`Zod v4`** в пакете `@repo/shared-schemas`.
+- В контроллерах NestJS используется наш `ZodValidationPipe`:
+  - **`GET /api/knowledge/metrics/paginated`** — применяет **Offset-пагинацию** (`limit`, `offset`, `category`, `sortBy: 'viewsCount' | 'helpfulCount'`), возвращая `{ items, total, limit, offset, hasMore }`.
+  - **`GET /api/telemetry/events`** — применяет **Cursor-пагинацию** (`take: limit + 1` по UUID курсору и `orderBy: [{ createdAt: 'desc' }, { id: 'desc' }]`), что исключает смещение строк при высокочастотной записи новых событий телеметрии.
+
+---
+
+## 4. Rust-Free `Prisma 7` (`@prisma/adapter-pg`) и отказоустойчивый In-Memory Fallback
+
+В версии `Prisma 7.10.1` мы полностью отказались от устаревшего бинарного Rust-движка (`query-engine`), перейдя на Wasm-компилятор запросов и драйверный адаптер `@prisma/adapter-pg` поверх пула `pg.Pool`:
+
+1. **Проба `SELECT 1` при старте (`PrismaService.onModuleInit`):**
+   Если `DATABASE_URL` не задан или локальный PostgreSQL не запущен, `PrismaService` аккуратно закрывает `pg.Pool` и переключается в режим **In-Memory Fallback** (используя те же начальные сиды `INITIAL_ARTICLE_SEEDS`), сохраняя работоспособность всех эндпоинтов, включая Offset и Cursor пагинацию.
+2. **Преимущество для Docker (`docker/api.Dockerfile`):**
+   Сгенерированный ESM-клиент компилируется `tsc` напрямую в `apps/api/dist/generated/prisma/`, благодаря чему команда `pnpm prune --prod --ignore-scripts` очищает все dev-зависимости без временных `/tmp`-костылей, а финальному контейнеру `node:22-alpine` не требуется пакет `openssl`.
+
+---
+
+## 5. Graceful Shutdown для бесконечных SSE-потоков (`takeUntil(this.shutdown$)`) и TCP `:4001`
+
+Неочевидная архитектурная ловушка любого сервера с **Server-Sent Events (`@Sse('stream')`)**:
+Когда Docker Compose или облачный оркестратор останавливает контейнер, он посылает процессу сигнал `SIGTERM`. Даже если в `main.ts` включён `app.enableShutdownHooks()`, открытое браузером SSE-соединение в `TelemetryService` подписано на бесконечный таймер пульса `interval(15000)`:
+
+```typescript title="apps/api/src/modules/telemetry/telemetry.service.ts"
+async onModuleDestroy(): Promise<void> {
+  this.shutdown$.next()
+  this.shutdown$.complete()
+  this.events$.complete()
+  await this.telemetryClient.close()
+}
+
+getEventStream(): Observable<MessageEvent> {
+  // ...
+  return merge(of(welcomeEvent), this.events$.asObservable(), heartbeat$).pipe(
+    takeUntil(this.shutdown$),
+    map((event) => ({ id: event.id, type: 'message', data: event })),
+  )
+}
+```
+
+В RxJS оператор `merge(...)` не завершает HTTP-ответ, пока активен хотя бы один из его внутренних потоков. Оператор **`takeUntil(this.shutdown$)`** гарантирует, что в момент вызова `onModuleDestroy()` все открытые SSE-стримы мгновенно завершаются, TCP-клиент к микросервису `apps/telemetry-ms` (`:4001`) и пул соединений `PrismaService` штатно закрываются, и контейнер останавливается за **`< 200 мс`** вместо 10-секундного зависания до принудительного `SIGKILL`.

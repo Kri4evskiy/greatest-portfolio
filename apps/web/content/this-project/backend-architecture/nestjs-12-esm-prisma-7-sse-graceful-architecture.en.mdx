@@ -1,0 +1,111 @@
+---
+title: "NestJS 12 ESM Backend Architecture: 4-Tier Enterprise Decomposition, Prisma 7 Wasm, Graceful SSE Shutdown & X-Request-Id"
+sidebarLabel: "NestJS 12 ESM & Prisma 7"
+summary: "Engineering reference for apps/api and apps/telemetry-ms: 4-tier enterprise structure, HTTP/SSE request lifecycle, CRLF-safe X-Request-Id correlation headers, Rust-free Prisma 7 with In-Memory fallback, and Graceful Shutdown."
+category: "this-project"
+format: "deep-dive"
+tags: ["nestjs", "prisma", "backend", "microservices", "sse", "security", "architecture"]
+readingTime: "8 min"
+publishedAt: "2026-11-21"
+order: 1
+tldr:
+  - "Source code in `apps/api/src` is organized into 4 isolated tiers (`common`, `config`, `migrations`, `modules`), replacing `class-validator` with shared `Zod v4` contracts from `@repo/shared-schemas` and enforcing a `100kb` body size limit."
+  - "Every HTTP request receives a validated `X-Request-Id` correlation header (`resolveCorrelationRequestId` guarded against CRLF / Log Injection) propagated across request logs and `SentryExceptionFilter` error payloads."
+  - "`PrismaService` runs on Rust-free `Prisma 7` (`@prisma/adapter-pg` + `pg.Pool`) with automatic `In-Memory` fallback, while `enableShutdownHooks()` + RxJS `takeUntil(this.shutdown$)` drain infinite `SSE` streams on `SIGTERM` in `< 200ms`."
+---
+
+## 1. The 4-Tier Enterprise Structure (`common`, `config`, `migrations`, `modules`)
+
+To keep `apps/api` (running on Native ESM `"type": "module"` under Node.js 22+) strictly modular as new backend capabilities are added, the codebase is partitioned into 4 distinct boundaries:
+
+| Tier in `apps/api/src/` | Architectural Responsibility | Core Modules |
+| :--- | :--- | :--- |
+| **`common/`** | Cross-cutting framework mechanics independent of business domains | `middleware/logging.middleware.ts`, `utils/request-id.util.ts`, `interceptors/timeout.interceptor.ts`, `filters/sentry-exception.filter.ts`, `pipes/zod-validation.pipe.ts`, `decorators/` (`@Public`, `@SkipTimeout`) |
+| **`config/`** | Fail-fast `process.env` Zod validation at startup (direct `process.env` reads inside services are prohibited) | `app.config.ts` (`loadAppConfig`, `WORKFOLIO_DEMO_MODE`), `database.config.ts` |
+| **`migrations/` & `prisma/`** | Data access layer (`Prisma 7` + `@prisma/adapter-pg`), resilient In-Memory fallback, and CLI seeding | `prisma.service.ts`, `migrations/scripts/seed.ts`, `seed-data.ts` |
+| **`modules/`** | Self-contained domain modules with controllers, services, guards, and DTOs | `auth/` (`JwtRolesGuard`, `AuthService`), `knowledge/` (article metrics & Offset pagination), `telemetry/` (TCP client `:4001`, `@Sse('stream')`, and Cursor pagination) |
+
+---
+
+## 2. Request Lifecycle, `100kb` Body Limit & CRLF-Safe `X-Request-Id` Correlation
+
+Every incoming HTTP request passes through 6 deterministic stages:
+
+```text
+Incoming HTTP Request
+  │
+  ▼ 1. Express Hardening (main.ts): JSON/URL-encoded limit 100kb ➔ helmet() ➔ cookieParser() ➔ CORS
+  ▼ 2. LoggingMiddleware ('{*path}'): resolveCorrelationRequestId() ➔ X-Request-Id response header
+  ▼ 3. Guards: global ThrottlerGuard (100 req/min; 5 req/min on auth) ➔ JwtRolesGuard (HttpOnly cookie)
+  ▼ 4. Interceptors: LoggingInterceptor ➔ TimeoutInterceptor (15s; bypasses @Sse() and @SkipTimeout())
+  ▼ 5. Pipes: ZodValidationPipe(Schema) — validates Body / Query / Param against @repo/shared-schemas
+  ▼ 6. Controller ➔ Service ➔ Prisma 7 / TCP :4001 (or SentryExceptionFilter returning requestId)
+```
+
+### JSON Body DoS Prevention & CRLF Log Injection Defense
+1. **Strict `100kb` Body Limit (`apps/api/src/main.ts`):**
+   To protect V8 memory and event-loop latency from oversized JSON payload floods, `main.ts` configures `app.useBodyParser('json', { limit: '100kb' })`.
+2. **Validating `X-Request-Id` in `apps/api/src/common/utils/request-id.util.ts`:**
+   Blindly logging client-supplied `X-Request-Id` headers opens a **CRLF / Log Injection** vector where an attacker injects newline characters (`\r\n`) to forge log lines. `resolveCorrelationRequestId()` accepts incoming IDs only when they match `/^[A-Za-z0-9_-]{8,64}$/`, falling back to a fresh `randomUUID()`:
+
+```typescript title="apps/api/src/common/utils/request-id.util.ts"
+export const REQUEST_ID_HEADER = 'X-Request-Id'
+const SAFE_REQUEST_ID_REGEX = /^[A-Za-z0-9_-]{8,64}$/
+
+export type RequestWithCorrelationId = Request & { requestId?: string }
+
+export function resolveCorrelationRequestId(incomingHeaderValue?: string): string {
+  const trimmed = incomingHeaderValue?.trim()
+  return trimmed && SAFE_REQUEST_ID_REGEX.test(trimmed) ? trimmed : randomUUID()
+}
+```
+
+This `requestId` is exposed to browser clients via CORS `exposedHeaders: ['X-Request-Id']`, logged with request latency, and returned in `SentryExceptionFilter` error JSON responses.
+
+---
+
+## 3. Why `ZodValidationPipe` Over `class-validator` & Dual Pagination Strategies
+
+Instead of duplicating validation logic across backend `class-validator` classes and frontend `Zod` schemas, the monorepo enforces a **Single Source of Truth**:
+
+- All contracts (`GuestPassFormSchema`, `OffsetPaginationQuerySchema`, `CursorPaginationQuerySchema`, `ArticleReactionInputSchema`) are authored once in **`Zod v4`** inside `@repo/shared-schemas`.
+- NestJS controllers apply `ZodValidationPipe`:
+  - **`GET /api/knowledge/metrics/paginated`** — implements **Offset Pagination** (`limit`, `offset`, `category`, `sortBy: 'viewsCount' | 'helpfulCount'`), returning `{ items, total, limit, offset, hasMore }`.
+  - **`GET /api/telemetry/events`** — implements **Cursor Pagination** (`take: limit + 1` by UUID cursor with `orderBy: [{ createdAt: 'desc' }, { id: 'desc' }]`), preventing page drift under high-frequency telemetry writes.
+
+---
+
+## 4. Rust-Free `Prisma 7` (`@prisma/adapter-pg`) & Resilient In-Memory Fallback
+
+In `Prisma 7.10.1`, we replaced the legacy Rust binary query engine with the Wasm query compiler and `@prisma/adapter-pg` driver adapter over `pg.Pool`:
+
+1. **Startup `SELECT 1` Probe (`PrismaService.onModuleInit`):**
+   When `DATABASE_URL` is unset or PostgreSQL is unreachable, `PrismaService` cleanly closes `pg.Pool` and switches to its **In-Memory Fallback** seeded with `INITIAL_ARTICLE_SEEDS` — keeping all REST, SSE, and Offset/Cursor pagination endpoints 100% operational.
+2. **Docker Build Optimization (`docker/api.Dockerfile`):**
+   The generated ESM client is compiled by `tsc` directly into `apps/api/dist/generated/prisma/`, allowing `pnpm prune --prod --ignore-scripts` to strip dev dependencies without `/tmp` copy workarounds or runtime `openssl` packages.
+
+---
+
+## 5. Graceful Shutdown for Infinite SSE Streams (`takeUntil(this.shutdown$)`) & TCP `:4001`
+
+A classic production pitfall with **Server-Sent Events (`@Sse('stream')`)**:
+When Docker Compose or a cloud orchestrator stops a container, it sends `SIGTERM`. Even with `app.enableShutdownHooks()` enabled in `main.ts`, an active browser SSE connection in `TelemetryService` is subscribed to an infinite `interval(15000)` heartbeat observable:
+
+```typescript title="apps/api/src/modules/telemetry/telemetry.service.ts"
+async onModuleDestroy(): Promise<void> {
+  this.shutdown$.next()
+  this.shutdown$.complete()
+  this.events$.complete()
+  await this.telemetryClient.close()
+}
+
+getEventStream(): Observable<MessageEvent> {
+  // ...
+  return merge(of(welcomeEvent), this.events$.asObservable(), heartbeat$).pipe(
+    takeUntil(this.shutdown$),
+    map((event) => ({ id: event.id, type: 'message', data: event })),
+  )
+}
+```
+
+In RxJS, `merge(...)` never completes while any inner stream remains open. Piping **`takeUntil(this.shutdown$)`** ensures that when `onModuleDestroy()` fires on `SIGTERM`, all active SSE streams complete immediately, the TCP client to `apps/telemetry-ms` (`:4001`) and `PrismaService` connection pool close cleanly, and the container exits in **`< 200ms`** instead of hanging for 10 seconds until a forced `SIGKILL`.

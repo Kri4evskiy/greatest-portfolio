@@ -17,6 +17,8 @@ async function bootstrap(): Promise<void> {
     },
   })
 
+  app.enableShutdownHooks()
+
   await app.listen()
   logger.log(`Telemetry Microservice listening via TCP on ${host}:${port}`)
 }

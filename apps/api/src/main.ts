@@ -11,7 +11,11 @@ import { appConfig } from './config/app.config.js'
 
 async function bootstrap(): Promise<void> {
   const logger = new Logger('NestAPI')
-  const app = await NestFactory.create<NestExpressApplication>(AppModule)
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    bodyParser: false,
+  })
+  app.useBodyParser('json', { limit: '100kb' })
+  app.useBodyParser('urlencoded', { limit: '100kb', extended: true })
 
   // Behind Next.js rewrites or a single cloud/Nginx reverse proxy, trust exactly 1 proxy hop
   // so ThrottlerGuard reads the real client IP from X-Forwarded-For without allowing spoofing.
@@ -34,7 +38,10 @@ async function bootstrap(): Promise<void> {
     origin: appConfig.allowedOrigins,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    exposedHeaders: ['X-Request-Id'],
   })
+
+  app.enableShutdownHooks()
 
   await app.listen(appConfig.port, '0.0.0.0')
   logger.log(`NestJS API running on http://localhost:${appConfig.port}/api`)

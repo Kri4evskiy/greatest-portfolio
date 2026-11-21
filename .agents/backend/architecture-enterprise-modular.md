@@ -19,7 +19,8 @@ apps/api/src/
 │   ├── filters/                # sentry-exception.filter.ts
 │   ├── interceptors/           # logging.interceptor.ts, timeout.interceptor.ts
 │   ├── middleware/             # logging.middleware.ts
-│   └── pipes/                  # zod-validation.pipe.ts
+│   ├── pipes/                  # zod-validation.pipe.ts
+│   └── utils/                  # request-id.util.ts (X-Request-Id Correlation ID + защита от Log Injection)
 │
 ├── config/                     # Типизированная конфигурация окружения (Zod)
 │   ├── app.config.ts           # Порты, URL-ы, секреты с production-проверкой JWT_SECRET

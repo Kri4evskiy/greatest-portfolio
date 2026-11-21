@@ -2,6 +2,8 @@
 
 import { type GuestPassFormInput, type SessionProfile, SessionProfileSchema } from '@repo/shared-schemas'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useEffect } from 'react'
+import { broadcastAuthSessionChange, subscribeAuthSessionChange } from '../lib/auth-cross-tab-sync'
 
 export const VISITOR_PROFILE_QUERY_KEY = ['auth', 'me'] as const
 
@@ -31,6 +33,15 @@ async function fetchVisitorProfile(): Promise<SessionProfile> {
 }
 
 export function useVisitorProfile() {
+  const queryClient = useQueryClient()
+
+  useEffect(() => {
+    return subscribeAuthSessionChange(() => {
+      void queryClient.invalidateQueries({ queryKey: VISITOR_PROFILE_QUERY_KEY })
+      void queryClient.invalidateQueries({ queryKey: ['knowledge'] })
+    })
+  }, [queryClient])
+
   return useQuery({
     queryKey: VISITOR_PROFILE_QUERY_KEY,
     queryFn: fetchVisitorProfile,
@@ -63,6 +74,7 @@ export function useIssueGuestPassMutation() {
     onSuccess: (profile) => {
       queryClient.setQueryData(VISITOR_PROFILE_QUERY_KEY, profile)
       void queryClient.invalidateQueries({ queryKey: ['knowledge'] })
+      broadcastAuthSessionChange()
     },
   })
 }
@@ -85,6 +97,7 @@ export function useLogoutMutation() {
     },
     onSuccess: (profile) => {
       queryClient.setQueryData(VISITOR_PROFILE_QUERY_KEY, profile)
+      broadcastAuthSessionChange()
     },
   })
 }

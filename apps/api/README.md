@@ -10,18 +10,19 @@
 
 ```text
 apps/api/src/
-├── main.ts                     # Bootstrap: Helmet, CORS, CookieParser, SentryExceptionFilter, LoggingInterceptor
+├── main.ts                     # Bootstrap: Helmet, CORS (exposedHeaders: X-Request-Id), enableShutdownHooks(), CookieParser
 ├── app.module.ts               # Root Module: ThrottlerModule, APP_GUARD (ThrottlerGuard), APP_INTERCEPTOR (TimeoutInterceptor), LoggingMiddleware
 ├── app.controller.ts           # Healthcheck (GET /api/health)
 │
 ├── common/                     # Сквозные механизмы фреймворка (Cross-Cutting Concerns)
 │   ├── decorators/             # @Public() и @SkipTimeout()
 │   ├── dto/                    # PaginationQuerySchema / PaginationQueryDto (заготовка под пагинацию логов и MCP)
-│   ├── filters/                # SentryExceptionFilter (глобальный @Catch(), маскирует 5xx детали)
+│   ├── filters/                # SentryExceptionFilter (глобальный @Catch(), маскирует 5xx детали и возвращает requestId)
 │   ├── guards/                 # Директория для общих гардов (.gitkeep)
 │   ├── interceptors/           # LoggingInterceptor (debug) и TimeoutInterceptor (15s с обходом SSE)
 │   ├── middleware/             # LoggingMiddleware (Express-уровень на '{*path}')
-│   └── pipes/                  # ZodValidationPipe (точечная валидация через схемы @repo/shared-schemas)
+│   ├── pipes/                  # ZodValidationPipe (точечная валидация через схемы @repo/shared-schemas)
+│   └── utils/                  # request-id.util.ts (генерация и защита X-Request-Id от CRLF Log Injection)
 │
 ├── config/                     # Типизированная Fail-Fast конфигурация (Zod)
 │   ├── app.config.ts           # PORT, WEB_ORIGIN, WORKFOLIO_DEMO_MODE, JWT_SECRET, ADMIN_SECRET_PASSCODE, TELEMETRY_MS_*, SENTRY_DSN
@@ -89,12 +90,13 @@ apps/api/src/
 
 ### Почему выбраны именно такие решения
 
-1. **`LoggingMiddleware` vs `LoggingInterceptor`:**
-   - `LoggingMiddleware` работает на уровне Express **до** гардов и роутинга — поэтому он видит **все** запросы, включая `404`, `403` (отбитые `JwtRolesGuard`) и `429` (отбитые `ThrottlerGuard`). Использует named wildcard `'{*path}'` (требование `path-to-regexp` в NestJS 12 / Express 5 вместо устаревшего `'*'`).
+1. **`LoggingMiddleware` (`X-Request-Id` Correlation ID) vs `LoggingInterceptor`:**
+   - `LoggingMiddleware` работает на уровне Express **до** гардов и роутинга — поэтому он видит **все** запросы, включая `404`, `403` (отбитые `JwtRolesGuard`) и `429` (отбитые `ThrottlerGuard`). Генерирует или валидирует заголовок `X-Request-Id` (`SAFE_REQUEST_ID_REGEX = /^[A-Za-z0-9_-]{8,64}$/` для защиты от Log Injection), прокидывает его в ответ и `SentryExceptionFilter`, и использует named wildcard `'{*path}'` (требование `path-to-regexp` в NestJS 12 / Express 5 вместо устаревшего `'*'`).
    - `LoggingInterceptor` работает **после** гардов вокруг контроллера через RxJS `tap()` и имеет доступ к NestJS `ExecutionContext`.
-2. **Глобальный `TimeoutInterceptor` + защита SSE:**
+2. **Глобальный `TimeoutInterceptor` + защита SSE и `Graceful Shutdown` (`enableShutdownHooks`):**
    - В `AppModule` подключён `TimeoutInterceptor` (15 секунд — запас под cold start Serverless PostgreSQL в Neon.tech).
    - Чтобы он не обрывал долгоживущий SSE-стрим каждые 15 секунд, `TimeoutInterceptor` инжектирует `Reflector` и автоматически пропускает любой метод с метаданными `@Sse()` (`'__sse__'`), а также маршруты с явным `@SkipTimeout()`.
+   - В `main.ts` (`apps/api` и `apps/telemetry-ms`) активирован `app.enableShutdownHooks()`, а в `TelemetryService.onModuleDestroy()` поток SSE обернут в `takeUntil(this.shutdown$)` с закрытием `telemetryClient.close()`, чтобы при `SIGTERM` в Docker/Render активные `interval(15000)` SSE-стримы и `pg.Pool` закрывались за `< 200 мс` без зависания контейнера до `SIGKILL`.
 3. **Почему нет `app.useGlobalPipes(new ValidationPipe())`:**
    - Вместо дублирования DTO-классов с `class-validator`, монорепозиторий использует **единый контракт на базе `Zod v4`** в пакете `@repo/shared-schemas`.
    - TypeScript-типы `z.infer<...>` стираются после компиляции, поэтому `reflect-metadata` не видит схему в runtime. Для этого наш `ZodValidationPipe` принимает конкретную Zod-схему точечно в параметре (`@Body(new ZodValidationPipe(GuestPassFormSchema))`), а файлы `modules/*/dto/*.dto.ts` служат доменными реэкспортами из `@repo/shared-schemas`.

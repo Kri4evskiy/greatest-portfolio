@@ -44,7 +44,7 @@ apps/web/
     │   └── section-nav/                  # PageSectionNavigator (плавающий outline / мобильная pill-кнопка)
     │
     ├── features/                         # [Слой 3: User Scenarios & Interactions]
-    │   ├── auth/                         # GuestPassModal + queries/use-visitor-profile.ts
+    │   ├── auth/                         # GuestPassModal + lib/auth-cross-tab-sync.ts + queries/use-visitor-profile.ts
     │   ├── search/                       # CommandPaletteModal (на базе @repo/ui Dialog) + search-index-client.ts
     │   ├── telemetry-stream/             # FooterSseStatus + use-telemetry-stream.ts (SSE + bfcache)
     │   └── kb-sandboxes/ui/              # Ленивые клиентские острова (mdx-client-widgets.tsx, D3, MCP)
