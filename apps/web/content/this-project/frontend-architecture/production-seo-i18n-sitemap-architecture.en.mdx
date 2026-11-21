@@ -138,7 +138,7 @@ Both metadata routes in `apps/web/src/app/` declare `export const dynamic = 'for
 | **Localized `openGraph` (`en_US`, `uk_UA`, `ru_RU`)** | ✅ Shipped | All public routes and Knowledge Base articles (`article:published_time`, `tags`) |
 | **Static `/robots.txt` & `/sitemap.xml` (`force-static`)** | ✅ Shipped | `apps/web/src/app/robots.ts`, `apps/web/src/app/sitemap.ts` |
 | **Localized `404` & `Error` Boundaries inside `LocaleRootLayout`** | ✅ Shipped | `apps/web/src/app/[locale]/not-found.tsx` (RSC) + `[...rest]/page.tsx` and `[locale]/error.tsx` |
-| **Dynamic `opengraph-image.tsx` (`1200×630`) & `icon.tsx`** | ⏳ Queued with `UI v2` | Scheduled via `next/og` (`ImageResponse` / Satori) using a local `.ttf` `Inter` font buffer once the `Workfolio UI v2` visual identity is finalized |
+| **Branded `opengraph-image.tsx` (`1200×630`), `icon.tsx` (`32×32`) & `apple-icon.tsx` (`180×180`)** | ✅ Shipped | `apps/web/src/app/[locale]/opengraph-image.tsx`, `apps/web/src/app/icon.tsx`, `apple-icon.tsx` (Obsidian Editorial Dark `>_` powered by `next/og`) |
 | **JSON-LD (`Person` / `TechArticle` Schema.org)** | 💡 Optional Enhancement | Can be embedded via `<script type="application/ld+json">` for Google Rich Results |
 
 ---

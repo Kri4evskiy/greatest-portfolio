@@ -32,10 +32,13 @@ apps/web/src/
 │   │                           # ТОЛЬКО тонкие Server Components: layout, page, route
 │   ├── globals.css
 │   ├── global-error.tsx
+│   ├── icon.tsx                # Фавиконка 32×32 (Obsidian Terminal Prompt >_)
+│   ├── apple-icon.tsx          # Иконка 180×180 (next/og)
 │   ├── robots.ts               # Статический SSG /robots.txt (force-static)
 │   ├── sitemap.ts              # Статический SSG /sitemap.xml с матрицей hreflang (force-static)
 │   ├── [locale]/
 │   │   ├── layout.tsx          # Провайдеры, Header, Footer, Modals, metadataBase
+│   │   ├── opengraph-image.tsx # OpenGraph карточка 1200×630 (Obsidian Editorial Dark)
 │   │   ├── page.tsx            # Главная: сборка Hero, Experience, Roadmap
 │   │   ├── error.tsx           # Локализованный Error Boundary внутри LocaleRootLayout
 │   │   ├── not-found.tsx       # Локализованный 404 RSC внутри LocaleRootLayout

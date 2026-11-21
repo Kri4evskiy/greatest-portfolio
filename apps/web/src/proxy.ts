@@ -35,5 +35,5 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
 }
 
 export const config = {
-  matcher: ['/((?!api|search-index|_next|_vercel|.*\\..*).*)'],
+  matcher: ['/((?!api|search-index|icon|apple-icon|_next|_vercel|.*opengraph-image.*|.*twitter-image.*|.*\\..*).*)'],
 }

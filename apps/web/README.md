@@ -22,12 +22,15 @@ apps/web/
     ├── app/                              # [Слой 1: Routing & Composition]
     │   ├── globals.css                   # Composition Root Tailwind v4 (@import "@repo/ui/theme.css" + @source)
     │   ├── global-error.tsx              # Глобальный Error Boundary (аварийный fallback всего <html>)
+    │   ├── icon.tsx                      # Статическая фавиконка 32×32 (Obsidian Terminal Prompt >_)
+    │   ├── apple-icon.tsx                # Иконка 180×180 для Apple / мобильных закладок
     │   ├── robots.ts                     # Статический SSG /robots.txt (force-static)
     │   ├── sitemap.ts                    # Статический SSG /sitemap.xml со всеми локалями и hreflang (force-static)
     │   ├── search-index/[locale]/
     │   │   └── route.ts                  # Статический SSG JSON-индекс для Cmd+K (force-static)
     │   └── [locale]/
     │       ├── layout.tsx                # Корневой layout: next/font, Zero-FOUC palette <script>, metadataBase, провайдеры
+    │       ├── opengraph-image.tsx       # Статическая карточка-превью 1200×630 (Obsidian Editorial Dark, next/og)
     │       ├── page.tsx                  # Главная страница Workfolio (RSC)
     │       ├── error.tsx                 # Локализованный Error Boundary внутри LocaleRootLayout ('use client')
     │       ├── not-found.tsx             # Локализованная 404 страница внутри LocaleRootLayout (чистый RSC)

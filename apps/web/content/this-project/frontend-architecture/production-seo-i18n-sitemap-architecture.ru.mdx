@@ -138,7 +138,7 @@ export function buildPageAlternates(pathname: string, locale: SupportedLocale = 
 | **Локализованный `openGraph` (`en_US`, `uk_UA`, `ru_RU`)** | ✅ Реализовано | Все публичные страницы и статьи Базы Знаний (`article:published_time`, `tags`) |
 | **Статические `/robots.txt` и `/sitemap.xml` (`force-static`)** | ✅ Реализовано | `apps/web/src/app/robots.ts`, `apps/web/src/app/sitemap.ts` |
 | **Локализованные границы ошибок `404` и `Error` внутри `LocaleRootLayout`** | ✅ Реализовано | `apps/web/src/app/[locale]/not-found.tsx` (RSC) + `[...rest]/page.tsx` и `[locale]/error.tsx` |
-| **Динамические карточки `opengraph-image.tsx` (`1200×630`) и `icon.tsx`** | ⏳ В очереди (в связке с `UI v2`) | Будет реализовано на базе `next/og` (`ImageResponse` / Satori) с чтением локального `.ttf`-буфера шрифта `Inter` сразу после утверждения палитры и типографики `Workfolio UI v2` |
+| **Брендированные `opengraph-image.tsx` (`1200×630`), `icon.tsx` (`32×32`) и `apple-icon.tsx` (`180×180`)** | ✅ Реализовано | `apps/web/src/app/[locale]/opengraph-image.tsx`, `apps/web/src/app/icon.tsx`, `apple-icon.tsx` (Obsidian Editorial Dark `>_` на базе `next/og`) |
 | **JSON-LD (`Person` / `TechArticle` Schema.org)** | 💡 Опциональное улучшение | Может быть добавлено в `<script type="application/ld+json">` для расширенных сниппетов Google (Rich Results) |
 
 ---
