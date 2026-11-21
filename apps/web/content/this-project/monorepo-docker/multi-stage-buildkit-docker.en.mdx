@@ -79,3 +79,17 @@ ENV PORT=4000
 
 > [!TIP]
 > Because the production `api` image excludes `Prisma CLI`, database schema migrations (`prisma migrate deploy`) run as a dedicated CI/CD step before rolling out new containers.
+
+---
+
+## 4. Separating `docker-compose.yml` (Zero-Friction Reviewer Demo) from `docker-compose.prod.yml` (Strict Production)
+
+To let a reviewing Team Lead or CTO spin up the entire topology in a single command (`docker compose up --build`) without manually creating an `.env` file while keeping real cloud/VPS deployments strictly locked down, orchestration is split into two Compose definitions:
+
+| Parameter | `docker-compose.yml` (Local Reviewer Demo) | `docker-compose.prod.yml` (Strict Production) |
+| :--- | :--- | :--- |
+| **Launch Command** | `docker compose up --build -d` | `docker compose -f docker-compose.prod.yml --env-file .env.prod up --build -d` |
+| **`WORKFOLIO_DEMO_MODE`** | `"true"` (permits fallback to the shared `DEFAULT_DEV_JWT_SECRET` in `@repo/shared-schemas` and logs an explicit warning) | Omitted (`"false"` — enforces strict fail-fast validation in `loadAppConfig`) |
+| **Compose-Level Secret Enforcement** | `${JWT_SECRET:-}` (auto-resolved via `resolveJwtSecret()` without `.env`) | Hard fail-fast interpolation `${JWT_SECRET:?}`, `${ADMIN_SECRET_PASSCODE:?}`, `${POSTGRES_PASSWORD:?}` |
+| **`Secure` Flag on `HttpOnly` `kb_access_token` Cookie** | `false` (`appConfig.isProduction && !appConfig.isDemoMode` — works over `http://localhost:3000`) | `true` (enforced strictly over HTTPS / TLS) |
+| **PostgreSQL Port (`5432`)** | `127.0.0.1:5432:5432` (bound to host loopback for DBeaver / DataGrip inspection) | **Unpublished from host** (100% isolated inside the private `backend-network`) |

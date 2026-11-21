@@ -89,10 +89,22 @@ Once running, open in your browser:
 
 ### Option 2: Full Docker Stack (PostgreSQL 16 + Microservice + API + Web)
 
-To spin up the entire containerized topology including `postgres:16-alpine` and test multi-stage builds (`turbo prune --docker`):
+We provide two distinct Docker Compose configurations separating **1-Command Local Reviewer Demo** from **Strict Production Deployment**:
+
+#### 2A. Local Reviewer Demo (`docker-compose.yml` — Zero `.env` Required)
+
+Spins up the entire containerized topology (`postgres:16-alpine` + `telemetry-ms` + `api` + `web`) with `WORKFOLIO_DEMO_MODE=true` and pre-aligned reviewer demo credentials so any Team Lead or CTO can evaluate the full stack in one command:
 
 ```bash
 docker compose up --build -d
+```
+
+#### 2B. Strict Production (`docker-compose.prod.yml` — Fail-Fast Secrets & Isolated DB)
+
+Enforces non-default secrets (`JWT_SECRET >= 32` chars, `ADMIN_SECRET_PASSCODE`, `POSTGRES_PASSWORD`, `WEB_ORIGIN`, `NEXT_PUBLIC_SITE_URL`) at both Docker Compose parse time (`${VAR:?error}`) and NestJS startup (`WORKFOLIO_DEMO_MODE` disabled), while completely unpublishing PostgreSQL port `5432` from the host machine:
+
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env.prod up --build -d
 ```
 
 ---
@@ -178,7 +190,8 @@ greatest-portfolio/
 ├── scripts/                    # Automation scripts (bootstrap-env.mjs, dev-runner.mjs)
 ├── AGENTS.md                   # Root AI context router
 ├── biome.json                  # Unified Rust-based linter and formatter
-├── docker-compose.yml          # Container orchestration (postgres + telemetry-ms + api + web)
+├── docker-compose.yml          # Zero-friction local reviewer demo stack (WORKFOLIO_DEMO_MODE=true)
+├── docker-compose.prod.yml     # Strict production stack (fail-fast secrets & isolated Postgres)
 ├── lefthook.yml                # Pre-commit Git hooks (Biome check + Typecheck)
 ├── pnpm-workspace.yaml         # Monorepo package boundaries and allowBuilds security list
 ├── tsconfig.base.json          # Root strict TypeScript configuration

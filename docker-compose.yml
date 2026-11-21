@@ -50,6 +50,7 @@ services:
         condition: service_started
     environment:
       NODE_ENV: production
+      WORKFOLIO_DEMO_MODE: ${WORKFOLIO_DEMO_MODE:-true}
       PORT: 4000
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/workfolio_db?schema=public
       DIRECT_URL: postgresql://postgres:postgres@postgres:5432/workfolio_db?schema=public
@@ -57,9 +58,9 @@ services:
       ADMIN_SECRET_PASSCODE: ${ADMIN_SECRET_PASSCODE:-workfolio-admin-2026}
       TELEMETRY_MS_HOST: telemetry-ms
       TELEMETRY_MS_PORT: 4001
-      WEB_ORIGIN: http://localhost:3000
+      WEB_ORIGIN: ${WEB_ORIGIN:-http://localhost:3000}
     # Production Note: In a production VPS setup behind Nginx/Caddy or Cloud Ingress (e.g. AWS ALB),
-    # ports: - "127.0.0.1:4000:4000" only serves reverse proxy traffic. On PaaS (Render/Fly.io) this is automatic.
+    # use docker-compose.prod.yml which enforces strict non-default secrets and unpublishes Postgres host ports.
     ports:
       - "127.0.0.1:4000:4000"
     healthcheck:
@@ -84,6 +85,7 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3000
+      NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-http://localhost:3000}
       API_INTERNAL_URL: http://api:4000
       JWT_SECRET: ${JWT_SECRET:-}
     ports:

@@ -47,7 +47,7 @@ export interface EngineeringRoadmapItem {
 export const ENGINEERING_ROADMAP_ITEMS: readonly EngineeringRoadmapItem[] = [
   {
     id: 'seo-og-error-boundaries',
-    status: 'planned',
+    status: 'shipped',
     kind: 'ui-ux',
     priority: 'P1',
     effort: 'S',

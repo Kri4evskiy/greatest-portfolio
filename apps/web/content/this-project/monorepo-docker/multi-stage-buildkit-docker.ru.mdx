@@ -79,3 +79,17 @@ ENV PORT=4000
 
 > [!TIP]
 > Так как продакшен-образ `api` не содержит `Prisma CLI`, миграции схемы БД (`prisma migrate deploy`) выполняются отдельным шагом в CI/CD перед переключением трафика.
+
+---
+
+## 4. Разделение `docker-compose.yml` (Zero-Friction Reviewer Demo) и `docker-compose.prod.yml` (Strict Production)
+
+Чтобы тимлид или СТО мог развернуть весь стек одной командой `docker compose up --build` без ручного создания `.env`, но боевой деплой на VPS оставался строго защищённым от дефолтных секретов, оркестрация разделена на два файла:
+
+| Параметр | `docker-compose.yml` (Local Reviewer Demo) | `docker-compose.prod.yml` (Strict Production) |
+| :--- | :--- | :--- |
+| **Команда запуска** | `docker compose up --build -d` | `docker compose -f docker-compose.prod.yml --env-file .env.prod up --build -d` |
+| **`WORKFOLIO_DEMO_MODE`** | `"true"` (разрешает fallback на единый `DEFAULT_DEV_JWT_SECRET` из `@repo/shared-schemas` и выводит `console.warn`) | Не задан (`"false"` — жёсткий fail-fast в `loadAppConfig` при пустых или дефолтных секретах) |
+| **Проверка секретов на уровне Compose** | `${JWT_SECRET:-}` (авто-резолв через `resolveJwtSecret()` без `.env`) | Обязательная интерполяция `${JWT_SECRET:?}`, `${ADMIN_SECRET_PASSCODE:?}`, `${POSTGRES_PASSWORD:?}` |
+| **Флаг `Secure` у `HttpOnly` куки `kb_access_token`** | `false` (`appConfig.isProduction && !appConfig.isDemoMode` — работает по `http://localhost:3000`) | `true` (работает строго поверх HTTPS / TLS) |
+| **Порт `postgres` (`5432`)** | `127.0.0.1:5432:5432` (доступен только с localhost для DBeaver / DataGrip) | **Не опубликован на хост** (100% изолирован внутри приватной сети `backend-network`) |

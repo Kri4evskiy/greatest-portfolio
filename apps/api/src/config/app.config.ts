@@ -6,6 +6,7 @@ const MIN_PROD_JWT_SECRET_LENGTH = 32
 
 const AppEnvSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+  WORKFOLIO_DEMO_MODE: z.enum(['true', 'false']).optional().default('false'),
   PORT: z.coerce.number().int().min(1).max(65535).default(4000),
   WEB_ORIGIN: z.string().trim().min(1).default('http://localhost:3000'),
   JWT_SECRET: z.string().trim().optional(),
@@ -18,6 +19,7 @@ const AppEnvSchema = z.object({
 export interface AppConfig {
   nodeEnv: 'development' | 'production' | 'test'
   isProduction: boolean
+  isDemoMode: boolean
   port: number
   webOrigin: string
   allowedOrigins: string[]
@@ -30,7 +32,7 @@ export interface AppConfig {
 
 /**
  * Validates and builds the typed application configuration from environment variables.
- * Rejects missing or default JWT secrets when NODE_ENV === 'production'.
+ * Rejects missing or default JWT secrets when NODE_ENV === 'production' (unless WORKFOLIO_DEMO_MODE === 'true').
  */
 export function loadAppConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   const parsed = AppEnvSchema.safeParse(env)
@@ -41,8 +43,9 @@ export function loadAppConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
 
   const data = parsed.data
   const isProduction = data.NODE_ENV === 'production'
+  const isDemoMode = data.WORKFOLIO_DEMO_MODE === 'true'
 
-  if (isProduction) {
+  if (isProduction && !isDemoMode) {
     const rawSecret = data.JWT_SECRET ?? ''
     if (rawSecret.length < MIN_PROD_JWT_SECRET_LENGTH || rawSecret === DEFAULT_DEV_JWT_SECRET) {
       throw new Error(
@@ -55,17 +58,31 @@ export function loadAppConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
         'Security violation: ADMIN_SECRET_PASSCODE must be explicitly overridden when NODE_ENV=production',
       )
     }
+  } else if (isProduction && isDemoMode) {
+    const rawSecret = data.JWT_SECRET ?? ''
+    if (rawSecret.length > 0 && rawSecret.length < MIN_PROD_JWT_SECRET_LENGTH) {
+      throw new Error(
+        `Security violation: JWT_SECRET in WORKFOLIO_DEMO_MODE must be at least ${MIN_PROD_JWT_SECRET_LENGTH} characters`,
+      )
+    }
+    console.warn(
+      '[WORKFOLIO DEMO MODE] Running with local reviewer demo credentials. Use docker-compose.prod.yml with explicit secrets for real cloud deployments.',
+    )
   }
 
-  const allowedOrigins = isProduction
-    ? data.WEB_ORIGIN.split(',')
-        .map((origin) => origin.trim())
-        .filter(Boolean)
-    : [data.WEB_ORIGIN, 'http://127.0.0.1:3000']
+  const configuredOrigins = data.WEB_ORIGIN.split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean)
+
+  const allowedOrigins =
+    isProduction && !isDemoMode
+      ? configuredOrigins
+      : Array.from(new Set([...configuredOrigins, 'http://localhost:3000', 'http://127.0.0.1:3000']))
 
   return {
     nodeEnv: data.NODE_ENV,
     isProduction,
+    isDemoMode,
     port: data.PORT,
     webOrigin: data.WEB_ORIGIN,
     allowedOrigins,

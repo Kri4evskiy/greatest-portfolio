@@ -24,7 +24,7 @@ apps/api/src/
 │   └── pipes/                  # ZodValidationPipe (точечная валидация через схемы @repo/shared-schemas)
 │
 ├── config/                     # Типизированная Fail-Fast конфигурация (Zod)
-│   ├── app.config.ts           # PORT, WEB_ORIGIN, JWT_SECRET, ADMIN_SECRET_PASSCODE, TELEMETRY_MS_*, SENTRY_DSN
+│   ├── app.config.ts           # PORT, WEB_ORIGIN, WORKFOLIO_DEMO_MODE, JWT_SECRET, ADMIN_SECRET_PASSCODE, TELEMETRY_MS_*, SENTRY_DSN
 │   └── database.config.ts      # DATABASE_URL, DIRECT_URL, парсер ?schema=
 │
 ├── generated/prisma/           # Автогенерируемый ESM-клиент Prisma 7 (игнорируется Git и Biome)
@@ -107,11 +107,12 @@ apps/api/src/
 
 1. **Zod-валидация окружения при старте (`src/config/app.config.ts`):**
    - В `development`/`test` допускаются безопасные дефолты для быстрого локального старта.
-   - В `NODE_ENV === 'production'` запуск процесса **принудительно падает**, если:
+   - В `NODE_ENV === 'production'` при `WORKFOLIO_DEMO_MODE !== 'true'` (`docker-compose.prod.yml`) запуск процесса **принудительно падает (Fail-Fast)**, если:
      - `JWT_SECRET` не задан, короче 32 символов или равен dev-значению;
      - `ADMIN_SECRET_PASSCODE` не переопределён и остался равным dev-значению.
+   - В режиме локального ревьюер-демо (`WORKFOLIO_DEMO_MODE === 'true'` в `docker-compose.yml`) разрешается старт одной командой `docker compose up --build` без `.env` (оба сервиса через `resolveJwtSecret()` берут единый `DEFAULT_DEV_JWT_SECRET` из `@repo/shared-schemas`), с выводом предупреждения `[WORKFOLIO DEMO MODE]` и установкой `secure: false` на куке `kb_access_token` для работы по `http://localhost:3000`.
 2. **Хранение сессий и защита от атак:**
-   - JWT хранится исключительно в `HttpOnly`, `SameSite=Lax` (`Secure` в production) cookie `kb_access_token` — никаких токенов в `LocalStorage`.
+   - JWT хранится исключительно в `HttpOnly`, `SameSite=Lax` (`Secure` в production при `!isDemoMode`) cookie `kb_access_token` — никаких токенов в `LocalStorage`.
    - Проверка `adminPasscode` в `AuthService` выполняется через SHA-256 + `crypto.timingSafeEqual` (защита от timing-атак).
    - В `production` включён `app.set('trust proxy', 1)` для корректного определения IP клиента в `ThrottlerGuard` за Nginx / облачным прокси.
    - На `/api/auth/guest-pass` и `/api/auth/login` стоит строгий лимит `5 req / 60s`.

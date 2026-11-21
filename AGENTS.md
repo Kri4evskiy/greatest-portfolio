@@ -25,7 +25,7 @@
 | **База данных (PostgreSQL, Neon.tech, Prisma ORM)**                 | `.agents/backend/database-prisma.md`                                                                                                     | `apps/api/prisma/*`, `apps/api/src/prisma/*`                                  |
 | **Микросервисы и Server-Sent Events (SSE)**                         | `.agents/backend/microservices-sse.md`                                                                                                   | `apps/telemetry-ms/*`, `apps/api/src/modules/telemetry/*`                     |
 | **CI/CD (GitHub Actions, Composite Actions, Quality Gates)**        | `.agents/architecture/ci-cd.md`                                                                                                          | `.github/workflows/*`, `.github/actions/*`                                    |
-| **Docker, Мониторинг и Инфраструктура (Nginx, Redis, AWS Roadmap)** | `.agents/architecture/docker-deploy.md` + `.agents/architecture/enterprise-infrastructure-roadmap.md`                                    | `docker/*`, `docker-compose.yml`                                              |
+| **Docker, Мониторинг и Инфраструктура (Nginx, Redis, AWS Roadmap)** | `.agents/architecture/docker-deploy.md` + `.agents/architecture/enterprise-infrastructure-roadmap.md`                                    | `docker/*`, `docker-compose.yml`, `docker-compose.prod.yml`                   |
 
 ## 🛠️ Базовые команды монорепозитория
 

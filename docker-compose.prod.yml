@@ -1,0 +1,111 @@
+# ==============================================================================
+# 🔒 STRICT PRODUCTION DOCKER COMPOSE (docker-compose.prod.yml)
+# ==============================================================================
+# Usage:
+#   docker compose -f docker-compose.prod.yml --env-file .env.prod up --build -d
+#
+# Key Differences from Local Reviewer Demo (docker-compose.yml):
+#   1. WORKFOLIO_DEMO_MODE is NOT enabled (strict fail-fast validation in NestJS).
+#   2. Mandatory non-default secrets (JWT_SECRET >= 32 chars, ADMIN_SECRET_PASSCODE,
+#      POSTGRES_PASSWORD) are enforced at Compose parse time via ${VAR:?error}.
+#   3. PostgreSQL does NOT expose port 5432 to the host machine — it is 100% isolated
+#      inside 'backend-network' (or override DATABASE_URL to point to Neon.tech TLS).
+# ==============================================================================
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: workfolio-postgres-prod
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set strong POSTGRES_PASSWORD in environment or .env.prod}
+      POSTGRES_DB: ${POSTGRES_DB:-workfolio_db}
+    volumes:
+      - postgres_prod_data:/var/lib/postgresql/data
+    networks:
+      - backend-network
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-workfolio_db}" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  telemetry-ms:
+    build:
+      context: .
+      dockerfile: docker/telemetry-ms.Dockerfile
+    container_name: workfolio-telemetry-ms-prod
+    restart: always
+    environment:
+      NODE_ENV: production
+      TELEMETRY_MS_HOST: 0.0.0.0
+      TELEMETRY_MS_PORT: 4001
+    networks:
+      - backend-network
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/api.Dockerfile
+    container_name: workfolio-api-prod
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+      telemetry-ms:
+        condition: service_started
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-workfolio_db}?schema=public}
+      DIRECT_URL: ${DIRECT_URL:-postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-workfolio_db}?schema=public}
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET (>=32 chars, non-default) in environment or .env.prod}
+      ADMIN_SECRET_PASSCODE: ${ADMIN_SECRET_PASSCODE:?Set non-default ADMIN_SECRET_PASSCODE in environment or .env.prod}
+      TELEMETRY_MS_HOST: telemetry-ms
+      TELEMETRY_MS_PORT: 4001
+      WEB_ORIGIN: ${WEB_ORIGIN:?Set WEB_ORIGIN (e.g. https://your-domain.com) in environment or .env.prod}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+    ports:
+      - "127.0.0.1:4000:4000"
+    healthcheck:
+      test: [ "CMD-SHELL", "wget -qO- http://127.0.0.1:4000/api/health || exit 1" ]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    networks:
+      - backend-network
+      - frontend-network
+
+  web:
+    build:
+      context: .
+      dockerfile: docker/web.Dockerfile
+    container_name: workfolio-web-prod
+    restart: always
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:?Set NEXT_PUBLIC_SITE_URL (e.g. https://your-domain.com) in environment or .env.prod}
+      API_INTERNAL_URL: http://api:4000
+      JWT_SECRET: ${JWT_SECRET:?Set matching JWT_SECRET (>=32 chars) in environment or .env.prod}
+      NEXT_PUBLIC_SENTRY_DSN: ${NEXT_PUBLIC_SENTRY_DSN:-}
+      NEXT_PUBLIC_POSTHOG_KEY: ${NEXT_PUBLIC_POSTHOG_KEY:-}
+      NEXT_PUBLIC_POSTHOG_HOST: ${NEXT_PUBLIC_POSTHOG_HOST:-https://app.posthog.com}
+    ports:
+      - "127.0.0.1:3000:3000"
+    networks:
+      - frontend-network
+
+networks:
+  backend-network:
+    driver: bridge
+  frontend-network:
+    driver: bridge
+
+volumes:
+  postgres_prod_data:

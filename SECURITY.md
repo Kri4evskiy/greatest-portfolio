@@ -25,6 +25,9 @@ This repository implements a multi-tier, zero-trust security architecture design
 ### 4. Zero-Trust Backend & Microservice Isolation
 
 - **Private Docker Network:** The `apps/telemetry-ms` microservice runs within an isolated internal Docker bridge (`backend-network`) communicating exclusively over TCP (`:4001`). No host ports are exposed to the public internet.
+- **Reviewer Demo vs. Strict Production Compose Split:**
+  - `docker-compose.yml` enables `WORKFOLIO_DEMO_MODE=true` (falling back via `resolveJwtSecret()` to the shared `DEFAULT_DEV_JWT_SECRET` in `@repo/shared-schemas` when `.env` is absent) and HTTP-compatible cookie flags (`Secure: false` on `localhost`) for zero-friction evaluation without an `.env` file.
+  - `docker-compose.prod.yml` omits `WORKFOLIO_DEMO_MODE`, enforces mandatory non-default `JWT_SECRET` (`>= 32` chars), `ADMIN_SECRET_PASSCODE`, and `POSTGRES_PASSWORD` at both Compose parse time (`${VAR:?}`) and NestJS startup (`loadAppConfig`), sets `Secure: true` on `HttpOnly` cookies, and unpublishes PostgreSQL port `5432` from the host.
 - **Controlled Ingress & Anonymized Telemetry:** All external HTTP and SSE traffic enters through the public gateway (`apps/web` rewrites or `apps/api`), preventing direct probing of internal microservices. Public SSE telemetry (`GET /api/telemetry/stream`) strips personal `actorName` values and internal privilege roles (`ADMIN`).
 
 ### 5. Contract Validation & Input Sanitization

@@ -23,7 +23,7 @@ export class AuthController {
 
     res.cookie(KB_ACCESS_COOKIE_NAME, accessToken, {
       httpOnly: true,
-      secure: appConfig.isProduction,
+      secure: appConfig.isProduction && !appConfig.isDemoMode,
       sameSite: 'lax',
       path: '/',
       maxAge: KB_COOKIE_MAX_AGE_MS,
@@ -54,7 +54,7 @@ export class AuthController {
   logout(@Res({ passthrough: true }) res: Response): SessionProfile {
     res.clearCookie(KB_ACCESS_COOKIE_NAME, {
       httpOnly: true,
-      secure: appConfig.isProduction,
+      secure: appConfig.isProduction && !appConfig.isDemoMode,
       sameSite: 'lax',
       path: '/',
     })
