@@ -1,6 +1,7 @@
 import { DEFAULT_LOCALE, SupportedLocaleEnum } from '@repo/shared-schemas'
 import { Badge, Callout } from '@repo/ui'
 import { Database, ShieldCheck } from 'lucide-react'
+import type { Metadata } from 'next'
 import { getTranslations } from 'next-intl/server'
 import { Suspense } from 'react'
 import { KnowledgeDirectoryExplorer } from '@/entities/knowledge-article/ui/knowledge-directory-explorer'
@@ -10,6 +11,29 @@ import {
   getKnowledgeTree,
   type MdxArticleFrontmatter,
 } from '@/entities/knowledge-content'
+import { buildLocalizedUrl, buildPageAlternates, resolveOgLocale } from '@/shared/lib/seo'
+
+export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
+  const { locale } = await params
+  const parsed = SupportedLocaleEnum.safeParse(locale)
+  const resolvedLocale = parsed.success ? parsed.data : DEFAULT_LOCALE
+  const t = await getTranslations({ locale: resolvedLocale, namespace: 'KnowledgeBase' })
+  const title = `${t('title')} | Workfolio`
+  const description = t('description')
+
+  return {
+    title,
+    description,
+    alternates: buildPageAlternates('/knowledge-base', resolvedLocale),
+    openGraph: {
+      title,
+      description,
+      url: buildLocalizedUrl('/knowledge-base', resolvedLocale),
+      locale: resolveOgLocale(resolvedLocale),
+      type: 'website',
+    },
+  }
+}
 
 export default async function KnowledgeBaseIndexPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params

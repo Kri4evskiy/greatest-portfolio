@@ -1,0 +1,141 @@
+---
+title: "Архітектура Production SEO в Next.js 16: SSG Sitemap, Hreflang-матриця локалей та OpenGraph"
+sidebarLabel: "Production SEO та Sitemap"
+summary: "Інженерний довідник із реалізації SEO в мультимовному портфоліо на Next.js 16: мапінг локалей (en / uk ➔ /ua / ru), статична генерація robots.ts і sitemap.ts, canonical + hreflang та взаємодія з Edge JWT Proxy."
+category: "this-project"
+format: "deep-dive"
+tags: ["seo", "nextjs", "i18n", "ssg", "sitemap", "architecture"]
+readingTime: "7 хв"
+publishedAt: "2026-11-21"
+order: 4
+tldr:
+  - "Модуль `apps/web/src/shared/lib/seo.ts` централізує генерацію канонічних URL, безпечний парсинг `NEXT_PUBLIC_SITE_URL` (`parsed.origin`) та мапінг трьох форм локалі: внутрішній код (`uk`), URL-сегмент (`/ua`), ISO 639-1 `hreflang` (`uk`) та OpenGraph (`uk_UA`)."
+  - "`robots.ts` і `sitemap.ts` позначені `export const dynamic = 'force-static'` (`0 КБ` клієнтського JS) та автоматично оминають перевірки JWT у `src/proxy.ts` завдяки регулярному виразу `matcher` (що виключає файли з крапкою: `/robots.txt`, `/sitemap.xml`)."
+  - "Динамічні прев’ю-картки `opengraph-image.tsx` (`next/og` Satori 1200×630 із локальним `.ttf`-буфером шрифту `Inter`) свідомо заплановані у зв’язці з візуальним редизайном `Workfolio UI v2`."
+---
+
+## 1. Трирівнева матриця локалей (`Internal Code` vs `URL Prefix` vs `Hreflang / OpenGraph`)
+
+Головна особливість мультимовного SEO в нашому проєкті полягає в тому, що внутрішній код мови, публічний префікс в адресній стрічці браузера та стандартні коди для пошукових роботів Google / месенджерів (Telegram, LinkedIn, Slack) підпорядковуються різним специфікаціям.
+
+У `apps/web/src/shared/i18n/routing.ts` увімкнено режим `localePrefix: { mode: 'as-needed', prefixes: { uk: '/ua' } }`. Щоб на жодній сторінці не виникало розбіжностей, модуль `apps/web/src/shared/lib/seo.ts` чітко розділяє ці три представлення:
+
+| Мова | Внутрішній тип (`SupportedLocale` та суфікс `.mdx`) | Публічний URL-префікс (`as-needed`) | Пошуковий стандарт ISO 639-1 (`<html lang>` і `hreflang`) | Стандарт месенджерів (`og:locale`) |
+| :--- | :--- | :--- | :--- | :--- |
+| **English (Default)** | `'en'` (`*.en.mdx`) | Без префікса (`/`, `/cv`, `/knowledge-base`) | `en` (+ `x-default`) | `en_US` |
+| **Українська** | `'uk'` (`*.uk.mdx`) | `/ua` (`/ua`, `/ua/cv`, `/ua/knowledge-base`) | `uk` | `uk_UA` |
+| **Русский** | `'ru'` (`*.ru.mdx`) | `/ru` (`/ru`, `/ru/cv`, `/ru/knowledge-base`) | `ru` | `ru_RU` |
+
+> [!IMPORTANT]
+> За специфікацією Google Search Central атрибут `hreflang` зобов’язаний використовувати код мови за стандартом **ISO 639-1** (`uk` для української мови, а не код країни `ua`), але сам `href` усередині цього тегу має вказувати на реальний публічний маршрут сайту (`https://domain.com/ua/...`). Саме тому в `buildLanguageAlternatesMap()` ключ словника — `uk`, а згенерований URL веде на префікс `/ua`.
+
+---
+
+## 2. Єдине SEO-ядро та захист від невалідного Origin (`apps/web/src/shared/lib/seo.ts`)
+
+Усі SEO-обчислення винесені в чисті серверні функції без зовнішніх залежностей:
+
+```typescript title="apps/web/src/shared/lib/seo.ts"
+const DEFAULT_SITE_URL = 'http://localhost:3000'
+
+const LOCALE_URL_PREFIX_MAP: Record<SupportedLocale, string> = {
+  en: '',
+  uk: '/ua',
+  ru: '/ru',
+}
+
+const OG_LOCALE_MAP: Record<SupportedLocale, string> = {
+  en: 'en_US',
+  uk: 'uk_UA',
+  ru: 'ru_RU',
+}
+
+export function resolveSiteUrl(): string {
+  const raw = process.env.NEXT_PUBLIC_SITE_URL?.trim()
+  if (!raw) return DEFAULT_SITE_URL
+
+  try {
+    const parsed = new URL(raw)
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return DEFAULT_SITE_URL
+    }
+    return parsed.origin
+  } catch {
+    return DEFAULT_SITE_URL
+  }
+}
+```
+
+### Чому `resolveSiteUrl()` повертає `parsed.origin` через `new URL(raw)`?
+У `apps/web/src/app/[locale]/layout.tsx` викликається `metadataBase: new URL(resolveSiteUrl())`. Якщо у змінній оточення `NEXT_PUBLIC_SITE_URL` на хостингу випадково опиниться рядок без протоколу, із зайвим слешем або шляхом (наприклад, `example.com/`), пряме створення `new URL()` без `try/catch` зламає збірку `next build`, а некоректний протокол може порушити цілісність `<link rel="canonical">`. Валідація через `parsed.origin` гарантує чистий `https://domain.com` або безпечний відкат на `http://localhost:3000`.
+
+---
+
+## 3. Як працюють `canonical`, `alternates.languages` (`hreflang`) та `openGraph`
+
+Функція `buildPageAlternates(pathname, locale)` викликається всередині `generateMetadata()` на всіх рівнях маршрутизації (`[locale]/layout.tsx`, `[locale]/cv/page.tsx`, `[locale]/knowledge-base/page.tsx` та `[locale]/knowledge-base/[...slug]/page.tsx`):
+
+```typescript title="apps/web/src/shared/lib/seo.ts"
+export function buildLanguageAlternatesMap(pathname: string): Record<string, string> {
+  return {
+    en: buildLocalizedUrl(pathname, 'en'),
+    uk: buildLocalizedUrl(pathname, 'uk'),
+    ru: buildLocalizedUrl(pathname, 'ru'),
+    'x-default': buildLocalizedUrl(pathname, DEFAULT_LOCALE),
+  }
+}
+
+export function buildPageAlternates(pathname: string, locale: SupportedLocale = DEFAULT_LOCALE) {
+  return {
+    canonical: buildLocalizedUrl(pathname, locale),
+    languages: buildLanguageAlternatesMap(pathname),
+  }
+}
+```
+
+Для сторінки `/ua/cv` Next.js 16 автоматично генерує в `<head>` такий набір тегів:
+1. **`<link rel="canonical" href="https://.../ua/cv" />`** — повідомляє пошуковику головну адресу поточної локалізованої сторінки (захист від дублів за наявності query-параметрів на кшталт `?unlock=knowledge-base`).
+2. **`<link rel="alternate" hreflang="en" href="https://.../cv" />`** — пов’язує англійську версію без префікса `/en`.
+3. **`<link rel="alternate" hreflang="uk" href="https://.../ua/cv" />`** — пов’язує українську версію за префіксом `/ua`.
+4. **`<link rel="alternate" hreflang="ru" href="https://.../ru/cv" />`** — пов’язує російську версію.
+5. **`<link rel="alternate" hreflang="x-default" href="https://.../cv" />`** — вказує дефолтну (англійську) сторінку для користувачів з будь-якими іншими мовами браузера.
+6. **OpenGraph (`og:title`, `og:description`, `og:url`, `og:locale`, `og:type`)** — формує локалізовану картку-прев’ю посилання під час надсилання в **Telegram, LinkedIn, Slack або Discord** (для статей Бази Знань додатково проставляються `og:type="article"`, `article:published_time` та `article:tag`).
+
+---
+
+## 4. Статичні `robots.ts` і `sitemap.ts` та їх взаємодія з Security / Edge Proxy
+
+Обидва файли в `apps/web/src/app/` використовують `export const dynamic = 'force-static'`, тому вони компілюються один раз на етапі `next build` і віддаються як чиста статика:
+
+1. **Прозорий пропуск через `src/proxy.ts`:**
+   У нашому Edge Proxy (`apps/web/src/proxy.ts`) задано фільтр:
+   ```typescript
+   matcher: ['/((?!api|search-index|_next|_vercel|.*\\..*).*)']
+   ```
+   Будь-який URL, що містить крапку (`.*\\..*`), включно з `/robots.txt` та `/sitemap.xml`, **оминає Edge-мідлвару напряму**. Пошукові боти отримують XML/TXT миттєво без запуску Web Crypto JWT і без редіректів локалі.
+2. **Ізоляція службових ендпоінтів у `robots.ts`:**
+   ```typescript title="apps/web/src/app/robots.ts"
+   rules: [
+     {
+       userAgent: '*',
+       allow: '/',
+       disallow: ['/api/', '/search-index/'],
+     },
+   ]
+   ```
+   Ми явно закриваємо від пошукових роботів `/api/` (бекенд-ендпоінти та SSE-потік) і `/search-index/` (сирі JSON-дампи індексу для модалки `Cmd+K`, призначені виключно для клієнтського пошуку, а не для індексації в Google).
+3. **Автоматичний обхід дерева `.mdx` у `sitemap.ts`:**
+   Генератор `sitemap.ts` бере кореневі сторінки (`/`, `/cv`, `/knowledge-base`), додає до них усі статичні шляхи папок і статей через `getAllStaticKnowledgeSlugArrays()` та підтягує реальну дату публікації `publishedAt` із легковагового кешу фронтматерів `getAllKnowledgeFrontmatters(DEFAULT_LOCALE)`. Для кожного маршруту створюються 3 записи (`en`, `uk`, `ru`) із вбудованою матрицею `alternates.languages`.
+
+---
+
+## 5. Що вже реалізовано vs. що заплановано в наступних ітераціях
+
+| Компонент SEO | Статус | Де знаходиться / Коли впроваджується |
+| :--- | :--- | :--- |
+| **`metadataBase` + валідація `NEXT_PUBLIC_SITE_URL`** | ✅ Реалізовано | `apps/web/src/shared/lib/seo.ts`, `turbo.json` (`globalEnv`) |
+| **`canonical` + `hreflang` (`en`, `uk`, `ru`, `x-default`)** | ✅ Реалізовано | `layout.tsx`, `cv/page.tsx`, `knowledge-base/page.tsx`, `[...slug]/page.tsx` |
+| **Локалізований `openGraph` (`en_US`, `uk_UA`, `ru_RU`)** | ✅ Реалізовано | Усі публічні сторінки та статті Бази Знань (`article:published_time`, `tags`) |
+| **Статичні `/robots.txt` і `/sitemap.xml` (`force-static`)** | ✅ Реалізовано | `apps/web/src/app/robots.ts`, `apps/web/src/app/sitemap.ts` |
+| **Динамічні картки `opengraph-image.tsx` (`1200×630`) та `icon.tsx`** | ⏳ У черзі (у зв’язці з `UI v2`) | Буде реалізовано на базі `next/og` (`ImageResponse` / Satori) із читанням локального `.ttf`-буфера шрифту `Inter` одразу після затвердження палітри й типографіки `Workfolio UI v2` |
+| **JSON-LD (`Person` / `TechArticle` Schema.org)** | 💡 Опціональне покращення | Може бути додано в `<script type="application/ld+json">` для розширених сніпетів Google (Rich Results) |

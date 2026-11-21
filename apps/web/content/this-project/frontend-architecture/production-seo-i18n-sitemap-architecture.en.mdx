@@ -1,0 +1,141 @@
+---
+title: "Production SEO Architecture in Next.js 16: SSG Sitemap, Locale Hreflang Matrix & OpenGraph"
+sidebarLabel: "Production SEO & Sitemap"
+summary: "Engineering reference for our multilingual SEO pipeline in Next.js 16: locale mapping (en / uk ➔ /ua / ru), static robots.ts and sitemap.ts generation, canonical + hreflang tags, and Edge JWT Proxy coexistence."
+category: "this-project"
+format: "deep-dive"
+tags: ["seo", "nextjs", "i18n", "ssg", "sitemap", "architecture"]
+readingTime: "7 min"
+publishedAt: "2026-11-21"
+order: 4
+tldr:
+  - "Module `apps/web/src/shared/lib/seo.ts` centralizes canonical URL builders, strict `NEXT_PUBLIC_SITE_URL` origin parsing (`parsed.origin`), and the 3-tier locale mapping: internal code (`uk`), public URL prefix (`/ua`), ISO 639-1 `hreflang` (`uk`), and OpenGraph (`uk_UA`)."
+  - "`robots.ts` and `sitemap.ts` enforce `export const dynamic = 'force-static'` (`0 KB` client JS) and bypass JWT checks in `src/proxy.ts` automatically via the dot-file `matcher` exclusion (`/robots.txt`, `/sitemap.xml`)."
+  - "Dynamic social preview cards (`opengraph-image.tsx` via `next/og` Satori 1200×630 with a local `.ttf` `Inter` font buffer) are scheduled alongside the `Workfolio UI v2` visual redesign."
+---
+
+## 1. The 3-Tier Locale Matrix (`Internal Code` vs `URL Prefix` vs `Hreflang / OpenGraph`)
+
+A core nuance of multilingual SEO in this monorepo is that internal locale codes, public browser URL prefixes, and search engine / social messenger specifications follow different standards.
+
+In `apps/web/src/shared/i18n/routing.ts`, routing uses `localePrefix: { mode: 'as-needed', prefixes: { uk: '/ua' } }`. To prevent inconsistencies across pages, `apps/web/src/shared/lib/seo.ts` explicitly maps each representation:
+
+| Language | Internal Type (`SupportedLocale` & `.mdx` suffix) | Public URL Prefix (`as-needed`) | Search Engine ISO 639-1 (`<html lang>` & `hreflang`) | Messenger Standard (`og:locale`) |
+| :--- | :--- | :--- | :--- | :--- |
+| **English (Default)** | `'en'` (`*.en.mdx`) | No prefix (`/`, `/cv`, `/knowledge-base`) | `en` (+ `x-default`) | `en_US` |
+| **Ukrainian** | `'uk'` (`*.uk.mdx`) | `/ua` (`/ua`, `/ua/cv`, `/ua/knowledge-base`) | `uk` | `uk_UA` |
+| **Russian** | `'ru'` (`*.ru.mdx`) | `/ru` (`/ru`, `/ru/cv`, `/ru/knowledge-base`) | `ru` | `ru_RU` |
+
+> [!IMPORTANT]
+> According to Google Search Central guidelines, the `hreflang` attribute must use the **ISO 639-1** language code (`uk` for Ukrainian, not the country code `ua`), while its `href` attribute must resolve to the actual public URL (`https://domain.com/ua/...`). Therefore, `buildLanguageAlternatesMap()` maps the `uk` key directly to the `/ua` URL prefix.
+
+---
+
+## 2. Unified SEO Core & Origin Hardening (`apps/web/src/shared/lib/seo.ts`)
+
+All SEO URL builders live in pure server functions with zero external dependencies:
+
+```typescript title="apps/web/src/shared/lib/seo.ts"
+const DEFAULT_SITE_URL = 'http://localhost:3000'
+
+const LOCALE_URL_PREFIX_MAP: Record<SupportedLocale, string> = {
+  en: '',
+  uk: '/ua',
+  ru: '/ru',
+}
+
+const OG_LOCALE_MAP: Record<SupportedLocale, string> = {
+  en: 'en_US',
+  uk: 'uk_UA',
+  ru: 'ru_RU',
+}
+
+export function resolveSiteUrl(): string {
+  const raw = process.env.NEXT_PUBLIC_SITE_URL?.trim()
+  if (!raw) return DEFAULT_SITE_URL
+
+  try {
+    const parsed = new URL(raw)
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return DEFAULT_SITE_URL
+    }
+    return parsed.origin
+  } catch {
+    return DEFAULT_SITE_URL
+  }
+}
+```
+
+### Why `resolveSiteUrl()` validates `parsed.origin` via `new URL(raw)`
+In `apps/web/src/app/[locale]/layout.tsx`, Next.js expects a valid URL instance in `metadataBase: new URL(resolveSiteUrl())`. If a deployment environment accidentally provides a malformed `NEXT_PUBLIC_SITE_URL` (missing protocol or containing trailing path segments), unguarded `new URL()` calls would crash `next build`. Extracting `parsed.origin` with protocol verification (`http:` / `https:`) guarantees a clean origin or a safe fallback to `http://localhost:3000`.
+
+---
+
+## 3. How `canonical`, `alternates.languages` (`hreflang`), and `openGraph` Work
+
+The `buildPageAlternates(pathname, locale)` helper is used inside `generateMetadata()` across all route levels (`[locale]/layout.tsx`, `[locale]/cv/page.tsx`, `[locale]/knowledge-base/page.tsx`, and `[locale]/knowledge-base/[...slug]/page.tsx`):
+
+```typescript title="apps/web/src/shared/lib/seo.ts"
+export function buildLanguageAlternatesMap(pathname: string): Record<string, string> {
+  return {
+    en: buildLocalizedUrl(pathname, 'en'),
+    uk: buildLocalizedUrl(pathname, 'uk'),
+    ru: buildLocalizedUrl(pathname, 'ru'),
+    'x-default': buildLocalizedUrl(pathname, DEFAULT_LOCALE),
+  }
+}
+
+export function buildPageAlternates(pathname: string, locale: SupportedLocale = DEFAULT_LOCALE) {
+  return {
+    canonical: buildLocalizedUrl(pathname, locale),
+    languages: buildLanguageAlternatesMap(pathname),
+  }
+}
+```
+
+For `/ru/cv`, Next.js 16 emits the following tags in `<head>`:
+1. **`<link rel="canonical" href="https://.../ru/cv" />`** — declares the authoritative URL for the current locale (preventing duplicate indexing from query parameters like `?unlock=knowledge-base`).
+2. **`<link rel="alternate" hreflang="en" href="https://.../cv" />`** — links the unprefixed English route.
+3. **`<link rel="alternate" hreflang="uk" href="https://.../ua/cv" />`** — links the `/ua`-prefixed Ukrainian route.
+4. **`<link rel="alternate" hreflang="ru" href="https://.../ru/cv" />`** — links the `/ru`-prefixed Russian route.
+5. **`<link rel="alternate" hreflang="x-default" href="https://.../cv" />`** — defines the default English fallback for unmatched browser locales.
+6. **OpenGraph (`og:title`, `og:description`, `og:url`, `og:locale`, `og:type`)** — renders localized Rich Link Previews when shared in **Telegram, LinkedIn, Slack, or Discord** (with `og:type="article"`, `article:published_time`, and `article:tag` added automatically on Knowledge Base notes).
+
+---
+
+## 4. Static `robots.ts` & `sitemap.ts` and Edge Security Coexistence
+
+Both metadata routes in `apps/web/src/app/` declare `export const dynamic = 'force-static'`, compiling at build time with `0 KB` of client-side JavaScript:
+
+1. **Zero-Friction Edge Proxy Bypass (`src/proxy.ts`):**
+   Our Edge Proxy defines:
+   ```typescript
+   matcher: ['/((?!api|search-index|_next|_vercel|.*\\..*).*)']
+   ```
+   Any path containing a file extension (`.*\\..*`), including `/robots.txt` and `/sitemap.xml`, bypasses the Edge middleware completely without triggering Web Crypto JWT verification or locale redirects.
+2. **Internal Endpoint Isolation in `robots.ts`:**
+   ```typescript title="apps/web/src/app/robots.ts"
+   rules: [
+     {
+       userAgent: '*',
+       allow: '/',
+       disallow: ['/api/', '/search-index/'],
+     },
+   ]
+   ```
+   We explicitly disallow `/api/` (backend REST/SSE endpoints) and `/search-index/` (raw JSON dumps used by the client-side `Cmd+K` modal) so search engines only index human-readable pages.
+3. **Recursive `.mdx` Discovery in `sitemap.ts`:**
+   `sitemap.ts` combines top-level routes (`/`, `/cv`, `/knowledge-base`) with all static folder hubs and articles returned by `getAllStaticKnowledgeSlugArrays()`, pairing each article with its `publishedAt` timestamp from `getAllKnowledgeFrontmatters(DEFAULT_LOCALE)` and emitting localized entries for `en`, `uk`, and `ru`.
+
+---
+
+## 5. Shipped Foundation vs. Upcoming SEO Milestones
+
+| SEO Capability | Status | Location / Milestone |
+| :--- | :--- | :--- |
+| **`metadataBase` + `NEXT_PUBLIC_SITE_URL` origin hardening** | ✅ Shipped | `apps/web/src/shared/lib/seo.ts`, `turbo.json` (`globalEnv`) |
+| **`canonical` + `hreflang` (`en`, `uk`, `ru`, `x-default`)** | ✅ Shipped | `layout.tsx`, `cv/page.tsx`, `knowledge-base/page.tsx`, `[...slug]/page.tsx` |
+| **Localized `openGraph` (`en_US`, `uk_UA`, `ru_RU`)** | ✅ Shipped | All public routes and Knowledge Base articles (`article:published_time`, `tags`) |
+| **Static `/robots.txt` & `/sitemap.xml` (`force-static`)** | ✅ Shipped | `apps/web/src/app/robots.ts`, `apps/web/src/app/sitemap.ts` |
+| **Dynamic `opengraph-image.tsx` (`1200×630`) & `icon.tsx`** | ⏳ Queued with `UI v2` | Scheduled via `next/og` (`ImageResponse` / Satori) using a local `.ttf` `Inter` font buffer once the `Workfolio UI v2` visual identity is finalized |
+| **JSON-LD (`Person` / `TechArticle` Schema.org)** | 💡 Optional Enhancement | Can be embedded via `<script type="application/ld+json">` for Google Rich Results |

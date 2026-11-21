@@ -28,6 +28,7 @@ import {
   type MdxArticleFrontmatter,
 } from '@/entities/knowledge-content'
 import { Link } from '@/shared/i18n/navigation'
+import { buildLocalizedUrl, buildPageAlternates, resolveOgLocale } from '@/shared/lib/seo'
 
 interface CatchAllKnowledgePageProps {
   params: Promise<{
@@ -50,20 +51,42 @@ export async function generateMetadata({ params }: CatchAllKnowledgePageProps): 
   const { locale, slug } = await params
   const parsed = SupportedLocaleEnum.safeParse(locale)
   const resolvedLocale = parsed.success ? parsed.data : DEFAULT_LOCALE
+  const pathname = `/knowledge-base/${slug.join('/')}`
 
   const article = getArticleByPathSegments(slug, resolvedLocale)
   if (article) {
+    const title = `${article.title} | Engineering Knowledge Base`
     return {
-      title: `${article.title} | Engineering Knowledge Base`,
+      title,
       description: article.summary,
+      alternates: buildPageAlternates(pathname, resolvedLocale),
+      openGraph: {
+        title,
+        description: article.summary,
+        url: buildLocalizedUrl(pathname, resolvedLocale),
+        locale: resolveOgLocale(resolvedLocale),
+        type: 'article',
+        publishedTime: article.publishedAt,
+        tags: [...article.tags],
+      },
     }
   }
 
   const folder = getFolderByPathSegments(slug, resolvedLocale)
   if (folder) {
+    const title = `${folder.label} | Engineering Knowledge Base`
+    const description = `${folder.label} (${folder.articleCount} engineering notes)`
     return {
-      title: `${folder.label} | Engineering Knowledge Base`,
-      description: `${folder.label} (${folder.articleCount} engineering notes)`,
+      title,
+      description,
+      alternates: buildPageAlternates(pathname, resolvedLocale),
+      openGraph: {
+        title,
+        description,
+        url: buildLocalizedUrl(pathname, resolvedLocale),
+        locale: resolveOgLocale(resolvedLocale),
+        type: 'website',
+      },
     }
   }
 

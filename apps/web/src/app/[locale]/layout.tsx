@@ -10,6 +10,7 @@ import { type ReactNode, Suspense } from 'react'
 import { GuestPassModal } from '@/features/auth/guest-pass-modal'
 import { CommandPaletteModal } from '@/features/search/command-palette-modal'
 import { PALETTE_INIT_SCRIPT } from '@/shared/lib/palette'
+import { buildLocalizedUrl, buildPageAlternates, resolveOgLocale, resolveSiteUrl } from '@/shared/lib/seo'
 import { QueryProvider } from '@/shared/providers/query-provider'
 import { ThemeProvider } from '@/shared/providers/theme-provider'
 import { WorkfolioFooter } from '@/widgets/footer/workfolio-footer'
@@ -36,10 +37,22 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
   const parsed = SupportedLocaleEnum.safeParse(locale)
   const resolvedLocale = parsed.success ? parsed.data : DEFAULT_LOCALE
   const t = await getTranslations({ locale: resolvedLocale, namespace: 'Metadata' })
+  const title = t('title')
+  const description = t('description')
 
   return {
-    title: t('title'),
-    description: t('description'),
+    metadataBase: new URL(resolveSiteUrl()),
+    title,
+    description,
+    alternates: buildPageAlternates('/', resolvedLocale),
+    openGraph: {
+      title,
+      description,
+      url: buildLocalizedUrl('/', resolvedLocale),
+      siteName: 'Stanislav Krychevskyi — Workfolio & Knowledge Base',
+      locale: resolveOgLocale(resolvedLocale),
+      type: 'website',
+    },
   }
 }
 
