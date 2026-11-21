@@ -11,29 +11,40 @@
 
 ## 🔥 Приоритетная очередь разработки (Next Up)
 
-### Приоритет №1: Внедрение Redis (Distributed Rate Limiting & Response Cache)
+### Приоритет №1 (Quick High-Impact Full-Stack Showcase): Страница `System Observability & API Inspector` (`/[locale]/system-status`) + `GET /api/capabilities`
+
+- [ ] **Выделенная страница мониторинга архитектуры, живой Cursor/Offset пагинации и матрица `Capability-Gated UI` (`apps/api`, `apps/web`, `@repo/shared-schemas`):**
+  - **Зачем (инженерный смысл и связь с уже готовым бэкендом):**
+    В `apps/api` уже реализованы, но пока не подключены к UI мощные эндпоинты: `GET /api/telemetry/events` (**Cursor-based пагинация** `take: limit + 1`, `nextCursor`, фильтр по `eventType`), `GET /api/knowledge/metrics/paginated` (**Offset-based пагинация** `limit`, `offset`, `category`, `sortBy: 'viewsCount' | 'helpfulCount'`) и `GET /api/telemetry/stats` (TCP RPC к микросервису `:4001`). Выделенная страница `/[locale]/system-status` (открывается кликом по живому пульсу `SSE LIVE` в `WorkfolioFooter`) превращает их в интерактивный Full-Stack шоукейс для тимлида/СТО и одновременно закладывает фундамент `Capability-Gated UI` для всех следующих задач (Redis, CMS, S3/R2, Telegram Bot).
+  - **1. Контракт в `@repo/shared-schemas` и бэкенд `apps/api`:**
+    - Добавить `SystemCapabilitiesSchema` (`status: 'ok'`, `mode: 'demo' | 'development' | 'production'`, `persistence: 'postgresql' | 'in-memory-fallback'`, `rateLimiter: 'redis' | 'in-memory'`, `telemetryTcpConnected: boolean`, `integrations: { redisCache: boolean, s3ObjectStorage: boolean, telegramBotAuth: boolean, sentryObservability: boolean }`) — **строго булевы/enum флаги без утечки секретов и внутренних портов**.
+    - Расширить `AppController` (`GET /api/health` и/или `GET /api/capabilities`) для отдачи `SystemCapabilities`.
+    - Сделать витринное чтение `GET /api/knowledge/metrics/paginated` публичным (`@Public()`, Read-Only, под защитой глобального `ThrottlerGuard` `100 req/min`), оставив мутации `POST /api/knowledge/:slug/view` и `POST /api/knowledge/:slug/helpful` за `@Roles('USER', 'ADMIN')`.
+  - **2. Фронтенд (`apps/web/src/app/[locale]/system-status/page.tsx` + `features/telemetry-stream/*`):**
+    - **Hybrid SSG Shell + Live Client Dashboard:** оболочка страницы (заголовки, локализация `EN/UK/RU`, SEO `generateMetadata` + запись `/system-status` в `sitemap.ts`) предрендерится статически (`SSG`), а панели данных работают через `TanStack Query v5` (`IndexedDB`) + живой `EventSource` (`SSE`).
+    - **Модуль 1 — Live Architecture & Capabilities Matrix (`GET /api/capabilities` + `GET /api/telemetry/stats`):** карточки реального статуса узлов (`Next.js 16 Edge Proxy`, `NestJS 12 API`, `PostgreSQL` vs `In-Memory Fallback`, `TCP Microservice :4001`, `Redis Cache`, `S3/R2 Storage`, `Telegram Bot Auth`) с честными плашками Capability Gating (_«Нет API-ключа / Работает In-Memory Fallback»_).
+    - **Модуль 2 — Live Event Log с Cursor-пагинацией (`useInfiniteQuery` ➔ `GET /api/telemetry/events`):** таблица системных событий (`GUEST_PASS_ISSUED`, `ARTICLE_VIEWED`, `ARTICLE_HELPFUL`), фильтр по `eventType`, кнопка `Load older events (Cursor)` (показывающая реальный UUID `nextCursor`) и мгновенная подсветка новых событий из `SSE`-стрима.
+    - **Модуль 3 — Knowledge Base Popularity Leaderboard с Offset-пагинацией (`useQuery` + `keepPreviousData` ➔ `GET /api/knowledge/metrics/paginated`):** рейтинг самых читаемых и полезных статей с фильтром по категории, сортировкой (`viewsCount` / `helpfulCount`) и классической постраничной навигацией (`Page 1, 2, 3...`, `limit`, `offset`, `total`).
+    - **Точка входа в UI:** плашка `FooterSseStatus` (`SSE LIVE`) в `WorkfolioFooter` оборачивается в кликабельный `<Link href="/system-status">` с бейджем `Inspect Live API →`.
+  - **Архитектурные Trade-offs:**
+    - _SSG vs Live Data:_ сама страница `/[locale]/system-status` остаётся `SSG` (чтобы не требовать живого API во время `next build` в Docker/CI), а живые метрики подтягиваются клиентом через `TanStack Query` с мгновенным показом кэша из `IndexedDB`.
+    - _Security:_ публичный Read-Only доступ к обезличенным счётчикам просмотров (`/api/knowledge/metrics/paginated`) и анонимизированным событиям (`/api/telemetry/events`) защищён глобальным `@nestjs/throttler` (`100 req/min`) и не раскрывает `actorName` или роль `ADMIN`.
+
+### Приоритет №2: Внедрение Redis (Distributed Rate Limiting & Response Cache)
 
 - [ ] **Архитектурное внедрение Redis (`apps/api`, `docker-compose.yml`, `docker-compose.prod.yml`):**
   - **Зачем:**
     1. _Distributed Rate Limiting:_ масштабирование защиты от брутфорса (`POST /api/auth/login`, `POST /api/auth/guest-pass`) при работе нескольких реплик API.
-    2. _Response Caching (Cache-Aside):_ кэширование аналитических эндпоинтов (`GET /api/knowledge/stats`) с TTL 60 сек, снижающее нагрузку на PostgreSQL (Neon.tech) на 95%.
+    2. _Response Caching (Cache-Aside):_ кэширование аналитических эндпоинтов (`GET /api/knowledge/metrics/paginated`, `GET /api/telemetry/stats` и будущих CMS-запросов) с TTL 60 сек, снижающее нагрузку на PostgreSQL (Neon.tech) на 95%.
     3. _Session Revocation:_ фундамент для мгновенного отзыва скомпрометированных сессий и Refresh-токенов (`VisitorSession`).
+    4. _Интеграция с `/system-status`:_ автоматическое переключение индикатора `rateLimiter` в `GET /api/capabilities` из `'in-memory'` в `'redis'`.
   - **Паттерн Graceful In-Memory Fallback:** если переменная `REDIS_URL` отсутствует в `.env`, система автоматически и без ошибок откатывается на встроенный `In-Memory Throttler` и прямое чтение из БД.
   - **Инфраструктура и пакетная модель:**
     - _Docker:_ `redis:7-alpine` (~30 МБ) в приватной сети `backend-network` (`127.0.0.1:6379:6379` в `docker-compose.yml` и без хост-порта в `docker-compose.prod.yml`, healthcheck `redis-cli ping`).
     - _Архитектурная развилка:_ прямое подключение `ioredis` + `@nest-lab/throttler-storage-redis` + `@nestjs/cache-manager` в `apps/api` либо выделение пакета `packages/redis` (`@repo/cache`) для переиспользования между `apps/api` и `apps/telemetry-ms`.
   - **Спецификация:** `.agents/backend/security-jwt.md` (Секция 4).
 
-### Приоритет №2: Автоматическое тестирование (`Vitest` + `Playwright` в CI)
-
-- [ ] **Unit & Integration Tests (`Vitest`):** тесты Zod v4 схем (`@repo/shared-schemas`), Zustand-сторов (`uiStore` / `use-ui-store.ts`, `palette.ts`) и NestJS-сервисов (`AuthService`, `app.config.ts`) + интеграция джобы `unit-tests` в Stage 1 CI (`turbo run test --affected`). _(Строго `Vitest`, без `Jest`/`ts-jest`: `ts-jest` ограничен `typescript <7` и завязан на legacy JS Compiler API, тогда как `Vitest` нативно совместим с `TypeScript 7`.)_
-- [ ] **E2E Playwright Suite:** проверка RBAC-флоу (`GuestPassModal` → `HttpOnly` кука → чтение `.mdx` → маскирование `<Redact />`) + джоба `e2e` после `build` в CI (и синхронизация карточки `playwright-vitest-ci` в `engineering-roadmap.ts`).
-
-### Приоритет №3: Переосмысление визуального дизайна (Mobile-First Editorial `UI v2`)
-
-- [ ] **Авторский редизайн Workfolio (`UI v2`):** глубокое визуальное и типографическое переосмысление интерфейса поверх уже готового фундамента (`Tailwind CSS v4`, 2D-палитры `Warm Paper / Graphite / Sepia`, Zero-CLS шрифты `Inter` + `JetBrains Mono`, `@starting-style`, `@container`), включая точечное применение современных примитивов React 19.2+ (`<Activity>` для сохранения состояния скрытых табов без размонтирования, `useEffectEvent` для чтения актуальных значений в эффектах без лишних переподписок и опциональные `<ViewTransition>`), строго следуя `.agents/frontend/*` (Mobile-First с опорой на `360px`, чистая иерархия, продуманные карточки и таблицы без визуального шума).
-
-### Приоритет №4 (Full-Stack Backend Track): DB-Backed Knowledge Base CMS (`NestJS Entities` + `Prisma 7` + `R2/MinIO` + Server-Side Pagination)
+### Приоритет №3 (Full-Stack Backend Track): DB-Backed Knowledge Base CMS (`NestJS Entities` + `Prisma 7` + `R2/MinIO` + Server-Side Pagination)
 
 - [ ] **Полноценный CMS-бэкенд для Базы Знаний с реальной пагинацией из БД и объектным хранением `.mdx`:**
   1. **Цель и контекст (результаты аудита диска):** перенести каталог и выдачу Базы Знаний на реальные SQL-запросы к PostgreSQL через NestJS 12, чтобы кнопки `Показать ещё разделы`, `Показать ещё` внутри подтем (`4+` карточек) и фильтрация/поиск `#тегов` выполняли настоящие запросы на бэкенд, а `.mdx`-тела статей и медиафайлы хранились в `Cloudflare R2` / `MinIO` без пересборки всего фронтенда при добавлении новых заметок. _(Фактический аудит репозитория: текущие `.mdx` в `apps/web/content` занимают лишь ~699 KB; основной объём диска съедает локальный кэш `.turbo` — ~6.4 GB — и общий `node_modules` ~1.22 GB, поэтому `.turbo` достаточно периодически очищать.)_
@@ -55,7 +66,18 @@
      - **SSR/ISR HydrationBoundary + `useInfiniteQuery`:** серверный prefetch первой порции (6 разделов + Топ-10 тегов) для мгновенного первого экрана и SEO, а догрузка по кнопкам `Показать ещё` (разделы, подтемы, сетка 4+ статей) — через `useInfiniteQuery` в `apps/web/src/entities/knowledge-article/queries/` с реальными запросами в Network Tab.
      - **Debounced (`250ms`) серверный поиск по `#тегам`** в раскрывающейся панели с кэшированием в `TanStack Query`.
      - **On-Demand ISR (`revalidateTag`)** при создании/обновлении статьи в Admin API или синхронизации с R2.
-     - **Graceful Air-Gapped Fallback:** если `DATABASE_URL` или S3/R2-ключи не заданы, UI без ошибок работает на локальном SSG-движке `apps/web/content/*.mdx` (в единой модели Capability Gating).
+     - **Graceful Air-Gapped Fallback:** если `DATABASE_URL` или S3/R2-ключи не заданы (`s3ObjectStorage: false` в `GET /api/capabilities`), UI без ошибок работает на локальном SSG-движке `apps/web/content/*.mdx` (в единой модели Capability Gating).
+  5. **Архитектурные Trade-offs:**
+     - _Build-time SSG vs Runtime DB + R2:_ чистый локальный `.mdx` даёт нулевую сетевую задержку и работу без запущенного API на этапе сборки, тогда как DB + R2 требует живого коннекта или ISR. Компромисс решается гибридным **Dual-Source Loader**: первая порция и `sitemap.ts` всегда имеют мгновенный fallback на локальные файлы `apps/web/content/*.mdx`, а при активной БД (`persistence === 'postgresql'`) каталог переключается на серверную SQL-пагинацию через `TanStack Query`.
+
+### Приоритет №4: Автоматическое тестирование (`Vitest` + `Playwright` в CI)
+
+- [ ] **Unit & Integration Tests (`Vitest`):** тесты Zod v4 схем (`@repo/shared-schemas`), Zustand-сторов (`uiStore` / `use-ui-store.ts`, `palette.ts`) и NestJS-сервисов (`AuthService`, `app.config.ts`) + интеграция джобы `unit-tests` в Stage 1 CI (`turbo run test --affected`). _(Строго `Vitest`, без `Jest`/`ts-jest`: `ts-jest` ограничен `typescript <7` и завязан на legacy JS Compiler API, тогда как `Vitest` нативно совместим с `TypeScript 7`.)_
+- [ ] **E2E Playwright Suite:** проверка RBAC-флоу (`GuestPassModal` → `HttpOnly` кука → чтение `.mdx` → маскирование `<Redact />` + проверка `/system-status`) + джоба `e2e` после `build` в CI (и синхронизация карточки `playwright-vitest-ci` в `engineering-roadmap.ts`).
+
+### Приоритет №5: Переосмысление визуального дизайна (Mobile-First Editorial `UI v2`)
+
+- [ ] **Авторский редизайн Workfolio (`UI v2`):** глубокое визуальное и типографическое переосмысление интерфейса поверх уже готового фундамента (`Tailwind CSS v4`, 2D-палитры `Warm Paper / Graphite / Sepia`, Zero-CLS шрифты `Inter` + `JetBrains Mono`, `@starting-style`, `@container`), включая точечное применение современных примитивов React 19.2+ (`<Activity>` для сохранения состояния скрытых табов без размонтирования, `useEffectEvent` для чтения актуальных значений в эффектах без лишних переподписок и опциональные `<ViewTransition>`), строго следуя `.agents/frontend/*` (Mobile-First с опорой на `360px`, чистая иерархия, продуманные карточки и таблицы без визуального шума).
 
 ---
 

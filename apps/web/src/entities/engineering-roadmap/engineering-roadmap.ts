@@ -46,6 +46,53 @@ export interface EngineeringRoadmapItem {
 
 export const ENGINEERING_ROADMAP_ITEMS: readonly EngineeringRoadmapItem[] = [
   {
+    id: 'system-observability-api-inspector',
+    status: 'planned',
+    kind: 'architecture',
+    priority: 'P1',
+    effort: 'S',
+    title: {
+      en: 'Live System Observability Page (/system-status), Cursor/Offset API Inspector & Capability Matrix',
+      uk: 'Сторінка System Observability (/system-status), Cursor/Offset API інспектор і матриця інтеграцій',
+      ru: 'Страница System Observability (/system-status), Cursor/Offset API-инспектор и матрица интеграций',
+    },
+    summary: {
+      en: 'Dedicated /system-status page (linked from the footer SSE LIVE indicator) showcasing real Cursor pagination (GET /api/telemetry/events), Offset pagination (GET /api/knowledge/metrics/paginated), TCP microservice stats, and the GET /api/capabilities matrix.',
+      uk: 'Виділена сторінка /system-status (відкривається кліком по футеру SSE LIVE), що демонструє живу Cursor-пагінацію (/api/telemetry/events), Offset-пагінацію (/api/knowledge/metrics/paginated), статистику TCP-мікросервісу та матрицю /api/capabilities.',
+      ru: 'Выделенная страница /system-status (открывается по клику на пульс SSE LIVE в футере), демонстрирующая живую Cursor-пагинацию (/api/telemetry/events), Offset-пагинацию (/api/knowledge/metrics/paginated), статы TCP-микросервиса и матрицу /api/capabilities.',
+    },
+    rationale: {
+      en: 'Immediately surfaces 100% of our existing NestJS 12 pagination & microservice endpoints in the UI while establishing the SystemCapabilitiesSchema contract used by Redis, S3/R2, and Telegram Bot capability gating.',
+      uk: 'Миттєво виводить у інтерфейс уже готові ендпоінти Cursor/Offset пагінації та TCP-телеметрії NestJS 12 і закладає контракт SystemCapabilitiesSchema для Redis, S3/R2 і Telegram-бота.',
+      ru: 'Мгновенно выводит в UI уже написанные на бэкенде эндпоинты Cursor/Offset пагинации и TCP-телеметрии NestJS 12, одновременно закладывая контракт SystemCapabilitiesSchema для Redis, S3/R2 и Telegram-бота.',
+    },
+    pros: {
+      en: [
+        'Zero wasted backend code: reviewers can inspect real Cursor (useInfiniteQuery) and Offset pagination in DevTools Network Tab',
+        'Provides a single source of truth (/api/capabilities) for active vs. fallback infrastructure modes without leaking secrets',
+      ],
+      uk: [
+        'Жодного «мертвого» коду на бекенді: рев’юер бачить живу Cursor (useInfiniteQuery) та Offset пагінацію прямо в Network Tab',
+        'Єдиний безпечний контракт (/api/capabilities) для індикації активних сервісів та In-Memory фолбеків без витоку ключів',
+      ],
+      ru: [
+        'Никакого «спящего» кода на API: тимлид видит живую Cursor (useInfiniteQuery) и Offset пагинацию прямо в Network Tab',
+        'Единый безопасный контракт (/api/capabilities) для отображения активных сервисов и In-Memory фолбэков без утечки ключей',
+      ],
+    },
+    constraints: {
+      en: [
+        'Page shell must remain SSG-compatible for Docker/CI builds while hydrating live pagination & SSE streams on the client',
+      ],
+      uk: [
+        'Оболонка сторінки має залишатися SSG-сумісною для збірки в Docker/CI, підвантажуючи живу пагінацію та SSE на клієнті',
+      ],
+      ru: [
+        'Оболочка страницы должна оставаться SSG-совместимой для сборки в Docker/CI, подгружая живую пагинацию и SSE на клиенте',
+      ],
+    },
+  },
+  {
     id: 'seo-og-error-boundaries',
     status: 'shipped',
     kind: 'ui-ux',
@@ -219,9 +266,9 @@ export const ENGINEERING_ROADMAP_ITEMS: readonly EngineeringRoadmapItem[] = [
   },
   {
     id: 'headless-cms-vs-git-mdx',
-    status: 'evaluating',
+    status: 'planned',
     kind: 'architecture',
-    priority: 'P2',
+    priority: 'P1',
     effort: 'L',
     title: {
       en: 'DB-Backed Knowledge Base CMS (NestJS Entities, Prisma 7, R2/MinIO & Server Pagination)',
