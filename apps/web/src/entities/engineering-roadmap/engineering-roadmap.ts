@@ -104,38 +104,38 @@ export const ENGINEERING_ROADMAP_ITEMS: readonly EngineeringRoadmapItem[] = [
       ru: 'Production SEO (Sitemap / Robots), локализованные Error Boundaries и Zero-Friction Docker Demo',
     },
     summary: {
-      en: 'Ship sitemap.ts (all localized SSG routes with hreflang), robots.ts, localized [locale]/not-found.tsx & error.tsx, and clean separation between 1-command Docker reviewer demo and strict production secrets (with OpenGraph image cards queued cleanly alongside UI v2).',
-      uk: 'Додати sitemap.ts (усі локалізовані SSG-маршрути з hreflang), robots.ts, локалізовані not-found.tsx / error.tsx та чітко розділити 1-командне Docker Demo для рев’юера і суворі прод-секрети (динамічні OpenGraph-картки заплановані разом з UI v2).',
-      ru: 'Добавить sitemap.ts (все локализованные SSG-роуты с hreflang), robots.ts, локализованные not-found.tsx / error.tsx и разделить 1-командное Docker Demo для тимлида и строгие прод-секреты (а OpenGraph-карточки вынести в пару к UI v2).',
+      en: 'Ship sitemap.ts (all localized SSG routes with hreflang), robots.ts, Obsidian Editorial Dark opengraph-image.tsx (1200x630) & terminal >_ icon.tsx, localized [locale]/not-found.tsx & error.tsx, and clean separation between 1-command Docker reviewer demo and strict production secrets.',
+      uk: 'Додати sitemap.ts (усі локалізовані SSG-маршрути з hreflang), robots.ts, Obsidian Editorial Dark opengraph-image.tsx (1200x630) та іконки >_ icon.tsx, локалізовані not-found.tsx / error.tsx та чітко розділити 1-командне Docker Demo для рев’юера і суворі прод-секрети.',
+      ru: 'Добавить sitemap.ts (все локализованные SSG-роуты с hreflang), robots.ts, карточки Obsidian Editorial Dark opengraph-image.tsx (1200x630) и иконки >_ icon.tsx, локализованные not-found.tsx / error.tsx и разделить 1-командное Docker Demo для тимлида и строгие прод-секреты.',
     },
     rationale: {
-      en: 'Delivers full EN/UA/RU search indexing, localized 404/Error recovery, and effortless docker compose up --build without API keys (via capability-gated disabled badges) while keeping strict fail-fast validation in docker-compose.prod.yml.',
-      uk: 'Забезпечує EN/UA/RU пошукову індексацію, локалізовані 404/Error-сторінки та безшовний docker compose up --build без API-ключів (із блокуванням зовнішніх інтеграцій через capability-плашки), зберігаючи жорсткий fail-fast у docker-compose.prod.yml.',
-      ru: 'Обеспечивает EN/UA/RU индексацию, локализованные 404/Error-страницы и лёгкий запуск docker compose up --build без API-ключей (с блокировкой внешних сервисов через плашку «нет API-ключа») при сохранении строгого fail-fast в docker-compose.prod.yml.',
+      en: 'Delivers full EN/UA/RU search indexing, branded 1200x630 social preview cards, localized 404/Error recovery, and effortless docker compose up --build without API keys while keeping strict fail-fast validation in docker-compose.prod.yml.',
+      uk: 'Забезпечує EN/UA/RU пошукову індексацію, брендовані 1200x630 картки-прев’ю, локалізовані 404/Error-сторінки та безшовний docker compose up --build без API-ключів, зберігаючи жорсткий fail-fast у docker-compose.prod.yml.',
+      ru: 'Обеспечивает EN/UA/RU индексацию, брендированные 1200x630 карточки-превью, локализованные 404/Error-страницы и лёгкий запуск docker compose up --build без API-ключей при сохранении строгого fail-fast в docker-compose.prod.yml.',
     },
     pros: {
       en: [
-        'Full EN/UA/RU SEO sitemap coverage + 1-command Docker onboarding for reviewers with zero manual .env edits',
-        'Capability-gated UI cleanly disables external services missing API keys instead of crashing startup',
+        'Full EN/UA/RU SEO sitemap coverage + branded 1200x630 OpenGraph cards & terminal >_ favicons via next/og',
+        '1-command Docker onboarding for reviewers with zero manual .env edits while docker-compose.prod.yml enforces strict secrets',
       ],
       uk: [
-        'Повне EN/UA/RU SEO-покриття + запуск через Docker однією командою без ручного налаштування .env',
-        'Capability-gated UI акуратно блокує зовнішні сервіси без API-ключів замість падіння при старті',
+        'Повне EN/UA/RU SEO-покриття + брендовані 1200x630 OpenGraph-картки та іконки >_ через next/og',
+        'Запуск через Docker однією командою без ручного налаштування .env при суворому захисті docker-compose.prod.yml',
       ],
       ru: [
-        'Полная EN/UA/RU индексация + запуск в Docker одной командой без ручного создания .env',
-        'Capability-gated UI честно отключает внешние сервисы без API-ключей вместо падения контейнера',
+        'Полная EN/UA/RU индексация + брендированные 1200x630 OpenGraph-карточки и фавиконки >_ через next/og',
+        'Запуск в Docker одной командой без ручного создания .env при строгой защите в docker-compose.prod.yml',
       ],
     },
     constraints: {
       en: [
-        'Dynamic 1200x630 opengraph-image.tsx (ImageResponse + local TTF font buffer) is deferred to pair cleanly with UI v2',
+        'Uses the built-in offline Satori font buffer so social preview cards build deterministically in air-gapped Docker/CI environments',
       ],
       uk: [
-        'Динамічні opengraph-image.tsx (1200x630, ImageResponse + локальний TTF-шрифт) відкладено до редизайну UI v2',
+        'Використовує вбудований офлайн-буфер шрифту Satori, щоб картки стабільно збиралися в ізольованих Docker/CI середовищах',
       ],
       ru: [
-        'Динамические карточки opengraph-image.tsx (1200x630, ImageResponse + локальный TTF-шрифт) запланированы в пару к UI v2',
+        'Использует встроенный офлайн-буфер шрифта Satori, чтобы карточки гарантированно собирались в изолированных Docker/CI контейнерах',
       ],
     },
   },
