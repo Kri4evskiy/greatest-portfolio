@@ -137,5 +137,22 @@ Both metadata routes in `apps/web/src/app/` declare `export const dynamic = 'for
 | **`canonical` + `hreflang` (`en`, `uk`, `ru`, `x-default`)** | ✅ Shipped | `layout.tsx`, `cv/page.tsx`, `knowledge-base/page.tsx`, `[...slug]/page.tsx` |
 | **Localized `openGraph` (`en_US`, `uk_UA`, `ru_RU`)** | ✅ Shipped | All public routes and Knowledge Base articles (`article:published_time`, `tags`) |
 | **Static `/robots.txt` & `/sitemap.xml` (`force-static`)** | ✅ Shipped | `apps/web/src/app/robots.ts`, `apps/web/src/app/sitemap.ts` |
+| **Localized `404` & `Error` Boundaries inside `LocaleRootLayout`** | ✅ Shipped | `apps/web/src/app/[locale]/not-found.tsx` (RSC) + `[...rest]/page.tsx` and `[locale]/error.tsx` |
 | **Dynamic `opengraph-image.tsx` (`1200×630`) & `icon.tsx`** | ⏳ Queued with `UI v2` | Scheduled via `next/og` (`ImageResponse` / Satori) using a local `.ttf` `Inter` font buffer once the `Workfolio UI v2` visual identity is finalized |
 | **JSON-LD (`Person` / `TechArticle` Schema.org)** | 💡 Optional Enhancement | Can be embedded via `<script type="application/ld+json">` for Google Rich Results |
+
+---
+
+## 6. Two-Tier Error Boundary Architecture & Localized `404` (`not-found.tsx` + `[...rest]` + `error.tsx`)
+
+In a multilingual Next.js App Router setup rooted under `app/[locale]/*`, a root-level `app/not-found.tsx` renders **outside** `LocaleRootLayout` (stripping `WorkfolioHeader`, the 2D `Mode × Palette` theme switcher, `Cmd+K` search, and the active locale context).
+
+To preserve the complete shell and localization on `404` or runtime failures, we use a two-tier boundary architecture:
+
+1. **Catch-All Unknown Route Interception (`apps/web/src/app/[locale]/[...rest]/page.tsx` ➔ `[locale]/not-found.tsx`):**
+   - Any unmatched URL inside a locale (e.g., `/unknown` or `/ru/unknown`) falls through to `[...rest]/page.tsx`, which immediately invokes `notFound()` from `next/navigation`.
+   - Triggering `notFound()` inside the `[locale]` segment activates **`apps/web/src/app/[locale]/not-found.tsx`** — a pure **React Server Component (`0 KB` client JS)** powered by `getTranslations('NotFound')`. It renders inside `<main>` within `LocaleRootLayout`, keeping the header, theme, and footer intact while returning a proper HTTP `404` status code to search engine crawlers.
+2. **Two-Tier Runtime Error Boundaries (`[locale]/error.tsx` vs `app/global-error.tsx`):**
+   - **`apps/web/src/app/[locale]/error.tsx` (`'use client'`):** localized boundary inside `LocaleRootLayout` (`useTranslations('ErrorPage')`). It catches page-level rendering exceptions while keeping the site header and navigation interactive, logs the exception with Sentry graceful degradation, displays `error.digest`, and provides a `reset()` retry trigger.
+   - **`apps/web/src/app/global-error.tsx` (`'use client'`):** last-resort root boundary providing its own `<html>` and `<body>` shell (inferring the locale from `window.location.pathname`) in the rare event that `LocaleRootLayout` itself fails.
+

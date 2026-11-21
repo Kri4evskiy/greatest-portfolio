@@ -243,5 +243,20 @@
     "educationHeading": "Education",
     "coursesHeading": "Courses",
     "languagesHeading": "Languages"
+  },
+  "NotFound": {
+    "badge": "404 • Route Not Found",
+    "title": "This page does not exist in Workfolio",
+    "description": "The requested URL could not be matched to any Workfolio CV section or Knowledge Base engineering note. Use ⌘K global search or return to the main hubs below.",
+    "backHomeBtn": "Back to Workfolio CV",
+    "openKbBtn": "Explore Knowledge Base"
+  },
+  "ErrorPage": {
+    "badge": "Runtime Boundary • Caught Exception",
+    "title": "Something went wrong while rendering this view",
+    "description": "The localized React error boundary intercepted an unexpected runtime failure while preserving the active layout and navigation.",
+    "digestLabel": "Error Digest:",
+    "retryBtn": "Try Again",
+    "backHomeBtn": "Return to Home"
   }
 }

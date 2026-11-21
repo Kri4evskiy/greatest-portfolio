@@ -32,9 +32,14 @@ apps/web/src/
 │   │                           # ТОЛЬКО тонкие Server Components: layout, page, route
 │   ├── globals.css
 │   ├── global-error.tsx
+│   ├── robots.ts               # Статический SSG /robots.txt (force-static)
+│   ├── sitemap.ts              # Статический SSG /sitemap.xml с матрицей hreflang (force-static)
 │   ├── [locale]/
-│   │   ├── layout.tsx          # Провайдеры, Header, Footer, Modals
+│   │   ├── layout.tsx          # Провайдеры, Header, Footer, Modals, metadataBase
 │   │   ├── page.tsx            # Главная: сборка Hero, Experience, Roadmap
+│   │   ├── error.tsx           # Локализованный Error Boundary внутри LocaleRootLayout
+│   │   ├── not-found.tsx       # Локализованный 404 RSC внутри LocaleRootLayout
+│   │   ├── [...rest]/page.tsx  # Catch-all неизвестных маршрутов ➔ notFound()
 │   │   ├── cv/page.tsx         # Страница резюме
 │   │   └── knowledge-base/     # Роуты базы знаний
 │   └── search-index/[locale]/  # API route статического индекса
@@ -66,7 +71,7 @@ apps/web/src/
     │                           # Фундамент, не знающий о специфике бизнес-фичей
     ├── hooks/                  # Браузерные DOM/ScrollSpy UI-хуки (use-section-navigation.ts)
     ├── i18n/                   # navigation.ts, routing.ts, request.ts
-    ├── lib/                    # edge-jwt.ts, analytics.ts, palette.ts
+    ├── lib/                    # edge-jwt.ts, seo.ts, analytics.ts, palette.ts
     ├── providers/              # ThemeProvider, QueryProvider
     └── store/                  # Zustand (use-ui-store: actions + атомарные use* хуки + uiStore)
 ```

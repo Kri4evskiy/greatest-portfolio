@@ -21,12 +21,17 @@ apps/web/
     │
     ├── app/                              # [Слой 1: Routing & Composition]
     │   ├── globals.css                   # Composition Root Tailwind v4 (@import "@repo/ui/theme.css" + @source)
-    │   ├── global-error.tsx              # Глобальный Error Boundary
+    │   ├── global-error.tsx              # Глобальный Error Boundary (аварийный fallback всего <html>)
+    │   ├── robots.ts                     # Статический SSG /robots.txt (force-static)
+    │   ├── sitemap.ts                    # Статический SSG /sitemap.xml со всеми локалями и hreflang (force-static)
     │   ├── search-index/[locale]/
     │   │   └── route.ts                  # Статический SSG JSON-индекс для Cmd+K (force-static)
     │   └── [locale]/
-    │       ├── layout.tsx                # Корневой layout: next/font, Zero-FOUC palette <script>, провайдеры, модалки
+    │       ├── layout.tsx                # Корневой layout: next/font, Zero-FOUC palette <script>, metadataBase, провайдеры
     │       ├── page.tsx                  # Главная страница Workfolio (RSC)
+    │       ├── error.tsx                 # Локализованный Error Boundary внутри LocaleRootLayout ('use client')
+    │       ├── not-found.tsx             # Локализованная 404 страница внутри LocaleRootLayout (чистый RSC)
+    │       ├── [...rest]/page.tsx        # Catch-all роут неизвестных путей внутри локали ➔ notFound()
     │       ├── cv/page.tsx               # Страница резюме (PDF <object> + структурированный ATS-вид)
     │       └── knowledge-base/           # Защищённая База Знаний (layout + index + [...slug] catch-all)
     │
@@ -50,7 +55,7 @@ apps/web/
     └── shared/                           # [Слой 5: Infrastructure & Common Tools]
         ├── hooks/                        # Чистые браузерные DOM/ScrollSpy-хуки (use-section-navigation.ts)
         ├── i18n/                         # routing.ts, request.ts (next/root-params), navigation.ts
-        ├── lib/                          # edge-jwt.ts (Web Crypto HS256), palette.ts (Zero-FOUC), analytics.ts
+        ├── lib/                          # edge-jwt.ts (Web Crypto HS256), seo.ts (canonical/hreflang), palette.ts (Zero-FOUC), analytics.ts
         ├── providers/                    # ThemeProvider (next-themes), QueryProvider (TanStack + IndexedDB)
         └── store/                        # useUIStore (Zustand — модалки, фильтры, папки сайдбара, palette)
 ```
@@ -136,13 +141,15 @@ apps/web/
 
 ### Основные маршруты (`apps/web/src/app`)
 
-| Маршрут                              | Тип рендеринга                | Назначение                                                                           |
-| :----------------------------------- | :---------------------------- | :----------------------------------------------------------------------------------- |
-| `/[locale]` (`/`, `/ua`, `/ru`)      | `SSG`                         | Главная страница Workfolio CV: Hero, Case Studies, Experience, Tech Radar, Roadmap   |
-| `/[locale]/cv`                       | `SSG`                         | Страница резюме: встроенный просмотр `public/cv/*.pdf` и структурированный ATS-режим |
-| `/[locale]/knowledge-base`           | `SSG` + Edge JWT              | Обзорный каталог Базы Знаний с фильтром по категориям, форматам и `#тегам`           |
-| `/[locale]/knowledge-base/[...slug]` | `SSG` + Edge JWT              | Универсальный catch-all роут: хабы тем, вкладки подтем и статьи с `TOC` и метриками  |
-| `/search-index/[locale]`             | Static Route (`force-static`) | Предсобранный JSON-индекс для мгновенного поиска `Cmd+K`                             |
+| Маршрут                              | Тип рендеринга                | Назначение                                                                            |
+| :----------------------------------- | :---------------------------- | :------------------------------------------------------------------------------------ |
+| `/[locale]` (`/`, `/ua`, `/ru`)      | `SSG`                         | Главная страница Workfolio CV: Hero, Case Studies, Experience, Tech Radar, Roadmap    |
+| `/[locale]/cv`                       | `SSG`                         | Страница резюме: встроенный просмотр `public/cv/*.pdf` и структурированный ATS-режим  |
+| `/[locale]/knowledge-base`           | `SSG` + Edge JWT              | Обзорный каталог Базы Знаний с фильтром по категориям, форматам и `#тегам`            |
+| `/[locale]/knowledge-base/[...slug]` | `SSG` + Edge JWT              | Универсальный catch-all роут: хабы тем, вкладки подтем и статьи с `TOC` и метриками   |
+| `/[locale]/[...rest]`                | `RSC` (`notFound()`)          | Перехват неизвестных URL внутри локали с рендером `[locale]/not-found.tsx` в layout   |
+| `/robots.txt` и `/sitemap.xml`       | Static Route (`force-static`) | SSG-правила индексации и мультиязычная карта сайта с матрицей `hreflang` (`en/uk/ru`) |
+| `/search-index/[locale]`             | Static Route (`force-static`) | Предсобранный JSON-индекс для мгновенного поиска `Cmd+K`                              |
 
 ### Команды разработки
 

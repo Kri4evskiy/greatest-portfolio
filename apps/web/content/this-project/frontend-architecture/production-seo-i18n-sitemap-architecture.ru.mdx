@@ -137,5 +137,22 @@ export function buildPageAlternates(pathname: string, locale: SupportedLocale = 
 | **`canonical` + `hreflang` (`en`, `uk`, `ru`, `x-default`)** | ✅ Реализовано | `layout.tsx`, `cv/page.tsx`, `knowledge-base/page.tsx`, `[...slug]/page.tsx` |
 | **Локализованный `openGraph` (`en_US`, `uk_UA`, `ru_RU`)** | ✅ Реализовано | Все публичные страницы и статьи Базы Знаний (`article:published_time`, `tags`) |
 | **Статические `/robots.txt` и `/sitemap.xml` (`force-static`)** | ✅ Реализовано | `apps/web/src/app/robots.ts`, `apps/web/src/app/sitemap.ts` |
+| **Локализованные границы ошибок `404` и `Error` внутри `LocaleRootLayout`** | ✅ Реализовано | `apps/web/src/app/[locale]/not-found.tsx` (RSC) + `[...rest]/page.tsx` и `[locale]/error.tsx` |
 | **Динамические карточки `opengraph-image.tsx` (`1200×630`) и `icon.tsx`** | ⏳ В очереди (в связке с `UI v2`) | Будет реализовано на базе `next/og` (`ImageResponse` / Satori) с чтением локального `.ttf`-буфера шрифта `Inter` сразу после утверждения палитры и типографики `Workfolio UI v2` |
 | **JSON-LD (`Person` / `TechArticle` Schema.org)** | 💡 Опциональное улучшение | Может быть добавлено в `<script type="application/ld+json">` для расширенных сниппетов Google (Rich Results) |
+
+---
+
+## 6. Двухуровневая архитектура границ ошибок и локализованный `404` (`not-found.tsx` + `[...rest]` + `error.tsx`)
+
+В мультиязычном App Router с динамическим корневым сегментом `app/[locale]/*` стандартный корневой `app/not-found.tsx` рендерится **вне** локализованного `LocaleRootLayout` (теряются `WorkfolioHeader`, переключатель темы `Mode × Palette`, поиск `Cmd+K` и активный язык).
+
+Чтобы пользователь при ошибке `404` или сбое рендера оставался внутри привычного интерфейса на выбранном языке, выстроена двухуровневая защита:
+
+1. **Перехват неизвестных маршрутов (`apps/web/src/app/[locale]/[...rest]/page.tsx` ➔ `[locale]/not-found.tsx`):**
+   - Любой несуществующий путь внутри локали (например, `/unknown` или `/ru/unknown`) попадает в catch-all сегмент `[...rest]/page.tsx`, который синхронно вызывает `notFound()` из `next/navigation`.
+   - Вызов `notFound()` внутри `[locale]` активирует наш локализованный **`apps/web/src/app/[locale]/not-found.tsx`** — чистый **React Server Component (`0 КБ` клиентского JS)** на базе `getTranslations('NotFound')`, который рендерится прямо внутри `<main>` в `LocaleRootLayout`, сохраняя всю навигацию сайта и отдавая корректный HTTP-статус `404` для поисковых роботов.
+2. **Два уровня Runtime Error Boundaries (`[locale]/error.tsx` vs `app/global-error.tsx`):**
+   - **`apps/web/src/app/[locale]/error.tsx` (`'use client'`):** локализованный предохранитель внутри `LocaleRootLayout` (`useTranslations('ErrorPage')`). Перехватывает 99% ошибок рендера дочерних страниц, сохраняет шапку/футер/тему, логирует исключение в формате Sentry (`Graceful No-Op`, если `NEXT_PUBLIC_SENTRY_DSN` пуст), выводит `error.digest` и даёт кнопку повторной попытки `reset()`.
+   - **`apps/web/src/app/global-error.tsx` (`'use client'`):** аварийный корневой предохранитель со своим тегом `<html>` и `<body>` (с автоопределением языка по префиксу `window.location.pathname`), который срабатывает только в том случае, если ошибка произошла в самом корневом `LocaleRootLayout`.
+
