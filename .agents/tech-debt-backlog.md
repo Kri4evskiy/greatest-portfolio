@@ -11,47 +11,29 @@
 
 ## 🔥 Приоритетная очередь разработки (Next Up)
 
-### ✅ Завершено: Production SEO (`robots.ts` / `sitemap.ts`), Локализованные Error/404 и Zero-Friction `Docker Compose` Demo
+### Приоритет №1: Внедрение Redis (Distributed Rate Limiting & Response Cache)
 
-- [x] **Технический SEO-минимум и границы ошибок (`apps/web/src/app`):**
-  1. `apps/web/src/app/robots.ts` и `sitemap.ts` (100% SSG на этапе `next build`, `0 KB` клиентского JS; файлы с точкой автоматически пропускаются Edge Proxy `matcher` в `src/proxy.ts` без лишних проверок JWT):
-     - Единый резолвер базового URL (`apps/web/src/shared/lib/seo.ts`: `process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'`) + `metadataBase`, `canonical` и `alternates.languages` (`en` / `uk` / `ru` / `x-default`) в `layout.tsx`, `cv/page.tsx`, `knowledge-base/page.tsx` и `knowledge-base/[...slug]/page.tsx`.
-     - В `robots.ts`: `allow: '/'`, `disallow: ['/api/', '/search-index/']`, ссылка на `${siteUrl}/sitemap.xml`.
-     - В `sitemap.ts`: генерация карты всех локализованных SSG-роутов (публичные `/`, `/cv`, `/knowledge-base` + все папки и статьи через `getAllStaticKnowledgeSlugArrays()`) с полной матрицей `alternates.languages`.
-  2. Локализованные границы ошибок внутри `LocaleRootLayout` (с сохранением `WorkfolioHeader`, 2D-темы `Mode × Palette`, `Cmd+K` и `WorkfolioFooter`):
-     - `apps/web/src/app/[locale]/not-found.tsx` (чистый **React Server Component** на `getTranslations('NotFound')` и примитивах `@repo/ui` `Card`, `Badge`, `Button`) + catch-all роут `apps/web/src/app/[locale]/[...rest]/page.tsx`, вызывающий `notFound()` для всех неизвестных путей внутри локали.
-     - `apps/web/src/app/[locale]/error.tsx` (клиентский предохранитель `'use client'` с `{ error, reset }`, `useTranslations('ErrorPage')` и кнопками повтора / возврата на главную из `@repo/ui`, в дополнение к root `global-error.tsx`).
-     - Переводы `NotFound` и `ErrorPage` в `apps/web/messages/{en,ru,uk}.json`.
-       _(Динамические `opengraph-image.tsx` / `icon.tsx` вынесены в отдельную задачу бэклога ниже — логично делать их в связке с `UI v2`, чтобы не перерисовывать карточку дважды.)_
-- [x] **`docker-compose.yml` Zero-Friction Demo для тимлида vs Strict Production (`docker-compose.prod.yml`):**
-  1. `apps/api/src/config/app.config.ts`: добавлен булев флаг `WORKFOLIO_DEMO_MODE` (`'true' | 'false'`). При `isProduction && !isDemoMode` сохраняется жёсткий fail-fast на дефолтные/пустые `JWT_SECRET` и `ADMIN_SECRET_PASSCODE`; при `isProduction && isDemoMode` разрешается запуск с согласованным demo-секретом (`>= 32` символов), кука `kb_access_token` ставится с `secure: false` для `http://localhost:3000`, и выводится `console.warn('[WORKFOLIO DEMO MODE] ...')`.
-  2. `docker-compose.yml` (**Local Reviewer Demo**): передаёт `WORKFOLIO_DEMO_MODE: "true"` и `JWT_SECRET: ${JWT_SECRET:-}` (при отсутствии `.env` оба контейнера `api` и `web` берут единый `DEFAULT_DEV_JWT_SECRET` из `@repo/shared-schemas` через `resolveJwtSecret()`), чтобы `docker compose up --build` поднимал весь стек одной командой без `.env`.
-  3. `docker-compose.prod.yml` (**Real Production**): `WORKFOLIO_DEMO_MODE` отсутствует, обязательные секреты форсируются на этапе парсинга Compose (`${JWT_SECRET:?}`, `${ADMIN_SECRET_PASSCODE:?}`, `${POSTGRES_PASSWORD:?}`, `${WEB_ORIGIN:?}`, `${NEXT_PUBLIC_SITE_URL:?}`) + fail-fast проверкой в NestJS, а порт `postgres` не публикуется наружу из `backend-network`.
-  4. Синхронизированы команды и описание режимов в `README.md`, `SECURITY.md` и `.agents/architecture/docker-deploy.md`.
-
-### Приоритет №2: Внедрение Redis (Distributed Rate Limiting & Response Cache)
-
-- [ ] **Архитектурное внедрение Redis (`apps/api`, `docker-compose.yml`):**
+- [ ] **Архитектурное внедрение Redis (`apps/api`, `docker-compose.yml`, `docker-compose.prod.yml`):**
   - **Зачем:**
     1. _Distributed Rate Limiting:_ масштабирование защиты от брутфорса (`POST /api/auth/login`, `POST /api/auth/guest-pass`) при работе нескольких реплик API.
     2. _Response Caching (Cache-Aside):_ кэширование аналитических эндпоинтов (`GET /api/knowledge/stats`) с TTL 60 сек, снижающее нагрузку на PostgreSQL (Neon.tech) на 95%.
     3. _Session Revocation:_ фундамент для мгновенного отзыва скомпрометированных сессий и Refresh-токенов (`VisitorSession`).
   - **Паттерн Graceful In-Memory Fallback:** если переменная `REDIS_URL` отсутствует в `.env`, система автоматически и без ошибок откатывается на встроенный `In-Memory Throttler` и прямое чтение из БД.
   - **Инфраструктура и пакетная модель:**
-    - _Docker:_ `redis:7-alpine` (~30 МБ) в приватной сети `backend-network` (`127.0.0.1:6379:6379`, healthcheck `redis-cli ping`).
+    - _Docker:_ `redis:7-alpine` (~30 МБ) в приватной сети `backend-network` (`127.0.0.1:6379:6379` в `docker-compose.yml` и без хост-порта в `docker-compose.prod.yml`, healthcheck `redis-cli ping`).
     - _Архитектурная развилка:_ прямое подключение `ioredis` + `@nest-lab/throttler-storage-redis` + `@nestjs/cache-manager` в `apps/api` либо выделение пакета `packages/redis` (`@repo/cache`) для переиспользования между `apps/api` и `apps/telemetry-ms`.
   - **Спецификация:** `.agents/backend/security-jwt.md` (Секция 4).
 
-### Приоритет №3: Автоматическое тестирование (`Vitest` + `Playwright` в CI)
+### Приоритет №2: Автоматическое тестирование (`Vitest` + `Playwright` в CI)
 
 - [ ] **Unit & Integration Tests (`Vitest`):** тесты Zod v4 схем (`@repo/shared-schemas`), Zustand-сторов (`uiStore` / `use-ui-store.ts`, `palette.ts`) и NestJS-сервисов (`AuthService`, `app.config.ts`) + интеграция джобы `unit-tests` в Stage 1 CI (`turbo run test --affected`). _(Строго `Vitest`, без `Jest`/`ts-jest`: `ts-jest` ограничен `typescript <7` и завязан на legacy JS Compiler API, тогда как `Vitest` нативно совместим с `TypeScript 7`.)_
 - [ ] **E2E Playwright Suite:** проверка RBAC-флоу (`GuestPassModal` → `HttpOnly` кука → чтение `.mdx` → маскирование `<Redact />`) + джоба `e2e` после `build` в CI (и синхронизация карточки `playwright-vitest-ci` в `engineering-roadmap.ts`).
 
-### Приоритет №4: Переосмысление визуального дизайна (Mobile-First Editorial `UI v2`)
+### Приоритет №3: Переосмысление визуального дизайна (Mobile-First Editorial `UI v2`)
 
 - [ ] **Авторский редизайн Workfolio (`UI v2`):** глубокое визуальное и типографическое переосмысление интерфейса поверх уже готового фундамента (`Tailwind CSS v4`, 2D-палитры `Warm Paper / Graphite / Sepia`, Zero-CLS шрифты `Inter` + `JetBrains Mono`, `@starting-style`, `@container`), включая точечное применение современных примитивов React 19.2+ (`<Activity>` для сохранения состояния скрытых табов без размонтирования, `useEffectEvent` для чтения актуальных значений в эффектах без лишних переподписок и опциональные `<ViewTransition>`), строго следуя `.agents/frontend/*` (Mobile-First с опорой на `360px`, чистая иерархия, продуманные карточки и таблицы без визуального шума).
 
-### Приоритет №5 (Full-Stack Backend Track): DB-Backed Knowledge Base CMS (`NestJS Entities` + `Prisma 7` + `R2/MinIO` + Server-Side Pagination)
+### Приоритет №4 (Full-Stack Backend Track): DB-Backed Knowledge Base CMS (`NestJS Entities` + `Prisma 7` + `R2/MinIO` + Server-Side Pagination)
 
 - [ ] **Полноценный CMS-бэкенд для Базы Знаний с реальной пагинацией из БД и объектным хранением `.mdx`:**
   1. **Цель и контекст (результаты аудита диска):** перенести каталог и выдачу Базы Знаний на реальные SQL-запросы к PostgreSQL через NestJS 12, чтобы кнопки `Показать ещё разделы`, `Показать ещё` внутри подтем (`4+` карточек) и фильтрация/поиск `#тегов` выполняли настоящие запросы на бэкенд, а `.mdx`-тела статей и медиафайлы хранились в `Cloudflare R2` / `MinIO` без пересборки всего фронтенда при добавлении новых заметок. _(Фактический аудит репозитория: текущие `.mdx` в `apps/web/content` занимают лишь ~699 KB; основной объём диска съедает локальный кэш `.turbo` — ~6.4 GB — и общий `node_modules` ~1.22 GB, поэтому `.turbo` достаточно периодически очищать.)_
