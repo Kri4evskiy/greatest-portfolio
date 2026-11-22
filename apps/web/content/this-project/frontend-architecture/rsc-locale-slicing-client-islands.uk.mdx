@@ -78,3 +78,18 @@ window.addEventListener('pageshow', (event) => {
 Для передбачуваної роботи компілятора клієнтський стан розділений за областю життя:
 - **Локальний `useState`:** використовується всередині інтерактивних симуляцій `D3.js` (`d3-architecture-flow.tsx`, `d3-react-render-graph.tsx`), щоб перемикання режимів графа не викликало ререндер сусідніх компонентів сторінки.
 - **Глобальний `Zustand` (`use-ui-store.ts`):** зберігає лише крос-компонентний стан UI (модалки `Cmd+K` / `Guest Pass` та розгорнуті папки дерева Бази Знань із SSR-безпечною синхронізацією в `sessionStorage`).
+
+---
+
+## 4. Enterprise-шар запитів: `apiClient`, `AbortSignal`, `QueryCache` та типізовані роути
+
+Замість підключення `axios` (~30 KB) та дублювання рядкових маршрутів у UI-компонентах фронтенд використовує zero-dependency типізований транспорт поверх нативного `fetch` у зв'язці з `TanStack Query v5`:
+
+1. **Єдині реєстри `API_ENDPOINTS` та `APP_ROUTES`:**
+   - Контракти API описані в `@repo/shared-schemas` (`API_ENDPOINTS` + шаблонізатор `resolveEndpoint` для параметризованих маршрутів на кшталт `/api/knowledge/:slug/view`).
+   - Маршрути сторінок Next.js, бейджі шапки та `Cmd+K` переходи централізовані в `apps/web/src/shared/i18n/app-routes.ts` (`APP_ROUTES`, `resolveHeaderRouteBadge`, `buildKnowledgeBasePath`).
+2. **Типізований `apiClient` (`apps/web/src/shared/lib/api-client.ts`):**
+   - Підтримує `get`, `post`, `put`, `patch`, `delete`, рантайм-валідацію відповідей через `Zod`, обробку `204 No Content` та `FormData`, витягування `X-Request-Id` у `ApiClientError`, композитний `AbortController` (скасування з TanStack Query + захисний таймаут `10_000ms`) і легкий пайплайн інтерсепторів (`request`, `response`, `error`).
+3. **3-шарові `queries/*.ts` та захист `QueryCache` у `StrictMode`:**
+   - Кожен домен розділений на standalone-фетчери (`fetchSystemCapabilities(signal?)`), фабрики `queryOptions` / `infiniteQueryOptions` (`({ signal }) => ...`) та тонкі хуки `use*`.
+   - Глобальний `QueryCache({ onError })` у `QueryProvider` відсікає штатні `AbortError` / `CancelledError` (включно з подвійним маунтом React 19 `StrictMode` у `dev`) та очікувані `4xx` відповіді RBAC, передаючи лише реальні мережеві/5xx збої у `captureClientException` (строго за `NODE_ENV === 'production'`, без витоків dev-помилок у Sentry).

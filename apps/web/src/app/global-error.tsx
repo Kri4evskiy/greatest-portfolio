@@ -4,6 +4,7 @@ import { DEFAULT_LOCALE, SupportedLocale } from '@repo/shared-schemas'
 import { Button } from '@repo/ui'
 import { AlertTriangle, RotateCcw } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { captureClientException } from '@/shared/lib/analytics'
 
 const ERROR_TEXTS: Record<
   SupportedLocale,
@@ -46,8 +47,7 @@ export default function GlobalError({ error, reset }: { error: Error & { digest?
     setLang(resolvedLocale)
     document.documentElement.lang = resolvedLocale
 
-    const sentryDsn = process.env.NEXT_PUBLIC_SENTRY_DSN
-    console.error(`[Sentry ErrorBoundary (${sentryDsn ? 'DSN active' : 'Graceful No-Op'})]:`, error)
+    captureClientException(error, { boundary: 'GlobalError', digest: error.digest })
   }, [error])
 
   const t = ERROR_TEXTS[lang] ?? ERROR_TEXTS[DEFAULT_LOCALE]

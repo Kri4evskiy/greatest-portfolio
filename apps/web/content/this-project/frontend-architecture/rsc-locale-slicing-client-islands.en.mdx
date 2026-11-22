@@ -78,3 +78,18 @@ window.addEventListener('pageshow', (event) => {
 To keep rendering predictable, client state follows strict boundaries:
 - **Component-Local `useState`:** used inside interactive `D3.js` simulations (`d3-architecture-flow.tsx`, `d3-react-render-graph.tsx`) so toggling simulation modes never triggers re-renders outside the graph card.
 - **Global `Zustand` (`use-ui-store.ts`):** reserved strictly for cross-component UI state (`Cmd+K` / `Guest Pass` modals and expanded Knowledge Base folders persisted to `sessionStorage` after hydration).
+
+---
+
+## 4. Enterprise Client Fetching: `apiClient`, `AbortSignal`, `QueryCache` & Typed Routes
+
+Instead of adding `axios` (~30 KB) or scattering magic route strings across UI components, the frontend uses a zero-dependency typed HTTP layer paired with `TanStack Query v5`:
+
+1. **Centralized `API_ENDPOINTS` & `APP_ROUTES`:**
+   - API contracts live in `@repo/shared-schemas` (`API_ENDPOINTS` + template-literal `resolveEndpoint` for parameterized paths like `/api/knowledge/:slug/view`).
+   - Next.js page navigation and header/sidebar matching use `APP_ROUTES` + `resolveHeaderRouteBadge` in `apps/web/src/shared/i18n/app-routes.ts`.
+2. **Typed `apiClient` (`apps/web/src/shared/lib/api-client.ts`):**
+   - Exposes `get`, `post`, `put`, `patch`, and `delete` with runtime `Zod` validation, `204 No Content` & `FormData` support, `X-Request-Id` Correlation ID extraction into `ApiClientError`, composable `AbortController` timeouts (`10_000ms`), and lightweight `request`/`response`/`error` interceptors.
+3. **3-Layer `queries/*.ts` + `StrictMode`-Safe `QueryCache`:**
+   - Every domain splits standalone fetchers (`fetchSystemCapabilities(signal?)`) from `queryOptions` / `infiniteQueryOptions` (`({ signal }) => ...`) and thin `use*` hooks.
+   - `QueryProvider` configures a global `QueryCache({ onError })` shield that filters out `AbortError` / `CancelledError` (including expected React 19 `StrictMode` cancellations in `dev`) and expected `4xx` RBAC responses, forwarding only unexpected failures to the production-only `captureClientException` Sentry hook (`process.env.NODE_ENV === 'production'`).

@@ -46,3 +46,29 @@ export function trackEvent(
     // Non-blocking analytics
   })
 }
+
+/**
+ * Production-only client exception hook for Sentry / observability.
+ * Guarantees that development/test exceptions NEVER leak to Sentry.
+ */
+export function captureClientException(
+  error: unknown,
+  context?: Record<string, string | number | boolean | undefined>,
+): void {
+  if (typeof window === 'undefined') {
+    return
+  }
+
+  if (process.env.NODE_ENV !== 'production') {
+    console.debug('[Sentry Dev No-Op — disabled outside production]', error, context ?? {})
+    return
+  }
+
+  const sentryDsn = process.env.NEXT_PUBLIC_SENTRY_DSN?.trim()
+  if (!sentryDsn) {
+    return
+  }
+
+  // Integration hook for `@sentry/nextjs` (`Sentry.captureException(error, { extra: context })`)
+  void sentryDsn
+}

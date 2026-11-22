@@ -9,7 +9,8 @@ import {
 } from '@tanstack/react-query-persist-client'
 import { del, get, set } from 'idb-keyval'
 import { type ReactNode, useEffect, useState } from 'react'
-import { ApiClientError } from '@/shared/lib/api-client'
+import { captureClientException } from '@/shared/lib/analytics'
+import { ApiClientError, isCancelledRequestError } from '@/shared/lib/api-client'
 
 const CACHE_KEY = 'greatest-portfolio-query-cache'
 const CACHE_BUSTER = 'v1'
@@ -20,31 +21,26 @@ let browserPersister: Persister | undefined
 let browserRestorePromise: Promise<void> | null = null
 let hasRestoredBrowserCache = false
 
-function isCancelledQueryError(error: unknown): boolean {
-  if (!(error instanceof Error)) {
-    return false
-  }
-  return error.name === 'AbortError' || error.name === 'CancelledError' || error.name === 'CanceledError'
-}
-
 function makeQueryClient(): QueryClient {
   return new QueryClient({
     queryCache: new QueryCache({
       onError: (error, query) => {
         // Ignore standard AbortError / TanStack Query unmount cancellations (e.g. React 19 StrictMode)
-        if (isCancelledQueryError(error)) {
+        if (isCancelledRequestError(error)) {
           return
         }
         if (query.state.status === 'pending' && query.state.fetchStatus === 'idle') {
           return
         }
-        // Ignore expected 4xx RBAC / validation responses; surface real network or 5xx failures
+        // Ignore expected 4xx RBAC / validation responses; forward real network or 5xx failures
         if (error instanceof ApiClientError && error.status >= 400 && error.status < 500) {
           return
         }
-        if (process.env.NODE_ENV === 'development') {
-          console.error('[QueryCache Error]:', query.queryKey, error)
-        }
+        captureClientException(error, {
+          source: 'QueryCache.onError',
+          queryKey: JSON.stringify(query.queryKey),
+          ...(error instanceof ApiClientError ? { status: error.status, requestId: error.requestId } : {}),
+        })
       },
     }),
     defaultOptions: {

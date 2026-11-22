@@ -5,6 +5,7 @@ import { AlertTriangle, ArrowLeft, RotateCcw } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useEffect } from 'react'
 import { Link } from '@/shared/i18n/navigation'
+import { captureClientException } from '@/shared/lib/analytics'
 
 export default function LocaleErrorBoundary({
   error,
@@ -16,8 +17,7 @@ export default function LocaleErrorBoundary({
   const t = useTranslations('ErrorPage')
 
   useEffect(() => {
-    const sentryDsn = process.env.NEXT_PUBLIC_SENTRY_DSN
-    console.error(`[Sentry LocaleErrorBoundary (${sentryDsn ? 'DSN active' : 'Graceful No-Op'})]:`, error)
+    captureClientException(error, { boundary: 'LocaleErrorBoundary', digest: error.digest })
   }, [error])
 
   return (
