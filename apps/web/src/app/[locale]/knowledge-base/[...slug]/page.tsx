@@ -27,8 +27,9 @@ import {
   type KnowledgeTreeFolderNode,
   type MdxArticleFrontmatter,
 } from '@/entities/knowledge-content'
+import { AUTHOR_PROFILE, pickLocalized } from '@/entities/workfolio-profile/author-profile'
 import { Link } from '@/shared/i18n/navigation'
-import { buildLocalizedUrl, buildPageAlternates, resolveOgLocale } from '@/shared/lib/seo'
+import { buildLocalizedUrl, buildPageAlternates, buildTechArticleJsonLd, resolveOgLocale } from '@/shared/lib/seo'
 
 interface CatchAllKnowledgePageProps {
   params: Promise<{
@@ -202,9 +203,20 @@ export default async function KnowledgeCatchAllPage({ params }: CatchAllKnowledg
     const parentSegments = slug.slice(0, -1)
     const parentHref = parentSegments.length > 0 ? `/knowledge-base/${parentSegments.join('/')}` : '/knowledge-base'
     const { prev, next, related } = getAdjacentAndRelatedArticles(article.routePath, resolvedLocale)
+    const articleJsonLd = buildTechArticleJsonLd({
+      locale: resolvedLocale,
+      pathname: `/knowledge-base/${article.routePath}`,
+      title: article.title,
+      description: article.summary,
+      publishedAt: article.publishedAt,
+      authorName: pickLocalized(AUTHOR_PROFILE.fullName, resolvedLocale),
+      tags: article.tags,
+    })
 
     return (
       <div className="flex flex-col gap-6 xl:flex-row xl:items-start">
+        {/* biome-ignore lint/security/noDangerouslySetInnerHtml: Server-serialized JSON-LD escaped against < script injection */}
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: articleJsonLd }} />
         <article className="min-w-0 flex-1 rounded-xl border border-border bg-card p-5 shadow-xs sm:p-8">
           <BreadcrumbsNav rootLabel={t('breadcrumbsRoot')} items={breadcrumbs} />
 

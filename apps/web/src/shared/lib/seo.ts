@@ -73,3 +73,69 @@ export function buildPageAlternates(pathname: string, locale: SupportedLocale = 
 export function resolveOgLocale(locale: SupportedLocale): string {
   return OG_LOCALE_MAP[locale]
 }
+
+export interface ProfilePageJsonLdInput {
+  locale: SupportedLocale
+  pathname: string
+  fullName: string
+  roleTitle: string
+  description: string
+  sameAs: readonly string[]
+  knowsAbout: readonly string[]
+}
+
+export interface TechArticleJsonLdInput {
+  locale: SupportedLocale
+  pathname: string
+  title: string
+  description: string
+  publishedAt: string
+  authorName: string
+  tags: readonly string[]
+}
+
+export function serializeSafeJsonLd(payload: Record<string, unknown>): string {
+  return JSON.stringify(payload).replace(/</g, '\\u003c')
+}
+
+export function buildProfilePageJsonLd(input: ProfilePageJsonLdInput): string {
+  const pageUrl = buildLocalizedUrl(input.pathname, input.locale)
+
+  return serializeSafeJsonLd({
+    '@context': 'https://schema.org',
+    '@type': 'ProfilePage',
+    url: pageUrl,
+    inLanguage: input.locale,
+    name: `${input.fullName} — ${input.roleTitle}`,
+    description: input.description,
+    mainEntity: {
+      '@type': 'Person',
+      name: input.fullName,
+      jobTitle: input.roleTitle,
+      url: buildLocalizedUrl('/', input.locale),
+      sameAs: [...input.sameAs],
+      knowsAbout: [...input.knowsAbout],
+    },
+  })
+}
+
+export function buildTechArticleJsonLd(input: TechArticleJsonLdInput): string {
+  const articleUrl = buildLocalizedUrl(input.pathname, input.locale)
+
+  return serializeSafeJsonLd({
+    '@context': 'https://schema.org',
+    '@type': 'TechArticle',
+    headline: input.title,
+    description: input.description,
+    url: articleUrl,
+    inLanguage: input.locale,
+    datePublished: input.publishedAt,
+    dateModified: input.publishedAt,
+    keywords: input.tags.join(', '),
+    author: {
+      '@type': 'Person',
+      name: input.authorName,
+      url: buildLocalizedUrl('/', input.locale),
+    },
+  })
+}

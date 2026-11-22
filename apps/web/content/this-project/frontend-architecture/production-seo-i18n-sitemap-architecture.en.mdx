@@ -9,9 +9,9 @@ readingTime: "6 min"
 publishedAt: "2026-11-21"
 order: 4
 tldr:
-  - "Module `apps/web/src/shared/lib/seo.ts` centralizes canonical URL builders, strict `NEXT_PUBLIC_SITE_URL` origin parsing (`parsed.origin`), and the locale mapping: internal code (`uk`), public URL prefix (`/ua`), ISO 639-1 `hreflang` (`uk`), and OpenGraph (`uk_UA`)."
-  - "`robots.ts`, `sitemap.ts`, `icon.tsx`, `apple-icon.tsx`, and `[locale]/opengraph-image.tsx` leverage the native File-Based Metadata API (`0 KB` client JS) and bypass JWT checks in `src/proxy.ts` via `matcher`."
-  - "Social preview cards (`1200×630` `Obsidian Editorial Dark`) and terminal `>_` icons are code-generated at build time via `next/og` (`ImageResponse` / Satori) with zero external network dependencies."
+  - "Module `apps/web/src/shared/lib/seo.ts` centralizes canonical URL builders, strict `NEXT_PUBLIC_SITE_URL` origin parsing (`parsed.origin`), locale mapping (`uk` ➔ `/ua` ➔ `uk_UA`), and XSS-safe `JSON-LD` serialization (`ProfilePage`, `Person`, `TechArticle`)."
+  - "`robots.ts`, `sitemap.ts`, `llms.txt/route.ts`, `icon.tsx`, `apple-icon.tsx`, and `[locale]/opengraph-image.tsx` leverage the native File-Based Metadata API (`0 KB` client JS) and bypass JWT checks in `src/proxy.ts` via `matcher`."
+  - "Adaptive `viewport` (`themeColor`: `#FAF8F5` / `#121211`), `max-image-preview: 'large'`, `1200×630` `Obsidian Editorial Dark` cards, and the `/llms.txt` standard maximize discoverability across both Google Search and AI search engines (ChatGPT, Claude, Perplexity, Cursor)."
 ---
 
 ## 1. The 3-Tier Locale Matrix (`Internal Code` vs `URL Prefix` vs `Hreflang / OpenGraph`)
@@ -114,8 +114,11 @@ export const config = {
 2. **Recursive `.mdx` Discovery in `sitemap.ts`:** combines top-level hubs (`/`, `/cv`, `/knowledge-base`) with all paths from `getAllStaticKnowledgeSlugArrays()` and real `publishedAt` dates from `getAllKnowledgeFrontmatters(DEFAULT_LOCALE)`.
 3. **Code-Generated Branded Graphics via `next/og` (`ImageResponse` / Satori):**
    - `apps/web/src/app/icon.tsx` (`32×32`) and `apple-icon.tsx` (`180×180`) render the obsidian terminal prompt `>_` icon.
-   - `apps/web/src/app/[locale]/opengraph-image.tsx` (`1200×630`) generates the `Obsidian Editorial Dark` preview card for each locale (`generateStaticParams`) offline.
+   - `apps/web/src/app/[locale]/opengraph-image.tsx` (`1200×630`) generates the `Obsidian Editorial Dark` preview card for each locale (`generateStaticParams`) offline, paired with `googleBot: { 'max-image-preview': 'large' }` and adaptive `viewport.themeColor` (`#FAF8F5` / `#121211`) in `layout.tsx`.
    - **Soft-404 Prevention:** for any unmatched URL inside a locale, the catch-all route `app/[locale]/[...rest]/page.tsx` invokes `notFound()`, returning a strict HTTP `404` status to crawlers via the pure RSC `app/[locale]/not-found.tsx`.
+4. **Structured `JSON-LD` (`Schema.org`) & AI Discovery Manifest (`/llms.txt`):**
+   - `buildProfilePageJsonLd()` and `buildTechArticleJsonLd()` in `seo.ts` emit server-rendered `<script type="application/ld+json">` blocks (escaping `<` ➔ `\u003c` against XSS) on `/`, `/cv`, and all `/knowledge-base/[...slug]` engineering notes.
+   - The static route `apps/web/src/app/llms.txt/route.ts` (`force-static`) compiles a machine-readable Markdown portfolio dossier (executive profile, quantified commercial highlights, 16 ADRs, and full Knowledge Base catalog) tailored for LLM agents (**ChatGPT Search, Claude, Perplexity, Cursor**).
 
 ---
 
@@ -123,10 +126,12 @@ export const config = {
 
 | SEO Component | File / Location | Production Responsibility |
 | :--- | :--- | :--- |
-| **SEO Core & Origin Validator** | `apps/web/src/shared/lib/seo.ts` | Validates `NEXT_PUBLIC_SITE_URL` (`parsed.origin`) and builds `canonical`, `hreflang`, and `og:locale` |
+| **SEO Core & JSON-LD Builders** | `apps/web/src/shared/lib/seo.ts` | Validates `NEXT_PUBLIC_SITE_URL` (`parsed.origin`) and builds `canonical`, `hreflang`, `og:locale`, and `JSON-LD` (`ProfilePage` / `TechArticle`) |
+| **Adaptive Viewport & GoogleBot Rules** | `apps/web/src/app/[locale]/layout.tsx` | System `theme-color` (`#FAF8F5` / `#121211`), `authors`/`creator`, and `max-image-preview: 'large'` |
 | **Turborepo Env Invalidation** | `turbo.json` (`globalEnv`) | Automatically invalidates SSG metadata cache when `NEXT_PUBLIC_SITE_URL` changes |
 | **Robots.txt Generator** | `apps/web/src/app/robots.ts` | Static crawler indexing rules (`allow: '/'`, `disallow: ['/api/', '/search-index/']`) |
 | **Multilingual Sitemap.xml** | `apps/web/src/app/sitemap.ts` | Full localized route map (`EN / UA / RU`) with `lastModified` timestamps from `.mdx` |
+| **AI Discovery Manifest (`/llms.txt`)** | `apps/web/src/app/llms.txt/route.ts` | Structured Markdown dossier of commercial track record, 16 ADRs, and KB catalog for AI search engines |
 | **OpenGraph Social Banner (`1200×630`)** | `apps/web/src/app/[locale]/opengraph-image.tsx` | Build-time `Obsidian Editorial Dark` preview card generation via `next/og` |
 | **Browser & Apple Icons (`32×32`, `180×180`)** | `apps/web/src/app/icon.tsx`, `apple-icon.tsx` | Vector-sharp terminal prompt `>_` icons via `ImageResponse` |
 | **Strict HTTP 404 Catch-All** | `apps/web/src/app/[locale]/[...rest]/page.tsx` + `not-found.tsx` | Prevents Soft-404 indexing by returning an HTTP `404` inside `LocaleRootLayout` |

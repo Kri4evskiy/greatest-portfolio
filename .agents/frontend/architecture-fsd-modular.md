@@ -34,6 +34,7 @@ apps/web/src/
 │   ├── global-error.tsx
 │   ├── icon.tsx                # Фавиконка 32×32 (Obsidian Terminal Prompt >_)
 │   ├── apple-icon.tsx          # Иконка 180×180 (next/og)
+│   ├── llms.txt/route.ts       # Статический SSG /llms.txt для AI-поисковиков (force-static)
 │   ├── robots.ts               # Статический SSG /robots.txt (force-static)
 │   ├── sitemap.ts              # Статический SSG /sitemap.xml с матрицей hreflang (force-static)
 │   ├── [locale]/

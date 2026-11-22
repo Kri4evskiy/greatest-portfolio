@@ -24,6 +24,7 @@ apps/web/
     │   ├── global-error.tsx              # Глобальный Error Boundary (аварийный fallback всего <html>)
     │   ├── icon.tsx                      # Статическая фавиконка 32×32 (Obsidian Terminal Prompt >_)
     │   ├── apple-icon.tsx                # Иконка 180×180 для Apple / мобильных закладок
+    │   ├── llms.txt/route.ts             # Статический SSG AI-манифест /llms.txt для LLM-поисковиков (force-static)
     │   ├── robots.ts                     # Статический SSG /robots.txt (force-static)
     │   ├── sitemap.ts                    # Статический SSG /sitemap.xml со всеми локалями и hreflang (force-static)
     │   ├── search-index/[locale]/
@@ -152,6 +153,7 @@ apps/web/
 | `/[locale]/knowledge-base/[...slug]` | `SSG` + Edge JWT              | Универсальный catch-all роут: хабы тем, вкладки подтем и статьи с `TOC` и метриками   |
 | `/[locale]/[...rest]`                | `RSC` (`notFound()`)          | Перехват неизвестных URL внутри локали с рендером `[locale]/not-found.tsx` в layout   |
 | `/robots.txt` и `/sitemap.xml`       | Static Route (`force-static`) | SSG-правила индексации и мультиязычная карта сайта с матрицей `hreflang` (`en/uk/ru`) |
+| `/llms.txt`                          | Static Route (`force-static`) | Машиночитаемый Markdown-паспорт портфолио, 16 ADR и каталога статей для AI-агентов    |
 | `/search-index/[locale]`             | Static Route (`force-static`) | Предсобранный JSON-индекс для мгновенного поиска `Cmd+K`                              |
 
 ### Команды разработки

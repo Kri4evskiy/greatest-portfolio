@@ -1,7 +1,7 @@
 import '../globals.css'
 import { DEFAULT_LOCALE, SUPPORTED_LOCALES, SupportedLocaleEnum } from '@repo/shared-schemas'
 import { TooltipProvider } from '@repo/ui'
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { Inter, JetBrains_Mono } from 'next/font/google'
 import { notFound } from 'next/navigation'
 import { NextIntlClientProvider } from 'next-intl'
@@ -32,6 +32,14 @@ export function generateStaticParams() {
   return SUPPORTED_LOCALES.map((locale) => ({ locale }))
 }
 
+export const viewport: Viewport = {
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#FAF8F5' },
+    { media: '(prefers-color-scheme: dark)', color: '#121211' },
+  ],
+  colorScheme: 'light dark',
+}
+
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const { locale } = await params
   const parsed = SupportedLocaleEnum.safeParse(locale)
@@ -44,6 +52,20 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
     metadataBase: new URL(resolveSiteUrl()),
     title,
     description,
+    authors: [{ name: 'Stanislav Krychevskyi', url: 'https://github.com/Kri4evskiy' }],
+    creator: 'Stanislav Krychevskyi',
+    publisher: 'Stanislav Krychevskyi',
+    robots: {
+      index: true,
+      follow: true,
+      googleBot: {
+        index: true,
+        follow: true,
+        'max-image-preview': 'large',
+        'max-snippet': -1,
+        'max-video-preview': -1,
+      },
+    },
     alternates: buildPageAlternates('/', resolvedLocale),
     openGraph: {
       title,

@@ -9,9 +9,9 @@ readingTime: "6 мин"
 publishedAt: "2026-11-21"
 order: 4
 tldr:
-  - "Модуль `apps/web/src/shared/lib/seo.ts` централизует генерацию канонических URL, безопасный парсинг `NEXT_PUBLIC_SITE_URL` (`parsed.origin`) и маппинг форм локали: внутренний код (`uk`), URL-сегмент (`/ua`), ISO 639-1 `hreflang` (`uk`) и OpenGraph (`uk_UA`)."
-  - "`robots.ts`, `sitemap.ts`, `icon.tsx`, `apple-icon.tsx` и `[locale]/opengraph-image.tsx` работают на базе нативного File-Based Metadata API (`0 КБ` клиентского JS) и исключены из проверок JWT в `src/proxy.ts` через `matcher`."
-  - "Превью-карточки `1200×630` (`Obsidian Editorial Dark`) и терминальные иконки `>_` генерируются на этапе сборки через `next/og` (`ImageResponse` / Satori) в 100% автономном режиме."
+  - "Модуль `apps/web/src/shared/lib/seo.ts` централизует генерацию канонических URL, безопасный парсинг `NEXT_PUBLIC_SITE_URL` (`parsed.origin`), маппинг форм локали (`uk` ➔ `/ua` ➔ `uk_UA`) и XSS-безопасную сериализацию `JSON-LD` (`ProfilePage`, `Person`, `TechArticle`)."
+  - "`robots.ts`, `sitemap.ts`, `llms.txt/route.ts`, `icon.tsx`, `apple-icon.tsx` и `[locale]/opengraph-image.tsx` работают на базе нативного File-Based Metadata API (`0 КБ` клиентского JS) и исключены из проверок JWT в `src/proxy.ts` через `matcher`."
+  - "Адаптивный `viewport` (`themeColor`: `#FAF8F5` / `#121211`), директива `max-image-preview: 'large'`, превью-карточки `1200×630` (`Obsidian Editorial Dark`) и стандарт `/llms.txt` обеспечивают максимальную видимость как в Google Search, так и в AI-поисковиках (ChatGPT, Claude, Perplexity, Cursor)."
 ---
 
 ## 1. Трёхуровневая матрица локалей (`Internal Code` vs `URL Prefix` vs `Hreflang / OpenGraph`)
@@ -114,8 +114,11 @@ export const config = {
 2. **Автоматический обход дерева `.mdx` в `sitemap.ts`:** объединяет корневые хабы (`/`, `/cv`, `/knowledge-base`) со всеми путями из `getAllStaticKnowledgeSlugArrays()` и реальными датами `publishedAt` из `getAllKnowledgeFrontmatters(DEFAULT_LOCALE)`.
 3. **Кодогенерация графики через `next/og` (`ImageResponse` / Satori):**
    - `apps/web/src/app/icon.tsx` (`32×32`) и `apple-icon.tsx` (`180×180`) генерируют обсидиановую иконку терминала `>_`.
-   - `apps/web/src/app/[locale]/opengraph-image.tsx` (`1200×630`) рендерит фирменный баннер `Obsidian Editorial Dark` для каждой локали (`generateStaticParams`) без внешних сетевых запросов за шрифтами.
+   - `apps/web/src/app/[locale]/opengraph-image.tsx` (`1200×630`) рендерит фирменный баннер `Obsidian Editorial Dark` для каждой локали (`generateStaticParams`) без внешних сетевых запросов за шрифтами, а в `layout.tsx` включена директива `googleBot: { 'max-image-preview': 'large' }` и адаптивный `viewport.themeColor` (`#FAF8F5` / `#121211`) для мобильных шторок Safari и Chrome.
    - **Предотвращение Soft-404 в индексе:** для любых несуществующих URL внутри локали catch-all маршрут `app/[locale]/[...rest]/page.tsx` синхронно вызывает `notFound()`, отдавая поисковому роботу строгий HTTP-статус `404` внутри локализованного серверного компонента `app/[locale]/not-found.tsx`.
+4. **Структурированные данные `JSON-LD` (`Schema.org`) и AI-манифест `/llms.txt`:**
+   - Хелперы `buildProfilePageJsonLd()` и `buildTechArticleJsonLd()` в `seo.ts` генерируют серверный `<script type="application/ld+json">` (с экранированием `<` ➔ `\u003c` против XSS) на главной странице (`/`), резюме (`/cv`) и во всех конспектах Базы Знаний (`/knowledge-base/[...slug]`).
+   - Статический маршрут `apps/web/src/app/llms.txt/route.ts` (`force-static`) формирует машиночитаемый Markdown-паспорт портфолио (профиль, коммерческий трек-рекорд с метриками, 16 ADR и полное оглавление Базы Знаний) специально для LLM-агентов (**ChatGPT Search, Claude, Perplexity, Cursor**).
 
 ---
 
@@ -123,10 +126,12 @@ export const config = {
 
 | Компонент SEO | Файл / Расположение | Назначение в продакшене |
 | :--- | :--- | :--- |
-| **SEO Core & Origin Validator** | `apps/web/src/shared/lib/seo.ts` | Валидация `NEXT_PUBLIC_SITE_URL` (`parsed.origin`), генерация `canonical`, `hreflang` и `og:locale` |
+| **SEO Core & JSON-LD Builders** | `apps/web/src/shared/lib/seo.ts` | Валидация `NEXT_PUBLIC_SITE_URL` (`parsed.origin`), генерация `canonical`, `hreflang`, `og:locale` и `JSON-LD` (`ProfilePage` / `TechArticle`) |
+| **Adaptive Viewport & GoogleBot Rules** | `apps/web/src/app/[locale]/layout.tsx` | Системный `theme-color` (`#FAF8F5` / `#121211`), `authors`/`creator` и `max-image-preview: 'large'` |
 | **Turborepo Env Invalidation** | `turbo.json` (`globalEnv`) | Автоматическая пересборка SSG-метаданных при смене `NEXT_PUBLIC_SITE_URL` |
 | **Robots.txt Generator** | `apps/web/src/app/robots.ts` | Статические правила индексации (`allow: '/'`, `disallow: ['/api/', '/search-index/']`) |
 | **Multilingual Sitemap.xml** | `apps/web/src/app/sitemap.ts` | Полная карта локализованных маршрутов (`EN / UA / RU`) с `lastModified` из `.mdx` |
+| **AI Discovery Manifest (`/llms.txt`)** | `apps/web/src/app/llms.txt/route.ts` | Структурированный Markdown-манифест опыта, 16 ADR и каталога статей для AI-поисковиков |
 | **OpenGraph Social Banner (`1200×630`)** | `apps/web/src/app/[locale]/opengraph-image.tsx` | Статическая кодогенерация карточек `Obsidian Editorial Dark` через `next/og` |
 | **Browser & Apple Icons (`32×32`, `180×180`)** | `apps/web/src/app/icon.tsx`, `apple-icon.tsx` | Векторная генерация фавиконок `>_` через `ImageResponse` |
 | **Strict HTTP 404 Catch-All** | `apps/web/src/app/[locale]/[...rest]/page.tsx` + `not-found.tsx` | Защита от Soft-404: возврат честного HTTP `404` с сохранением навигации `LocaleRootLayout` |
