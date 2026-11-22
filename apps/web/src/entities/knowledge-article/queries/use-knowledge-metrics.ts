@@ -11,7 +11,7 @@ import {
   type PaginatedArticleMetricsResponse,
   PaginatedArticleMetricsResponseSchema,
 } from '@repo/shared-schemas'
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, queryOptions, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { z } from 'zod'
 import { apiClient } from '@/shared/lib/api-client'
 
@@ -20,14 +20,6 @@ export const KNOWLEDGE_PAGINATED_METRICS_QUERY_KEY = ['knowledge', 'metrics', 'p
 
 const ArticleMetaArraySchema = z.array(ArticleMetaSchema).max(500)
 
-export function useKnowledgeMetrics(enabled = true) {
-  return useQuery({
-    queryKey: KNOWLEDGE_METRICS_QUERY_KEY,
-    queryFn: ({ signal }) => apiClient.get(API_ENDPOINTS.knowledgeMetrics, ArticleMetaArraySchema, { signal }),
-    enabled,
-  })
-}
-
 export interface UsePaginatedKnowledgeMetricsParams {
   limit: number
   offset: number
@@ -35,29 +27,67 @@ export interface UsePaginatedKnowledgeMetricsParams {
   sortBy: KnowledgeMetricsSortBy
 }
 
-export function usePaginatedKnowledgeMetrics(params: UsePaginatedKnowledgeMetricsParams) {
-  return useQuery({
+export interface ArticleReactionPayload {
+  slug: string
+  category: KnowledgeCategory
+}
+
+export function fetchKnowledgeMetrics(signal?: AbortSignal): Promise<ArticleMeta[]> {
+  return apiClient.get(API_ENDPOINTS.knowledgeMetrics, ArticleMetaArraySchema, { signal })
+}
+
+export function fetchPaginatedKnowledgeMetrics(
+  params: UsePaginatedKnowledgeMetricsParams,
+  signal?: AbortSignal,
+): Promise<PaginatedArticleMetricsResponse> {
+  return apiClient.get(API_ENDPOINTS.knowledgeMetricsPaginated, PaginatedArticleMetricsResponseSchema, {
+    signal,
+    params: {
+      limit: params.limit,
+      offset: params.offset,
+      sortBy: params.sortBy,
+      category: params.category,
+    },
+  })
+}
+
+export function recordArticleView({ slug, category }: ArticleReactionPayload): Promise<ArticleMeta> {
+  return apiClient.post(buildKnowledgeViewEndpoint(slug), ArticleMetaSchema, { category })
+}
+
+export function recordArticleHelpful({ slug, category }: ArticleReactionPayload): Promise<ArticleMeta> {
+  return apiClient.post(buildKnowledgeHelpfulEndpoint(slug), ArticleMetaSchema, { category })
+}
+
+export function knowledgeMetricsQueryOptions(enabled = true) {
+  return queryOptions({
+    queryKey: KNOWLEDGE_METRICS_QUERY_KEY,
+    queryFn: ({ signal }) => fetchKnowledgeMetrics(signal),
+    enabled,
+  })
+}
+
+export function paginatedKnowledgeMetricsQueryOptions(params: UsePaginatedKnowledgeMetricsParams) {
+  return queryOptions({
     queryKey: [...KNOWLEDGE_PAGINATED_METRICS_QUERY_KEY, params] as const,
-    queryFn: ({ signal }): Promise<PaginatedArticleMetricsResponse> =>
-      apiClient.get(API_ENDPOINTS.knowledgeMetricsPaginated, PaginatedArticleMetricsResponseSchema, {
-        signal,
-        params: {
-          limit: params.limit,
-          offset: params.offset,
-          sortBy: params.sortBy,
-          category: params.category,
-        },
-      }),
+    queryFn: ({ signal }) => fetchPaginatedKnowledgeMetrics(params, signal),
     placeholderData: keepPreviousData,
   })
+}
+
+export function useKnowledgeMetrics(enabled = true) {
+  return useQuery(knowledgeMetricsQueryOptions(enabled))
+}
+
+export function usePaginatedKnowledgeMetrics(params: UsePaginatedKnowledgeMetricsParams) {
+  return useQuery(paginatedKnowledgeMetricsQueryOptions(params))
 }
 
 export function useIncrementViewMutation() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: ({ slug, category }: { slug: string; category: KnowledgeCategory }): Promise<ArticleMeta> =>
-      apiClient.post(buildKnowledgeViewEndpoint(slug), ArticleMetaSchema, { category }),
+    mutationFn: recordArticleView,
     onSuccess: (updated) => {
       queryClient.setQueryData<ArticleMeta[]>(KNOWLEDGE_METRICS_QUERY_KEY, (prev) => {
         if (!prev) return [updated]
@@ -74,8 +104,7 @@ export function useIncrementHelpfulMutation() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: ({ slug, category }: { slug: string; category: KnowledgeCategory }): Promise<ArticleMeta> =>
-      apiClient.post(buildKnowledgeHelpfulEndpoint(slug), ArticleMetaSchema, { category }),
+    mutationFn: recordArticleHelpful,
     onMutate: async ({ slug, category }) => {
       await queryClient.cancelQueries({ queryKey: KNOWLEDGE_METRICS_QUERY_KEY })
       const previous = queryClient.getQueryData<ArticleMeta[]>(KNOWLEDGE_METRICS_QUERY_KEY)

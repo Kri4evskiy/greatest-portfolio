@@ -35,6 +35,7 @@ export function WorkfolioHeader() {
   const isUnlocked = currentRole === 'USER' || currentRole === 'ADMIN'
   const isInsideKnowledgeBase = pathname.startsWith('/knowledge-base')
   const isOnCvPage = pathname === '/cv'
+  const isOnSystemStatusPage = pathname === '/system-status'
 
   const handleKnowledgeBaseClick = () => {
     if (isUnlocked) {
@@ -66,11 +67,11 @@ export function WorkfolioHeader() {
             <span className="truncate font-semibold tracking-tight text-xs sm:text-sm">Stanislav Krychevskyi</span>
           </Link>
 
-          {isInsideKnowledgeBase || isOnCvPage ? (
+          {isInsideKnowledgeBase || isOnCvPage || isOnSystemStatusPage ? (
             <>
               <span className="hidden shrink-0 font-mono text-xs text-muted-foreground lg:inline">/</span>
               <Badge variant="secondary" className="hidden shrink-0 font-mono text-xs lg:inline-flex">
-                {isInsideKnowledgeBase ? 'knowledge-base' : 'cv.pdf'}
+                {isInsideKnowledgeBase ? 'knowledge-base' : isOnCvPage ? 'cv.pdf' : 'system-status'}
               </Badge>
             </>
           ) : null}

@@ -97,6 +97,7 @@ apps/web/
   │
   ▼ 4. Client State & Offline Cache
        Typed apiClient (shared/lib/api-client.ts) над нативным fetch + AbortSignal + Zod-валидация и API_ENDPOINTS
+       3-слойные queries/*.ts (Standalone Fetcher ➔ queryOptions / infiniteQueryOptions ➔ use* Hook)
        TanStack Query v5 + IndexedDB Persister (idb-keyval, 24h TTL) кэширует ответы API (/api/auth/me, /api/capabilities, /api/knowledge/metrics*, /api/telemetry/*)
        Zustand (useUIStore) хранит только локальное UI-состояние (модалки, фильтры Tech Radar, папки сайдбара в sessionStorage)
 ```

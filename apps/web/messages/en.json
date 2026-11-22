@@ -191,6 +191,7 @@
     "cmdHeadingsMatch": "Section:",
     "cmdActionCvHome": "Workfolio CV — Overview & Experience",
     "cmdActionCvPdf": "CV / Resume — Visual PDF Preview & Download",
+    "cmdActionSystemStatus": "System Observability — Live API & Telemetry Inspector",
     "cmdActionTechRadar": "Tech Radar — 16 Architecture Decisions (ADR)",
     "cmdActionRoadmap": "Engineering Backlog — Tech Debt, Ideas & Trade-offs",
     "cmdActionKbOverview": "Knowledge Base — All Topics & Subtopics",

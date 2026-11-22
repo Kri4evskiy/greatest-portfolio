@@ -191,6 +191,7 @@
     "cmdHeadingsMatch": "Раздел:",
     "cmdActionCvHome": "Workfolio CV — Главная и Опыт",
     "cmdActionCvPdf": "CV / Резюме — Просмотр и скачивание PDF",
+    "cmdActionSystemStatus": "System Observability — Инспектор Live API и SSE",
     "cmdActionTechRadar": "Tech Radar — Матрица 16 технологий (ADR)",
     "cmdActionRoadmap": "Инженерный Бэклог — Tech Debt, Идеи и Компромиссы",
     "cmdActionKbOverview": "База Знаний — Все темы и подтемы",

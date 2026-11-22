@@ -4,7 +4,11 @@
 
 ## 1. Железное правило разделения стейта
 
-- **Серверный стейт (`TanStack Query v5`):** Любые данные, приходящие из `apps/api` (профиль текущей сессии `/api/auth/me`, метрики статей `/api/knowledge/metrics`, отправка реакции `helpful`).
+- **Серверный стейт (`TanStack Query v5`):** Любые данные, приходящие из `apps/api` (профиль текущей сессии `/api/auth/me`, матрица `/api/capabilities`, метрики статей `/api/knowledge/metrics*`, телеметрия `/api/telemetry/*`, отправка реакции `helpful`).
+  - **Стандарт 3-слойной структуры `queries/*.ts`:**
+    1. **Standalone Fetcher (Service):** экспортируемая функция (`fetchSystemCapabilities(signal?)`, `fetchPaginatedKnowledgeMetrics(params, signal?)`), использующая `apiClient` (`apps/web/src/shared/lib/api-client.ts`) поверх нативного `fetch` с `ApiRouteTarget`, Zod-валидацией и пробросом `AbortSignal`.
+    2. **Options Factory (`queryOptions` / `infiniteQueryOptions`):** единый источник `queryKey`, `queryFn: ({ signal }) => fetcher(..., signal)` и `staleTime` — переиспользуется и в хуках, и при императивном `prefetchQuery` / `invalidateQueries`.
+    3. **Hook Controller (`use*`):** тонкий хук (`useQuery(...)`, `useInfiniteQuery(...)`, `useMutation(...)`) для UI-компонентов.
 - **Клиентский UI-стейт (`Zustand`):** Только синхронное состояние интерфейса, не принадлежащее серверу:
   - [`apps/web/src/shared/store/use-ui-store.ts`](../../apps/web/src/shared/store/use-ui-store.ts): модалки `Guest Pass` и `Cmd+K`, выбранная технология в `ADR Inspector` и фильтры `Tech Radar`, состояние открытых веток сайдбара Базы Знаний (`expandedKbFolders`), активная палитра `palette` (с императивным вызовом `uiStore.getState().actions.syncPaletteFromStorage()` в `ThemeProvider` без лишней подписки на стор).
   - **ЗАПРЕЩЕНО** сохранять ответы `fetch` / `axios` или JWT-токены внутри `Zustand`.

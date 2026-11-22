@@ -3,6 +3,7 @@
 import { getKnowledgeFormatLabel, type SupportedLocale } from '@repo/shared-schemas'
 import { Badge, Button, Dialog, DialogContent, DialogDescription, DialogTitle } from '@repo/ui'
 import {
+  Activity,
   ArrowRight,
   BookOpen,
   Compass,
@@ -40,7 +41,7 @@ type PaletteEntry =
       kind: 'quick-action'
       id: string
       label: string
-      actionType: 'cv-home' | 'cv-pdf' | 'tech-radar' | 'roadmap' | 'kb-overview'
+      actionType: 'cv-home' | 'cv-pdf' | 'system-status' | 'tech-radar' | 'roadmap' | 'kb-overview'
     }
   | {
       kind: 'article'
@@ -121,6 +122,7 @@ export function CommandPaletteModal({ locale }: CommandPaletteModalProps) {
   const quickActions = useMemo<PaletteEntry[]>(
     () => [
       { kind: 'quick-action', id: 'qa-cv-pdf', label: t('cmdActionCvPdf'), actionType: 'cv-pdf' },
+      { kind: 'quick-action', id: 'qa-system-status', label: t('cmdActionSystemStatus'), actionType: 'system-status' },
       { kind: 'quick-action', id: 'qa-kb', label: t('cmdActionKbOverview'), actionType: 'kb-overview' },
       { kind: 'quick-action', id: 'qa-radar', label: t('cmdActionTechRadar'), actionType: 'tech-radar' },
       { kind: 'quick-action', id: 'qa-roadmap', label: t('cmdActionRoadmap'), actionType: 'roadmap' },
@@ -216,6 +218,10 @@ export function CommandPaletteModal({ locale }: CommandPaletteModalProps) {
         }
         if (entry.actionType === 'cv-pdf') {
           router.push('/cv')
+          return
+        }
+        if (entry.actionType === 'system-status') {
+          router.push('/system-status')
           return
         }
         if (entry.actionType === 'tech-radar') {
@@ -393,6 +399,8 @@ export function CommandPaletteModal({ locale }: CommandPaletteModalProps) {
                             <Home className="h-4 w-4 shrink-0 text-primary" />
                           ) : entry.actionType === 'cv-pdf' ? (
                             <FileDown className="h-4 w-4 shrink-0 text-primary" />
+                          ) : entry.actionType === 'system-status' ? (
+                            <Activity className="h-4 w-4 shrink-0 text-primary" />
                           ) : entry.actionType === 'tech-radar' ? (
                             <Cpu className="h-4 w-4 shrink-0 text-primary" />
                           ) : entry.actionType === 'roadmap' ? (
