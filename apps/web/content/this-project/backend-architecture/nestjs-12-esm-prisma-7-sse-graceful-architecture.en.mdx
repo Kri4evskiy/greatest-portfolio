@@ -68,10 +68,11 @@ This `requestId` is exposed to browser clients via CORS `exposedHeaders: ['X-Req
 
 Instead of duplicating validation logic across backend `class-validator` classes and frontend `Zod` schemas, the monorepo enforces a **Single Source of Truth**:
 
-- All contracts (`GuestPassFormSchema`, `OffsetPaginationQuerySchema`, `CursorPaginationQuerySchema`, `ArticleReactionInputSchema`) are authored once in **`Zod v4`** inside `@repo/shared-schemas`.
+- All contracts (`GuestPassFormSchema`, `SystemCapabilitiesSchema`, `PaginatedArticleMetricsQuerySchema`, `SystemEventsQuerySchema`, `ArticleReactionInputSchema`) are authored once in **`Zod v4`** inside `@repo/shared-schemas`.
 - NestJS controllers apply `ZodValidationPipe`:
-  - **`GET /api/knowledge/metrics/paginated`** — implements **Offset Pagination** (`limit`, `offset`, `category`, `sortBy: 'viewsCount' | 'helpfulCount'`), returning `{ items, total, limit, offset, hasMore }`.
-  - **`GET /api/telemetry/events`** — implements **Cursor Pagination** (`take: limit + 1` by UUID cursor with `orderBy: [{ createdAt: 'desc' }, { id: 'desc' }]`), preventing page drift under high-frequency telemetry writes.
+  - **`GET /api/capabilities`** — exposes sanitized boolean runtime flags (`persistence`, `rateLimiter`, `telemetryTcpConnected`, `integrations`) for Capability-Gated UI on `/[locale]/system-status` without leaking secrets or ports.
+  - **`GET /api/knowledge/metrics/paginated`** — public Read-Only (`@Public()`, protected by global `ThrottlerGuard` 100 req/min) **Offset Pagination** (`limit`, `offset`, `category`, `sortBy: 'viewsCount' | 'helpfulCount'`), returning `{ items, total, limit, offset, hasMore }`.
+  - **`GET /api/telemetry/events`** — implements **Cursor Pagination** (`take: limit + 1` by UUID cursor and optional `eventType` filter with `orderBy: [{ createdAt: 'desc' }, { id: 'desc' }]`), preventing page drift under high-frequency telemetry writes.
 
 ---
 

@@ -1,6 +1,7 @@
 'use client'
 
 import {
+  API_ENDPOINTS,
   type PaginatedSystemEventsResponse,
   PaginatedSystemEventsResponseSchema,
   type SystemCapabilities,
@@ -23,7 +24,7 @@ export const TelemetryStatsResponseSchema = z.object({
 export type TelemetryStatsResponse = z.infer<typeof TelemetryStatsResponseSchema>
 
 async function fetchSystemCapabilities(): Promise<SystemCapabilities> {
-  const res = await fetch('/api/capabilities', {
+  const res = await fetch(API_ENDPOINTS.capabilities, {
     method: 'GET',
     credentials: 'include',
   })
@@ -43,7 +44,7 @@ export function useSystemCapabilities() {
 }
 
 async function fetchTelemetryStats(): Promise<TelemetryStatsResponse> {
-  const res = await fetch('/api/telemetry/stats', {
+  const res = await fetch(API_ENDPOINTS.telemetryStats, {
     method: 'GET',
     credentials: 'include',
   })
@@ -82,7 +83,7 @@ async function fetchPaginatedTelemetryEvents(params: {
     searchParams.set('eventType', params.eventType)
   }
 
-  const res = await fetch(`/api/telemetry/events?${searchParams.toString()}`, {
+  const res = await fetch(`${API_ENDPOINTS.telemetryEvents}?${searchParams.toString()}`, {
     method: 'GET',
     credentials: 'include',
   })

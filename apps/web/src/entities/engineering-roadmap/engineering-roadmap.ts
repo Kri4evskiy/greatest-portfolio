@@ -47,7 +47,7 @@ export interface EngineeringRoadmapItem {
 export const ENGINEERING_ROADMAP_ITEMS: readonly EngineeringRoadmapItem[] = [
   {
     id: 'system-observability-api-inspector',
-    status: 'planned',
+    status: 'shipped',
     kind: 'architecture',
     priority: 'P1',
     effort: 'S',

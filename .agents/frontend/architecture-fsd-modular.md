@@ -45,27 +45,30 @@ apps/web/src/
 │   │   ├── not-found.tsx       # Локализованный 404 RSC внутри LocaleRootLayout
 │   │   ├── [...rest]/page.tsx  # Catch-all неизвестных маршрутов ➔ notFound()
 │   │   ├── cv/page.tsx         # Страница резюме
+│   │   ├── system-status/page.tsx # System Observability & Live API Inspector (SSG + Client Dashboard)
 │   │   └── knowledge-base/     # Роуты базы знаний
 │   └── search-index/[locale]/  # API route статического индекса
 │
 ├── widgets/                    # [Слой 2: Composite UI Blocks]
 │   │                           # Крупные композиционные блоки, собирающие несколько сущностей
 │   ├── header/                 # WorkfolioHeader, LanguageSwitcher, ThemeToggle
-│   ├── footer/                 # WorkfolioFooter, FooterSseStatus
+│   ├── footer/                 # WorkfolioFooter (кликабельный FooterSseStatus ➔ /system-status)
 │   └── section-nav/            # PageSectionNavigator
 │
 ├── features/                   # [Слой 3: User Scenarios & Interactions]
 │   │                           # Интерактивные фичи с действиями пользователя
 │   ├── auth/                   # GuestPassModal + lib/auth-cross-tab-sync.ts + queries/use-visitor-profile
 │   ├── search/                 # CommandPaletteModal, useSearchIndex, search-client
-│   ├── telemetry-stream/       # FooterSseStatus, useTelemetryStream hook
+│   ├── telemetry-stream/       # FooterSseStatus, useTelemetryStream,
+│   │                           # queries/use-system-observability, lib/system-status-helpers,
+│   │                           # ui/{system-status-dashboard,capabilities-matrix-card,live-event-log-card,knowledge-leaderboard-card,observability-data-table}
 │   └── kb-sandboxes/           # Интерактивные песочницы в статьях (Zod, JWT, SSE, Redis)
 │
 ├── entities/                   # [Слой 4: Business Data Representation]
 │   │                           # Отображение данных предметной области (без глобальных сайд-эффектов)
 │   ├── knowledge-article/      # HAST RSC-рендер (mdx-article-renderer, code-block, callout-config),
 │   │                           # ArticleToc, MetricsBar, DirectoryExplorer, KnowledgeSidebar,
-│   │                           # queries/use-knowledge-metrics
+│   │                           # queries/use-knowledge-metrics (metrics, paginated metrics, mutations)
 │   ├── knowledge-content/      # mdx-fs-loader, mdx-ast-parser (remark/rehype HAST), mdx-search-index,
 │   │                           # link-sanitizer, shiki-highlighter, mdx-types
 │   ├── workfolio-profile/      # author-profile.ts, cv-file.ts, CvDocumentShowcase

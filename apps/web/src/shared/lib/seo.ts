@@ -1,18 +1,6 @@
-import { DEFAULT_LOCALE, type SupportedLocale } from '@repo/shared-schemas'
+import { DEFAULT_LOCALE, LOCALE_METADATA, type SupportedLocale } from '@repo/shared-schemas'
 
 const DEFAULT_SITE_URL = 'http://localhost:3000'
-
-const LOCALE_URL_PREFIX_MAP: Record<SupportedLocale, string> = {
-  en: '',
-  uk: '/ua',
-  ru: '/ru',
-}
-
-const OG_LOCALE_MAP: Record<SupportedLocale, string> = {
-  en: 'en_US',
-  uk: 'uk_UA',
-  ru: 'ru_RU',
-}
 
 export function resolveSiteUrl(): string {
   const raw = process.env.NEXT_PUBLIC_SITE_URL?.trim()
@@ -42,7 +30,7 @@ export function normalizeSeoPathname(pathname: string): string {
 
 export function buildLocalizedPath(pathname: string, locale: SupportedLocale = DEFAULT_LOCALE): string {
   const normalizedPath = normalizeSeoPathname(pathname)
-  const prefix = LOCALE_URL_PREFIX_MAP[locale]
+  const prefix = LOCALE_METADATA[locale].urlPrefix
 
   if (normalizedPath === '/') {
     return prefix || '/'
@@ -71,7 +59,7 @@ export function buildPageAlternates(pathname: string, locale: SupportedLocale = 
 }
 
 export function resolveOgLocale(locale: SupportedLocale): string {
-  return OG_LOCALE_MAP[locale]
+  return LOCALE_METADATA[locale].ogLocale
 }
 
 export interface ProfilePageJsonLdInput {

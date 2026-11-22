@@ -1,6 +1,6 @@
 'use client'
 
-import type { SupportedLocale } from '@repo/shared-schemas'
+import { API_ENDPOINTS, type SupportedLocale } from '@repo/shared-schemas'
 import {
   Badge,
   Button,
@@ -52,7 +52,7 @@ export function CapabilitiesMatrixCard({ locale }: { locale: SupportedLocale }) 
         <div className="space-y-1">
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="info" className="font-mono text-[10px]">
-              GET /api/capabilities + /api/telemetry/stats
+              {`GET ${API_ENDPOINTS.capabilities} + ${API_ENDPOINTS.telemetryStats}`}
             </Badge>
             {capabilities ? (
               <Badge

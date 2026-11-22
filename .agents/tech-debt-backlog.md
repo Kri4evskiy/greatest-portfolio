@@ -13,7 +13,7 @@
 
 ### Приоритет №1 (Quick High-Impact Full-Stack Showcase): Страница `System Observability & API Inspector` (`/[locale]/system-status`) + `GET /api/capabilities`
 
-- [ ] **Выделенная страница мониторинга архитектуры, живой Cursor/Offset пагинации и матрица `Capability-Gated UI` (`apps/api`, `apps/web`, `@repo/shared-schemas`):**
+- [x] **Выделенная страница мониторинга архитектуры, живой Cursor/Offset пагинации и матрица `Capability-Gated UI` (`apps/api`, `apps/web`, `@repo/shared-schemas`):** _(Реализовано — карточка `system-observability-api-inspector` в статусе `shipped`)_
   - **Зачем (инженерный смысл и связь с уже готовым бэкендом):**
     В `apps/api` уже реализованы, но пока не подключены к UI мощные эндпоинты: `GET /api/telemetry/events` (**Cursor-based пагинация** `take: limit + 1`, `nextCursor`, фильтр по `eventType`), `GET /api/knowledge/metrics/paginated` (**Offset-based пагинация** `limit`, `offset`, `category`, `sortBy: 'viewsCount' | 'helpfulCount'`) и `GET /api/telemetry/stats` (TCP RPC к микросервису `:4001`). Выделенная страница `/[locale]/system-status` (открывается кликом по живому пульсу `SSE LIVE` в `WorkfolioFooter`) превращает их в интерактивный Full-Stack шоукейс для тимлида/СТО и одновременно закладывает фундамент `Capability-Gated UI` для всех следующих задач (Redis, CMS, S3/R2, Telegram Bot).
   - **1. Контракт в `@repo/shared-schemas` и бэкенд `apps/api`:**

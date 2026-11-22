@@ -1,3 +1,4 @@
+export * from './api-routes.js'
 export * from './auth.schema.js'
 export * from './capabilities.schema.js'
 export * from './knowledge.schema.js'

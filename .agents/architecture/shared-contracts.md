@@ -68,9 +68,14 @@
 
 - `SupportedLocaleEnum = z.enum(['en', 'uk', 'ru'])`
 - `DEFAULT_LOCALE = 'en'`
-- `LOCALE_METADATA`: словарь кодов, коротких меток (`EN`, `UA`, `RU`) и нативных названий языков.
+- `LOCALE_METADATA`: словарь кодов, коротких меток (`EN`, `UA`, `RU`), нативных названий языков, BCP-47 тегов (`bcp47Tag`: `'en-US' | 'uk-UA' | 'ru-RU'`), OpenGraph-локалей (`ogLocale`: `'en_US' | 'uk_UA' | 'ru_RU'`) и URL-префиксов (`urlPrefix`: `'' | '/ua' | '/ru'`).
 
-### 7. Контракты Offset и Cursor пагинации (`pagination.schema.ts`)
+### 7. Контракты Offset и Cursor пагинации (`pagination.schema.ts`, `knowledge.schema.ts`, `telemetry.schema.ts`)
 
-- `OffsetPaginationQuerySchema` (`limit`, `offset`) и фабрика `createOffsetPaginatedResponseSchema(ItemSchema)` (используется в `PaginatedArticleMetricsResponseSchema` для `GET /api/knowledge/metrics/paginated`).
-- `CursorPaginationQuerySchema` (`limit`, `cursor`, `eventType`) и фабрика `createCursorPaginatedResponseSchema(ItemSchema)` (используется в `PaginatedSystemEventsResponseSchema` для `GET /api/telemetry/events`).
+- `OffsetPaginationQuerySchema` (`limit`, `offset`), `PaginatedArticleMetricsQuerySchema` (`limit`, `offset`, `category`, `sortBy: 'viewsCount' | 'helpfulCount'`) и фабрика `createOffsetPaginatedResponseSchema(ItemSchema)` (используется в `PaginatedArticleMetricsResponseSchema` для `GET /api/knowledge/metrics/paginated`).
+- `CursorPaginationQuerySchema` (`limit`, `cursor`), `SystemEventsQuerySchema` (`limit`, `cursor`, `eventType`) и фабрика `createCursorPaginatedResponseSchema(ItemSchema)` (используется в `PaginatedSystemEventsResponseSchema` для `GET /api/telemetry/events`).
+
+### 8. Возможности системы и общие роуты (`capabilities.schema.ts`, `api-routes.ts`)
+
+- `SystemCapabilitiesSchema` (`status: 'ok'`, `mode: 'demo' | 'development' | 'production'`, `persistence: 'postgresql' | 'in-memory-fallback'`, `rateLimiter: 'redis' | 'in-memory'`, `telemetryTcpConnected: boolean`, `integrations: { redisCache, s3ObjectStorage, telegramBotAuth, sentryObservability }`, `timestamp: z.iso.datetime()`).
+- `API_ENDPOINTS`: единый реестр клиентских `/api/*` путей (`health`, `capabilities`, `auth*`, `knowledgeMetrics*`, `telemetry*`).

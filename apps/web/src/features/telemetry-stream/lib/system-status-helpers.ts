@@ -1,9 +1,10 @@
-import type {
-  SupportedLocale,
-  SystemCapabilities,
-  SystemEventLogItem,
-  TelemetryEvent,
-  TelemetryEventType,
+import {
+  LOCALE_METADATA,
+  type SupportedLocale,
+  type SystemCapabilities,
+  type SystemEventLogItem,
+  type TelemetryEvent,
+  type TelemetryEventType,
 } from '@repo/shared-schemas'
 
 export type ArchitectureNodeId =
@@ -98,19 +99,13 @@ export function truncateUuid(uuid: string): string {
   return `${uuid.slice(0, 8)}…${uuid.slice(-4)}`
 }
 
-const DATE_LOCALE_MAP: Record<SupportedLocale, string> = {
-  en: 'en-US',
-  uk: 'uk-UA',
-  ru: 'ru-RU',
-}
-
 export function formatSystemTimestamp(iso: string, locale: SupportedLocale): string {
   const date = new Date(iso)
   if (Number.isNaN(date.getTime())) {
     return iso
   }
 
-  return new Intl.DateTimeFormat(DATE_LOCALE_MAP[locale], {
+  return new Intl.DateTimeFormat(LOCALE_METADATA[locale].bcp47Tag, {
     hour: '2-digit',
     minute: '2-digit',
     second: '2-digit',

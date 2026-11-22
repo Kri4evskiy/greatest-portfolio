@@ -14,21 +14,33 @@ export const LOCALE_METADATA: Record<
     code: SupportedLocale
     shortLabel: string
     nativeName: string
+    bcp47Tag: string
+    ogLocale: string
+    urlPrefix: string
   }
 > = {
   en: {
     code: 'en',
     shortLabel: 'EN',
     nativeName: 'English',
+    bcp47Tag: 'en-US',
+    ogLocale: 'en_US',
+    urlPrefix: '',
   },
   uk: {
     code: 'uk',
     shortLabel: 'UA',
     nativeName: 'Українська',
+    bcp47Tag: 'uk-UA',
+    ogLocale: 'uk_UA',
+    urlPrefix: '/ua',
   },
   ru: {
     code: 'ru',
     shortLabel: 'RU',
     nativeName: 'Русский',
+    bcp47Tag: 'ru-RU',
+    ogLocale: 'ru_RU',
+    urlPrefix: '/ru',
   },
 }

@@ -68,10 +68,11 @@ export function resolveCorrelationRequestId(incomingHeaderValue?: string): strin
 
 В классических проектах на NestJS DTO описывают дважды: на бэкенде через декораторы `class-validator` и на фронтенде через `Zod`. В нашем монорепозитории действует принцип **Single Source of Truth**:
 
-- Все контракты (`GuestPassFormSchema`, `OffsetPaginationQuerySchema`, `CursorPaginationQuerySchema`, `ArticleReactionInputSchema`) описаны один раз на **`Zod v4`** в пакете `@repo/shared-schemas`.
+- Все контракты (`GuestPassFormSchema`, `SystemCapabilitiesSchema`, `PaginatedArticleMetricsQuerySchema`, `SystemEventsQuerySchema`, `ArticleReactionInputSchema`) описаны один раз на **`Zod v4`** в пакете `@repo/shared-schemas`.
 - В контроллерах NestJS используется наш `ZodValidationPipe`:
-  - **`GET /api/knowledge/metrics/paginated`** — применяет **Offset-пагинацию** (`limit`, `offset`, `category`, `sortBy: 'viewsCount' | 'helpfulCount'`), возвращая `{ items, total, limit, offset, hasMore }`.
-  - **`GET /api/telemetry/events`** — применяет **Cursor-пагинацию** (`take: limit + 1` по UUID курсору и `orderBy: [{ createdAt: 'desc' }, { id: 'desc' }]`), что исключает смещение строк при высокочастотной записи новых событий телеметрии.
+  - **`GET /api/capabilities`** — отдаёт безопасные булевы флаги рантайма (`persistence`, `rateLimiter`, `telemetryTcpConnected`, `integrations`) для матрицы Capability-Gated UI на `/[locale]/system-status` без утечки секретов и портов.
+  - **`GET /api/knowledge/metrics/paginated`** — публичное Read-Only чтение (`@Public()` под защитой глобального `ThrottlerGuard` 100 req/min) с **Offset-пагинацией** (`limit`, `offset`, `category`, `sortBy: 'viewsCount' | 'helpfulCount'`), возвращающее `{ items, total, limit, offset, hasMore }`.
+  - **`GET /api/telemetry/events`** — применяет **Cursor-пагинацию** (`take: limit + 1` по UUID курсору с опциональным фильтром `eventType` и `orderBy: [{ createdAt: 'desc' }, { id: 'desc' }]`), что исключает смещение строк при высокочастотной записи новых событий телеметрии.
 
 ---
 

@@ -11,7 +11,7 @@ apps/api/src/
 │
 ├── main.ts                     # Bootstrap: Helmet, CORS, CookieParser, Filters, Interceptors
 ├── app.module.ts               # Root Module: импорт core-модулей, ThrottlerGuard, TimeoutInterceptor, LoggingMiddleware
-├── app.controller.ts           # Healthcheck (/api/health)
+├── app.controller.ts           # Healthcheck (/api/health) и матрица возможностей (/api/capabilities)
 
 ├── common/                     # Общий код фреймворка (Cross-Cutting Concerns)
 │   ├── decorators/             # public.decorator.ts (@Public), skip-timeout.decorator.ts (@SkipTimeout)
@@ -50,6 +50,7 @@ apps/api/src/
     │   └── knowledge.module.ts
     │
     └── telemetry/              # Модуль телеметрии и SSE
+        ├── dto/                # telemetry.dto.ts (SystemEventsQuerySchema из @repo/shared-schemas)
         ├── telemetry.controller.ts
         ├── telemetry.service.ts
         └── telemetry.module.ts

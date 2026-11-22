@@ -68,10 +68,11 @@ export function resolveCorrelationRequestId(incomingHeaderValue?: string): strin
 
 У класичних проєктах на NestJS DTO описують двічі: на бекенді через декоратори `class-validator` і на фронтенді через `Zod`. У нашому монорепозиторії діє принцип **Single Source of Truth**:
 
-- Усі контракти (`GuestPassFormSchema`, `OffsetPaginationQuerySchema`, `CursorPaginationQuerySchema`, `ArticleReactionInputSchema`) описані один раз на **`Zod v4`** у пакеті `@repo/shared-schemas`.
+- Усі контракти (`GuestPassFormSchema`, `SystemCapabilitiesSchema`, `PaginatedArticleMetricsQuerySchema`, `SystemEventsQuerySchema`, `ArticleReactionInputSchema`) описані один раз на **`Zod v4`** у пакеті `@repo/shared-schemas`.
 - У контролерах NestJS використовується наш `ZodValidationPipe`:
-  - **`GET /api/knowledge/metrics/paginated`** — застосовує **Offset-пагінацію** (`limit`, `offset`, `category`, `sortBy: 'viewsCount' | 'helpfulCount'`), повертаючи `{ items, total, limit, offset, hasMore }`.
-  - **`GET /api/telemetry/events`** — застосовує **Cursor-пагінацію** (`take: limit + 1` за UUID курсором та `orderBy: [{ createdAt: 'desc' }, { id: 'desc' }]`), що унеможливлює зміщення рядків при високочастотному записі нових подій телеметрії.
+  - **`GET /api/capabilities`** — віддає безпечні булеві прапорці рантайму (`persistence`, `rateLimiter`, `telemetryTcpConnected`, `integrations`) для матриці Capability-Gated UI на `/[locale]/system-status` без витоку секретів та портів.
+  - **`GET /api/knowledge/metrics/paginated`** — публічне Read-Only читання (`@Public()` під захистом глобального `ThrottlerGuard` 100 req/min) із **Offset-пагінацією** (`limit`, `offset`, `category`, `sortBy: 'viewsCount' | 'helpfulCount'`), що повертає `{ items, total, limit, offset, hasMore }`.
+  - **`GET /api/telemetry/events`** — застосовує **Cursor-пагінацію** (`take: limit + 1` за UUID курсором з опційним фільтром `eventType` та `orderBy: [{ createdAt: 'desc' }, { id: 'desc' }]`), що унеможливлює зміщення рядків при високочастотному записі нових подій телеметрії.
 
 ---
 

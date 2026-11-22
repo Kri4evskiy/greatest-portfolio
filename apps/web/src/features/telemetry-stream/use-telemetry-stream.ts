@@ -1,6 +1,6 @@
 'use client'
 
-import { type TelemetryEvent, TelemetryEventSchema } from '@repo/shared-schemas'
+import { API_ENDPOINTS, type TelemetryEvent, TelemetryEventSchema } from '@repo/shared-schemas'
 import { useEffect, useState } from 'react'
 
 export function useTelemetryStream() {
@@ -14,7 +14,7 @@ export function useTelemetryStream() {
     const connect = () => {
       source?.close()
       try {
-        source = new EventSource('/api/telemetry/stream', {
+        source = new EventSource(API_ENDPOINTS.telemetryStream, {
           withCredentials: true,
         })
 

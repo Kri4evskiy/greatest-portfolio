@@ -1,6 +1,6 @@
 'use client'
 
-import { type GuestPassFormInput, type SessionProfile, SessionProfileSchema } from '@repo/shared-schemas'
+import { API_ENDPOINTS, type GuestPassFormInput, type SessionProfile, SessionProfileSchema } from '@repo/shared-schemas'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect } from 'react'
 import { broadcastAuthSessionChange, subscribeAuthSessionChange } from '../lib/auth-cross-tab-sync'
@@ -17,7 +17,7 @@ const FALLBACK_GUEST_PROFILE: SessionProfile = {
 
 async function fetchVisitorProfile(): Promise<SessionProfile> {
   try {
-    const res = await fetch('/api/auth/me', {
+    const res = await fetch(API_ENDPOINTS.authMe, {
       method: 'GET',
       credentials: 'include',
     })
@@ -54,7 +54,7 @@ export function useIssueGuestPassMutation() {
 
   return useMutation({
     mutationFn: async (input: GuestPassFormInput): Promise<SessionProfile> => {
-      const res = await fetch('/api/auth/guest-pass', {
+      const res = await fetch(API_ENDPOINTS.authGuestPass, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -84,7 +84,7 @@ export function useLogoutMutation() {
 
   return useMutation({
     mutationFn: async (): Promise<SessionProfile> => {
-      const res = await fetch('/api/auth/logout', {
+      const res = await fetch(API_ENDPOINTS.authLogout, {
         method: 'POST',
         credentials: 'include',
       })

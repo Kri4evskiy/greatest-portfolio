@@ -1,7 +1,9 @@
 'use client'
 
 import {
+  API_ENDPOINTS,
   type SupportedLocale,
+  type SystemEventLogItem,
   type TelemetryEvent,
   type TelemetryEventType,
   TelemetryEventTypeEnum,
@@ -22,6 +24,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@repo/ui'
+import type { ColumnDef } from '@tanstack/react-table'
 import { Activity, ArrowDownCircle, Radio, RefreshCw, Sparkles } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useState } from 'react'
@@ -32,6 +35,7 @@ import {
   truncateUuid,
 } from '../lib/system-status-helpers'
 import { usePaginatedTelemetryEvents } from '../queries/use-system-observability'
+import { ObservabilityDataTable } from './observability-data-table'
 
 type EventFilterValue = 'ALL' | TelemetryEventType
 
@@ -70,13 +74,70 @@ export function LiveEventLogCard({ locale, sseConnected, recentLiveEvents }: Liv
     }
   }
 
+  const columns: ColumnDef<SystemEventLogItem>[] = [
+    {
+      accessorKey: 'type',
+      header: () => t('colEventType'),
+      meta: {
+        cellClassName: 'whitespace-nowrap px-3 py-2.5 align-top',
+      },
+      cell: ({ row }) => {
+        const item = row.original
+        const isLiveHighlight = liveIds.has(item.id)
+        return (
+          <div className="flex items-center gap-1.5">
+            <Badge variant={getTelemetryEventBadgeVariant(item.type)} className="font-mono text-[10px]">
+              {item.type}
+            </Badge>
+            {isLiveHighlight ? (
+              <Badge variant="success" className="font-mono text-[10px]">
+                <Sparkles className="h-2.5 w-2.5" />
+                <span>SSE</span>
+              </Badge>
+            ) : null}
+          </div>
+        )
+      },
+    },
+    {
+      accessorKey: 'message',
+      header: () => t('colEventMessage'),
+      meta: {
+        cellClassName: 'max-w-md px-3 py-2.5 align-top font-mono text-[11px] text-foreground',
+      },
+      cell: ({ row }) => <span className="break-words">{row.original.message}</span>,
+    },
+    {
+      id: 'context',
+      header: () => t('colEventContext'),
+      meta: {
+        cellClassName: 'whitespace-nowrap px-3 py-2.5 align-top font-mono text-[11px] text-muted-foreground',
+      },
+      cell: ({ row }) => {
+        const item = row.original
+        if (item.slug) return <span>/{item.slug}</span>
+        if (item.actorRole) return <span>{item.actorRole}</span>
+        return <span>—</span>
+      },
+    },
+    {
+      accessorKey: 'createdAt',
+      header: () => t('colEventTime'),
+      meta: {
+        headerClassName: 'px-3 py-2.5 text-right font-medium',
+        cellClassName: 'whitespace-nowrap px-3 py-2.5 text-right align-top font-mono text-[11px] text-muted-foreground',
+      },
+      cell: ({ row }) => formatSystemTimestamp(row.original.createdAt, locale),
+    },
+  ]
+
   return (
     <Card>
       <CardHeader className="gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="space-y-1">
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="info" className="font-mono text-[10px]">
-              useInfiniteQuery ➔ GET /api/telemetry/events
+              {`useInfiniteQuery ➔ GET ${API_ENDPOINTS.telemetryEvents}`}
             </Badge>
             <Badge variant={sseConnected ? 'success' : 'warning'} className="font-mono text-[10px]">
               <Radio className="h-3 w-3" />
@@ -105,7 +166,6 @@ export function LiveEventLogCard({ locale, sseConnected, recentLiveEvents }: Liv
       </CardHeader>
 
       <CardContent className="space-y-4">
-        {/* Filter by eventType */}
         <div className="flex flex-wrap items-center justify-between gap-2">
           <ToggleGroup
             type="single"
@@ -127,7 +187,6 @@ export function LiveEventLogCard({ locale, sseConnected, recentLiveEvents }: Liv
           </span>
         </div>
 
-        {/* Event Log List / Table */}
         {eventsQuery.isLoading ? (
           <div className="space-y-2">
             {Array.from({ length: 4 }, (_, idx) => (
@@ -138,67 +197,19 @@ export function LiveEventLogCard({ locale, sseConnected, recentLiveEvents }: Liv
           <div className="rounded-lg border border-warning/40 bg-warning/10 p-4 text-xs text-muted-foreground">
             {t('eventsFetchError')}
           </div>
-        ) : displayItems.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-border bg-surface-subtle p-6 text-center text-xs text-muted-foreground">
-            {t('eventsEmptyState')}
-          </div>
         ) : (
-          <div className="overflow-x-auto rounded-lg border border-border/80">
-            <table className="w-full min-w-[620px] border-collapse text-left text-xs">
-              <thead>
-                <tr className="border-b border-border/70 bg-surface-subtle font-mono text-[11px] text-muted-foreground">
-                  <th className="px-3 py-2.5 font-medium">{t('colEventType')}</th>
-                  <th className="px-3 py-2.5 font-medium">{t('colEventMessage')}</th>
-                  <th className="px-3 py-2.5 font-medium">{t('colEventContext')}</th>
-                  <th className="px-3 py-2.5 text-right font-medium">{t('colEventTime')}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border/60">
-                {displayItems.map((item) => {
-                  const isLiveHighlight = liveIds.has(item.id)
-                  return (
-                    <tr
-                      key={item.id}
-                      className={
-                        isLiveHighlight
-                          ? 'bg-primary/5 transition-colors'
-                          : 'bg-background transition-colors hover:bg-surface-subtle/60'
-                      }
-                    >
-                      <td className="whitespace-nowrap px-3 py-2.5 align-top">
-                        <div className="flex items-center gap-1.5">
-                          <Badge variant={getTelemetryEventBadgeVariant(item.type)} className="font-mono text-[10px]">
-                            {item.type}
-                          </Badge>
-                          {isLiveHighlight ? (
-                            <Badge variant="success" className="font-mono text-[10px]">
-                              <Sparkles className="h-2.5 w-2.5" />
-                              <span>SSE</span>
-                            </Badge>
-                          ) : null}
-                        </div>
-                      </td>
-                      <td className="max-w-md px-3 py-2.5 align-top font-mono text-[11px] text-foreground">
-                        <span className="break-words">{item.message}</span>
-                      </td>
-                      <td className="whitespace-nowrap px-3 py-2.5 align-top font-mono text-[11px] text-muted-foreground">
-                        {item.slug ? (
-                          <span>/{item.slug}</span>
-                        ) : item.actorRole ? (
-                          <span>{item.actorRole}</span>
-                        ) : (
-                          <span>—</span>
-                        )}
-                      </td>
-                      <td className="whitespace-nowrap px-3 py-2.5 text-right align-top font-mono text-[11px] text-muted-foreground">
-                        {formatSystemTimestamp(item.createdAt, locale)}
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
+          <ObservabilityDataTable
+            data={displayItems}
+            columns={columns}
+            emptyState={t('eventsEmptyState')}
+            minTableWidthClass="min-w-[620px]"
+            getRowId={(row) => row.id}
+            getRowClassName={(row) =>
+              liveIds.has(row.id)
+                ? 'bg-primary/5 transition-colors'
+                : 'bg-background transition-colors hover:bg-surface-subtle/60'
+            }
+          />
         )}
       </CardContent>
 

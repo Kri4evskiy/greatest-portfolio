@@ -37,17 +37,19 @@ apps/web/
     │       ├── not-found.tsx             # Локализованная 404 страница внутри LocaleRootLayout (чистый RSC)
     │       ├── [...rest]/page.tsx        # Catch-all роут неизвестных путей внутри локали ➔ notFound()
     │       ├── cv/page.tsx               # Страница резюме (PDF <object> + структурированный ATS-вид)
+    │       ├── system-status/page.tsx    # System Observability & API Inspector (SSG + Client Dashboard)
     │       └── knowledge-base/           # Защищённая База Знаний (layout + index + [...slug] catch-all)
     │
     ├── widgets/                          # [Слой 2: Composite UI Blocks]
     │   ├── header/                       # WorkfolioHeader, LanguageSwitcher, ThemeToggle (2D Mode × Palette)
-    │   ├── footer/                       # WorkfolioFooter
+    │   ├── footer/                       # WorkfolioFooter (кликабельный SSE LIVE бейдж ➔ /system-status)
     │   └── section-nav/                  # PageSectionNavigator (плавающий outline / мобильная pill-кнопка)
     │
     ├── features/                         # [Слой 3: User Scenarios & Interactions]
     │   ├── auth/                         # GuestPassModal + lib/auth-cross-tab-sync.ts + queries/use-visitor-profile.ts
     │   ├── search/                       # CommandPaletteModal (на базе @repo/ui Dialog) + search-index-client.ts
-    │   ├── telemetry-stream/             # FooterSseStatus + use-telemetry-stream.ts (SSE + bfcache)
+    │   ├── telemetry-stream/             # FooterSseStatus + use-telemetry-stream.ts + queries/use-system-observability.ts
+    │   │                                 # + lib/system-status-helpers.ts + ui/{system-status-dashboard,capabilities-matrix-card,live-event-log-card,knowledge-leaderboard-card,observability-data-table}.tsx
     │   └── kb-sandboxes/ui/              # Ленивые клиентские острова (mdx-client-widgets.tsx, D3, MCP)
     │
     ├── entities/                         # [Слой 4: Business Data Representation]
@@ -145,16 +147,17 @@ apps/web/
 
 ### Основные маршруты (`apps/web/src/app`)
 
-| Маршрут                              | Тип рендеринга                | Назначение                                                                            |
-| :----------------------------------- | :---------------------------- | :------------------------------------------------------------------------------------ |
-| `/[locale]` (`/`, `/ua`, `/ru`)      | `SSG`                         | Главная страница Workfolio CV: Hero, Case Studies, Experience, Tech Radar, Roadmap    |
-| `/[locale]/cv`                       | `SSG`                         | Страница резюме: встроенный просмотр `public/cv/*.pdf` и структурированный ATS-режим  |
-| `/[locale]/knowledge-base`           | `SSG` + Edge JWT              | Обзорный каталог Базы Знаний с фильтром по категориям, форматам и `#тегам`            |
-| `/[locale]/knowledge-base/[...slug]` | `SSG` + Edge JWT              | Универсальный catch-all роут: хабы тем, вкладки подтем и статьи с `TOC` и метриками   |
-| `/[locale]/[...rest]`                | `RSC` (`notFound()`)          | Перехват неизвестных URL внутри локали с рендером `[locale]/not-found.tsx` в layout   |
-| `/robots.txt` и `/sitemap.xml`       | Static Route (`force-static`) | SSG-правила индексации и мультиязычная карта сайта с матрицей `hreflang` (`en/uk/ru`) |
-| `/llms.txt`                          | Static Route (`force-static`) | Машиночитаемый Markdown-паспорт портфолио, 16 ADR и каталога статей для AI-агентов    |
-| `/search-index/[locale]`             | Static Route (`force-static`) | Предсобранный JSON-индекс для мгновенного поиска `Cmd+K`                              |
+| Маршрут                              | Тип рендеринга                | Назначение                                                                              |
+| :----------------------------------- | :---------------------------- | :-------------------------------------------------------------------------------------- |
+| `/[locale]` (`/`, `/ua`, `/ru`)      | `SSG`                         | Главная страница Workfolio CV: Hero, Case Studies, Experience, Tech Radar, Roadmap      |
+| `/[locale]/cv`                       | `SSG`                         | Страница резюме: встроенный просмотр `public/cv/*.pdf` и структурированный ATS-режим    |
+| `/[locale]/system-status`            | `SSG` + Client Inspector      | Инспектор API: матрица `/api/capabilities`, Cursor-лог событий (`SSE`) и Offset-рейтинг |
+| `/[locale]/knowledge-base`           | `SSG` + Edge JWT              | Обзорный каталог Базы Знаний с фильтром по категориям, форматам и `#тегам`              |
+| `/[locale]/knowledge-base/[...slug]` | `SSG` + Edge JWT              | Универсальный catch-all роут: хабы тем, вкладки подтем и статьи с `TOC` и метриками     |
+| `/[locale]/[...rest]`                | `RSC` (`notFound()`)          | Перехват неизвестных URL внутри локали с рендером `[locale]/not-found.tsx` в layout     |
+| `/robots.txt` и `/sitemap.xml`       | Static Route (`force-static`) | SSG-правила индексации и мультиязычная карта сайта с матрицей `hreflang` (`en/uk/ru`)   |
+| `/llms.txt`                          | Static Route (`force-static`) | Машиночитаемый Markdown-паспорт портфолио, 16 ADR и каталога статей для AI-агентов      |
+| `/search-index/[locale]`             | Static Route (`force-static`) | Предсобранный JSON-индекс для мгновенного поиска `Cmd+K`                                |
 
 ### Команды разработки
 

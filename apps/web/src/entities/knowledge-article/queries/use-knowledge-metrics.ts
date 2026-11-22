@@ -1,6 +1,7 @@
 'use client'
 
 import {
+  API_ENDPOINTS,
   type ArticleMeta,
   ArticleMetaSchema,
   type KnowledgeCategory,
@@ -17,7 +18,7 @@ export const KNOWLEDGE_PAGINATED_METRICS_QUERY_KEY = ['knowledge', 'metrics', 'p
 const ArticleMetaArraySchema = z.array(ArticleMetaSchema).max(500)
 
 async function fetchKnowledgeMetrics(): Promise<ArticleMeta[]> {
-  const res = await fetch('/api/knowledge/metrics', {
+  const res = await fetch(API_ENDPOINTS.knowledgeMetrics, {
     method: 'GET',
     credentials: 'include',
   })
@@ -55,7 +56,7 @@ async function fetchPaginatedKnowledgeMetrics(
     searchParams.set('category', params.category)
   }
 
-  const res = await fetch(`/api/knowledge/metrics/paginated?${searchParams.toString()}`, {
+  const res = await fetch(`${API_ENDPOINTS.knowledgeMetricsPaginated}?${searchParams.toString()}`, {
     method: 'GET',
     credentials: 'include',
   })

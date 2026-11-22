@@ -12,7 +12,7 @@
 apps/api/src/
 ├── main.ts                     # Bootstrap: Helmet, CORS (exposedHeaders: X-Request-Id), enableShutdownHooks(), CookieParser
 ├── app.module.ts               # Root Module: ThrottlerModule, APP_GUARD (ThrottlerGuard), APP_INTERCEPTOR (TimeoutInterceptor), LoggingMiddleware
-├── app.controller.ts           # Healthcheck (GET /api/health)
+├── app.controller.ts           # Healthcheck (GET /api/health) и матрица возможностей (GET /api/capabilities)
 │
 ├── common/                     # Сквозные механизмы фреймворка (Cross-Cutting Concerns)
 │   ├── decorators/             # @Public() и @SkipTimeout()
@@ -25,7 +25,7 @@ apps/api/src/
 │   └── utils/                  # request-id.util.ts (генерация и защита X-Request-Id от CRLF Log Injection)
 │
 ├── config/                     # Типизированная Fail-Fast конфигурация (Zod)
-│   ├── app.config.ts           # PORT, WEB_ORIGIN, WORKFOLIO_DEMO_MODE, JWT_SECRET, ADMIN_SECRET_PASSCODE, TELEMETRY_MS_*, SENTRY_DSN
+│   ├── app.config.ts           # PORT, WEB_ORIGIN, WORKFOLIO_DEMO_MODE, JWT_SECRET, ADMIN_SECRET_PASSCODE, TELEMETRY_MS_*, SENTRY_DSN, integration flags
 │   └── database.config.ts      # DATABASE_URL, DIRECT_URL, парсер ?schema=
 │
 ├── generated/prisma/           # Автогенерируемый ESM-клиент Prisma 7 (игнорируется Git и Biome)
@@ -52,7 +52,8 @@ apps/api/src/
     │   ├── knowledge.controller.ts
     │   ├── knowledge.service.ts
     │   └── knowledge.module.ts
-    └── telemetry/              # Прокси к apps/telemetry-ms (TCP :4001) + SSE-стрим
+    └── telemetry/              # Прокси к apps/telemetry-ms (TCP :4001) + Cursor-лог + SSE-стрим
+        ├── dto/                # telemetry.dto.ts (SystemEventsQuerySchema)
         ├── telemetry.controller.ts
         ├── telemetry.service.ts
         └── telemetry.module.ts
@@ -131,18 +132,21 @@ apps/api/src/
 
 ## 5. Эндпоинты API (префикс `/api`)
 
-| Метод и путь                        | Доступ / Лимит                      | Назначение                                                                        |
-| :---------------------------------- | :---------------------------------- | :-------------------------------------------------------------------------------- |
-| `GET /api/health`                   | Public (`100/min`)                  | Проверка состояния сервиса и подключения к PostgreSQL                             |
-| `POST /api/auth/guest-pass`         | Public (`5/min`)                    | Выдача `Guest Pass` (`USER` или `ADMIN` по пасскоду), установка `HttpOnly` cookie |
-| `POST /api/auth/login`              | Public (`5/min`)                    | Алиас `guest-pass`                                                                |
-| `GET /api/auth/me`                  | Public (`100/min`)                  | Чтение текущего профиля из cookie (возвращает `GUEST`, если cookie нет)           |
-| `POST /api/auth/logout`             | Public (`100/min`)                  | Очистка `kb_access_token` cookie                                                  |
-| `GET /api/knowledge/metrics`        | `@Roles('USER', 'ADMIN')`           | Список метрик статей Базы Знаний                                                  |
-| `POST /api/knowledge/:slug/view`    | `@Roles('USER', 'ADMIN')`           | Атомарный инкремент просмотров + событие в `telemetry-ms`                         |
-| `POST /api/knowledge/:slug/helpful` | `@Roles('USER', 'ADMIN')`           | Атомарный инкремент «полезно» + событие в `telemetry-ms`                          |
-| `GET /api/telemetry/stream`         | `@SkipThrottle()`, `@SkipTimeout()` | Постоянный SSE-поток событий телеметрии                                           |
-| `GET /api/telemetry/stats`          | Public (`100/min`)                  | Статистика из TCP-микросервиса `apps/telemetry-ms`                                |
+| Метод и путь                           | Доступ / Лимит                      | Назначение                                                                        |
+| :------------------------------------- | :---------------------------------- | :-------------------------------------------------------------------------------- |
+| `GET /api/health`                      | Public (`100/min`)                  | Проверка состояния сервиса и подключения к PostgreSQL                             |
+| `GET /api/capabilities`                | Public (`100/min`)                  | Безопасная матрица возможностей системы (`SystemCapabilities`, без секретов)      |
+| `POST /api/auth/guest-pass`            | Public (`5/min`)                    | Выдача `Guest Pass` (`USER` или `ADMIN` по пасскоду), установка `HttpOnly` cookie |
+| `POST /api/auth/login`                 | Public (`5/min`)                    | Алиас `guest-pass`                                                                |
+| `GET /api/auth/me`                     | Public (`100/min`)                  | Чтение текущего профиля из cookie (возвращает `GUEST`, если cookie нет)           |
+| `POST /api/auth/logout`                | Public (`100/min`)                  | Очистка `kb_access_token` cookie                                                  |
+| `GET /api/knowledge/metrics`           | `@Roles('USER', 'ADMIN')`           | Список метрик статей Базы Знаний                                                  |
+| `GET /api/knowledge/metrics/paginated` | Public (`100/min`, Read-Only)       | Offset-пагинация рейтинга статей (`limit`, `offset`, `category`, `sortBy`)        |
+| `POST /api/knowledge/:slug/view`       | `@Roles('USER', 'ADMIN')`           | Атомарный инкремент просмотров + событие в `telemetry-ms`                         |
+| `POST /api/knowledge/:slug/helpful`    | `@Roles('USER', 'ADMIN')`           | Атомарный инкремент «полезно» + событие в `telemetry-ms`                          |
+| `GET /api/telemetry/stream`            | `@SkipThrottle()`, `@SkipTimeout()` | Постоянный SSE-поток событий телеметрии                                           |
+| `GET /api/telemetry/events`            | Public (`100/min`)                  | Cursor-пагинация системных событий (`limit`, `cursor`, `eventType`)               |
+| `GET /api/telemetry/stats`             | Public (`100/min`)                  | Статистика из TCP-микросервиса `apps/telemetry-ms`                                |
 
 ---
 

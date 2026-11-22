@@ -13,7 +13,7 @@
    - `pipes/`: `zod-validation.pipe.ts` (сквозная валидация через схемы из `@repo/shared-schemas`).
    - `utils/`: `request-id.util.ts` (`resolveCorrelationRequestId` с защитой `X-Request-Id` от CRLF / Log Injection).
 2. **`config/` — Централизованная типизированная конфигурация:**
-   - `app.config.ts`: Zod-валидация env-переменных при старте процесса (`PORT`, `WEB_ORIGIN`, `WORKFOLIO_DEMO_MODE`, `JWT_SECRET`, `ADMIN_SECRET_PASSCODE`, `TELEMETRY_MS_HOST/PORT`, `SENTRY_DSN`). В режиме `NODE_ENV === 'production'` (при `WORKFOLIO_DEMO_MODE !== 'true'`) запуск блокируется, если `JWT_SECRET` (`< 32` символов) или `ADMIN_SECRET_PASSCODE` не переопределены.
+   - `app.config.ts`: Zod-валидация env-переменных при старте процесса (`PORT`, `WEB_ORIGIN`, `WORKFOLIO_DEMO_MODE`, `JWT_SECRET`, `ADMIN_SECRET_PASSCODE`, `TELEMETRY_MS_HOST/PORT`, `SENTRY_DSN`, а также опциональные ключи интеграций `REDIS_URL`, `S3_*`, `TELEGRAM_BOT_TOKEN`, преобразуемые в булевы флаги `integrations` для `GET /api/capabilities`). В режиме `NODE_ENV === 'production'` (при `WORKFOLIO_DEMO_MODE !== 'true'`) запуск блокируется, если `JWT_SECRET` (`< 32` символов) или `ADMIN_SECRET_PASSCODE` не переопределены.
    - `database.config.ts`: валидация `DATABASE_URL` и `DIRECT_URL` (допускает пустые значения для In-Memory fallback).
 3. **`migrations/` — Слой управления миграциями и сидированием БД:**
    - `scripts/seed-data.ts`: единый источник начальных метрик статей (переиспользуется и в `seed.ts`, и в In-Memory fallback `PrismaService`).
@@ -22,8 +22,8 @@
    - Управляет жизненным циклом соединения с PostgreSQL (`Neon.tech` / локальный Docker Postgres) и автоматическим In-Memory fallback.
 5. **`modules/` — Изолированные доменные модули (Domain-Driven NestJS Modules):**
    - `auth/` (`guards/jwt-roles.guard.ts`, `decorators/roles.decorator.ts`, `dto/auth.dto.ts`, `auth.controller.ts`, `auth.service.ts`, `auth.module.ts`): Выпуск и верификация `JWT` в `HttpOnly Cookies`, управление гостевыми сессиями (`VisitorSession`) и `RBAC`.
-   - `knowledge/` (`dto/knowledge.dto.ts`, `knowledge.controller.ts`, `knowledge.service.ts`, `knowledge.module.ts`): Управление метриками статей Базы Знаний (`GET /api/knowledge/metrics`, `GET /api/knowledge/metrics/paginated`, `POST /api/knowledge/:slug/view`, `POST /api/knowledge/:slug/helpful`), защищенное ролями `USER` и `ADMIN`.
-   - `telemetry/` (`telemetry.controller.ts`, `telemetry.service.ts`, `telemetry.module.ts`): Проксирование событий в микросервис `apps/telemetry-ms` (`:4001`), Cursor-пагинация логов (`GET /api/telemetry/events`) и раздача реального времени клиентам через `@Sse('/api/telemetry/stream')` с чистым завершением потоков через `takeUntil(this.shutdown$)` в `onModuleDestroy()`.
+   - `knowledge/` (`dto/knowledge.dto.ts`, `knowledge.controller.ts`, `knowledge.service.ts`, `knowledge.module.ts`): Управление метриками статей Базы Знаний — публичное витринное чтение `GET /api/knowledge/metrics/paginated` (`@Public()`, Read-Only, Offset-пагинация с фильтром `category` и сортировкой `sortBy`) под глобальным `ThrottlerGuard`, и защищённые `@Roles('USER', 'ADMIN')` эндпоинты (`GET /api/knowledge/metrics`, `POST /api/knowledge/:slug/view`, `POST /api/knowledge/:slug/helpful`).
+   - `telemetry/` (`dto/telemetry.dto.ts`, `telemetry.controller.ts`, `telemetry.service.ts`, `telemetry.module.ts`): Проксирование событий в микросервис `apps/telemetry-ms` (`:4001`), проверка TCP-доступности для `GET /api/capabilities`, Cursor-пагинация логов (`GET /api/telemetry/events` с фильтром `eventType`) и раздача реального времени клиентам через `@Sse('/api/telemetry/stream')` с чистым завершением потоков через `takeUntil(this.shutdown$)` в `onModuleDestroy()`.
 
 ## 2. Сквозная валидация через `ZodValidationPipe`
 
