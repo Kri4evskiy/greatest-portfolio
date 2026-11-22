@@ -7,6 +7,7 @@ import {
   type TelemetryEvent,
   TelemetryEventSchema,
   type TelemetryEventType,
+  type TelemetryStatsResponse,
   type VisitorRoleType,
 } from '@repo/shared-schemas'
 import { firstValueFrom, interval, map, merge, Observable, of, Subject, takeUntil, timeout } from 'rxjs'
@@ -78,11 +79,7 @@ export class TelemetryService implements OnModuleDestroy {
     return stats.microserviceConnected
   }
 
-  async getMicroserviceStats(): Promise<{
-    totalEventsProcessed: number
-    recentEvents: TelemetryEvent[]
-    microserviceConnected: boolean
-  }> {
+  async getMicroserviceStats(): Promise<TelemetryStatsResponse> {
     try {
       const response = await firstValueFrom(
         this.telemetryClient

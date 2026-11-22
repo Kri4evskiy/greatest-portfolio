@@ -47,7 +47,7 @@
 - **Где применяется (Where):** В `apps/web`.
 - **Как реализовано (How):**
   - **В Zustand:** состояние сайдбара базы знаний, активная палитра (`default` / `graphite` / `sepia`), настройки интерактивных графиков `D3.js`, модалки авторизации и поиска (`use-ui-store.ts`: приватный стор с раздельными `actions`, явные `use*` атомарные хуки + `useUIActions()` для совместимости с `React 19 Compiler`), при этом `ThemeProvider` вызывает `uiStore.getState().actions.syncPaletteFromStorage()` императивно на mount/storage-событии без лишней подписки `useSyncExternalStore` на корневом провайдере.
-  - **В TanStack Query:** хуки `useArticleMeta()`, `useVisitorProfile()`, мутации лайков/закладок с `onMutate` (Optimistic UI).
+  - **В TanStack Query:** хуки `useKnowledgeMetrics()`, `usePaginatedKnowledgeMetrics()`, `useSystemCapabilities()`, `usePaginatedTelemetryEvents()`, `useVisitorProfile()` и мутации с `onMutate` (Optimistic UI), работающие поверх zero-dep типизированного `apiClient` (`apps/web/src/shared/lib/api-client.ts`: нативный `fetch` + `ApiRouteTarget` + `AbortSignal` + таймаут + рантайм-валидация `Zod` без `axios`).
 
 ---
 
@@ -82,7 +82,7 @@
 - **Почему выбрали (Why):**
   - `TanStack Table`: Headless-утилита (0 стилей, 100% контроль верстки через наш Tailwind), которая берет на себя сложную математику сортировки, мульти-фильтрации и пагинации.
   - `React 19 Compiler` (`babel-plugin-react-compiler`): Автоматическая компиляторная мемоизация компонентов и хуков на этапе сборки (`reactCompiler: true`) в связке с `optimizePackageImports` и RSC-островами.
-- **Где применяется (Where):** `TanStack Table` — в интерактивной матрице навыков (**Tech Radar**) на странице CV. `React 19 Compiler` + `@next/bundle-analyzer` — в `apps/web/next.config.ts`.
+- **Где применяется (Where):** `TanStack Table` (с границей `'use no memo'` под React 19 Compiler) — в интерактивной матрице навыков (**Tech Radar**) на странице CV и в инспекторе **System Observability** (`/system-status` — `ObservabilityDataTable`). `React 19 Compiler` + `@next/bundle-analyzer` — в `apps/web/next.config.ts`.
 - **Как реализовано (How):** `reactCompiler: true` активирован в `next.config.ts`, а замеры диеты клиентского бандла и RSC-островов оформлены как инженерный кейс внутри самой Базы знаний.
 
 ---

@@ -14,7 +14,8 @@ export const LOCALE_METADATA: Record<
     code: SupportedLocale
     shortLabel: string
     nativeName: string
-    bcp47Tag: string
+    /** Standard IETF locale tag (BCP 47) consumed by `Intl.DateTimeFormat` / `Intl.NumberFormat`. */
+    intlLocale: string
     ogLocale: string
     urlPrefix: string
   }
@@ -23,7 +24,7 @@ export const LOCALE_METADATA: Record<
     code: 'en',
     shortLabel: 'EN',
     nativeName: 'English',
-    bcp47Tag: 'en-US',
+    intlLocale: 'en-US',
     ogLocale: 'en_US',
     urlPrefix: '',
   },
@@ -31,7 +32,7 @@ export const LOCALE_METADATA: Record<
     code: 'uk',
     shortLabel: 'UA',
     nativeName: 'Українська',
-    bcp47Tag: 'uk-UA',
+    intlLocale: 'uk-UA',
     ogLocale: 'uk_UA',
     urlPrefix: '/ua',
   },
@@ -39,7 +40,7 @@ export const LOCALE_METADATA: Record<
     code: 'ru',
     shortLabel: 'RU',
     nativeName: 'Русский',
-    bcp47Tag: 'ru-RU',
+    intlLocale: 'ru-RU',
     ogLocale: 'ru_RU',
     urlPrefix: '/ru',
   },

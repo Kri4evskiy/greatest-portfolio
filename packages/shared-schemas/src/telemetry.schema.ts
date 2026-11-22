@@ -38,3 +38,10 @@ export type SystemEventsQuery = z.infer<typeof SystemEventsQuerySchema>
 
 export const PaginatedSystemEventsResponseSchema = createCursorPaginatedResponseSchema(SystemEventLogItemSchema)
 export type PaginatedSystemEventsResponse = z.infer<typeof PaginatedSystemEventsResponseSchema>
+
+export const TelemetryStatsResponseSchema = z.object({
+  totalEventsProcessed: z.number().int().nonnegative(),
+  recentEvents: z.array(TelemetryEventSchema),
+  microserviceConnected: z.boolean(),
+})
+export type TelemetryStatsResponse = z.infer<typeof TelemetryStatsResponseSchema>

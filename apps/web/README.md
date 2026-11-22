@@ -61,7 +61,7 @@ apps/web/
     └── shared/                           # [Слой 5: Infrastructure & Common Tools]
         ├── hooks/                        # Чистые браузерные DOM/ScrollSpy-хуки (use-section-navigation.ts)
         ├── i18n/                         # routing.ts, request.ts (next/root-params), navigation.ts
-        ├── lib/                          # edge-jwt.ts (Web Crypto HS256), seo.ts (canonical/hreflang), palette.ts (Zero-FOUC), analytics.ts
+        ├── lib/                          # api-client.ts (typed fetch + AbortSignal + Zod), edge-jwt.ts (Web Crypto HS256), seo.ts (canonical/hreflang), palette.ts (Zero-FOUC), analytics.ts
         ├── providers/                    # ThemeProvider (next-themes), QueryProvider (TanStack + IndexedDB)
         └── store/                        # useUIStore (Zustand — модалки, фильтры, папки сайдбара, palette)
 ```
@@ -96,7 +96,8 @@ apps/web/
        Live SSE (use-telemetry-stream.ts) переподключается на pageshow/pagehide для сохранения bfcache
   │
   ▼ 4. Client State & Offline Cache
-       TanStack Query v5 + IndexedDB Persister (idb-keyval, 24h TTL) хранит ответы API (/api/auth/me, /api/knowledge/metrics)
+       Typed apiClient (shared/lib/api-client.ts) над нативным fetch + AbortSignal + Zod-валидация и API_ENDPOINTS
+       TanStack Query v5 + IndexedDB Persister (idb-keyval, 24h TTL) кэширует ответы API (/api/auth/me, /api/capabilities, /api/knowledge/metrics*, /api/telemetry/*)
        Zustand (useUIStore) хранит только локальное UI-состояние (модалки, фильтры Tech Radar, папки сайдбара в sessionStorage)
 ```
 

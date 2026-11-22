@@ -3,6 +3,7 @@
 import { API_ENDPOINTS, type GuestPassFormInput, type SessionProfile, SessionProfileSchema } from '@repo/shared-schemas'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect } from 'react'
+import { apiClient } from '@/shared/lib/api-client'
 import { broadcastAuthSessionChange, subscribeAuthSessionChange } from '../lib/auth-cross-tab-sync'
 
 export const VISITOR_PROFILE_QUERY_KEY = ['auth', 'me'] as const
@@ -15,19 +16,13 @@ const FALLBACK_GUEST_PROFILE: SessionProfile = {
   expiresAt: null,
 }
 
-async function fetchVisitorProfile(): Promise<SessionProfile> {
+async function fetchVisitorProfile(signal?: AbortSignal): Promise<SessionProfile> {
   try {
-    const res = await fetch(API_ENDPOINTS.authMe, {
-      method: 'GET',
-      credentials: 'include',
-    })
-    if (!res.ok) {
-      return FALLBACK_GUEST_PROFILE
+    return await apiClient.get(API_ENDPOINTS.authMe, SessionProfileSchema, { signal })
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw error
     }
-    const data: unknown = await res.json()
-    const parsed = SessionProfileSchema.safeParse(data)
-    return parsed.success ? parsed.data : FALLBACK_GUEST_PROFILE
-  } catch {
     return FALLBACK_GUEST_PROFILE
   }
 }
@@ -44,7 +39,7 @@ export function useVisitorProfile() {
 
   return useQuery({
     queryKey: VISITOR_PROFILE_QUERY_KEY,
-    queryFn: fetchVisitorProfile,
+    queryFn: ({ signal }) => fetchVisitorProfile(signal),
     staleTime: 1000 * 60 * 10,
   })
 }
@@ -53,24 +48,8 @@ export function useIssueGuestPassMutation() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (input: GuestPassFormInput): Promise<SessionProfile> => {
-      const res = await fetch(API_ENDPOINTS.authGuestPass, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify(input),
-      })
-
-      if (!res.ok) {
-        const errBody = (await res.json().catch(() => ({}))) as { message?: string }
-        throw new Error(errBody.message ?? 'Не удалось выпустить гостевой пропуск')
-      }
-
-      const data: unknown = await res.json()
-      return SessionProfileSchema.parse(data)
-    },
+    mutationFn: (input: GuestPassFormInput): Promise<SessionProfile> =>
+      apiClient.post(API_ENDPOINTS.authGuestPass, SessionProfileSchema, input),
     onSuccess: (profile) => {
       queryClient.setQueryData(VISITOR_PROFILE_QUERY_KEY, profile)
       void queryClient.invalidateQueries({ queryKey: ['knowledge'] })
@@ -84,16 +63,11 @@ export function useLogoutMutation() {
 
   return useMutation({
     mutationFn: async (): Promise<SessionProfile> => {
-      const res = await fetch(API_ENDPOINTS.authLogout, {
-        method: 'POST',
-        credentials: 'include',
-      })
-      if (!res.ok) {
+      try {
+        return await apiClient.post(API_ENDPOINTS.authLogout, SessionProfileSchema)
+      } catch {
         return FALLBACK_GUEST_PROFILE
       }
-      const data: unknown = await res.json()
-      const parsed = SessionProfileSchema.safeParse(data)
-      return parsed.success ? parsed.data : FALLBACK_GUEST_PROFILE
     },
     onSuccess: (profile) => {
       queryClient.setQueryData(VISITOR_PROFILE_QUERY_KEY, profile)

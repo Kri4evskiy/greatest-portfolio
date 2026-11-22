@@ -105,7 +105,7 @@ export function formatSystemTimestamp(iso: string, locale: SupportedLocale): str
     return iso
   }
 
-  return new Intl.DateTimeFormat(LOCALE_METADATA[locale].bcp47Tag, {
+  return new Intl.DateTimeFormat(LOCALE_METADATA[locale].intlLocale, {
     hour: '2-digit',
     minute: '2-digit',
     second: '2-digit',
