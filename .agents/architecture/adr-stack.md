@@ -47,7 +47,7 @@
 - **Где применяется (Where):** В `apps/web`.
 - **Как реализовано (How):**
   - **В Zustand:** состояние сайдбара базы знаний, активная палитра (`default` / `graphite` / `sepia`), настройки интерактивных графиков `D3.js`, модалки авторизации и поиска (`use-ui-store.ts`: приватный стор с раздельными `actions`, явные `use*` атомарные хуки + `useUIActions()` для совместимости с `React 19 Compiler`), при этом `ThemeProvider` вызывает `uiStore.getState().actions.syncPaletteFromStorage()` императивно на mount/storage-событии без лишней подписки `useSyncExternalStore` на корневом провайдере.
-  - **В TanStack Query:** хуки `useKnowledgeMetrics()`, `usePaginatedKnowledgeMetrics()`, `useSystemCapabilities()`, `usePaginatedTelemetryEvents()`, `useVisitorProfile()` и мутации с `onMutate` (Optimistic UI), работающие поверх zero-dep типизированного `apiClient` (`apps/web/src/shared/lib/api-client.ts`: нативный `fetch` + `ApiRouteTarget` + `AbortSignal` + таймаут + рантайм-валидация `Zod` без `axios`).
+  - **В TanStack Query:** хуки `useKnowledgeMetrics()`, `usePaginatedKnowledgeMetrics()`, `useSystemCapabilities()`, `usePaginatedTelemetryEvents()`, `useVisitorProfile()` и мутации с `onMutate` (Optimistic UI), работающие поверх типизированного `apiClient` (`apps/web/src/shared/lib/api-client.ts`: `Axios` с `withCredentials: true`, `interceptors`, `timeout`, `AbortSignal` + `ApiEndpointPath` + рантайм-валидация `Zod`; при этом нативный `fetch` сохранён на сервере и в статическом поиске).
 
 ---
 

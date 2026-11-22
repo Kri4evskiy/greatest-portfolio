@@ -78,4 +78,4 @@
 ### 8. Возможности системы и общие роуты (`capabilities.schema.ts`, `api-routes.ts`)
 
 - `SystemCapabilitiesSchema` (`status: 'ok'`, `mode: 'demo' | 'development' | 'production'`, `persistence: 'postgresql' | 'in-memory-fallback'`, `rateLimiter: 'redis' | 'in-memory'`, `telemetryTcpConnected: boolean`, `integrations: { redisCache, s3ObjectStorage, telegramBotAuth, sentryObservability }`, `timestamp: z.iso.datetime()`).
-- `API_ENDPOINTS`, типы `ApiEndpointPath` / `EndpointPathParams` и универсальный резолвер `resolveEndpoint(template, pathParams)` — единый реестр клиентских `/api/*` путей (включая параметризованные шаблоны вроде `/api/knowledge/:slug/view`), потребляемый типизированным `apiClient` (`apps/web/src/shared/lib/api-client.ts`).
+- `API_ENDPOINTS`, типы `ApiEndpointPath` / `EndpointPathParams` и универсальный резолвер `resolveEndpoint(template, pathParams)` — единый реестр клиентских `/api/*` путей (включая параметризованные шаблоны вроде `/api/knowledge/:slug/view`), потребляемый Axios-клиентом `apiClient` (`apps/web/src/shared/lib/api-client.ts`).

@@ -1,9 +1,8 @@
 import { type ApiEndpointPath, type EndpointPathParams, resolveEndpoint } from '@repo/shared-schemas'
+import axios, { type AxiosHeaders, type AxiosProgressEvent, type AxiosRequestConfig, type Method } from 'axios'
 import type { z } from 'zod'
 
 const DEFAULT_REQUEST_TIMEOUT_MS = 10_000
-
-export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
 
 export class ApiClientError extends Error {
   readonly status: number
@@ -22,195 +21,126 @@ export type QueryParamValue = string | number | boolean | null | undefined
 export interface ApiRequestOptions<TPath extends ApiEndpointPath> {
   pathParams?: EndpointPathParams<TPath>
   params?: Record<string, QueryParamValue>
-  headers?: HeadersInit
+  headers?: AxiosRequestConfig['headers']
   signal?: AbortSignal | undefined
   timeoutMs?: number
+  onUploadProgress?: (progressEvent: AxiosProgressEvent) => void
 }
-
-export interface ApiRequestInterceptorContext {
-  url: string
-  method: HttpMethod
-  init: RequestInit
-}
-
-export interface ApiResponseInterceptorContext {
-  url: string
-  method: HttpMethod
-  response: Response
-}
-
-export interface ApiErrorInterceptorContext {
-  url: string
-  method: HttpMethod
-  error: unknown
-}
-
-export type ApiRequestInterceptor = (context: ApiRequestInterceptorContext) => RequestInit | Promise<RequestInit>
-export type ApiResponseInterceptor = (context: ApiResponseInterceptorContext) => void | Promise<void>
-export type ApiErrorInterceptor = (context: ApiErrorInterceptorContext) => void | Promise<void>
 
 export function isCancelledRequestError(error: unknown): boolean {
+  if (axios.isCancel(error)) {
+    return true
+  }
   if (!(error instanceof Error)) {
     return false
   }
   return error.name === 'AbortError' || error.name === 'CancelledError' || error.name === 'CanceledError'
 }
 
-function buildRequestUrl<TPath extends ApiEndpointPath>(
-  endpoint: TPath,
-  pathParams?: EndpointPathParams<TPath>,
+function compactQueryParams(
   params?: Record<string, QueryParamValue>,
-): string {
-  const resolvedPath = resolveEndpoint(endpoint, pathParams)
+): Record<string, string | number | boolean> | undefined {
   if (!params) {
-    return resolvedPath
+    return undefined
   }
 
-  const searchParams = new URLSearchParams()
+  const cleaned: Record<string, string | number | boolean> = {}
   for (const [key, value] of Object.entries(params)) {
     if (value !== undefined && value !== null && value !== '') {
-      searchParams.set(key, String(value))
+      cleaned[key] = value
     }
   }
-
-  const serialized = searchParams.toString()
-  return serialized ? `${resolvedPath}?${serialized}` : resolvedPath
+  return cleaned
 }
 
-/**
- * Composes TanStack Query's cancellation signal with a bounded safety timeout,
- * supporting all browsers in our `browserslist` (`Chrome >= 111`, `Safari >= 16.4`).
- */
-function createRequestSignal(
-  externalSignal: AbortSignal | undefined,
-  timeoutMs: number,
-): { signal: AbortSignal; cleanup: () => void } {
-  const controller = new AbortController()
-
-  if (externalSignal?.aborted) {
-    controller.abort(externalSignal.reason)
-    return { signal: controller.signal, cleanup: () => undefined }
-  }
-
-  const onExternalAbort = () => {
-    controller.abort(externalSignal?.reason)
-  }
-
-  externalSignal?.addEventListener('abort', onExternalAbort, { once: true })
-
-  const timerId = setTimeout(() => {
-    controller.abort(new DOMException(`Request timed out after ${timeoutMs}ms`, 'TimeoutError'))
-  }, timeoutMs)
-
-  const cleanup = () => {
-    clearTimeout(timerId)
-    externalSignal?.removeEventListener('abort', onExternalAbort)
-  }
-
-  return { signal: controller.signal, cleanup }
-}
-
-async function parseErrorMessage(response: Response): Promise<string> {
-  try {
-    const body = (await response.json()) as { message?: unknown }
-    if (typeof body.message === 'string' && body.message.trim().length > 0) {
-      return body.message
+function extractNestErrorMessage(data: unknown, status: number): string {
+  if (typeof data === 'object' && data !== null && 'message' in data) {
+    const rawMessage = (data as { message?: unknown }).message
+    if (typeof rawMessage === 'string' && rawMessage.trim().length > 0) {
+      return rawMessage
     }
-    if (Array.isArray(body.message)) {
-      const joined = body.message.filter((item): item is string => typeof item === 'string').join(', ')
+    if (Array.isArray(rawMessage)) {
+      const joined = rawMessage.filter((item): item is string => typeof item === 'string').join(', ')
       if (joined.length > 0) {
         return joined
       }
     }
-  } catch {
-    // Ignore non-JSON error payloads
   }
-  return `API request failed (${response.status})`
+  return `API request failed (${status})`
 }
 
-function buildRequestInit(
-  method: HttpMethod,
-  signal: AbortSignal,
-  body?: unknown,
-  customHeaders?: HeadersInit,
-): RequestInit {
-  const headers = new Headers(customHeaders)
-  let serializedBody: BodyInit | undefined
+function extractHeaderValue(headers: unknown, headerName: string): string | undefined {
+  if (!headers || typeof headers !== 'object') {
+    return undefined
+  }
+  if (typeof (headers as AxiosHeaders).get === 'function') {
+    const value = (headers as AxiosHeaders).get(headerName)
+    return typeof value === 'string' ? value : undefined
+  }
+  const record = headers as Record<string, unknown>
+  const direct = record[headerName] ?? record[headerName.toLowerCase()]
+  return typeof direct === 'string' ? direct : undefined
+}
 
-  if (body instanceof FormData) {
-    serializedBody = body
-  } else if (body !== undefined) {
-    if (!headers.has('Content-Type')) {
-      headers.set('Content-Type', 'application/json')
+const axiosInstance = axios.create({
+  withCredentials: true,
+  timeout: DEFAULT_REQUEST_TIMEOUT_MS,
+  headers: {
+    Accept: 'application/json',
+  },
+})
+
+axiosInstance.interceptors.response.use(
+  (response) => response,
+  (error: unknown) => {
+    if (axios.isCancel(error)) {
+      return Promise.reject(error)
     }
-    serializedBody = JSON.stringify(body)
-  }
 
-  return {
-    method,
-    credentials: 'include',
-    signal,
-    headers,
-    ...(serializedBody !== undefined ? { body: serializedBody } : {}),
-  }
-}
+    if (axios.isAxiosError(error) && error.response) {
+      const status = error.response.status
+      const message = extractNestErrorMessage(error.response.data, status)
+      const requestId = extractHeaderValue(error.response.headers, 'x-request-id')
+      return Promise.reject(new ApiClientError(message, status, requestId))
+    }
 
-const requestInterceptors: ApiRequestInterceptor[] = []
-const responseInterceptors: ApiResponseInterceptor[] = []
-const errorInterceptors: ApiErrorInterceptor[] = []
+    if (axios.isAxiosError(error)) {
+      const status = error.code === 'ECONNABORTED' ? 408 : 0
+      return Promise.reject(new ApiClientError(error.message || 'Network error', status))
+    }
+
+    return Promise.reject(error)
+  },
+)
 
 async function requestAndValidate<TPath extends ApiEndpointPath, TSchema extends z.ZodType>(
-  method: HttpMethod,
+  method: Method,
   endpoint: TPath,
   schema: TSchema,
   body?: unknown,
   options: ApiRequestOptions<TPath> = {},
 ): Promise<z.infer<TSchema>> {
-  const url = buildRequestUrl(endpoint, options.pathParams, options.params)
-  const { signal, cleanup } = createRequestSignal(options.signal, options.timeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS)
+  const url = resolveEndpoint(endpoint, options.pathParams)
+  const params = compactQueryParams(options.params)
 
-  try {
-    let init = buildRequestInit(method, signal, body, options.headers)
-    for (const interceptor of requestInterceptors) {
-      init = await interceptor({ url, method, init })
-    }
+  const response = await axiosInstance.request<unknown>({
+    method,
+    url,
+    ...(params ? { params } : {}),
+    ...(body !== undefined ? { data: body } : {}),
+    ...(options.headers ? { headers: options.headers } : {}),
+    ...(options.signal ? { signal: options.signal } : {}),
+    ...(options.timeoutMs !== undefined ? { timeout: options.timeoutMs } : {}),
+    ...(options.onUploadProgress ? { onUploadProgress: options.onUploadProgress } : {}),
+  })
 
-    const response = await fetch(url, init)
-
-    for (const interceptor of responseInterceptors) {
-      await interceptor({ url, method, response })
-    }
-
-    if (!response.ok) {
-      const errorMessage = await parseErrorMessage(response)
-      const requestId = response.headers.get('x-request-id') ?? undefined
-      throw new ApiClientError(errorMessage, response.status, requestId)
-    }
-
-    if (response.status === 204 || response.headers.get('content-length') === '0') {
-      return schema.parse(undefined)
-    }
-
-    const payload: unknown = await response.json()
-    return schema.parse(payload)
-  } catch (error) {
-    if (!options.signal?.aborted && !isCancelledRequestError(error)) {
-      for (const interceptor of errorInterceptors) {
-        await interceptor({ url, method, error })
-      }
-    }
-    throw error
-  } finally {
-    cleanup()
-  }
+  const payload = response.status === 204 ? undefined : response.data
+  return schema.parse(payload)
 }
 
 export const apiClient = {
-  interceptors: {
-    request: requestInterceptors,
-    response: responseInterceptors,
-    error: errorInterceptors,
-  },
+  /** Exposes native Axios interceptors for cross-cutting concerns (e.g. Refresh Token queues). */
+  interceptors: axiosInstance.interceptors,
 
   get<TPath extends ApiEndpointPath, TSchema extends z.ZodType>(
     endpoint: TPath,

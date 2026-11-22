@@ -81,15 +81,16 @@ window.addEventListener('pageshow', (event) => {
 
 ---
 
-## 4. Enterprise-шар запитів: `apiClient`, `AbortSignal`, `QueryCache` та типізовані роути
+## 4. Enterprise-шар запитів: `apiClient` (`Axios`), `AbortSignal`, `QueryCache` та типізовані роути
 
-Замість підключення `axios` (~30 KB) та дублювання рядкових маршрутів у UI-компонентах фронтенд використовує zero-dependency типізований транспорт поверх нативного `fetch` у зв'язці з `TanStack Query v5`:
+Поки серверний шар Next.js спирається на нативний `fetch`, клієнтська взаємодія з API (`'use client'` + `TanStack Query v5`) побудована поверх перевіреного **Axios** із жорсткою `Zod`-валідацією та реєстрами маршрутів:
 
 1. **Єдині реєстри `API_ENDPOINTS` та `APP_ROUTES`:**
    - Контракти API описані в `@repo/shared-schemas` (`API_ENDPOINTS` + шаблонізатор `resolveEndpoint` для параметризованих маршрутів на кшталт `/api/knowledge/:slug/view`).
    - Маршрути сторінок Next.js, бейджі шапки та `Cmd+K` переходи централізовані в `apps/web/src/shared/i18n/app-routes.ts` (`APP_ROUTES`, `resolveHeaderRouteBadge`, `buildKnowledgeBasePath`).
-2. **Типізований `apiClient` (`apps/web/src/shared/lib/api-client.ts`):**
-   - Підтримує `get`, `post`, `put`, `patch`, `delete`, рантайм-валідацію відповідей через `Zod`, обробку `204 No Content` та `FormData`, витягування `X-Request-Id` у `ApiClientError`, композитний `AbortController` (скасування з TanStack Query + захисний таймаут `10_000ms`) і легкий пайплайн інтерсепторів (`request`, `response`, `error`).
+2. **Типізований Axios `apiClient` (`apps/web/src/shared/lib/api-client.ts`):**
+   - Інкапсулює налаштований інстанс `axios.create({ withCredentials: true, timeout: 10_000 })` (захист ланцюга постачання забезпечено через `allowBuilds` у `pnpm-workspace.yaml` та `pnpm-lock.yaml`).
+   - Підтримує `get`, `post`, `put`, `patch`, `delete`, рантайм-валідацію відповідей через `Zod`, обробку `204 No Content` та `onUploadProgress`, витягування `X-Request-Id` у `ApiClientError`, фільтрацію порожніх query-параметрів (захист від `cursor=null`), нативний `AbortSignal` та інтерсептори Axios.
 3. **3-шарові `queries/*.ts` та захист `QueryCache` у `StrictMode`:**
    - Кожен домен розділений на standalone-фетчери (`fetchSystemCapabilities(signal?)`), фабрики `queryOptions` / `infiniteQueryOptions` (`({ signal }) => ...`) та тонкі хуки `use*`.
    - Глобальний `QueryCache({ onError })` у `QueryProvider` відсікає штатні `AbortError` / `CancelledError` (включно з подвійним маунтом React 19 `StrictMode` у `dev`) та очікувані `4xx` відповіді RBAC, передаючи лише реальні мережеві/5xx збої у `captureClientException` (строго за `NODE_ENV === 'production'`, без витоків dev-помилок у Sentry).

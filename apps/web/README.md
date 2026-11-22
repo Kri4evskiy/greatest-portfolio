@@ -61,7 +61,7 @@ apps/web/
     └── shared/                           # [Слой 5: Infrastructure & Common Tools]
         ├── hooks/                        # Чистые браузерные DOM/ScrollSpy-хуки (use-section-navigation.ts)
         ├── i18n/                         # app-routes.ts (APP_ROUTES, resolveHeaderRouteBadge, buildKnowledgeBasePath), routing.ts, request.ts, navigation.ts
-        ├── lib/                          # api-client.ts (GET/POST/PUT/PATCH/DELETE + interceptors + AbortSignal + Zod), edge-jwt.ts, seo.ts, palette.ts, analytics.ts (PostHog + prod-only Sentry captureClientException)
+        ├── lib/                          # api-client.ts (Axios + interceptors + AbortSignal + Zod), edge-jwt.ts, seo.ts, palette.ts, analytics.ts (PostHog + prod-only Sentry captureClientException)
         ├── providers/                    # ThemeProvider (next-themes), QueryProvider (TanStack + IndexedDB)
         └── store/                        # useUIStore (Zustand — модалки, фильтры, папки сайдбара, palette)
 ```
@@ -96,7 +96,7 @@ apps/web/
        Live SSE (use-telemetry-stream.ts) переподключается на pageshow/pagehide для сохранения bfcache
   │
   ▼ 4. Client State & Offline Cache
-       Typed apiClient (shared/lib/api-client.ts) над нативным fetch + AbortSignal + Zod-валидация и API_ENDPOINTS
+       Typed apiClient (shared/lib/api-client.ts) на базе Axios (interceptors, X-Request-Id, timeout, AbortSignal) + Zod-валидация и API_ENDPOINTS
        3-слойные queries/*.ts (Standalone Fetcher ➔ queryOptions / infiniteQueryOptions ➔ use* Hook)
        TanStack Query v5 + IndexedDB Persister (idb-keyval, 24h TTL) кэширует ответы API (/api/auth/me, /api/capabilities, /api/knowledge/metrics*, /api/telemetry/*)
        Zustand (useUIStore) хранит только локальное UI-состояние (модалки, фильтры Tech Radar, папки сайдбара в sessionStorage)
