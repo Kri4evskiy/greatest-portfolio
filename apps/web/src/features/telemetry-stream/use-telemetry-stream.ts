@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react'
 export function useTelemetryStream() {
   const [sseConnected, setSseConnected] = useState(false)
   const [latestEvent, setLatestEvent] = useState<TelemetryEvent | null>(null)
+  const [recentEvents, setRecentEvents] = useState<TelemetryEvent[]>([])
 
   useEffect(() => {
     let source: EventSource | null = null
@@ -26,7 +27,9 @@ export function useTelemetryStream() {
             const parsedJson: unknown = JSON.parse(event.data as string)
             const validated = TelemetryEventSchema.safeParse(parsedJson)
             if (validated.success) {
-              setLatestEvent(validated.data)
+              const incoming = validated.data
+              setLatestEvent(incoming)
+              setRecentEvents((prev) => [incoming, ...prev.filter((item) => item.id !== incoming.id)].slice(0, 15))
               setSseConnected(true)
             }
           } catch {
@@ -68,5 +71,6 @@ export function useTelemetryStream() {
   return {
     sseConnected,
     latestEvent,
+    recentEvents,
   }
 }

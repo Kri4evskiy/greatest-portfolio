@@ -222,7 +222,8 @@
   },
   "Footer": {
     "contactPrompt": "Відкритий до пропозицій на позиції Senior Frontend / Fullstack",
-    "waitingPulse": "/api/telemetry/stream • Очікування пульсу..."
+    "waitingPulse": "/api/telemetry/stream • Очікування пульсу...",
+    "inspectLiveApi": "Інспектор API"
   },
   "CvPage": {
     "metaTitle": "Станіслав Кричевський — CV / Резюме (PDF та повний профіль)",
@@ -258,5 +259,96 @@
     "digestLabel": "Код помилки (Digest):",
     "retryBtn": "Спробувати знову",
     "backHomeBtn": "Повернутися на головну"
+  },
+  "SystemStatusPage": {
+    "metaTitle": "Системна телеметрія та Інспектор API — Архітектура Workfolio",
+    "metaDescription": "Жива матриця можливостей архітектури, журнал подій із Cursor-пагінацією (SSE) та рейтинг популярності Бази Знань із Offset-пагінацією.",
+    "backToWorkfolio": "На головну Workfolio CV",
+    "readOnlyBadge": "Read-Only • Ліміт 100 req/min",
+    "heroTitle": "System Observability та Інспектор Live API",
+    "heroSubtitle": "Гібридна SSG-оболонка на TanStack Query v5 (IndexedDB Offline-First), живому EventSource (SSE) та реальній Cursor/Offset пагінації до бекенду NestJS 12.",
+    "tabAll": "Усі модулі",
+    "tabCapabilities": "1. Матриця вузлів",
+    "tabEvents": "2. Журнал подій (Cursor)",
+    "tabLeaderboard": "3. Рейтинг статей (Offset)",
+    "refreshBtn": "Оновити",
+    "updatedAtLabel": "Знімок:",
+    "module1Title": "Жива матриця архітектури та Capability Gating",
+    "module1Subtitle": "Безпечні булеві прапорці рантайму без витоку секретів та внутрішніх портів. Зовнішні інтеграції без API-ключів автоматично працюють у режимі Capability-Gated Fallback.",
+    "persistencePostgres": "PostgreSQL активний",
+    "persistenceMemory": "In-Memory Fallback",
+    "statusOnline": "Онлайн",
+    "statusFallback": "In-Memory Fallback",
+    "statusCapabilityGated": "Capability Gated",
+    "capabilityGatedTooltip": "Немає API-ключа в .env — сервіс безпечно працює в автономному режимі Air-Gapped / In-Memory Fallback.",
+    "apiOfflineTitle": "Бекенд API зараз недоступний",
+    "apiOfflineHint": "Статична SSG-оболонка продовжує працювати через кеш IndexedDB. Запустіть apps/api (:4000) і натисніть «Оновити».",
+    "rateLimiterLabel": "Rate Limiter",
+    "sentryLabel": "Sentry SDK",
+    "configured": "Підключено",
+    "noApiKeyShort": "Немає ключа (No-Op)",
+    "tcpProcessedLabel": "Подій оброблено TCP-воркером",
+    "nodes": {
+      "edge-proxy": {
+        "title": "Next.js 16 Edge Proxy",
+        "desc": "Edge-перевірка JWT HS256 через Web Crypto та маршрутизація локалей next-intl."
+      },
+      "nestjs-api": {
+        "title": "NestJS 12 API",
+        "desc": "Шлюз на Native ESM із ZodValidationPipe, Helmet та глобальним @nestjs/throttler."
+      },
+      "persistence": {
+        "title": "Prisma 7 Persistence",
+        "desc": "PostgreSQL (@prisma/adapter-pg) з автоматичним переходом в In-Memory сховище."
+      },
+      "telemetry-tcp": {
+        "title": "TCP Microservice :4001",
+        "desc": "Ізольований воркер apps/telemetry-ms, що приймає події та статистику через TCP RPC."
+      },
+      "redis-cache": {
+        "title": "Redis Cache & Limiter",
+        "desc": "Розподілений Rate Limiting та Cache-Aside (відкат на In-Memory без REDIS_URL)."
+      },
+      "s3-storage": {
+        "title": "S3 / R2 Object Storage",
+        "desc": "Бакет Cloudflare R2 / MinIO для MDX та PDF-резюме (відкат на локальну ФС)."
+      },
+      "telegram-auth": {
+        "title": "Telegram Bot Auth",
+        "desc": "Підтвердження доступу через Deep Link бота (відкат на 1-Click Guest Pass)."
+      }
+    },
+    "module2Title": "Журнал подій (Cursor-пагінація + SSE)",
+    "module2Subtitle": "Запобігає зміщенню рядків під час частих записів завдяки UUID-курсору (take: limit + 1) та миттєво підсвічує нові події з SSE-стріму.",
+    "eventFilterAria": "Фільтр подій за типом",
+    "filterAllEvents": "Усі події",
+    "loadedEventsCount": "Показано: {count}",
+    "eventsFetchError": "Не вдалося завантажити події з /api/telemetry/events.",
+    "eventsEmptyState": "Системних подій поки що немає. Видайте 1-Click Guest Pass або відкрийте статтю Бази Знань, щоб побачити потік у реальному часі.",
+    "colEventType": "Тип події",
+    "colEventMessage": "Повідомлення",
+    "colEventContext": "Контекст",
+    "colEventTime": "Час",
+    "nextCursorLabel": "nextCursor (UUID)",
+    "cursorEndReached": "null (кінець стрічки)",
+    "loadOlderEventsBtn": "Load older events (Cursor)",
+    "loadingOlderEvents": "Завантаження курсора...",
+    "noOlderEventsBtn": "Більше подій немає",
+    "module3Title": "Рейтинг популярності Бази Знань (Offset-пагінація)",
+    "module3Subtitle": "Публічне Read-Only читання на useQuery + keepPreviousData без мерехтіння інтерфейсу під час перемикання сторінок.",
+    "updatingPage": "Оновлення...",
+    "sortByAria": "Сортування рейтингу",
+    "sortViews": "За переглядами",
+    "sortHelpful": "За корисністю",
+    "categoryFilterAria": "Фільтр за категорією",
+    "filterAllCategories": "Усі категорії",
+    "leaderboardFetchError": "Не вдалося завантажити рейтинг із /api/knowledge/metrics/paginated.",
+    "leaderboardEmptyState": "Немає статей у вибраній категорії.",
+    "colArticleSlug": "Слаг статті",
+    "colCategory": "Категорія",
+    "colViews": "Перегляди",
+    "colHelpful": "Корисно",
+    "prevPageBtn": "Назад",
+    "nextPageBtn": "Далі"
   }
 }

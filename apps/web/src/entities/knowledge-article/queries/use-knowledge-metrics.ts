@@ -1,10 +1,18 @@
 'use client'
 
-import { type ArticleMeta, ArticleMetaSchema, type KnowledgeCategory } from '@repo/shared-schemas'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  type ArticleMeta,
+  ArticleMetaSchema,
+  type KnowledgeCategory,
+  type KnowledgeMetricsSortBy,
+  type PaginatedArticleMetricsResponse,
+  PaginatedArticleMetricsResponseSchema,
+} from '@repo/shared-schemas'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { z } from 'zod'
 
 export const KNOWLEDGE_METRICS_QUERY_KEY = ['knowledge', 'metrics'] as const
+export const KNOWLEDGE_PAGINATED_METRICS_QUERY_KEY = ['knowledge', 'metrics', 'paginated'] as const
 
 const ArticleMetaArraySchema = z.array(ArticleMetaSchema).max(500)
 
@@ -25,6 +33,44 @@ export function useKnowledgeMetrics(enabled = true) {
     queryKey: KNOWLEDGE_METRICS_QUERY_KEY,
     queryFn: fetchKnowledgeMetrics,
     enabled,
+  })
+}
+
+export interface UsePaginatedKnowledgeMetricsParams {
+  limit: number
+  offset: number
+  category?: KnowledgeCategory | undefined
+  sortBy: KnowledgeMetricsSortBy
+}
+
+async function fetchPaginatedKnowledgeMetrics(
+  params: UsePaginatedKnowledgeMetricsParams,
+): Promise<PaginatedArticleMetricsResponse> {
+  const searchParams = new URLSearchParams({
+    limit: String(params.limit),
+    offset: String(params.offset),
+    sortBy: params.sortBy,
+  })
+  if (params.category) {
+    searchParams.set('category', params.category)
+  }
+
+  const res = await fetch(`/api/knowledge/metrics/paginated?${searchParams.toString()}`, {
+    method: 'GET',
+    credentials: 'include',
+  })
+  if (!res.ok) {
+    throw new Error(`Failed to fetch paginated metrics (${res.status})`)
+  }
+  const data: unknown = await res.json()
+  return PaginatedArticleMetricsResponseSchema.parse(data)
+}
+
+export function usePaginatedKnowledgeMetrics(params: UsePaginatedKnowledgeMetricsParams) {
+  return useQuery({
+    queryKey: [...KNOWLEDGE_PAGINATED_METRICS_QUERY_KEY, params] as const,
+    queryFn: () => fetchPaginatedKnowledgeMetrics(params),
+    placeholderData: keepPreviousData,
   })
 }
 

@@ -103,7 +103,7 @@ export async function WorkfolioFooter({ locale }: { locale: SupportedLocale }) {
             </p>
           </div>
 
-          <FooterSseStatus waitingLabel={t('waitingPulse')} />
+          <FooterSseStatus waitingLabel={t('waitingPulse')} inspectLabel={t('inspectLiveApi')} />
         </div>
       </div>
     </footer>

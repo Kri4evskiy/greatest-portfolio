@@ -222,7 +222,8 @@
   },
   "Footer": {
     "contactPrompt": "Открыт к диалогу по позициям Senior Frontend / Fullstack",
-    "waitingPulse": "/api/telemetry/stream • Waiting for pulse..."
+    "waitingPulse": "/api/telemetry/stream • Waiting for pulse...",
+    "inspectLiveApi": "Инспектор API"
   },
   "CvPage": {
     "metaTitle": "Станислав Кричевский — CV / Резюме (PDF и полный профиль)",
@@ -258,5 +259,96 @@
     "digestLabel": "Код ошибки (Digest):",
     "retryBtn": "Попробовать снова",
     "backHomeBtn": "Вернуться на главную"
+  },
+  "SystemStatusPage": {
+    "metaTitle": "Системная телеметрия и Инспектор API — Архитектура Workfolio",
+    "metaDescription": "Живая матрица возможностей архитектуры, журнал событий с Cursor-пагинацией (SSE) и рейтинг популярности Базы Знаний с Offset-пагинацией.",
+    "backToWorkfolio": "На главную Workfolio CV",
+    "readOnlyBadge": "Read-Only • Лимит 100 req/min",
+    "heroTitle": "System Observability и Инспектор Live API",
+    "heroSubtitle": "Гибридная SSG-оболочка на TanStack Query v5 (IndexedDB Offline-First), живом EventSource (SSE) и реальной Cursor/Offset пагинации к бэкенду NestJS 12.",
+    "tabAll": "Все модули",
+    "tabCapabilities": "1. Матрица узлов",
+    "tabEvents": "2. Журнал событий (Cursor)",
+    "tabLeaderboard": "3. Рейтинг статей (Offset)",
+    "refreshBtn": "Обновить",
+    "updatedAtLabel": "Снимок:",
+    "module1Title": "Живая матрица архитектуры и Capability Gating",
+    "module1Subtitle": "Безопасные булевы флаги рантайма без утечки секретов и внутренних портов. Внешние интеграции без API-ключей автоматически работают в режиме Capability-Gated Fallback.",
+    "persistencePostgres": "PostgreSQL активен",
+    "persistenceMemory": "In-Memory Fallback",
+    "statusOnline": "Онлайн",
+    "statusFallback": "In-Memory Fallback",
+    "statusCapabilityGated": "Capability Gated",
+    "capabilityGatedTooltip": "Нет API-ключа в .env — сервис безопасно работает в автономном режиме Air-Gapped / In-Memory Fallback.",
+    "apiOfflineTitle": "Бэкенд API сейчас недоступен",
+    "apiOfflineHint": "Статическая SSG-оболочка продолжает работать через кэш IndexedDB. Запустите apps/api (:4000) и нажмите «Обновить».",
+    "rateLimiterLabel": "Rate Limiter",
+    "sentryLabel": "Sentry SDK",
+    "configured": "Подключён",
+    "noApiKeyShort": "Нет ключа (No-Op)",
+    "tcpProcessedLabel": "Событий обработано TCP-воркером",
+    "nodes": {
+      "edge-proxy": {
+        "title": "Next.js 16 Edge Proxy",
+        "desc": "Edge-проверка JWT HS256 через Web Crypto и маршрутизация локалей next-intl."
+      },
+      "nestjs-api": {
+        "title": "NestJS 12 API",
+        "desc": "Шлюз на Native ESM с ZodValidationPipe, Helmet и глобальным @nestjs/throttler."
+      },
+      "persistence": {
+        "title": "Prisma 7 Persistence",
+        "desc": "PostgreSQL (@prisma/adapter-pg) с автоматическим переходом в In-Memory хранилище."
+      },
+      "telemetry-tcp": {
+        "title": "TCP Microservice :4001",
+        "desc": "Изолированный воркер apps/telemetry-ms, принимающий события и статистику по TCP RPC."
+      },
+      "redis-cache": {
+        "title": "Redis Cache & Limiter",
+        "desc": "Распределённый Rate Limiting и Cache-Aside (откат на In-Memory без REDIS_URL)."
+      },
+      "s3-storage": {
+        "title": "S3 / R2 Object Storage",
+        "desc": "Бакет Cloudflare R2 / MinIO для MDX и PDF-резюме (откат на локальную ФС)."
+      },
+      "telegram-auth": {
+        "title": "Telegram Bot Auth",
+        "desc": "Подтверждение доступа через Deep Link бота (откат на 1-Click Guest Pass)."
+      }
+    },
+    "module2Title": "Журнал событий (Cursor-пагинация + SSE)",
+    "module2Subtitle": "Исключает смещение строк при частых записях за счёт UUID-курсора (take: limit + 1) и мгновенно подсвечивает новые события из SSE-стрима.",
+    "eventFilterAria": "Фильтр событий по типу",
+    "filterAllEvents": "Все события",
+    "loadedEventsCount": "Показано: {count}",
+    "eventsFetchError": "Не удалось загрузить события из /api/telemetry/events.",
+    "eventsEmptyState": "Системных событий пока нет. Выдайте 1-Click Guest Pass или откройте статью Базы Знаний, чтобы увидеть поток в реальном времени.",
+    "colEventType": "Тип события",
+    "colEventMessage": "Сообщение",
+    "colEventContext": "Контекст",
+    "colEventTime": "Время",
+    "nextCursorLabel": "nextCursor (UUID)",
+    "cursorEndReached": "null (конец ленты)",
+    "loadOlderEventsBtn": "Load older events (Cursor)",
+    "loadingOlderEvents": "Загрузка курсора...",
+    "noOlderEventsBtn": "Больше событий нет",
+    "module3Title": "Рейтинг популярности Базы Знаний (Offset-пагинация)",
+    "module3Subtitle": "Публичное Read-Only чтение на useQuery + keepPreviousData без мигания интерфейса при переключении страниц.",
+    "updatingPage": "Обновление...",
+    "sortByAria": "Сортировка рейтинга",
+    "sortViews": "По просмотрам",
+    "sortHelpful": "По полезности",
+    "categoryFilterAria": "Фильтр по категории",
+    "filterAllCategories": "Все категории",
+    "leaderboardFetchError": "Не удалось загрузить рейтинг из /api/knowledge/metrics/paginated.",
+    "leaderboardEmptyState": "Нет статей в выбранной категории.",
+    "colArticleSlug": "Слаг статьи",
+    "colCategory": "Категория",
+    "colViews": "Просмотры",
+    "colHelpful": "Полезно",
+    "prevPageBtn": "Назад",
+    "nextPageBtn": "Вперёд"
   }
 }

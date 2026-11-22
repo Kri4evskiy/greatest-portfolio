@@ -47,6 +47,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.9,
       lastModified: FALLBACK_LAST_MODIFIED,
     },
+    {
+      pathname: '/system-status',
+      changeFrequency: 'weekly',
+      priority: 0.85,
+      lastModified: FALLBACK_LAST_MODIFIED,
+    },
   ]
 
   const kbSlugArrays = getAllStaticKnowledgeSlugArrays()

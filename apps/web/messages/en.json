@@ -222,7 +222,8 @@
   },
   "Footer": {
     "contactPrompt": "Available for Senior Frontend / Fullstack conversations",
-    "waitingPulse": "/api/telemetry/stream • Waiting for pulse..."
+    "waitingPulse": "/api/telemetry/stream • Waiting for pulse...",
+    "inspectLiveApi": "Inspect Live API"
   },
   "CvPage": {
     "metaTitle": "Stanislav Krychevskyi — CV / Resume (PDF & Full Profile)",
@@ -258,5 +259,96 @@
     "digestLabel": "Error Digest:",
     "retryBtn": "Try Again",
     "backHomeBtn": "Return to Home"
+  },
+  "SystemStatusPage": {
+    "metaTitle": "System Observability & API Inspector — Workfolio Live Architecture",
+    "metaDescription": "Live architecture capabilities matrix, Cursor-paginated telemetry event stream (SSE), and Offset-paginated Knowledge Base popularity leaderboard.",
+    "backToWorkfolio": "Back to Workfolio CV",
+    "readOnlyBadge": "Read-Only • Throttled 100 req/min",
+    "heroTitle": "System Observability & Live API Inspector",
+    "heroSubtitle": "Hybrid SSG shell powered by TanStack Query v5 (IndexedDB Offline-First), live EventSource (SSE) telemetry, and real Cursor vs Offset pagination against the NestJS 12 backend.",
+    "tabAll": "All Modules",
+    "tabCapabilities": "1. Capabilities Matrix",
+    "tabEvents": "2. Live Event Log (Cursor)",
+    "tabLeaderboard": "3. KB Leaderboard (Offset)",
+    "refreshBtn": "Refresh",
+    "updatedAtLabel": "Snapshot:",
+    "module1Title": "Live Architecture & Capabilities Matrix",
+    "module1Subtitle": "Boolean runtime capability flags without leaking secrets or internal ports. External services without API keys gracefully enter Capability-Gated fallback mode.",
+    "persistencePostgres": "PostgreSQL Active",
+    "persistenceMemory": "In-Memory Fallback",
+    "statusOnline": "Online",
+    "statusFallback": "In-Memory Fallback",
+    "statusCapabilityGated": "Capability Gated",
+    "capabilityGatedTooltip": "No API key configured in .env — running safely in Air-Gapped / In-Memory Fallback mode.",
+    "apiOfflineTitle": "Backend API is currently unreachable",
+    "apiOfflineHint": "The static SSG shell stays functional via IndexedDB cache. Start apps/api (:4000) and click Refresh.",
+    "rateLimiterLabel": "Rate Limiter",
+    "sentryLabel": "Sentry SDK",
+    "configured": "Configured",
+    "noApiKeyShort": "No API key (No-Op)",
+    "tcpProcessedLabel": "Microservice TCP events processed",
+    "nodes": {
+      "edge-proxy": {
+        "title": "Next.js 16 Edge Proxy",
+        "desc": "Zero-DB HS256 Web Crypto cookie verification and next-intl locale routing."
+      },
+      "nestjs-api": {
+        "title": "NestJS 12 API",
+        "desc": "Native ESM gateway with ZodValidationPipe, Helmet, and @nestjs/throttler."
+      },
+      "persistence": {
+        "title": "Prisma 7 Persistence",
+        "desc": "PostgreSQL (@prisma/adapter-pg) with automatic In-Memory store fallback."
+      },
+      "telemetry-tcp": {
+        "title": "TCP Microservice :4001",
+        "desc": "Isolated apps/telemetry-ms worker processing events and stats over TCP RPC."
+      },
+      "redis-cache": {
+        "title": "Redis Cache & Limiter",
+        "desc": "Distributed rate limiting and cache-aside layer (falls back to In-Memory)."
+      },
+      "s3-storage": {
+        "title": "S3 / R2 Object Storage",
+        "desc": "Cloudflare R2 / MinIO bucket for MDX bodies and PDF resumes (falls back to local FS)."
+      },
+      "telegram-auth": {
+        "title": "Telegram Bot Auth",
+        "desc": "Deep-link nonce verification via Telegram Bot API (falls back to 1-Click Guest Pass)."
+      }
+    },
+    "module2Title": "Live Event Log (Cursor Pagination + SSE)",
+    "module2Subtitle": "Prevents page drift under concurrent writes via UUID cursor (take: limit + 1) and highlights incoming Server-Sent Events in real time.",
+    "eventFilterAria": "Filter events by type",
+    "filterAllEvents": "All Events",
+    "loadedEventsCount": "Shown: {count}",
+    "eventsFetchError": "Failed to load telemetry events from /api/telemetry/events.",
+    "eventsEmptyState": "No telemetry events recorded yet. Issue a 1-Click Guest Pass or view a Knowledge Base article to emit live events.",
+    "colEventType": "Event Type",
+    "colEventMessage": "Message",
+    "colEventContext": "Context",
+    "colEventTime": "Timestamp",
+    "nextCursorLabel": "nextCursor (UUID)",
+    "cursorEndReached": "null (end of stream)",
+    "loadOlderEventsBtn": "Load older events (Cursor)",
+    "loadingOlderEvents": "Loading cursor page...",
+    "noOlderEventsBtn": "End of event log",
+    "module3Title": "Knowledge Base Popularity Leaderboard (Offset Pagination)",
+    "module3Subtitle": "Public Read-Only ranking powered by useQuery + keepPreviousData so page transitions never flash empty layouts.",
+    "updatingPage": "Refreshing...",
+    "sortByAria": "Sort leaderboard by metric",
+    "sortViews": "Most Viewed",
+    "sortHelpful": "Most Helpful",
+    "categoryFilterAria": "Filter leaderboard by category",
+    "filterAllCategories": "All Categories",
+    "leaderboardFetchError": "Failed to load article metrics from /api/knowledge/metrics/paginated.",
+    "leaderboardEmptyState": "No article metrics match the selected category filter.",
+    "colArticleSlug": "Article Slug",
+    "colCategory": "Category",
+    "colViews": "Views",
+    "colHelpful": "Helpful",
+    "prevPageBtn": "Prev",
+    "nextPageBtn": "Next"
   }
 }
