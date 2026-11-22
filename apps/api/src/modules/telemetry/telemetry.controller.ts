@@ -3,11 +3,11 @@ import { SkipThrottle } from '@nestjs/throttler'
 import type { PaginatedSystemEventsResponse } from '@repo/shared-schemas'
 import { Observable } from 'rxjs'
 import { SkipTimeout } from '../../common/decorators/skip-timeout.decorator.js'
-import { type CursorPaginationQueryDto, CursorPaginationQuerySchema } from '../../common/dto/pagination-query.dto.js'
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe.js'
+import { type SystemEventsQuery, SystemEventsQuerySchema } from './dto/telemetry.dto.js'
 import { TelemetryService } from './telemetry.service.js'
 
-const CursorPaginationQueryPipe = new ZodValidationPipe(CursorPaginationQuerySchema)
+const SystemEventsQueryPipe = new ZodValidationPipe(SystemEventsQuerySchema)
 
 @Controller('telemetry')
 export class TelemetryController {
@@ -29,9 +29,7 @@ export class TelemetryController {
   }
 
   @Get('events')
-  async getEvents(
-    @Query(CursorPaginationQueryPipe) query: CursorPaginationQueryDto,
-  ): Promise<PaginatedSystemEventsResponse> {
+  async getEvents(@Query(SystemEventsQueryPipe) query: SystemEventsQuery): Promise<PaginatedSystemEventsResponse> {
     return this.telemetryService.getSystemEvents(query)
   }
 }

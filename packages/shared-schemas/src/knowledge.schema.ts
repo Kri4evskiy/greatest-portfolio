@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import type { SupportedLocale } from './locale.schema.js'
-import { createOffsetPaginatedResponseSchema } from './pagination.schema.js'
+import { createOffsetPaginatedResponseSchema, OffsetPaginationQuerySchema } from './pagination.schema.js'
 
 export const KnowledgeCategoryEnum = z.enum([
   'this-project',
@@ -220,6 +220,15 @@ export const ArticleReactionInputSchema = z.object({
   category: KnowledgeCategoryEnum,
 })
 export type ArticleReactionInput = z.infer<typeof ArticleReactionInputSchema>
+
+export const KnowledgeMetricsSortByEnum = z.enum(['viewsCount', 'helpfulCount'])
+export type KnowledgeMetricsSortBy = z.infer<typeof KnowledgeMetricsSortByEnum>
+
+export const PaginatedArticleMetricsQuerySchema = OffsetPaginationQuerySchema.extend({
+  category: KnowledgeCategoryEnum.optional(),
+  sortBy: KnowledgeMetricsSortByEnum.default('viewsCount'),
+})
+export type PaginatedArticleMetricsQuery = z.infer<typeof PaginatedArticleMetricsQuerySchema>
 
 export const PaginatedArticleMetricsResponseSchema = createOffsetPaginatedResponseSchema(ArticleMetaSchema)
 export type PaginatedArticleMetricsResponse = z.infer<typeof PaginatedArticleMetricsResponseSchema>

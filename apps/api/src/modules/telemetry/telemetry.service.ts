@@ -3,13 +3,13 @@ import { Inject, Injectable, Logger, MessageEvent, OnModuleDestroy } from '@nest
 import { ClientProxy } from '@nestjs/microservices'
 import {
   type PaginatedSystemEventsResponse,
+  type SystemEventsQuery,
   type TelemetryEvent,
   TelemetryEventSchema,
   type TelemetryEventType,
   type VisitorRoleType,
 } from '@repo/shared-schemas'
 import { firstValueFrom, interval, map, merge, Observable, of, Subject, takeUntil, timeout } from 'rxjs'
-import type { CursorPaginationQueryDto } from '../../common/dto/pagination-query.dto.js'
 import { PrismaService } from '../../prisma/prisma.service.js'
 
 export const TELEMETRY_MS_CLIENT = 'TELEMETRY_MS_CLIENT'
@@ -69,8 +69,13 @@ export class TelemetryService implements OnModuleDestroy {
     return rawEvent
   }
 
-  async getSystemEvents(query: CursorPaginationQueryDto): Promise<PaginatedSystemEventsResponse> {
+  async getSystemEvents(query: SystemEventsQuery): Promise<PaginatedSystemEventsResponse> {
     return this.prisma.getCursorPaginatedSystemEvents(query)
+  }
+
+  async checkMicroserviceConnected(): Promise<boolean> {
+    const stats = await this.getMicroserviceStats()
+    return stats.microserviceConnected
   }
 
   async getMicroserviceStats(): Promise<{

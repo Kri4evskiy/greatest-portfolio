@@ -3,13 +3,13 @@ import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/commo
 import { PrismaPg } from '@prisma/adapter-pg'
 import {
   type ArticleMeta,
-  type CursorPaginationQuery,
   type KnowledgeCategory,
-  type OffsetPaginationQuery,
+  type PaginatedArticleMetricsQuery,
   type PaginatedArticleMetricsResponse,
   type PaginatedSystemEventsResponse,
   type Role,
   type SystemEventLogItem,
+  type SystemEventsQuery,
   TelemetryEventTypeEnum,
   type VisitorRoleType,
   VisitorRoleTypeEnum,
@@ -35,7 +35,7 @@ const MAX_MEMORY_SYSTEM_EVENTS = 200
 function buildOffsetMetricsPage(
   items: ArticleMeta[],
   total: number,
-  query: OffsetPaginationQuery,
+  query: Pick<PaginatedArticleMetricsQuery, 'limit' | 'offset'>,
 ): PaginatedArticleMetricsResponse {
   const consumed = query.offset + items.length
   const hasMore = consumed < total
@@ -208,18 +208,28 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return Array.from(this.memoryMetrics.values())
   }
 
-  async getPaginatedArticleMetrics(query: OffsetPaginationQuery): Promise<PaginatedArticleMetricsResponse> {
+  async getPaginatedArticleMetrics(query: PaginatedArticleMetricsQuery): Promise<PaginatedArticleMetricsResponse> {
+    const sortBy = query.sortBy ?? 'viewsCount'
+
     if (this.dbConnected && this.client) {
       try {
-        const [rows, total] = await Promise.all([
+        const where = query.category ? { category: query.category } : {}
+        const orderBy =
+          sortBy === 'helpfulCount'
+            ? [{ helpfulCount: 'desc' as const }, { viewsCount: 'desc' as const }, { slug: 'asc' as const }]
+            : [{ viewsCount: 'desc' as const }, { helpfulCount: 'desc' as const }, { slug: 'asc' as const }]
+
+        const [rows, total, allRowsCount] = await Promise.all([
           this.client.articleMetrics.findMany({
-            orderBy: [{ viewsCount: 'desc' }, { slug: 'asc' }],
+            where,
+            orderBy,
             take: query.limit,
             skip: query.offset,
           }),
-          this.client.articleMetrics.count(),
+          this.client.articleMetrics.count({ where }),
+          query.category ? this.client.articleMetrics.count() : Promise.resolve(1),
         ])
-        if (total > 0) {
+        if (total > 0 || (query.category && allRowsCount > 0)) {
           const items: ArticleMeta[] = rows.map((r) => ({
             slug: r.slug,
             category: r.category as KnowledgeCategory,
@@ -234,9 +244,17 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
       }
     }
 
-    const sorted = Array.from(this.memoryMetrics.values()).sort(
-      (a, b) => b.viewsCount - a.viewsCount || a.slug.localeCompare(b.slug),
-    )
+    const filtered = query.category
+      ? Array.from(this.memoryMetrics.values()).filter((item) => item.category === query.category)
+      : Array.from(this.memoryMetrics.values())
+
+    const sorted = filtered.sort((a, b) => {
+      const primaryDiff = sortBy === 'helpfulCount' ? b.helpfulCount - a.helpfulCount : b.viewsCount - a.viewsCount
+      if (primaryDiff !== 0) {
+        return primaryDiff
+      }
+      return a.slug.localeCompare(b.slug)
+    })
     const items = sorted.slice(query.offset, query.offset + query.limit)
     return buildOffsetMetricsPage(items, sorted.length, query)
   }
@@ -378,10 +396,11 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  async getCursorPaginatedSystemEvents(query: CursorPaginationQuery): Promise<PaginatedSystemEventsResponse> {
+  async getCursorPaginatedSystemEvents(query: SystemEventsQuery): Promise<PaginatedSystemEventsResponse> {
     if (this.dbConnected && this.client) {
       try {
         const rows = await this.client.systemEventLog.findMany({
+          ...(query.eventType ? { where: { eventType: query.eventType } } : {}),
           orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
           take: query.limit + 1,
           ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
@@ -403,9 +422,13 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
       }
     }
 
+    const filteredEvents = query.eventType
+      ? this.memoryEvents.filter((item) => item.type === query.eventType)
+      : this.memoryEvents
+
     let startIndex = 0
     if (query.cursor) {
-      const cursorIndex = this.memoryEvents.findIndex((item) => item.id === query.cursor)
+      const cursorIndex = filteredEvents.findIndex((item) => item.id === query.cursor)
       if (cursorIndex === -1) {
         return {
           items: [],
@@ -417,7 +440,7 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
       startIndex = cursorIndex + 1
     }
 
-    const sliced = this.memoryEvents.slice(startIndex, startIndex + query.limit + 1)
+    const sliced = filteredEvents.slice(startIndex, startIndex + query.limit + 1)
     const hasMore = sliced.length > query.limit
     const items = hasMore ? sliced.slice(0, query.limit) : sliced
     return {

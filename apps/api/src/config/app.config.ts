@@ -1,4 +1,4 @@
-import { DEFAULT_DEV_JWT_SECRET, resolveJwtSecret } from '@repo/shared-schemas'
+import { DEFAULT_DEV_JWT_SECRET, resolveJwtSecret, type SystemIntegrations } from '@repo/shared-schemas'
 import { z } from 'zod'
 
 const DEFAULT_DEV_ADMIN_PASSCODE = 'workfolio-admin-2026'
@@ -14,6 +14,12 @@ const AppEnvSchema = z.object({
   TELEMETRY_MS_HOST: z.string().trim().min(1).default('127.0.0.1'),
   TELEMETRY_MS_PORT: z.coerce.number().int().min(1).max(65535).default(4001),
   SENTRY_DSN: z.string().trim().optional(),
+  REDIS_URL: z.string().trim().optional(),
+  S3_ENDPOINT: z.string().trim().optional(),
+  S3_BUCKET: z.string().trim().optional(),
+  S3_ACCESS_KEY_ID: z.string().trim().optional(),
+  S3_SECRET_ACCESS_KEY: z.string().trim().optional(),
+  TELEGRAM_BOT_TOKEN: z.string().trim().optional(),
 })
 
 export interface AppConfig {
@@ -28,6 +34,7 @@ export interface AppConfig {
   telemetryMsHost: string
   telemetryMsPort: number
   sentryDsn: string | undefined
+  integrations: SystemIntegrations
 }
 
 /**
@@ -91,6 +98,14 @@ export function loadAppConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     telemetryMsHost: data.TELEMETRY_MS_HOST,
     telemetryMsPort: data.TELEMETRY_MS_PORT,
     sentryDsn: data.SENTRY_DSN || undefined,
+    integrations: {
+      redisCache: Boolean(data.REDIS_URL),
+      s3ObjectStorage: Boolean(
+        data.S3_ENDPOINT && data.S3_BUCKET && data.S3_ACCESS_KEY_ID && data.S3_SECRET_ACCESS_KEY,
+      ),
+      telegramBotAuth: Boolean(data.TELEGRAM_BOT_TOKEN),
+      sentryObservability: Boolean(data.SENTRY_DSN),
+    },
   }
 }
 

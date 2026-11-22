@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { createCursorPaginatedResponseSchema } from './pagination.schema.js'
+import { CursorPaginationQuerySchema, createCursorPaginatedResponseSchema } from './pagination.schema.js'
 import { VisitorRoleTypeEnum } from './roles.schema.js'
 
 export const TelemetryEventTypeEnum = z.enum([
@@ -30,6 +30,11 @@ export const SystemEventLogItemSchema = z.object({
   createdAt: z.iso.datetime(),
 })
 export type SystemEventLogItem = z.infer<typeof SystemEventLogItemSchema>
+
+export const SystemEventsQuerySchema = CursorPaginationQuerySchema.extend({
+  eventType: TelemetryEventTypeEnum.optional(),
+})
+export type SystemEventsQuery = z.infer<typeof SystemEventsQuerySchema>
 
 export const PaginatedSystemEventsResponseSchema = createCursorPaginatedResponseSchema(SystemEventLogItemSchema)
 export type PaginatedSystemEventsResponse = z.infer<typeof PaginatedSystemEventsResponseSchema>

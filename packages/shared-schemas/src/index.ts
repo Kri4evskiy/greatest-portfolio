@@ -1,4 +1,5 @@
 export * from './auth.schema.js'
+export * from './capabilities.schema.js'
 export * from './knowledge.schema.js'
 export * from './locale.schema.js'
 export * from './pagination.schema.js'

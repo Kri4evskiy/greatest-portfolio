@@ -1,7 +1,7 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Inject, Param, Post, Query, Req, UseGuards } from '@nestjs/common'
 import type { SessionProfile } from '@repo/shared-schemas'
 import type { Request } from 'express'
-import { type PaginationQueryDto, PaginationQuerySchema } from '../../common/dto/pagination-query.dto.js'
+import { Public } from '../../common/decorators/public.decorator.js'
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe.js'
 import { Roles } from '../auth/decorators/roles.decorator.js'
 import { JwtRolesGuard } from '../auth/guards/jwt-roles.guard.js'
@@ -11,13 +11,15 @@ import {
   ArticleReactionBodySchema,
   ArticleReactionInputSchema,
   type KnowledgeCategory,
+  type PaginatedArticleMetricsQuery,
+  PaginatedArticleMetricsQuerySchema,
   type PaginatedArticleMetricsResponse,
 } from './dto/knowledge.dto.js'
 import { KnowledgeService } from './knowledge.service.js'
 
 const ArticleSlugPipe = new ZodValidationPipe(ArticleReactionInputSchema.shape.slug)
 const ArticleReactionBodyPipe = new ZodValidationPipe(ArticleReactionBodySchema)
-const PaginationQueryPipe = new ZodValidationPipe(PaginationQuerySchema)
+const PaginatedMetricsQueryPipe = new ZodValidationPipe(PaginatedArticleMetricsQuerySchema)
 
 @Controller('knowledge')
 @UseGuards(JwtRolesGuard)
@@ -34,9 +36,9 @@ export class KnowledgeController {
   }
 
   @Get('metrics/paginated')
-  @Roles('USER', 'ADMIN')
+  @Public()
   async getPaginatedMetrics(
-    @Query(PaginationQueryPipe) query: PaginationQueryDto,
+    @Query(PaginatedMetricsQueryPipe) query: PaginatedArticleMetricsQuery,
   ): Promise<PaginatedArticleMetricsResponse> {
     return this.knowledgeService.getPaginatedMetrics(query)
   }
