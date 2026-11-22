@@ -23,6 +23,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { KnowledgeSearchItem } from '@/entities/knowledge-content'
 import { useVisitorProfile } from '@/features/auth/queries/use-visitor-profile'
 import { useSectionNavigation } from '@/shared/hooks/use-section-navigation'
+import { APP_ROUTES } from '@/shared/i18n/app-routes'
 import { useRouter } from '@/shared/i18n/navigation'
 import { trackEvent } from '@/shared/lib/analytics'
 import { useCommandPaletteInitialQuery, useIsCommandPaletteOpen, useUIActions } from '@/shared/store/use-ui-store'
@@ -213,15 +214,15 @@ export function CommandPaletteModal({ locale }: CommandPaletteModalProps) {
 
       if (entry.kind === 'quick-action') {
         if (entry.actionType === 'cv-home') {
-          router.push('/')
+          router.push(APP_ROUTES.home)
           return
         }
         if (entry.actionType === 'cv-pdf') {
-          router.push('/cv')
+          router.push(APP_ROUTES.cv)
           return
         }
         if (entry.actionType === 'system-status') {
-          router.push('/system-status')
+          router.push(APP_ROUTES.systemStatus)
           return
         }
         if (entry.actionType === 'tech-radar') {
@@ -234,9 +235,9 @@ export function CommandPaletteModal({ locale }: CommandPaletteModalProps) {
         }
         if (entry.actionType === 'kb-overview') {
           if (isUnlocked) {
-            router.push('/knowledge-base')
+            router.push(APP_ROUTES.knowledgeBase)
           } else {
-            openGuestPassModal('/knowledge-base')
+            openGuestPassModal(APP_ROUTES.knowledgeBase)
           }
           return
         }

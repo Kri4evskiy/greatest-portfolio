@@ -4,6 +4,7 @@ import { Database, ExternalLink, FileDown, Github, Linkedin, Mail, MapPin, Send 
 import { getTranslations } from 'next-intl/server'
 import { AUTHOR_PROFILE, pickLocalized } from '@/entities/workfolio-profile/author-profile'
 import { FooterSseStatus } from '@/features/telemetry-stream/footer-sse-status'
+import { APP_ROUTES } from '@/shared/i18n/app-routes'
 import { Link } from '@/shared/i18n/navigation'
 
 export async function WorkfolioFooter({ locale }: { locale: SupportedLocale }) {
@@ -34,7 +35,7 @@ export async function WorkfolioFooter({ locale }: { locale: SupportedLocale }) {
 
           <div className="flex flex-wrap items-center gap-2">
             <Link
-              href="/cv"
+              href={APP_ROUTES.cv}
               className="inline-flex items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/5 px-3 py-1.5 font-mono text-xs font-medium text-foreground transition-colors hover:border-primary hover:bg-primary/10"
             >
               <FileDown className="h-3.5 w-3.5 text-primary" />

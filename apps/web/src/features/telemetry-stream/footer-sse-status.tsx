@@ -2,6 +2,7 @@
 
 import { Badge, Tooltip, TooltipContent, TooltipTrigger } from '@repo/ui'
 import { Activity, ArrowUpRight, Radio, Server } from 'lucide-react'
+import { APP_ROUTES } from '@/shared/i18n/app-routes'
 import { Link } from '@/shared/i18n/navigation'
 import { useTelemetryStream } from './use-telemetry-stream'
 
@@ -15,7 +16,7 @@ export function FooterSseStatus({ waitingLabel, inspectLabel = 'Inspect Live API
 
   return (
     <Link
-      href="/system-status"
+      href={APP_ROUTES.systemStatus}
       aria-label={`${sseConnected ? 'SSE LIVE' : 'SSE STANDBY'} — ${inspectLabel}`}
       className="group flex min-w-0 flex-wrap items-center gap-2 rounded-lg border border-border/80 bg-background px-3 py-2 shadow-xs transition-colors hover:border-primary/50 hover:bg-accent/50 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring/50 sm:flex-nowrap sm:gap-3 sm:px-3.5"
     >

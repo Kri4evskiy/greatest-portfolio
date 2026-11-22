@@ -8,6 +8,7 @@ import { useLocale, useTranslations } from 'next-intl'
 import { useLogoutMutation, useVisitorProfile } from '@/features/auth/queries/use-visitor-profile'
 import { prefetchKnowledgeSearchIndex } from '@/features/search/search-index-client'
 import { useSectionNavigation } from '@/shared/hooks/use-section-navigation'
+import { APP_ROUTES, isRouteActive, resolveHeaderRouteBadge } from '@/shared/i18n/app-routes'
 import { Link, usePathname, useRouter } from '@/shared/i18n/navigation'
 import { trackEvent } from '@/shared/lib/analytics'
 import { useUIActions } from '@/shared/store/use-ui-store'
@@ -33,17 +34,17 @@ export function WorkfolioHeader() {
 
   const currentRole = profile?.role ?? 'GUEST'
   const isUnlocked = currentRole === 'USER' || currentRole === 'ADMIN'
-  const isInsideKnowledgeBase = pathname.startsWith('/knowledge-base')
-  const isOnCvPage = pathname === '/cv'
-  const isOnSystemStatusPage = pathname === '/system-status'
+  const isInsideKnowledgeBase = isRouteActive(pathname, APP_ROUTES.knowledgeBase, true)
+  const isOnCvPage = isRouteActive(pathname, APP_ROUTES.cv)
+  const headerRouteBadge = resolveHeaderRouteBadge(pathname)
 
   const handleKnowledgeBaseClick = () => {
     if (isUnlocked) {
-      router.push('/knowledge-base')
+      router.push(APP_ROUTES.knowledgeBase)
       return
     }
     trackEvent('guest_pass_modal_opened', { source: 'sticky_header_button' })
-    openGuestPassModal('/knowledge-base')
+    openGuestPassModal(APP_ROUTES.knowledgeBase)
   }
 
   return (
@@ -67,11 +68,11 @@ export function WorkfolioHeader() {
             <span className="truncate font-semibold tracking-tight text-xs sm:text-sm">Stanislav Krychevskyi</span>
           </Link>
 
-          {isInsideKnowledgeBase || isOnCvPage || isOnSystemStatusPage ? (
+          {headerRouteBadge ? (
             <>
               <span className="hidden shrink-0 font-mono text-xs text-muted-foreground lg:inline">/</span>
               <Badge variant="secondary" className="hidden shrink-0 font-mono text-xs lg:inline-flex">
-                {isInsideKnowledgeBase ? 'knowledge-base' : isOnCvPage ? 'cv.pdf' : 'system-status'}
+                {headerRouteBadge}
               </Badge>
             </>
           ) : null}
@@ -164,7 +165,7 @@ export function WorkfolioHeader() {
               variant="outline"
               size="sm"
               onClick={handleKnowledgeBaseClick}
-              onMouseEnter={() => router.prefetch('/knowledge-base')}
+              onMouseEnter={() => router.prefetch(APP_ROUTES.knowledgeBase)}
               className="group h-8 gap-1.5 border-primary/30 bg-background px-2.5 text-xs font-medium hover:border-primary hover:bg-accent sm:gap-2 sm:px-3"
             >
               <Lock className="h-3.5 w-3.5 shrink-0 text-warning transition-transform group-hover:scale-110" />

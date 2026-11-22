@@ -1,6 +1,7 @@
 import { DEFAULT_LOCALE, getTechRadarItems } from '@repo/shared-schemas'
 import { getKnowledgeTree } from '@/entities/knowledge-content'
 import { AUTHOR_PROFILE, AUTHOR_SKILL_GROUPS, COMMERCIAL_EXPERIENCE } from '@/entities/workfolio-profile/author-profile'
+import { APP_ROUTES } from '@/shared/i18n/app-routes'
 import { buildLocalizedUrl } from '@/shared/lib/seo'
 
 export const dynamic = 'force-static'
@@ -29,11 +30,12 @@ export function GET() {
     '',
     '## Primary Entry Points & Contact Channels',
     '',
-    `- [Interactive Workfolio Home (EN)](${buildLocalizedUrl('/', 'en')}): Full architecture showcase, case studies, Tech Radar (16 ADRs), and living engineering backlog.`,
-    `- [Interactive Workfolio Home (UA)](${buildLocalizedUrl('/', 'uk')}): Українська версія портфоліо та бази знань.`,
-    `- [Interactive Workfolio Home (RU)](${buildLocalizedUrl('/', 'ru')}): Русскоязычная версия портфолио и базы знаний.`,
-    `- [Full Resume / ATS CV & Downloadable PDF](${buildLocalizedUrl('/cv', 'en')}): Complete commercial timeline, hard skills matrix, and original PDF resume.`,
-    `- [Engineering Knowledge Base Hub](${buildLocalizedUrl('/knowledge-base', 'en')}): Continuously expanding multilingual (EN/UA/RU) engineering handbook and architectural reference (unlockable in 1 click via the Guest Pass RBAC demo).`,
+    `- [Interactive Workfolio Home (EN)](${buildLocalizedUrl(APP_ROUTES.home, 'en')}): Full architecture showcase, case studies, Tech Radar (16 ADRs), and living engineering backlog.`,
+    `- [Interactive Workfolio Home (UA)](${buildLocalizedUrl(APP_ROUTES.home, 'uk')}): Українська версія портфоліо та бази знань.`,
+    `- [Interactive Workfolio Home (RU)](${buildLocalizedUrl(APP_ROUTES.home, 'ru')}): Русскоязычная версия портфолио и базы знаний.`,
+    `- [Full Resume / ATS CV & Downloadable PDF](${buildLocalizedUrl(APP_ROUTES.cv, 'en')}): Complete commercial timeline, hard skills matrix, and original PDF resume.`,
+    `- [System Observability & API Inspector](${buildLocalizedUrl(APP_ROUTES.systemStatus, 'en')}): Live capabilities matrix, Cursor-paginated SSE telemetry log, and Offset-paginated Knowledge Base leaderboard.`,
+    `- [Engineering Knowledge Base Hub](${buildLocalizedUrl(APP_ROUTES.knowledgeBase, 'en')}): Continuously expanding multilingual (EN/UA/RU) engineering handbook and architectural reference (unlockable in 1 click via the Guest Pass RBAC demo).`,
     `- [GitHub Profile](${AUTHOR_PROFILE.contacts.githubUrl}) | [Monorepo Source Code](${AUTHOR_PROFILE.contacts.repoUrl})`,
     `- [LinkedIn](${AUTHOR_PROFILE.contacts.linkedinUrl}) | [Telegram](${AUTHOR_PROFILE.contacts.telegramUrl}) | Email: ${AUTHOR_PROFILE.contacts.email}`,
     '',

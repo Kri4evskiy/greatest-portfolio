@@ -15,6 +15,7 @@ import {
 import { type ReactNode, useState } from 'react'
 import { useVisitorProfile } from '@/features/auth/queries/use-visitor-profile'
 import { useSectionNavigation } from '@/shared/hooks/use-section-navigation'
+import { APP_ROUTES } from '@/shared/i18n/app-routes'
 import { Link, useRouter } from '@/shared/i18n/navigation'
 import { trackEvent } from '@/shared/lib/analytics'
 import { useUIActions } from '@/shared/store/use-ui-store'
@@ -37,11 +38,11 @@ export function HeroActionRow({ ctaUnlocked, ctaLocked, ctaCvPdf, ctaTechRadar, 
 
   const handleOpenKnowledgeBase = () => {
     if (isUnlocked) {
-      router.push('/knowledge-base')
+      router.push(APP_ROUTES.knowledgeBase)
       return
     }
     trackEvent('guest_pass_modal_opened', { source: 'hero_cta' })
-    openGuestPassModal('/knowledge-base')
+    openGuestPassModal(APP_ROUTES.knowledgeBase)
   }
 
   return (

@@ -75,12 +75,12 @@ export function paginatedTelemetryEventsQueryOptions(params: UsePaginatedTelemet
       fetchPaginatedTelemetryEvents(
         {
           limit,
-          cursor: pageParam,
+          cursor: pageParam ?? undefined,
           eventType: params.eventType,
         },
         signal,
       ),
-    initialPageParam: undefined as string | undefined,
+    initialPageParam: null as string | null,
     getNextPageParam: (lastPage) => (lastPage.hasMore ? (lastPage.nextCursor ?? undefined) : undefined),
     staleTime: 1000 * 15,
   })

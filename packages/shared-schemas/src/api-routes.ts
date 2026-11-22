@@ -7,6 +7,8 @@ export const API_ENDPOINTS = {
   authLogout: '/api/auth/logout',
   knowledgeMetrics: '/api/knowledge/metrics',
   knowledgeMetricsPaginated: '/api/knowledge/metrics/paginated',
+  knowledgeArticleView: '/api/knowledge/:slug/view',
+  knowledgeArticleHelpful: '/api/knowledge/:slug/helpful',
   telemetryStats: '/api/telemetry/stats',
   telemetryEvents: '/api/telemetry/events',
   telemetryStream: '/api/telemetry/stream',
@@ -14,14 +16,31 @@ export const API_ENDPOINTS = {
 
 export type ApiEndpointPath = (typeof API_ENDPOINTS)[keyof typeof API_ENDPOINTS]
 
-export type KnowledgeReactionEndpoint = `/api/knowledge/${string}/view` | `/api/knowledge/${string}/helpful`
+type ExtractParamNames<TPath extends string> = TPath extends `${string}:${infer Param}/${infer Rest}`
+  ? Param | ExtractParamNames<`/${Rest}`>
+  : TPath extends `${string}:${infer Param}`
+    ? Param
+    : never
 
-export type ApiRouteTarget = ApiEndpointPath | KnowledgeReactionEndpoint
+export type EndpointPathParams<TPath extends ApiEndpointPath> = [ExtractParamNames<TPath>] extends [never]
+  ? undefined
+  : Record<ExtractParamNames<TPath>, string>
 
-export function buildKnowledgeViewEndpoint(slug: string): `/api/knowledge/${string}/view` {
-  return `/api/knowledge/${encodeURIComponent(slug)}/view`
-}
+/**
+ * Resolves parameterized API route templates (e.g. `/api/knowledge/:slug/view`)
+ * into URL-encoded concrete paths without per-endpoint helper boilerplate.
+ */
+export function resolveEndpoint<TPath extends ApiEndpointPath>(
+  template: TPath,
+  pathParams?: EndpointPathParams<TPath>,
+): string {
+  if (!pathParams) {
+    return template
+  }
 
-export function buildKnowledgeHelpfulEndpoint(slug: string): `/api/knowledge/${string}/helpful` {
-  return `/api/knowledge/${encodeURIComponent(slug)}/helpful`
+  let resolved: string = template
+  for (const [key, value] of Object.entries(pathParams)) {
+    resolved = resolved.replace(`:${key}`, encodeURIComponent(String(value)))
+  }
+  return resolved
 }

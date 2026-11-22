@@ -11,6 +11,7 @@ import {
   getKnowledgeTree,
   type MdxArticleFrontmatter,
 } from '@/entities/knowledge-content'
+import { APP_ROUTES } from '@/shared/i18n/app-routes'
 import { buildLocalizedUrl, buildPageAlternates, resolveOgLocale } from '@/shared/lib/seo'
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
@@ -24,11 +25,11 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
   return {
     title,
     description,
-    alternates: buildPageAlternates('/knowledge-base', resolvedLocale),
+    alternates: buildPageAlternates(APP_ROUTES.knowledgeBase, resolvedLocale),
     openGraph: {
       title,
       description,
-      url: buildLocalizedUrl('/knowledge-base', resolvedLocale),
+      url: buildLocalizedUrl(APP_ROUTES.knowledgeBase, resolvedLocale),
       locale: resolveOgLocale(resolvedLocale),
       type: 'website',
     },

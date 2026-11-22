@@ -1,7 +1,7 @@
 'use client'
 
 import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister'
-import { IsRestoringProvider, QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { IsRestoringProvider, QueryCache, QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import {
   type Persister,
   persistQueryClientRestore,
@@ -9,6 +9,7 @@ import {
 } from '@tanstack/react-query-persist-client'
 import { del, get, set } from 'idb-keyval'
 import { type ReactNode, useEffect, useState } from 'react'
+import { ApiClientError } from '@/shared/lib/api-client'
 
 const CACHE_KEY = 'greatest-portfolio-query-cache'
 const CACHE_BUSTER = 'v1'
@@ -19,13 +20,43 @@ let browserPersister: Persister | undefined
 let browserRestorePromise: Promise<void> | null = null
 let hasRestoredBrowserCache = false
 
+function isCancelledQueryError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false
+  }
+  return error.name === 'AbortError' || error.name === 'CancelledError' || error.name === 'CanceledError'
+}
+
 function makeQueryClient(): QueryClient {
   return new QueryClient({
+    queryCache: new QueryCache({
+      onError: (error, query) => {
+        // Ignore standard AbortError / TanStack Query unmount cancellations (e.g. React 19 StrictMode)
+        if (isCancelledQueryError(error)) {
+          return
+        }
+        if (query.state.status === 'pending' && query.state.fetchStatus === 'idle') {
+          return
+        }
+        // Ignore expected 4xx RBAC / validation responses; surface real network or 5xx failures
+        if (error instanceof ApiClientError && error.status >= 400 && error.status < 500) {
+          return
+        }
+        if (process.env.NODE_ENV === 'development') {
+          console.error('[QueryCache Error]:', query.queryKey, error)
+        }
+      },
+    }),
     defaultOptions: {
       queries: {
         gcTime: TWENTY_FOUR_HOURS_MS,
         staleTime: 1000 * 60 * 5,
-        retry: 1,
+        retry: (failureCount, error) => {
+          if (error instanceof ApiClientError && error.status >= 400 && error.status < 500) {
+            return false
+          }
+          return failureCount < 1
+        },
         refetchOnWindowFocus: false,
       },
     },

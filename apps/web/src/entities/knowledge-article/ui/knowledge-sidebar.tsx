@@ -19,6 +19,7 @@ import { useLocale, useTranslations } from 'next-intl'
 import { useEffect, useMemo, useState } from 'react'
 import type { KnowledgeTreeFolderNode, KnowledgeTreeNode } from '@/entities/knowledge-content'
 import { prefetchKnowledgeSearchIndex } from '@/features/search/search-index-client'
+import { APP_ROUTES, isRouteActive } from '@/shared/i18n/app-routes'
 import { Link, usePathname } from '@/shared/i18n/navigation'
 import { useExpandedKbFolders, useUIActions } from '@/shared/store/use-ui-store'
 
@@ -214,8 +215,9 @@ export function KnowledgeSidebar({
 
   // Automatically expand only the active ancestor chain when opening a Topic, Subtopic, or Article
   useEffect(() => {
-    if (!pathname.startsWith('/knowledge-base/')) return
-    const rel = pathname.slice('/knowledge-base/'.length)
+    const kbPrefix = `${APP_ROUTES.knowledgeBase}/`
+    if (!pathname.startsWith(kbPrefix)) return
+    const rel = pathname.slice(kbPrefix.length)
     const segments = rel.split('/').filter(Boolean)
     if (segments.length === 0) return
 
@@ -279,12 +281,14 @@ export function KnowledgeSidebar({
 
         <div className="flex items-center gap-1 border-b border-border/60 pb-2.5">
           <Link
-            href="/knowledge-base"
+            href={APP_ROUTES.knowledgeBase}
             onClick={() => {
               if (closeOnSelect) setIsMobileOpen(false)
             }}
             className={`flex min-w-0 flex-1 items-center justify-between rounded-md px-2.5 py-1.5 text-xs font-semibold transition-colors ${
-              pathname === '/knowledge-base' ? 'bg-primary text-primary-foreground' : 'text-foreground hover:bg-muted'
+              isRouteActive(pathname, APP_ROUTES.knowledgeBase)
+                ? 'bg-primary text-primary-foreground'
+                : 'text-foreground hover:bg-muted'
             }`}
           >
             <span className="flex min-w-0 items-center gap-2">
@@ -293,7 +297,7 @@ export function KnowledgeSidebar({
             </span>
             <span
               className={`ml-2 shrink-0 rounded-sm px-1.5 py-0.5 font-mono text-[10px] ${
-                pathname === '/knowledge-base'
+                isRouteActive(pathname, APP_ROUTES.knowledgeBase)
                   ? 'bg-primary-foreground/20 text-primary-foreground'
                   : 'bg-muted text-muted-foreground'
               }`}

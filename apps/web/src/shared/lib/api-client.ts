@@ -1,4 +1,4 @@
-import type { ApiRouteTarget } from '@repo/shared-schemas'
+import { type ApiEndpointPath, type EndpointPathParams, resolveEndpoint } from '@repo/shared-schemas'
 import type { z } from 'zod'
 
 const DEFAULT_REQUEST_TIMEOUT_MS = 10_000
@@ -13,31 +13,39 @@ export class ApiClientError extends Error {
   }
 }
 
-export interface ApiRequestOptions {
-  params?: Record<string, string | number | boolean | undefined>
+export type QueryParamValue = string | number | boolean | null | undefined
+
+export interface ApiRequestOptions<TPath extends ApiEndpointPath> {
+  pathParams?: EndpointPathParams<TPath>
+  params?: Record<string, QueryParamValue>
   signal?: AbortSignal | undefined
   timeoutMs?: number
 }
 
-function buildRequestUrl(endpoint: ApiRouteTarget, params?: ApiRequestOptions['params']): string {
+function buildRequestUrl<TPath extends ApiEndpointPath>(
+  endpoint: TPath,
+  pathParams?: EndpointPathParams<TPath>,
+  params?: Record<string, QueryParamValue>,
+): string {
+  const resolvedPath = resolveEndpoint(endpoint, pathParams)
   if (!params) {
-    return endpoint
+    return resolvedPath
   }
 
   const searchParams = new URLSearchParams()
   for (const [key, value] of Object.entries(params)) {
-    if (value !== undefined) {
+    if (value !== undefined && value !== null && value !== '') {
       searchParams.set(key, String(value))
     }
   }
 
   const serialized = searchParams.toString()
-  return serialized ? `${endpoint}?${serialized}` : endpoint
+  return serialized ? `${resolvedPath}?${serialized}` : resolvedPath
 }
 
 /**
  * Composes TanStack Query's cancellation signal with a bounded safety timeout,
- * supporting both modern `AbortSignal.any` and older Safari 16.4+ browsers.
+ * supporting all browsers in our `browserslist` (`Chrome >= 111`, `Safari >= 16.4`).
  */
 function createRequestSignal(
   externalSignal: AbortSignal | undefined,
@@ -80,14 +88,14 @@ async function parseErrorMessage(response: Response): Promise<string> {
   return `API request failed (${response.status})`
 }
 
-async function requestAndValidate<TSchema extends z.ZodType>(
+async function requestAndValidate<TPath extends ApiEndpointPath, TSchema extends z.ZodType>(
   method: 'GET' | 'POST',
-  endpoint: ApiRouteTarget,
+  endpoint: TPath,
   schema: TSchema,
   body?: unknown,
-  options: ApiRequestOptions = {},
+  options: ApiRequestOptions<TPath> = {},
 ): Promise<z.infer<TSchema>> {
-  const url = buildRequestUrl(endpoint, options.params)
+  const url = buildRequestUrl(endpoint, options.pathParams, options.params)
   const { signal, cleanup } = createRequestSignal(options.signal, options.timeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS)
 
   try {
@@ -116,19 +124,19 @@ async function requestAndValidate<TSchema extends z.ZodType>(
 }
 
 export const apiClient = {
-  get<TSchema extends z.ZodType>(
-    endpoint: ApiRouteTarget,
+  get<TPath extends ApiEndpointPath, TSchema extends z.ZodType>(
+    endpoint: TPath,
     schema: TSchema,
-    options?: ApiRequestOptions,
+    options?: ApiRequestOptions<TPath>,
   ): Promise<z.infer<TSchema>> {
     return requestAndValidate('GET', endpoint, schema, undefined, options)
   },
 
-  post<TSchema extends z.ZodType>(
-    endpoint: ApiRouteTarget,
+  post<TPath extends ApiEndpointPath, TSchema extends z.ZodType>(
+    endpoint: TPath,
     schema: TSchema,
     body?: unknown,
-    options?: ApiRequestOptions,
+    options?: ApiRequestOptions<TPath>,
   ): Promise<z.infer<TSchema>> {
     return requestAndValidate('POST', endpoint, schema, body, options)
   },

@@ -77,7 +77,7 @@ apps/web/src/
 └── shared/                     # [Слой 5: Infrastructure & Common Tools]
     │                           # Фундамент, не знающий о специфике бизнес-фичей
     ├── hooks/                  # Браузерные DOM/ScrollSpy UI-хуки (use-section-navigation.ts)
-    ├── i18n/                   # navigation.ts, routing.ts, request.ts
+    ├── i18n/                   # app-routes.ts (APP_ROUTES, HEADER_ROUTE_BADGES), navigation.ts, routing.ts, request.ts
     ├── lib/                    # api-client.ts, edge-jwt.ts, seo.ts, analytics.ts, palette.ts
     ├── providers/              # ThemeProvider, QueryProvider
     └── store/                  # Zustand (use-ui-store: actions + атомарные use* хуки + uiStore)

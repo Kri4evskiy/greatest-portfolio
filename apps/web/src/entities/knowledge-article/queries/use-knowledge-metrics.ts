@@ -4,8 +4,6 @@ import {
   API_ENDPOINTS,
   type ArticleMeta,
   ArticleMetaSchema,
-  buildKnowledgeHelpfulEndpoint,
-  buildKnowledgeViewEndpoint,
   type KnowledgeCategory,
   type KnowledgeMetricsSortBy,
   type PaginatedArticleMetricsResponse,
@@ -52,11 +50,16 @@ export function fetchPaginatedKnowledgeMetrics(
 }
 
 export function recordArticleView({ slug, category }: ArticleReactionPayload): Promise<ArticleMeta> {
-  return apiClient.post(buildKnowledgeViewEndpoint(slug), ArticleMetaSchema, { category })
+  return apiClient.post(API_ENDPOINTS.knowledgeArticleView, ArticleMetaSchema, { category }, { pathParams: { slug } })
 }
 
 export function recordArticleHelpful({ slug, category }: ArticleReactionPayload): Promise<ArticleMeta> {
-  return apiClient.post(buildKnowledgeHelpfulEndpoint(slug), ArticleMetaSchema, { category })
+  return apiClient.post(
+    API_ENDPOINTS.knowledgeArticleHelpful,
+    ArticleMetaSchema,
+    { category },
+    { pathParams: { slug } },
+  )
 }
 
 export function knowledgeMetricsQueryOptions(enabled = true) {

@@ -2,6 +2,7 @@ import { DEFAULT_LOCALE, SUPPORTED_LOCALES, SupportedLocaleEnum } from '@repo/sh
 import type { Metadata } from 'next'
 import { getTranslations } from 'next-intl/server'
 import { SystemStatusDashboard } from '@/features/telemetry-stream/ui/system-status-dashboard'
+import { APP_ROUTES } from '@/shared/i18n/app-routes'
 import { buildLocalizedUrl, buildPageAlternates, resolveOgLocale } from '@/shared/lib/seo'
 
 export function generateStaticParams() {
@@ -19,11 +20,11 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
   return {
     title,
     description,
-    alternates: buildPageAlternates('/system-status', resolvedLocale),
+    alternates: buildPageAlternates(APP_ROUTES.systemStatus, resolvedLocale),
     openGraph: {
       title,
       description,
-      url: buildLocalizedUrl('/system-status', resolvedLocale),
+      url: buildLocalizedUrl(APP_ROUTES.systemStatus, resolvedLocale),
       locale: resolveOgLocale(resolvedLocale),
       type: 'website',
     },

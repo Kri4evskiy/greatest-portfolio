@@ -26,6 +26,7 @@ import { useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useEffect, useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
+import { normalizeKbRedirectPath } from '@/shared/i18n/app-routes'
 import { useRouter } from '@/shared/i18n/navigation'
 import { trackEvent } from '@/shared/lib/analytics'
 import { useIsGuestPassModalOpen, usePendingRedirectPath, useUIActions } from '@/shared/store/use-ui-store'
@@ -54,16 +55,6 @@ const ONE_CLICK_PRESETS: ReadonlyArray<{
 ]
 
 const VISITOR_ROLES: readonly VisitorRoleType[] = ['TEAM_LEAD', 'RECRUITER', 'DEVELOPER', 'FOUNDER', 'OTHER']
-
-function normalizeKbRedirectPath(rawPath: string | null | undefined): string {
-  const trimmed = rawPath?.trim()
-  if (!trimmed?.startsWith('/') || trimmed.startsWith('//')) {
-    return '/knowledge-base'
-  }
-
-  const withoutLocale = trimmed.replace(/^\/(en|ua|uk|ru)(?=\/|$)/, '')
-  return withoutLocale.startsWith('/knowledge-base') ? withoutLocale : '/knowledge-base'
-}
 
 export function GuestPassModal() {
   const t = useTranslations('GuestPassModal')

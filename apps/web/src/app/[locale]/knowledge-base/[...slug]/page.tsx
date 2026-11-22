@@ -28,6 +28,7 @@ import {
   type MdxArticleFrontmatter,
 } from '@/entities/knowledge-content'
 import { AUTHOR_PROFILE, pickLocalized } from '@/entities/workfolio-profile/author-profile'
+import { buildKnowledgeBasePath } from '@/shared/i18n/app-routes'
 import { Link } from '@/shared/i18n/navigation'
 import { buildLocalizedUrl, buildPageAlternates, buildTechArticleJsonLd, resolveOgLocale } from '@/shared/lib/seo'
 
@@ -52,7 +53,7 @@ export async function generateMetadata({ params }: CatchAllKnowledgePageProps): 
   const { locale, slug } = await params
   const parsed = SupportedLocaleEnum.safeParse(locale)
   const resolvedLocale = parsed.success ? parsed.data : DEFAULT_LOCALE
-  const pathname = `/knowledge-base/${slug.join('/')}`
+  const pathname = buildKnowledgeBasePath(slug.join('/'))
 
   const article = getArticleByPathSegments(slug, resolvedLocale)
   if (article) {
@@ -201,11 +202,11 @@ export default async function KnowledgeCatchAllPage({ params }: CatchAllKnowledg
   if (article) {
     const breadcrumbs = buildKnowledgeBreadcrumbs(slug, resolvedLocale, article.sidebarLabel)
     const parentSegments = slug.slice(0, -1)
-    const parentHref = parentSegments.length > 0 ? `/knowledge-base/${parentSegments.join('/')}` : '/knowledge-base'
+    const parentHref = buildKnowledgeBasePath(parentSegments.join('/'))
     const { prev, next, related } = getAdjacentAndRelatedArticles(article.routePath, resolvedLocale)
     const articleJsonLd = buildTechArticleJsonLd({
       locale: resolvedLocale,
-      pathname: `/knowledge-base/${article.routePath}`,
+      pathname: buildKnowledgeBasePath(article.routePath),
       title: article.title,
       description: article.summary,
       publishedAt: article.publishedAt,

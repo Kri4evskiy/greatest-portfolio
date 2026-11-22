@@ -60,7 +60,7 @@ apps/web/
     │
     └── shared/                           # [Слой 5: Infrastructure & Common Tools]
         ├── hooks/                        # Чистые браузерные DOM/ScrollSpy-хуки (use-section-navigation.ts)
-        ├── i18n/                         # routing.ts, request.ts (next/root-params), navigation.ts
+        ├── i18n/                         # app-routes.ts (APP_ROUTES, resolveHeaderRouteBadge, buildKnowledgeBasePath), routing.ts, request.ts, navigation.ts
         ├── lib/                          # api-client.ts (typed fetch + AbortSignal + Zod), edge-jwt.ts (Web Crypto HS256), seo.ts (canonical/hreflang), palette.ts (Zero-FOUC), analytics.ts
         ├── providers/                    # ThemeProvider (next-themes), QueryProvider (TanStack + IndexedDB)
         └── store/                        # useUIStore (Zustand — модалки, фильтры, папки сайдбара, palette)

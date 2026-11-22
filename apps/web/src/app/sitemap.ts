@@ -1,6 +1,7 @@
 import { DEFAULT_LOCALE, SUPPORTED_LOCALES } from '@repo/shared-schemas'
 import type { MetadataRoute } from 'next'
 import { getAllKnowledgeFrontmatters, getAllStaticKnowledgeSlugArrays } from '@/entities/knowledge-content'
+import { APP_ROUTES, buildKnowledgeBasePath } from '@/shared/i18n/app-routes'
 import { buildLanguageAlternatesMap, buildLocalizedUrl } from '@/shared/lib/seo'
 
 export const dynamic = 'force-static'
@@ -30,25 +31,25 @@ export default function sitemap(): MetadataRoute.Sitemap {
     lastModified: Date
   }> = [
     {
-      pathname: '/',
+      pathname: APP_ROUTES.home,
       changeFrequency: 'weekly',
       priority: 1.0,
       lastModified: FALLBACK_LAST_MODIFIED,
     },
     {
-      pathname: '/cv',
+      pathname: APP_ROUTES.cv,
       changeFrequency: 'monthly',
       priority: 0.9,
       lastModified: FALLBACK_LAST_MODIFIED,
     },
     {
-      pathname: '/knowledge-base',
+      pathname: APP_ROUTES.knowledgeBase,
       changeFrequency: 'weekly',
       priority: 0.9,
       lastModified: FALLBACK_LAST_MODIFIED,
     },
     {
-      pathname: '/system-status',
+      pathname: APP_ROUTES.systemStatus,
       changeFrequency: 'weekly',
       priority: 0.85,
       lastModified: FALLBACK_LAST_MODIFIED,
@@ -62,7 +63,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     const isArticle = articleLastMod !== undefined
 
     staticRoutes.push({
-      pathname: `/knowledge-base/${routeKey}`,
+      pathname: buildKnowledgeBasePath(routeKey),
       changeFrequency: isArticle ? 'monthly' : 'weekly',
       priority: isArticle ? 0.8 : 0.7,
       lastModified: articleLastMod ?? FALLBACK_LAST_MODIFIED,
