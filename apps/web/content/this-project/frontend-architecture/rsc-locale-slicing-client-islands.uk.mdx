@@ -89,7 +89,7 @@ window.addEventListener('pageshow', (event) => {
    - Контракти API описані в `@repo/shared-schemas` (`API_ENDPOINTS` + шаблонізатор `resolveEndpoint` для параметризованих маршрутів на кшталт `/api/knowledge/:slug/view`).
    - Маршрути сторінок Next.js, бейджі шапки та `Cmd+K` переходи централізовані в `apps/web/src/shared/i18n/app-routes.ts` (`APP_ROUTES`, `resolveHeaderRouteBadge`, `buildKnowledgeBasePath`).
 2. **Типізований Axios `apiClient` (`apps/web/src/shared/lib/api-client.ts`):**
-   - Інкапсулює налаштований інстанс `axios.create({ withCredentials: true, timeout: 10_000 })` (захист ланцюга постачання забезпечено через `allowBuilds` у `pnpm-workspace.yaml` та `pnpm-lock.yaml`).
+   - Інкапсулює налаштований інстанс `axios.create({ withCredentials: true, allowAbsoluteUrls: false, timeout: 16_000 })` (із запасом понад 15s `TimeoutInterceptor` бекенду; захист ланцюга постачання забезпечено через `allowBuilds` у `pnpm-workspace.yaml` та `pnpm-lock.yaml`).
    - Підтримує `get`, `post`, `put`, `patch`, `delete`, рантайм-валідацію відповідей через `Zod`, обробку `204 No Content` та `onUploadProgress`, витягування `X-Request-Id` у `ApiClientError`, фільтрацію порожніх query-параметрів (захист від `cursor=null`), нативний `AbortSignal` та інтерсептори Axios.
 3. **3-шарові `queries/*.ts` та захист `QueryCache` у `StrictMode`:**
    - Кожен домен розділений на standalone-фетчери (`fetchSystemCapabilities(signal?)`), фабрики `queryOptions` / `infiniteQueryOptions` (`({ signal }) => ...`) та тонкі хуки `use*`.

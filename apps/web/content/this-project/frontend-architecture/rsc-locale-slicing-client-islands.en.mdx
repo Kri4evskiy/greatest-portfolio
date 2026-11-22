@@ -89,7 +89,7 @@ While Next.js Server Components rely on native `fetch`, client-side API communic
    - API contracts live in `@repo/shared-schemas` (`API_ENDPOINTS` + template-literal `resolveEndpoint` for parameterized paths like `/api/knowledge/:slug/view`).
    - Next.js page navigation and header/sidebar matching use `APP_ROUTES` + `resolveHeaderRouteBadge` in `apps/web/src/shared/i18n/app-routes.ts`.
 2. **Typed Axios `apiClient` (`apps/web/src/shared/lib/api-client.ts`):**
-   - Wraps an isolated `axios.create({ withCredentials: true, timeout: 10_000 })` instance (with `allowBuilds` supply-chain protection in `pnpm-workspace.yaml` and `pnpm-lock.yaml`).
+   - Wraps an isolated `axios.create({ withCredentials: true, allowAbsoluteUrls: false, timeout: 16_000 })` instance (exceeding the backend's 15s `TimeoutInterceptor`, with `allowBuilds` supply-chain protection in `pnpm-workspace.yaml` and `pnpm-lock.yaml`).
    - Exposes `get`, `post`, `put`, `patch`, and `delete` with runtime `Zod` validation, `204 No Content` & `onUploadProgress` support, `X-Request-Id` Correlation ID extraction into `ApiClientError`, query param compaction (`cursor=null` guard), native `AbortSignal` support, and `axios` response interceptors.
 3. **3-Layer `queries/*.ts` + `StrictMode`-Safe `QueryCache`:**
    - Every domain splits standalone fetchers (`fetchSystemCapabilities(signal?)`) from `queryOptions` / `infiniteQueryOptions` (`({ signal }) => ...`) and thin `use*` hooks.

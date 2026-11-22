@@ -2,7 +2,8 @@ import { type ApiEndpointPath, type EndpointPathParams, resolveEndpoint } from '
 import axios, { type AxiosHeaders, type AxiosProgressEvent, type AxiosRequestConfig, type Method } from 'axios'
 import type { z } from 'zod'
 
-const DEFAULT_REQUEST_TIMEOUT_MS = 10_000
+// Exceeds backend TimeoutInterceptor (15_000ms) so Neon.tech cold-start 408 errors propagate cleanly
+const DEFAULT_REQUEST_TIMEOUT_MS = 16_000
 
 export class ApiClientError extends Error {
   readonly status: number
@@ -84,6 +85,7 @@ function extractHeaderValue(headers: unknown, headerName: string): string | unde
 
 const axiosInstance = axios.create({
   withCredentials: true,
+  allowAbsoluteUrls: false,
   timeout: DEFAULT_REQUEST_TIMEOUT_MS,
   headers: {
     Accept: 'application/json',
@@ -105,7 +107,7 @@ axiosInstance.interceptors.response.use(
     }
 
     if (axios.isAxiosError(error)) {
-      const status = error.code === 'ECONNABORTED' ? 408 : 0
+      const status = error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT' ? 408 : 0
       return Promise.reject(new ApiClientError(error.message || 'Network error', status))
     }
 
