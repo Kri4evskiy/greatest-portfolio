@@ -35,9 +35,10 @@ tldr:
 | Слой | Раннер и библиотеки | Область и путь | Что гарантирует |
 | :--- | :--- | :--- | :--- |
 | **Контракты (`Tier 1`)** | `Vitest` (Node) | `packages/shared-schemas/src/__tests__/` | `resolveEndpoint`, границы Zod-схем пагинации, целостность всех 16 локализованных ADR |
-| **Web Unit (`Tier 1`)** | `Vitest` (`node` + `jsdom`) | `apps/web/src/shared/**/__tests__/` | Таймауты и ошибки `Axios`, фильтрация ошибок `QueryClient`, `APP_ROUTES`, `useUIStore` |
+| **Web Unit (`Tier 1`)** | `Vitest` (`node` + `jsdom`) | `apps/web/src/shared/**/__tests__/` | `Axios`, Edge Web Crypto `verifyEdgeJwtHs256`, `QueryClient`, `APP_ROUTES`, `useUIStore` |
 | **Web Integration (`Tier 2`)** | `Vitest` + `RTL` + `MSW v3` | `apps/web/src/features/**/__tests__/` | Пагинация, фильтры категорий и сортировка через реальный `TanStack Query` |
-| **API Unit (`Tier 1`)** | `Vitest` + `unplugin-swc` | `apps/api/src/**/__tests__/*.spec.ts` | Production-проверки `app.config`, паритет `PrismaService` fallback, timing-safe `AuthService` |
+| **API Unit (`Tier 1`)** | `Vitest` + `unplugin-swc` | `apps/api/src/**/__tests__/*.spec.ts` | `app.config`, защита от CRLF `request-id`, `PrismaService` fallback, `AuthService` / `JwtRolesGuard` |
+| **Telemetry Unit (`Tier 1`)** | `Vitest` (Node + `@vitest/coverage-v8`) | `apps/telemetry-ms/src/__tests__/` | `TelemetryMicroserviceController`: Zod-фильтрация, буфер на 50 событий и `getStats()` |
 | **API HTTP E2E (`Tier 2`)** | `Vitest` + `Supertest` | `apps/api/test/*.e2e-spec.ts` | Полный `AppModule` (`CORS`, `CookieParser`, `ThrottlerGuard`, `ValidationPipe`, `HttpOnly` JWT) |
 | **Browser E2E (`Tier 3`)** | `Playwright` Chromium | `apps/web/e2e/{fixtures,pages,specs}/` | Edge `src/proxy.ts` JWT-верификация, разблокировка `GuestPassModal`, инспектор `/system-status` |
 

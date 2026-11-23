@@ -71,8 +71,9 @@ pnpm run lint:fix
 # Run TypeScript typecheck across all 5 workspace packages via Turborepo
 pnpm run typecheck
 
-# Run unit/integration tests across the monorepo (Vitest) and NestJS Supertest HTTP E2E
+# Run unit/integration tests, V8 code coverage, and NestJS Supertest HTTP E2E
 pnpm run test
+pnpm run test:coverage
 pnpm --filter @repo/api test:e2e
 
 # Full production build & Playwright Chromium E2E

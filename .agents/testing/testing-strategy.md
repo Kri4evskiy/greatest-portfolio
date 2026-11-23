@@ -20,19 +20,22 @@ greatest-portfolio/
 │   ├── vitest.config.ts                        # environment: 'jsdom', url: 'http://localhost:3000', coverage: v8
 │   ├── vitest.setup.ts                         # @testing-library/jest-dom/vitest + явный afterEach(cleanup)
 │   ├── playwright.config.ts                    # Dual prod webServer (api + web), fullyParallel + workers scaling
-│   ├── src/**/__tests__/*.test.ts(x)           # [Unit] Co-located рядом с тестируемым модулем (apiClient, store, routes)
+│   ├── src/**/__tests__/*.test.ts(x)           # [Unit] Co-located рядом с модулем (apiClient, edge-jwt, store, routes, QueryProvider)
 │   ├── src/**/__tests__/*.integration.test.tsx # [Integration] RTL + реальный TanStack Query + apiClient + MSW v3
 │   └── e2e/                                    # [Full-Stack E2E] Выделенная папка фронтенда (POM)
 │       ├── fixtures/app.fixture.ts             # Авто-проверка 0 console.error / 0 pageerror / 0 >=500 API
 │       ├── pages/*.page.ts                     # Page Object Models
 │       └── specs/*.spec.ts                     # Сценарии с test.step(...)
-└── apps/api/
-    ├── vitest.base.ts                          # Общая ESM/SWC-конфигурация (pool: 'forks', .js -> .ts resolver)
-    ├── vitest.config.ts                        # [Unit] src/**/*.spec.ts
-    ├── vitest.e2e.config.ts                    # [Backend E2E] test/**/*.e2e-spec.ts
-    ├── vitest.setup.ts                         # import 'reflect-metadata'
-    ├── src/**/__tests__/*.spec.ts              # [Unit] PrismaService In-Memory, loadAppConfig, AuthService/Controller
-    └── test/*.e2e-spec.ts                      # [Backend HTTP E2E] Реальный AppModule + Supertest + Pipes + Guards + Cookies
+├── apps/api/
+│   ├── vitest.base.ts                          # Общая ESM/SWC-конфигурация + coverage v8 (pool: 'forks', .js -> .ts resolver)
+│   ├── vitest.config.ts                        # [Unit] src/**/*.spec.ts
+│   ├── vitest.e2e.config.ts                    # [Backend E2E] test/**/*.e2e-spec.ts
+│   ├── vitest.setup.ts                         # import 'reflect-metadata'
+│   ├── src/**/__tests__/*.spec.ts              # [Unit] PrismaService In-Memory, loadAppConfig, request-id.util, AuthService/Controller/JwtRolesGuard
+│   └── test/*.e2e-spec.ts                      # [Backend HTTP E2E] Реальный AppModule + Supertest + Pipes + Guards + Cookies
+└── apps/telemetry-ms/
+    ├── vitest.config.ts                        # [Unit] environment: 'node', pool: 'forks' (обязателен для NestJS ESM + IDE Explorer), coverage: v8
+    └── src/__tests__/*.spec.ts                 # [Unit] TelemetryMicroserviceController (TCP @EventPattern / @MessagePattern)
 ```
 
 ### Когда какой слой использовать
@@ -109,6 +112,7 @@ greatest-portfolio/
 
 ```bash
 pnpm run test                         # Все Unit & Integration тесты через Turborepo
+pnpm run test:coverage                # V8 Coverage по воркспейсам через Turborepo (или pnpm exec vitest run --coverage из корня)
 pnpm run test:watch                   # Watch-режим (внутри конкретного воркспейса)
 pnpm --filter @repo/api test:e2e      # Backend HTTP E2E (AppModule + Supertest)
 pnpm run build && pnpm run test:e2e   # Full-Stack Playwright E2E против prod-сборок

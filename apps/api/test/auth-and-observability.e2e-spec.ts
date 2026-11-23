@@ -40,6 +40,7 @@ describe('Backend HTTP E2E (AppModule + Pipes + Guards + HttpOnly Cookies + In-M
 
   afterAll(async () => {
     await app?.close()
+    vi.unstubAllEnvs()
   })
 
   it('serves capabilities, issues HttpOnly Guest Pass, gates protected metrics, and validates pagination/cursor queries', async () => {

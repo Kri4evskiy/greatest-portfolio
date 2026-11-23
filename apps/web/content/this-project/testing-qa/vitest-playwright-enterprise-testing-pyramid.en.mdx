@@ -35,9 +35,10 @@ Rather than relying on slow UI tests for logic checks or mocking away entire fra
 | Layer | Runner & Libraries | Scope & Location | Key Guarantees |
 | :--- | :--- | :--- | :--- |
 | **Contracts (`Tier 1`)** | `Vitest` (Node) | `packages/shared-schemas/src/__tests__/` | `resolveEndpoint`, Zod defaults/bounds, integrity of 16 localized ADRs |
-| **Web Unit (`Tier 1`)** | `Vitest` (`node` + `jsdom`) | `apps/web/src/shared/**/__tests__/` | Axios timeouts/error normalization, `QueryClient` error filter, `APP_ROUTES`, `useUIStore` |
+| **Web Unit (`Tier 1`)** | `Vitest` (`node` + `jsdom`) | `apps/web/src/shared/**/__tests__/` | Axios normalization, `verifyEdgeJwtHs256`, `QueryClient` error filter, `APP_ROUTES`, `useUIStore` |
 | **Web Integration (`Tier 2`)** | `Vitest` + `RTL` + `MSW v3` | `apps/web/src/features/**/__tests__/` | Interactive pagination, category filter & sort transitions wired through real `TanStack Query` |
-| **API Unit (`Tier 1`)** | `Vitest` + `unplugin-swc` | `apps/api/src/**/__tests__/*.spec.ts` | `app.config` production guards, `PrismaService` in-memory parity, timing-safe `AuthService` |
+| **API Unit (`Tier 1`)** | `Vitest` + `unplugin-swc` | `apps/api/src/**/__tests__/*.spec.ts` | `app.config` prod guards, `request-id` CRLF sanitization, `PrismaService` fallback, `AuthService` / `JwtRolesGuard` |
+| **Telemetry Unit (`Tier 1`)** | `Vitest` (Node + `@vitest/coverage-v8`) | `apps/telemetry-ms/src/__tests__/` | `TelemetryMicroserviceController` schema validation, bounded 50-event ring, and `getStats()` |
 | **API HTTP E2E (`Tier 2`)** | `Vitest` + `Supertest` | `apps/api/test/*.e2e-spec.ts` | Full `AppModule` bootstrap (`CORS`, `CookieParser`, `ThrottlerGuard`, `ValidationPipe`, `HttpOnly` JWT) |
 | **Browser E2E (`Tier 3`)** | `Playwright` Chromium | `apps/web/e2e/{fixtures,pages,specs}/` | Edge `src/proxy.ts` JWT verification, `GuestPassModal` unlock flow, `/system-status` inspection |
 

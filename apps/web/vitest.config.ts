@@ -23,10 +23,16 @@ export default defineConfig({
     unstubGlobals: true,
     coverage: {
       provider: 'v8',
-      reporter: ['text', 'lcov'],
+      reporter: ['text', 'html', 'lcovonly'],
       reportsDirectory: './coverage',
       include: ['src/**/*.{ts,tsx}'],
-      exclude: ['src/**/*.d.ts', 'src/**/*.test.{ts,tsx}', 'src/app/**/opengraph-image.tsx'],
+      exclude: [
+        'src/**/*.d.ts',
+        'src/**/*.test.{ts,tsx}',
+        'src/app/**/opengraph-image.tsx',
+        'src/app/**/icon.tsx',
+        'src/app/**/apple-icon.tsx',
+      ],
     },
   },
 })

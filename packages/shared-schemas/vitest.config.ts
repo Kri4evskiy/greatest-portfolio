@@ -7,5 +7,12 @@ export default defineConfig({
     clearMocks: true,
     unstubEnvs: true,
     unstubGlobals: true,
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'html', 'lcovonly'],
+      reportsDirectory: './coverage',
+      include: ['src/**/*.ts'],
+      exclude: ['src/**/*.d.ts', 'src/**/__tests__/**'],
+    },
   },
 })

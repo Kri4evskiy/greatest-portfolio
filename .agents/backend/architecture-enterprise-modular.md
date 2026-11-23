@@ -28,7 +28,7 @@ apps/api/
     │   ├── interceptors/           # logging.interceptor.ts, timeout.interceptor.ts
     │   ├── middleware/             # logging.middleware.ts
     │   ├── pipes/                  # zod-validation.pipe.ts
-    │   └── utils/                  # request-id.util.ts (X-Request-Id Correlation ID + защита от Log Injection)
+    │   └── utils/                  # request-id.util.ts (X-Request-Id Correlation ID + защита от Log Injection + __tests__/request-id.util.spec.ts)
     │
     ├── config/                     # Типизированная конфигурация окружения (Zod)
     │   ├── __tests__/              # app.config.spec.ts
@@ -46,7 +46,7 @@ apps/api/
     └── modules/                    # Доменные модули (Domain Modules)
         │
         ├── auth/                   # Модуль аутентификации и сессий
-        │   ├── __tests__/          # auth.service.spec.ts, auth.controller.spec.ts
+        │   ├── __tests__/          # auth.service.spec.ts, auth.controller.spec.ts, jwt-roles.guard.spec.ts
         │   ├── guards/             # jwt-roles.guard.ts
         │   ├── decorators/         # roles.decorator.ts (@Roles)
         │   ├── dto/                # auth.dto.ts (реэкспорт из @repo/shared-schemas)

@@ -39,5 +39,5 @@
 
 ## 4. Тестирование (`Vitest` + `unplugin-swc` + `Supertest`)
 
-- Colocated unit-тесты лежат в `src/**/__tests__/*.spec.ts` (`config/__tests__/app.config.spec.ts`, `prisma/__tests__/prisma.service.spec.ts`, `modules/auth/__tests__/auth.{service,controller}.spec.ts`), а HTTP E2E-тесты полного `AppModule` через `Supertest` — в `test/auth-and-observability.e2e-spec.ts`.
+- Colocated unit-тесты лежат в `src/**/__tests__/*.spec.ts` (`common/utils/__tests__/request-id.util.spec.ts`, `config/__tests__/app.config.spec.ts`, `prisma/__tests__/prisma.service.spec.ts`, `modules/auth/__tests__/{auth.service,auth.controller,jwt-roles.guard}.spec.ts`), а HTTP E2E-тесты полного `AppModule` через `Supertest` — в `test/auth-and-observability.e2e-spec.ts`.
 - Правила компиляции ESM + `emitDecoratorMetadata` через `unplugin-swc` и `vitest.base.ts` (включая `SWC_NATIVE_BINDING_CACHE`) описаны в `.agents/testing/testing-strategy.md`.

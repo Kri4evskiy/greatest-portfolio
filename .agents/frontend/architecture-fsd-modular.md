@@ -71,7 +71,7 @@ apps/web/
     │   ├── telemetry-stream/   # FooterSseStatus, useTelemetryStream,
     │   │                       # queries/use-system-observability, lib/system-status-helpers,
     │   │                       # ui/{system-status-dashboard,capabilities-matrix-card,live-event-log-card,knowledge-leaderboard-card,observability-data-table}
-    │   │                       # + ui/__tests__/knowledge-leaderboard-card.integration.test.tsx (RTL + MSW v3)
+    │   │                       # + __tests__/knowledge-leaderboard-card.integration.test.tsx (RTL + MSW v3)
     │   └── kb-sandboxes/       # Интерактивные песочницы в статьях (Zod, JWT, SSE, Redis)
     │
     ├── entities/               # [Слой 4: Business Data Representation]
@@ -88,7 +88,7 @@ apps/web/
         │                       # Фундамент, не знающий о специфике бизнес-фичей
         ├── hooks/              # Браузерные DOM/ScrollSpy UI-хуки (use-section-navigation.ts)
         ├── i18n/               # app-routes.ts (+ __tests__/app-routes.test.ts), navigation.ts, routing.ts, request.ts
-        ├── lib/                # api-client.ts (+ __tests__/api-client.test.ts), edge-jwt.ts, seo.ts, analytics.ts, palette.ts
+        ├── lib/                # api-client.ts (+ __tests__/api-client.test.ts), edge-jwt.ts (+ __tests__/edge-jwt.test.ts), seo.ts, analytics.ts, palette.ts
         ├── providers/          # ThemeProvider, QueryProvider (+ __tests__/query-provider.test.tsx)
         └── store/              # Zustand (use-ui-store: actions + атомарные use* хуки + uiStore + __tests__/use-ui-store.test.ts)
 ```

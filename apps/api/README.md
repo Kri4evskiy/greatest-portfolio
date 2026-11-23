@@ -31,7 +31,7 @@ apps/api/
     │   ├── interceptors/           # LoggingInterceptor (debug) и TimeoutInterceptor (15s с обходом SSE)
     │   ├── middleware/             # LoggingMiddleware (Express-уровень на '{*path}')
     │   ├── pipes/                  # ZodValidationPipe (точечная валидация через схемы @repo/shared-schemas)
-    │   └── utils/                  # request-id.util.ts (генерация и защита X-Request-Id от CRLF Log Injection)
+    │   └── utils/                  # request-id.util.ts (генерация и защита X-Request-Id от CRLF Log Injection + __tests__/request-id.util.spec.ts)
     │
     ├── config/                     # Типизированная Fail-Fast конфигурация (Zod)
     │   ├── __tests__/              # app.config.spec.ts
@@ -52,7 +52,7 @@ apps/api/
     │
     └── modules/                    # Изолированные доменные модули (Domain Modules)
         ├── auth/                   # JWT в HttpOnly Cookies, Guest Pass, RBAC
-        │   ├── __tests__/          # auth.service.spec.ts, auth.controller.spec.ts
+        │   ├── __tests__/          # auth.service.spec.ts, auth.controller.spec.ts, jwt-roles.guard.spec.ts
         │   ├── decorators/         # @Roles(...)
         │   ├── dto/                # Реэкспорт схем/типов из @repo/shared-schemas
         │   ├── guards/             # JwtRolesGuard
@@ -172,6 +172,7 @@ pnpm --filter @repo/api dev
 pnpm --filter @repo/api typecheck
 pnpm --filter @repo/api lint
 pnpm --filter @repo/api test
+pnpm --filter @repo/api test:coverage
 pnpm --filter @repo/api test:e2e
 
 # Сборка (prisma generate + tsc -p tsconfig.build.json)

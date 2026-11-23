@@ -57,6 +57,13 @@ export function createApiVitestConfig(include: string[]) {
         clearMocks: true,
         unstubEnvs: true,
         unstubGlobals: true,
+        coverage: {
+          provider: 'v8' as const,
+          reporter: ['text', 'html', 'lcovonly'],
+          reportsDirectory: './coverage',
+          include: ['src/**/*.ts'],
+          exclude: ['src/**/*.d.ts', 'src/**/__tests__/**', 'src/generated/**', 'src/main.ts', 'src/migrations/**'],
+        },
       },
       plugins: [
         resolveTsExtensionPlugin(),
