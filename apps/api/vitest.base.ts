@@ -57,7 +57,6 @@ export function createApiVitestConfig(include: string[]) {
         clearMocks: true,
         unstubEnvs: true,
         unstubGlobals: true,
-        passWithNoTests: true,
       },
       plugins: [
         resolveTsExtensionPlugin(),
