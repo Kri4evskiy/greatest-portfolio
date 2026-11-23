@@ -203,6 +203,7 @@ export function LiveEventLogCard({ locale, sseConnected, recentLiveEvents }: Liv
             columns={columns}
             emptyState={t('eventsEmptyState')}
             minTableWidthClass="min-w-[620px]"
+            tableTestId="live-events-table"
             getRowId={(row) => row.id}
             getRowClassName={(row) =>
               liveIds.has(row.id)

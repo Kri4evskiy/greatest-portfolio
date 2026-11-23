@@ -107,7 +107,10 @@ export function CapabilitiesMatrixCard({ locale }: { locale: SupportedLocale }) 
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <div
+              data-testid="capabilities-nodes-grid"
+              className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+            >
               {nodes.map((node) => {
                 const Icon = NODE_ICONS[node.id]
                 const statusBadgeText =

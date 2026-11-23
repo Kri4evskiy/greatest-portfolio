@@ -119,7 +119,10 @@ export function GuestPassModal() {
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => (open ? openModal() : closeModal())}>
-      <DialogContent className="max-h-[90dvh] w-[calc(100vw-1.5rem)] overflow-y-auto p-4 sm:max-w-lg sm:p-6">
+      <DialogContent
+        data-testid="guest-pass-dialog"
+        className="max-h-[90dvh] w-[calc(100vw-1.5rem)] overflow-y-auto p-4 sm:max-w-lg sm:p-6"
+      >
         <DialogHeader>
           <div className="flex items-center gap-2">
             <Badge variant="outline" className="font-mono text-[11px]">
@@ -234,7 +237,12 @@ export function GuestPassModal() {
               <ShieldCheck className="h-3.5 w-3.5 text-success" />
               <span>Set-Cookie: HttpOnly; SameSite=Lax</span>
             </div>
-            <Button type="submit" disabled={isSubmitting || issuePassMutation.isPending} className="gap-1.5">
+            <Button
+              type="submit"
+              data-testid="guest-pass-submit-btn"
+              disabled={isSubmitting || issuePassMutation.isPending}
+              className="gap-1.5"
+            >
               <Sparkles className="h-4 w-4" />
               {issuePassMutation.isPending ? t('submittingBtn') : t('submitBtn')}
             </Button>

@@ -10,6 +10,7 @@ interface ObservabilityDataTableProps<TData> {
   getRowClassName?: (row: TData) => string
   minTableWidthClass?: string
   isDimmed?: boolean
+  tableTestId?: string
 }
 
 /**
@@ -27,6 +28,7 @@ export function ObservabilityDataTable<TData>({
   getRowClassName,
   minTableWidthClass = 'min-w-[560px]',
   isDimmed = false,
+  tableTestId,
 }: ObservabilityDataTableProps<TData>) {
   'use no memo'
 
@@ -45,7 +47,7 @@ export function ObservabilityDataTable<TData>({
         isDimmed ? 'opacity-70' : 'opacity-100'
       }`}
     >
-      <table className={`w-full ${minTableWidthClass} border-collapse text-left text-xs`}>
+      <table data-testid={tableTestId} className={`w-full ${minTableWidthClass} border-collapse text-left text-xs`}>
         <thead>
           {table.getHeaderGroups().map((headerGroup) => (
             <tr

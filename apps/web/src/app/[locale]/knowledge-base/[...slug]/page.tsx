@@ -218,7 +218,10 @@ export default async function KnowledgeCatchAllPage({ params }: CatchAllKnowledg
       <div className="flex flex-col gap-6 xl:flex-row xl:items-start">
         {/* biome-ignore lint/security/noDangerouslySetInnerHtml: Server-serialized JSON-LD escaped against < script injection */}
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: articleJsonLd }} />
-        <article className="min-w-0 flex-1 rounded-xl border border-border bg-card p-5 shadow-xs sm:p-8">
+        <article
+          data-testid="kb-article-content"
+          className="min-w-0 flex-1 rounded-xl border border-border bg-card p-5 shadow-xs sm:p-8"
+        >
           <BreadcrumbsNav rootLabel={t('breadcrumbsRoot')} items={breadcrumbs} />
 
           {article.isFallback ? (

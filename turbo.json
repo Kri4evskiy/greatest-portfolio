@@ -8,7 +8,8 @@
     "build": {
       "dependsOn": ["^build"],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
-      "outputs": [".next/**", "!.next/cache/**", "dist/**", "src/generated/**", "storybook-static/**"]
+      "outputs": [".next/**", "!.next/cache/**", "dist/**", "src/generated/**", "storybook-static/**"],
+      "passThroughEnv": ["SWC_NATIVE_BINDING_CACHE"]
     },
     "build-storybook": {
       "dependsOn": ["^build"],

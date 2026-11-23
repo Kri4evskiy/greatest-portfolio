@@ -228,6 +228,7 @@ export function KnowledgeLeaderboardCard({ locale }: { locale: SupportedLocale }
             minTableWidthClass="min-w-[560px]"
             getRowId={(row) => row.slug}
             isDimmed={metricsQuery.isPlaceholderData}
+            tableTestId="leaderboard-table"
           />
         )}
       </CardContent>
@@ -254,6 +255,7 @@ export function KnowledgeLeaderboardCard({ locale }: { locale: SupportedLocale }
           {pageNumbers.map((pageNum) => (
             <Button
               key={`page-${String(pageNum)}`}
+              data-testid={`leaderboard-page-${String(pageNum)}-btn`}
               variant={pageNum === currentPage ? 'default' : 'outline'}
               size="sm"
               disabled={metricsQuery.isFetching}
