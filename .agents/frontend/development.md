@@ -1,4 +1,4 @@
-# ⚡ Next.js App Router, Workfolio CV, MDX, D3.js и TanStack Redact (`apps/web`)
+# ⚡ Next.js App Router, Workfolio CV, MDX, D3.js и React 19 Compiler (`apps/web`)
 
 Этот документ описывает архитектуру фронтенд-приложения `apps/web`.
 

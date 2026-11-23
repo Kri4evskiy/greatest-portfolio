@@ -238,6 +238,6 @@ Setting `prepare-codegen: "true"` generates those three artifacts before `turbo 
 ### Evolution Roadmap (Zero DAG Rewrite)
 
 1. **`unit-tests` (`Vitest`):** parallel Stage 1 job (`needs: []`) with `prepare-codegen: "true"`, `fetch-depth: '0'` + `TURBO_SCM_BASE` on PRs, and `turbo run test --affected` to cover Zod schemas, `Zustand` stores, and `NestJS` services.
-2. **`e2e` (`Playwright`):** Stage 2 job (`needs: [ lint, typecheck, build ]`) caching Chromium browsers, verifying `GuestPassModal` → `HttpOnly` JWT cookie → `.mdx` unlock & `<Redact />` flows, and uploading trace artifacts on `failure()`.
+2. **`e2e` (`Playwright`):** Stage 2 job (`needs: [ lint, typecheck, build ]`) caching Chromium browsers, verifying `GuestPassModal` → `HttpOnly` JWT cookie → `.mdx` unlock & `/system-status` flows, and uploading trace artifacts on `failure()`.
 3. **Additional Hardening:** weekly `schedule:` cron for `security` + `.github/dependabot.yml` (catching CVEs between commits), `persist-credentials: false` on `actions/checkout@v6`, and `actionlint` inside `lint`.
 4. **Decoupled Continuous Deployment (CD):** separate per-service CD workflows (`apps/web` to Vercel with Remote Cache; `apps/api` and `apps/telemetry-ms` via `docker/*.Dockerfile` + `turbo prune --docker`) so editing `.mdx` notes never rebuilds backend Docker images.

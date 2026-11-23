@@ -124,7 +124,7 @@ const MCP_NODES: readonly DiagramNode[] = [
     step: '04',
     label: '16 ADRs • CV • MDX',
     sub: {
-      en: 'Redacted Public Snapshot',
+      en: 'Public Snapshot (No NDA)',
       uk: 'Публічний зріз без NDA',
       ru: 'Публичный срез без NDA',
     },
@@ -132,9 +132,9 @@ const MCP_NODES: readonly DiagramNode[] = [
     y: 120,
     badge: 'Deterministic JSON',
     description: {
-      en: 'Returns deterministic, structured facts from our ADR matrix, commercial CV timeline, and MDX frontmatter while keeping ADMIN-only <Redact /> metrics masked.',
-      uk: 'Повертає точні структуровані дані з матриці 16 ADR, досвіду роботи та MDX-метаданих, зберігаючи NDA-поля <Redact /> закритими.',
-      ru: 'Отдаёт детерминированные факты из матрицы 16 ADR, коммерческого опыта CV и MDX-метаданных, строго скрывая закрытые метрики под <Redact />.',
+      en: 'Returns deterministic, structured facts from our ADR matrix, commercial CV timeline, and MDX frontmatter while keeping ADMIN-only NDA metrics isolated.',
+      uk: 'Повертає точні структуровані дані з матриці 16 ADR, досвіду роботи та MDX-метаданих, ізолюючи закриті комерційні NDA-поля.',
+      ru: 'Отдаёт детерминированные факты из матрицы 16 ADR, коммерческого опыта CV и MDX-метаданных, строго изолируя закрытые NDA-метрики.',
     },
   },
 ]

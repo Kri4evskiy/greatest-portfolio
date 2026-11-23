@@ -238,6 +238,6 @@ concurrency:
 ### Дорожная карта расширения CI/CD
 
 1. **`unit-tests` (`Vitest`):** параллельный job в Stage 1 (`needs: []`) с `prepare-codegen: "true"`, `fetch-depth: '0'` / `TURBO_SCM_BASE` на PR и `turbo run test --affected` для проверки Zod-контрактов, `Zustand`-сторов и сервисов NestJS.
-2. **`e2e` (`Playwright`):** job после `build` (`needs: [ lint, typecheck, build ]`) с кэшем Chromium, проверкой RBAC-флоу (`GuestPassModal` → `HttpOnly` кука → `<Redact />`) и загрузкой отчётов/трейсов (`actions/upload-artifact`) по `if: failure()`.
+2. **`e2e` (`Playwright`):** job после `build` (`needs: [ lint, typecheck, build ]`) с кэшем Chromium, проверкой RBAC-флоу (`GuestPassModal` → `HttpOnly` кука → открытие `.mdx` и `/system-status`) и загрузкой отчётов/трейсов (`actions/upload-artifact`) по `if: failure()`.
 3. **Дополнительный hardening:** еженедельный `schedule:` крон для `security` + `.github/dependabot.yml` (чтобы новые CVE ловились даже в недели без коммитов), `persist-credentials: false` на `actions/checkout@v6` и `actionlint` внутри `lint`.
 4. **Раздельный CD (Continuous Delivery):** отдельные per-service деплои (`apps/web` на Vercel с Remote Cache; `apps/api` и `apps/telemetry-ms` через `docker/*.Dockerfile` с `turbo prune --docker`), чтобы добавление новых `.mdx`-конспектов не пересобирало Docker-образы бэкенда.

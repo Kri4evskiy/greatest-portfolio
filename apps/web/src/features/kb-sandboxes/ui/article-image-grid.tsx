@@ -10,7 +10,7 @@ export interface ArticleDiagramCard {
   caption: string
   formatLabel: string
   metricsBadge: string
-  svgPreviewType: 'webp-pipeline' | 'cookie-guard' | 'redact-bundle'
+  svgPreviewType: 'webp-pipeline' | 'cookie-guard' | 'compiler-bundle'
 }
 
 const DEFAULT_CARDS: readonly ArticleDiagramCard[] = [

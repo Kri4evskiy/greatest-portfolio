@@ -81,7 +81,7 @@
         "subtitle": "Захист від XSS через HttpOnly куки, перевірка ролей на рівні Next.js Edge Proxy + NestJS Guards та реактивний стрім подій із TCP-мікросервісу.",
         "metrics": "0 витоків токенів XSS • <15мс перевірка RBAC"
       },
-      "offline-first-redact-docker": {
+      "offline-first-compiler-docker": {
         "title": "IndexedDB Offline-First Cache, React 19 Compiler & Multi-Stage Docker",
         "subtitle": "Персистентний кеш TanStack Query в IndexedDB (віддача за 0 мс в авіарежимі), React 19 Compiler + RSC-дієта бандла та 3-ступенева збірка з turbo prune.",
         "metrics": "0ms Offline Reads • -32% JS Bundle"

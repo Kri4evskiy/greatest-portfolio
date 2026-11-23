@@ -31,7 +31,7 @@ interface CaseStudyConfig {
     | 'monorepo-adr'
     | 'react19-compiler-d3'
     | 'zero-trust-jwt-sse'
-    | 'offline-first-redact-docker'
+    | 'offline-first-compiler-docker'
   tags: readonly string[]
   articleSlug: string
   articleCategory: string
@@ -65,7 +65,7 @@ const CASE_STUDY_CONFIGS: readonly CaseStudyConfig[] = [
     articleCategory: 'nestjs-prisma',
   },
   {
-    id: 'offline-first-redact-docker',
+    id: 'offline-first-compiler-docker',
     tags: ['IndexedDB', 'TanStack Query v5', 'React Compiler', 'Docker BuildKit', 'Sentry'],
     articleSlug: 'offline-bundle/indexeddb-bundle-diet-docker',
     articleCategory: 'architecture-devops',

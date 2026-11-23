@@ -208,7 +208,7 @@ export class PortfolioMcpProvider {
 - [x] **1. Strictly Read-Only Capability Scope:** Expose only curated public/guest snapshots (`16 ADRs`, `CV timeline`, `MDX frontmatter & TL;DRs`). Never register database mutation tools, filesystem writers, or internal container diagnostics.
 - [x] **2. Hard IP Rate Limiting (`@nestjs/throttler`):** Enforce strict per-IP quotas (e.g., `20 req/min`) and cap concurrent `SSE` / `Streamable HTTP` connections so automated scanners cannot exhaust free-tier container RAM (`512 MB` on Render/Koyeb).
 - [x] **3. Bounded `Zod` Input & Payload Ceilings:** Cap string lengths (`.max(60)`), array sizes, and `limit <= 16` on every `@McpTool` schema to prevent oversized serialization spikes.
-- [x] **4. `<Redact />` NDA Boundary Preservation:** Public MCP responses must strip `ADMIN`-only commercial metrics, preserving 1:1 parity with our Zero-Trust MDX `<Redact>` policy.
+- [x] **4. NDA Boundary Preservation:** Public MCP responses must strip `ADMIN`-only commercial metrics, preserving strict separation between public snapshots and private data.
 
 ---
 

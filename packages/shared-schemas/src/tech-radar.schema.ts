@@ -122,7 +122,7 @@ export const TECH_RADAR_ITEMS_RU: readonly TechRadarItem[] = [
       '2D HSL-токены + Zero-CLS Inter/JetBrains Mono (next/font) + все примитивы @repo/ui имеют 100% покрытие .stories.tsx в Storybook 10.',
   },
   {
-    id: 'tanstack-table-redact',
+    id: 'tanstack-table-compiler',
     adrNumber: 8,
     name: 'TanStack Table & React 19 Compiler',
     category: 'Frontend',
@@ -349,7 +349,7 @@ export const TECH_RADAR_ITEMS_EN: readonly TechRadarItem[] = [
       '2D HSL tokens + Zero-CLS Inter/JetBrains Mono (next/font) + all @repo/ui primitives have 100% .stories.tsx coverage in Storybook 10.',
   },
   {
-    id: 'tanstack-table-redact',
+    id: 'tanstack-table-compiler',
     adrNumber: 8,
     name: 'TanStack Table & React 19 Compiler',
     category: 'Frontend',
@@ -576,7 +576,7 @@ export const TECH_RADAR_ITEMS_UK: readonly TechRadarItem[] = [
       '2D HSL-токени + Zero-CLS Inter/JetBrains Mono (next/font) + усі примітиви @repo/ui мають 100% покриття .stories.tsx у Storybook 10.',
   },
   {
-    id: 'tanstack-table-redact',
+    id: 'tanstack-table-compiler',
     adrNumber: 8,
     name: 'TanStack Table & React 19 Compiler',
     category: 'Frontend',

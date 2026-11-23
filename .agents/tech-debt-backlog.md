@@ -19,7 +19,7 @@
     - `@repo/shared-schemas`: `resolveEndpoint` / `compactQueryParams` (обязательное отсечение `cursor: null`, `undefined`, пустых строк), `SystemCapabilitiesSchema`, `PaginatedArticleMetricsQuerySchema`, `SystemEventsQuerySchema`.
     - `apps/web`: конфигурация `Axios` `apiClient` (`allowAbsoluteUrls: false`, `withCredentials: true`, таймаут `16_000ms` против `15_000ms` на API, `204 No Content`, проброс `X-Request-Id` в `ApiClientError`), `QueryCache.onError` (подавление `AbortError`/`CancelledError` и `4xx`), `normalizeKbRedirectPath` (`APP_ROUTES`).
     - `apps/api`: паритет фильтрации и пагинации in-memory fallback в `PrismaService` (`category`/`sortBy` для `/api/knowledge/metrics/paginated` и `eventType`/cursor для `/api/telemetry/events`), timing-safe проверка в `AuthService`.
-- [ ] **E2E Playwright Suite:** проверка ключевых пользовательских и RBAC-флоу (`GuestPassModal` → `HttpOnly` кука → чтение `.mdx` → маскирование `<Redact />` + живой осмотр `/[locale]/system-status`, включая пагинацию лидерборда и `Capability Gated` матрицу) + джоба `e2e` после `build` в `.github/workflows/ci.yml` и синхронизация карточки `playwright-vitest-ci` в `apps/web/src/entities/engineering-roadmap/engineering-roadmap.ts`.
+- [ ] **E2E Playwright Suite:** проверка ключевых пользовательских и RBAC-флоу (`GuestPassModal` → `HttpOnly` кука → чтение `.mdx` + живой осмотр `/[locale]/system-status`, включая пагинацию лидерборда и `Capability Gated` матрицу) + джоба `e2e` после `build` в `.github/workflows/ci.yml` и синхронизация карточки `playwright-vitest-ci` в `apps/web/src/entities/engineering-roadmap/engineering-roadmap.ts`.
 - [ ] **Quick-Win (`S`) — расширение стартового seed статей (`apps/api/src/migrations/scripts/seed-data.ts`):** увеличить `INITIAL_ARTICLE_SEEDS` с текущих 4 записей до 8–10 реальных слагов из `apps/web/content/` по разным категориям, чтобы Offset-пагинация (`limit=5`, `Page 1 / Page 2`) и фильтр по категориям на `/system-status` работали «из коробки» на чистом запуске без предварительного просмотра новых статей.
 
 ### Приоритет №2: Внедрение Redis (Distributed Rate Limiting, Response Cache & Session Revocation)
@@ -110,7 +110,7 @@
 
 ### 5. Backend AI & Model Context Protocol (`apps/api` — Future Milestone)
 
-- [ ] **Read-Only шоукейс `@nestjs/mcp` (`$0` за токены, статус `evaluating`):** публичный MCP (`Streamable HTTP`) с 16 ADR, опытом CV и `TL;DR` статей для `Cursor` / `Claude Desktop` — строго **Read-Only**, строго после `@nestjs/throttler`, с лимитами Zod (`limit <= 16`, `.max(60)`) и соблюдением `<Redact />`.
+- [ ] **Read-Only шоукейс `@nestjs/mcp` (`$0` за токены, статус `evaluating`):** публичный MCP (`Streamable HTTP`) с 16 ADR, опытом CV и `TL;DR` статей для `Cursor` / `Claude Desktop` — строго **Read-Only**, строго после `@nestjs/throttler`, с лимитами Zod (`limit <= 16`, `.max(60)`) и изоляцией закрытых NDA-данных.
 - [ ] _(Отложено / `deferred`)_ **Живой агент `@nestjs/ai`:** не нужен, пока поиск закрывает `Cmd+K` за $0/мес; при возврате — строго за `@UseGuards(JwtRolesGuard)` с `maxOutputTokens`.
 
 ---

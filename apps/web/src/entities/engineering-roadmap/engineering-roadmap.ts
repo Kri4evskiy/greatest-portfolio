@@ -452,15 +452,15 @@ export const ENGINEERING_ROADMAP_ITEMS: readonly EngineeringRoadmapItem[] = [
     constraints: {
       en: [
         'Must ship strictly after @nestjs/throttler (P1) with hard per-IP quotas (e.g. 20 req/min) and SSE session caps to protect 512 MB free-tier containers.',
-        'Strictly Read-Only scope with bounded Zod limits (limit <= 16) and mandatory masking of ADMIN-only <Redact /> NDA metrics.',
+        'Strictly Read-Only scope with bounded Zod limits (limit <= 16) and strict isolation of ADMIN-only NDA commercial metrics.',
       ],
       uk: [
         'Запускати виключно після @nestjs/throttler (P1) із жорстким лімітом запитів за IP (20 req/хв) та обмеженням активних сесій.',
-        'Суворий Read-Only контур із лімітами Zod (limit <= 16) і маскуванням закритих NDA-метрик <Redact />.',
+        'Суворий Read-Only контур із лімітами Zod (limit <= 16) та ізоляцією закритих комерційних NDA-метрик.',
       ],
       ru: [
         'Внедрять строго после настройки @nestjs/throttler (P1) с жёстким лимитом по IP (20 req/мин) и потолком активных сессий.',
-        'Строго Read-Only контур без мутаций БД, с верхними лимитами в Zod (limit <= 16) и маскированием закрытых метрик <Redact />.',
+        'Строго Read-Only контур без мутаций БД, с верхними лимитами в Zod (limit <= 16) и изоляцией закрытых коммерческих NDA-метрик.',
       ],
     },
   },
