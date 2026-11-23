@@ -212,15 +212,15 @@ export const ENGINEERING_ROADMAP_ITEMS: readonly EngineeringRoadmapItem[] = [
     },
     pros: {
       en: [
-        '46 Vitest unit/integration tests + NestJS Supertest HTTP E2E + Playwright Chromium E2E wired into GitHub Actions (--affected on PR)',
+        '56 Vitest unit/integration tests + V8 coverage/UI (:5124) + NestJS Supertest HTTP E2E + Playwright Chromium E2E wired into GitHub Actions (--affected on PR)',
         'Strict zero-cruft data-testid policy, Radix UI Portal handling, and 10-article INITIAL_ARTICLE_SEEDS parity out of the box',
       ],
       uk: [
-        '46 Vitest unit/integration тестів + NestJS Supertest HTTP E2E + Playwright Chromium E2E інтегровані в GitHub Actions (--affected на PR)',
+        '56 Vitest unit/integration тестів + V8 coverage/UI (:5124) + NestJS Supertest HTTP E2E + Playwright Chromium E2E інтегровані в GitHub Actions (--affected на PR)',
         'Суворе правило data-testid без сміття, робота з Radix UI Portals та 10 сід-статей для пагінації «з коробки»',
       ],
       ru: [
-        '46 Vitest unit/integration тестов + NestJS Supertest HTTP E2E + Playwright Chromium E2E встроены в GitHub Actions (--affected на PR)',
+        '56 Vitest unit/integration тестов + V8 coverage/UI (:5124) + NestJS Supertest HTTP E2E + Playwright Chromium E2E встроены в GitHub Actions (--affected на PR)',
         'Строгое правило data-testid без лишнего мусора, поддержка Radix UI Portals и 10 стартовых seed-статей для пагинации «из коробки»',
       ],
     },

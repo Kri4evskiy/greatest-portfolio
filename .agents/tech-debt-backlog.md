@@ -3,7 +3,7 @@
 ## 📌 Текущая база (Production Baseline)
 
 Архитектурное ядро находится в продакшен-состоянии (`v0.8.3`; подробности и 16 ADR лежат в `.agents/frontend/*`, `.agents/backend/*`, `.agents/architecture/*` и статьях базы знаний):
-- **Monorepo & DX:** `pnpm 12.21.0` + `Turborepo` + `TypeScript 7.0.2` (native Go compiler) + `Biome 2.6.4` + `Lefthook` · `@repo/shared-schemas` (`Zod v4`: `SystemCapabilitiesSchema`, `API_ENDPOINTS` + `resolveEndpoint`, `LOCALE_METADATA`, Offset/Cursor контракты) + `@repo/ui` (`Tailwind CSS v4.3.5` + `Storybook 10` (100% coverage, 11/11 компонентов)) · Multi-stage `Docker` + `GitHub Actions CI/CD`.
+- **Monorepo & DX:** `pnpm 12.21.0` + `Turborepo` + `TypeScript 7.0.2` (native Go compiler) + `Biome 2.6.4` + `Lefthook` · `@repo/shared-schemas` (`Zod v4`: `SystemCapabilitiesSchema`, `API_ENDPOINTS` + `resolveEndpoint`, `LOCALE_METADATA`, Offset/Cursor контракты) + `@repo/ui` (`Tailwind CSS v4.3.5` + `Storybook 10` (100% coverage, 11/11 компонентов)) · 3-уровневое QA (`Vitest` 15 файлов / 56 тестов + `V8 coverage` + `Vitest UI :5124`, `Supertest` HTTP E2E, `Playwright` POM + `test.step`, `INITIAL_ARTICLE_SEEDS` из 10 слагов) · Multi-stage `Docker` + 7-джобный `GitHub Actions CI/CD`.
 - **Frontend (`apps/web`):** `Next.js 16.4.6` (`React 19 Compiler`) · архитектура `FSD-Modular` (`app` ➔ `widgets` ➔ `features` ➔ `entities` ➔ `shared`, централизованный реестр маршрутов `APP_ROUTES`) · `next-intl` (`EN/UK/RU` SSG) · `/[locale]/system-status` (`System Observability & Live API Inspector`: матрица `Capability Gated`, Cursor-лог событий с `SSE` и Offset-рейтинг на `TanStack Table`) · кликабельный `SSE LIVE` в футере · `robots.ts` + мультиязычный `sitemap.ts` + `/llms.txt` + `JSON-LD` (`ProfilePage`, `Person`, `TechArticle`) + `icon.tsx` / `apple-icon.tsx` / `opengraph-image.tsx` + локализованные `[locale]/not-found.tsx` и `[locale]/error.tsx` (с prod-only `captureClientException`) · 2D Appearance + cross-tab auth sync (`BroadcastChannel`) · `Zero-Eval HAST MDX Engine` (`mtimeMs` кэш + `Dual-Theme Shiki`) · `Cmd+K` SSG-индекс · `TanStack Query v5` (`IndexedDB` + 3-слойные `queryOptions` + `QueryCache.onError` `AbortError`-shield + `Axios` `apiClient` с `allowAbsoluteUrls: false`, `16s` таймаутом и `X-Request-Id`) · `D3.js` острова · `Edge Web Crypto JWT` + строгий `CSP`.
 - **Backend (`apps/api` & `apps/telemetry-ms`):** `NestJS 12 ESM` (`common`/`config`/`migrations`/`modules`, Zod env validation & timing-safe auth, `enableShutdownHooks()` + `takeUntil(shutdown$)`, `X-Request-Id` Correlation ID, `TimeoutInterceptor` 15s, `WORKFOLIO_DEMO_MODE` vs `docker-compose.prod.yml`) + `Prisma 7` (`7.10.1`, Rust-free Wasm + `@prisma/adapter-pg` + In-Memory fallback + `prisma:seed`) + `GET /api/capabilities` (строго булевы флаги), публичный Read-Only `GET /api/knowledge/metrics/paginated` (с `category`/`sortBy`), `GET /api/telemetry/events` (Cursor + `eventType`) + `HttpOnly JWT` + `Helmet` + `@nestjs/throttler` + TCP-микросервис телеметрии (`:4001`) с `SSE`.
 
@@ -11,18 +11,7 @@
 
 ## 🔥 Приоритетная очередь разработки (Next Up)
 
-### Приоритет №1: Автоматическое тестирование (`Vitest` + `Playwright` в CI) + Seed Quick-Win ✅ Выполнено
-
-- [x] **Unit & Integration Tests (`Vitest`):** тесты воркспейсов (46 unit/integration тестов + HTTP E2E `Supertest`) с интеграцией джобы `unit-tests` в Stage 1 CI (`.github/workflows/ci.yml`: `turbo run test --affected` + `pnpm --filter @repo/api test:e2e`, корневой `vitest.config.ts` с `projects` для IDE Testing Explorer). _(Строго `Vitest`, без `Jest`/`ts-jest`: `ts-jest` ограничен `typescript <7` и завязан на legacy JS Compiler API, тогда как `Vitest` нативно совместим с `TypeScript 7`, `unplugin-swc` и ESM.)_
-  - **Базовые пакеты:** Zod v4 схемы (`@repo/shared-schemas`), Zustand-сторы (`use-ui-store.ts`, `palette.ts`), RTL + `MSW v3` интеграция (`knowledge-leaderboard-card.integration.test.tsx`) и NestJS-сервисы (`AuthService`, `AuthController`, `PrismaService`, `app.config.ts` + `AppModule` `Supertest` E2E).
-  - **Нетривиальные контракты и регрессии (`v0.8.3`):**
-    - `@repo/shared-schemas`: `resolveEndpoint` / `compactQueryParams` (обязательное отсечение `cursor: null`, `undefined`, пустых строк), `SystemCapabilitiesSchema`, `PaginatedArticleMetricsQuerySchema`, `SystemEventsQuerySchema`.
-    - `apps/web`: конфигурация `Axios` `apiClient` (`allowAbsoluteUrls: false`, `withCredentials: true`, таймаут `16_000ms` против `15_000ms` на API, `204 No Content`, проброс `X-Request-Id` в `ApiClientError`), `QueryCache.onError` (подавление `AbortError`/`CancelledError` и `4xx`), `normalizeKbRedirectPath` (`APP_ROUTES`).
-    - `apps/api`: паритет фильтрации и пагинации in-memory fallback в `PrismaService` (`category`/`sortBy` для `/api/knowledge/metrics/paginated` и `eventType`/cursor для `/api/telemetry/events`), timing-safe проверка в `AuthService`.
-- [x] **E2E Playwright Suite:** проверка ключевых пользовательских и RBAC-флоу (`apps/web/e2e/`: POM + `test.step`, `GuestPassModal` ➔ `HttpOnly` кука ➔ чтение `.mdx` + живой осмотр `/[locale]/system-status`, включая пагинацию лидерборда и `Capability Gated` матрицу) + джоба `e2e` после `build` в `.github/workflows/ci.yml` (`actions/upload-artifact@v7` при падении) + статья в Базе Знаний (`this-project/testing-qa`) и статус `shipped` на карточке `playwright-vitest-ci` в `apps/web/src/entities/engineering-roadmap/engineering-roadmap.ts`.
-- [x] **Quick-Win (`S`) — расширение стартового seed статей (`apps/api/src/migrations/scripts/seed-data.ts`):** `INITIAL_ARTICLE_SEEDS` увеличен с 4 до 10 реальных слагов из `apps/web/content/` по 8 категориям `KnowledgeCategory`, так что Offset-пагинация (`limit=5`, `Page 1 / Page 2`) и фильтр по категориям на `/system-status` работают «из коробки».
-
-### Приоритет №2: Внедрение Redis (Distributed Rate Limiting, Response Cache & Session Revocation)
+### Приоритет №1: Внедрение Redis (Distributed Rate Limiting, Response Cache & Session Revocation)
 
 - [ ] **Архитектурное внедрение Redis (`apps/api`, `docker-compose.yml`, `docker-compose.prod.yml`):**
   - **Зачем:**
@@ -34,9 +23,9 @@
   - **Инфраструктура и пакетная модель:**
     - _Docker:_ `redis:7-alpine` (~30 МБ) в приватной сети `backend-network` (`127.0.0.1:6379:6379` в `docker-compose.yml` и без хост-порта в `docker-compose.prod.yml`, healthcheck `redis-cli ping`).
     - _Архитектурная развилка:_ прямое подключение `ioredis` + `@nest-lab/throttler-storage-redis` + `@nestjs/cache-manager` в `apps/api` либо выделение пакета `packages/redis` (`@repo/cache`) для переиспользования между `apps/api` и `apps/telemetry-ms`.
-  - **Спецификация:** `.agents/backend/security-jwt.md` (Секция 4).
+  - **Спецификация:** `.agents/backend/security-jwt.md` (Секция 5).
 
-### Приоритет №3 (Full-Stack Backend Track): `S3/R2 Object Storage` ➔ DB-Backed Knowledge Base CMS (`NestJS Entities` + `Prisma 7` + `R2/MinIO` + Server-Side Pagination)
+### Приоритет №2 (Full-Stack Backend Track): `S3/R2 Object Storage` ➔ DB-Backed Knowledge Base CMS (`NestJS Entities` + `Prisma 7` + `R2/MinIO` + Server-Side Pagination)
 
 - [ ] **Фаза 1 — `S3-compatible Object Storage` (`@aws-sdk/client-s3` для `Cloudflare R2` + локальный `MinIO`):**
   - Выделить `StorageService` в `apps/api` (IAM least-privilege ключи, генерация краткоживущих Presigned URLs, стриминг/проксирование с проверкой MIME и размера файла) и подключить легковесный `minio` сервис в `docker-compose`.
@@ -65,7 +54,7 @@
   5. **Архитектурные Trade-offs:**
      - _Build-time SSG vs Runtime DB + R2:_ чистый локальный `.mdx` даёт нулевую сетевую задержку и работу без запущенного API на этапе сборки, тогда как DB + R2 требует живого коннекта или ISR. Компромисс решается гибридным **Dual-Source Loader**: первая порция и `sitemap.ts` всегда имеют мгновенный fallback на локальные файлы `apps/web/content/*.mdx`, а при активной БД (`persistence === 'postgresql'`) каталог переключается на серверную SQL-пагинацию через `TanStack Query`.
 
-### Приоритет №4: Переосмысление визуального дизайна (Mobile-First Editorial `UI v2`)
+### Приоритет №3: Переосмысление визуального дизайна (Mobile-First Editorial `UI v2`)
 
 - [ ] **Авторский редизайн Workfolio (`UI v2`):** глубокое визуальное и типографическое переосмысление интерфейса поверх уже готового фундамента (`Tailwind CSS v4`, 2D-палитры `Warm Paper / Graphite / Sepia`, Zero-CLS шрифты `Inter` + `JetBrains Mono`, `@starting-style`, `@container`), включая точечное применение современных примитивов React 19.2+ (`<Activity>` для сохранения состояния скрытых табов без размонтирования, `useEffectEvent` для чтения актуальных значений в эффектах без лишних переподписок и опциональные `<ViewTransition>`), строго следуя `.agents/frontend/*` (Mobile-First с опорой на `360px`, чистая иерархия, продуманные карточки и таблицы без визуального шума).
 
@@ -79,7 +68,7 @@
 
 ### 2. Security & Production Hardening (`apps/web`, `apps/api`)
 
-- [ ] **Access + Refresh JWT Rotation:** дополнить Edge HS256-верификацию парой короткоживущего `Access` (`15m`) + ротируемого `HttpOnly Refresh` (`7d`) токенов с хранением и отзывом сессий в `VisitorSession` / Redis (**Приоритет №2**) и single-flight `401`-очередью через `apiClient.interceptors` (`Axios`). _(Готовая заготовка: при переходе `JwtRolesGuard` на глобальный `APP_GUARD` использовать `@Public()` из `common/decorators/public.decorator.ts` для открытых эндпоинтов.)_
+- [ ] **Access + Refresh JWT Rotation:** дополнить Edge HS256-верификацию парой короткоживущего `Access` (`15m`) + ротируемого `HttpOnly Refresh` (`7d`) токенов с хранением и отзывом сессий в `VisitorSession` / Redis (**Приоритет №1**) и single-flight `401`-очередью через `apiClient.interceptors` (`Axios`). _(Готовая заготовка: при переходе `JwtRolesGuard` на глобальный `APP_GUARD` использовать `@Public()` из `common/decorators/public.decorator.ts` для открытых эндпоинтов.)_
 - [ ] **Next-Gen Auth & Telegram Bot Access для Базы Знаний (`apps/api`, `PostgreSQL`, `Telegram Bot API`):** заменить открытую 1-click демо-заглушку на полноценную БД-авторизацию с хэшированными токенами и опциональной регистрацией через Telegram-бота:
   1. _Инфраструктура и переменные окружения:_ создать бота в `@BotFather` (`/newbot`) ➔ `TELEGRAM_BOT_TOKEN`, 32+ символьный `TELEGRAM_WEBHOOK_SECRET`, опционально `TELEGRAM_ADMIN_CHAT_ID`; в `apps/api` использовать `grammy` (native ESM + TypeScript) или zero-dep `fetch` + модели сессий/токенов в PostgreSQL (`Prisma 7`).
   2. _Антиспам-ограничение Telegram Bot API и обходные решения:_ бот **не имеет права** писать первым по номеру телефона или username (защита Telegram от спама). Рабочий прод-паттерн — **Deep Link `https://t.me/<bot>?start=<nonce>`**:
@@ -96,11 +85,13 @@
 
 - [ ] **Live Sentry & PostHog SDK:** заменить обёртки-заглушки на реальные транспорты `@sentry/nextjs`, `@sentry/nestjs` и `posthog-js`, включаемые при наличии ключей в `.env`.
 - [ ] **Neon.tech Cloud Database Migration:** подключить боевой `DATABASE_URL` от Neon.tech PostgreSQL, прогнать `prisma migrate deploy` и сид (`pnpm --filter @repo/api prisma:seed` / `src/migrations/scripts/seed.ts`).
-- [ ] **S3-compatible Object Storage (`Cloudflare R2` + локальный `MinIO` — вынесено в Фазу 1 Приоритета №3):** освоить и внедрить в `apps/api` интеграцию через `@aws-sdk/client-s3`:
-  - _Зачем:_ практическое изучение работы с приватными объектными бакетами (`R2` / `MinIO`), IAM least-privilege ключами, генерацией краткоживущих **Presigned URLs** и безопасным бэкенд-стримингом/проксированием PDF-резюме (`/cv/*.pdf` в Фазе 1) и `.mdx`-статей + медиа-ассетов Базы Знаний (**Фаза 2 Приоритета №3**) с проверкой MIME-типов и размеров файлов.
+  - _Нюанс для чистого Docker Postgres (`workfolio-postgres`):_ прод-образ `docker/api.Dockerfile` очищается от CLI `prisma` через `pnpm prune --prod --ignore-scripts`, поэтому при самом первом запуске на пустом Docker volume таблицы сами не создаются — перед проверкой БД нужно прогнать `pnpm --filter @repo/api prisma:push` + `prisma:seed` снаружи (или вынести `prisma migrate deploy` в отдельную CI/init-джобу при переходе к прод-деплою).
+- [ ] **S3-compatible Object Storage (`Cloudflare R2` + локальный `MinIO` — вынесено в Фазу 1 Приоритета №2):** освоить и внедрить в `apps/api` интеграцию через `@aws-sdk/client-s3`:
+  - _Зачем:_ практическое изучение работы с приватными объектными бакетами (`R2` / `MinIO`), IAM least-privilege ключами, генерацией краткоживущих **Presigned URLs** и безопасным бэкенд-стримингом/проксированием PDF-резюме (`/cv/*.pdf` в Фазе 1) и `.mdx`-статей + медиа-ассетов Базы Знаний (**Фаза 2 Приоритета №2**) с проверкой MIME-типов и размеров файлов.
   - _Локальная разработка:_ легковесный `minio` сервис в `docker-compose` + graceful fallback на локальный статический файл `/cv/*.pdf` и локальные `apps/web/content/*.mdx`, когда S3 env-переменные не заданы.
 - [ ] **Nginx Reverse Proxy (`docker-compose.prod.yml` — Self-Hosted / VPS Learning Track):** настроить `Nginx` как единую точку входа (порты `80/443`, TLS) между внешними клиентами, фронтендом (`web:3000`) и бэкендом (`api:4000`) в качестве self-hosted/VPS альтернативы облачному Runbook (Vercel + Render):
   - отработать все ключевые прод-юзкейсы Nginx: **Reverse Proxy & Request Routing** (`/` ➔ `web:3000`, `/api/*` ➔ `api:4000`), **TLS Termination**, **Static Asset / Edge Caching Layer**, **L7 Rate Limiting** (`limit_req_zone` + передача `X-Forwarded-For` / `X-Real-IP` для `@nestjs/throttler` с `trust proxy: 1`), **Load Balancing upstreams** и **Long-Lived SSE / WebSocket Proxy** (`proxy_buffering off;`, `proxy_read_timeout`, `Connection ''` для бесперебойного `/api/telemetry/stream`).
+  - _Нюанс для проверки при подключении Nginx (`HEALTHCHECK` для `web`):_ сейчас `workfolio-postgres` и `workfolio-api` уже имеют Docker `HEALTHCHECK` (`Healthy`), а `workfolio-web` запускается со статусом `Started`. Перед добавлением `nginx` в `docker-compose.prod.yml` стоит добавить HTTP-`healthcheck` для `web` (`:3000` через `node -e "fetch(...)"`), чтобы `nginx` ждал `condition: service_healthy` и не отдавал `502` в первую секунду старта.
 - [ ] **Расширение Capability-Gated UI для новых фич (Redis, S3/R2, Telegram Bot):** контракт `GET /api/capabilities` (`SystemCapabilitiesSchema`) и матрица `/system-status` уже работают; для каждой следующей интеграции, если API-ключ не задан в `.env`, интерфейс **показывает** саму фичу, блокирует триггер (`disabled` / `aria-disabled`) и выводит локализованную плашку: _«Нет API-ключа для использования данного сервиса»_.
 - [ ] **Cross-Domain API Deployment (`NEXT_PUBLIC_API_URL`):** при выносе `apps/api` на отдельный домен добавить `NEXT_PUBLIC_API_URL` в `.env`, `.env.example`, `turbo.json` (`globalEnv`), пробросить `baseURL` в `Axios` (`api-client.ts`) и `EventSource` с фолбэком на `''` и добавить домен в CSP `connect-src`.
 
