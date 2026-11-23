@@ -11,12 +11,16 @@ export default defineConfig({
   },
   test: {
     environment: 'jsdom',
+    environmentOptions: {
+      jsdom: {
+        url: 'http://localhost:3000',
+      },
+    },
     setupFiles: ['./vitest.setup.ts'],
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
     clearMocks: true,
     unstubEnvs: true,
     unstubGlobals: true,
-    passWithNoTests: true,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'lcov'],

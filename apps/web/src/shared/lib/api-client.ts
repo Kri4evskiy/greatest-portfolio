@@ -3,7 +3,7 @@ import axios, { type AxiosHeaders, type AxiosProgressEvent, type AxiosRequestCon
 import type { z } from 'zod'
 
 // Exceeds backend TimeoutInterceptor (15_000ms) so Neon.tech cold-start 408 errors propagate cleanly
-const DEFAULT_REQUEST_TIMEOUT_MS = 16_000
+export const DEFAULT_REQUEST_TIMEOUT_MS = 16_000
 
 export class ApiClientError extends Error {
   readonly status: number
@@ -38,7 +38,7 @@ export function isCancelledRequestError(error: unknown): boolean {
   return error.name === 'AbortError' || error.name === 'CancelledError' || error.name === 'CanceledError'
 }
 
-function compactQueryParams(
+export function compactQueryParams(
   params?: Record<string, QueryParamValue>,
 ): Record<string, string | number | boolean> | undefined {
   if (!params) {

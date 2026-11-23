@@ -21,7 +21,7 @@ let browserPersister: Persister | undefined
 let browserRestorePromise: Promise<void> | null = null
 let hasRestoredBrowserCache = false
 
-function makeQueryClient(): QueryClient {
+export function makeQueryClient(): QueryClient {
   return new QueryClient({
     queryCache: new QueryCache({
       onError: (error, query) => {
@@ -76,16 +76,16 @@ function getBrowserPersister(): Persister {
       key: CACHE_KEY,
       storage: {
         getItem: async (key: string) => {
-          if (typeof window === 'undefined') return null
+          if (typeof window === 'undefined' || typeof window.indexedDB === 'undefined') return null
           const val = await get<string>(key)
           return val ?? null
         },
         setItem: async (key: string, value: string) => {
-          if (typeof window === 'undefined') return
+          if (typeof window === 'undefined' || typeof window.indexedDB === 'undefined') return
           await set(key, value)
         },
         removeItem: async (key: string) => {
-          if (typeof window === 'undefined') return
+          if (typeof window === 'undefined' || typeof window.indexedDB === 'undefined') return
           await del(key)
         },
       },
