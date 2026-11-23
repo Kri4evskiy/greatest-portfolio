@@ -11,16 +11,16 @@
 
 ## 🔥 Приоритетная очередь разработки (Next Up)
 
-### Приоритет №1: Автоматическое тестирование (`Vitest` + `Playwright` в CI) + Seed Quick-Win
+### Приоритет №1: Автоматическое тестирование (`Vitest` + `Playwright` в CI) + Seed Quick-Win ✅ Выполнено
 
-- [ ] **Unit & Integration Tests (`Vitest`):** тесты воркспейсов с интеграцией джобы `unit-tests` в Stage 1 CI (`.github/workflows/ci.yml`: `turbo run test --affected` + скрипт `test` в корневом `package.json` и `turbo.json`). _(Строго `Vitest`, без `Jest`/`ts-jest`: `ts-jest` ограничен `typescript <7` и завязан на legacy JS Compiler API, тогда как `Vitest` нативно совместим с `TypeScript 7` и ESM.)_
-  - **Базовые пакеты:** Zod v4 схемы (`@repo/shared-schemas`), Zustand-сторы (`uiStore` / `use-ui-store.ts`, `palette.ts`) и NestJS-сервисы (`AuthService`, `app.config.ts`).
+- [x] **Unit & Integration Tests (`Vitest`):** тесты воркспейсов (46 unit/integration тестов + HTTP E2E `Supertest`) с интеграцией джобы `unit-tests` в Stage 1 CI (`.github/workflows/ci.yml`: `turbo run test --affected` + `pnpm --filter @repo/api test:e2e`, корневой `vitest.config.ts` с `projects` для IDE Testing Explorer). _(Строго `Vitest`, без `Jest`/`ts-jest`: `ts-jest` ограничен `typescript <7` и завязан на legacy JS Compiler API, тогда как `Vitest` нативно совместим с `TypeScript 7`, `unplugin-swc` и ESM.)_
+  - **Базовые пакеты:** Zod v4 схемы (`@repo/shared-schemas`), Zustand-сторы (`use-ui-store.ts`, `palette.ts`), RTL + `MSW v3` интеграция (`knowledge-leaderboard-card.integration.test.tsx`) и NestJS-сервисы (`AuthService`, `AuthController`, `PrismaService`, `app.config.ts` + `AppModule` `Supertest` E2E).
   - **Нетривиальные контракты и регрессии (`v0.8.3`):**
     - `@repo/shared-schemas`: `resolveEndpoint` / `compactQueryParams` (обязательное отсечение `cursor: null`, `undefined`, пустых строк), `SystemCapabilitiesSchema`, `PaginatedArticleMetricsQuerySchema`, `SystemEventsQuerySchema`.
     - `apps/web`: конфигурация `Axios` `apiClient` (`allowAbsoluteUrls: false`, `withCredentials: true`, таймаут `16_000ms` против `15_000ms` на API, `204 No Content`, проброс `X-Request-Id` в `ApiClientError`), `QueryCache.onError` (подавление `AbortError`/`CancelledError` и `4xx`), `normalizeKbRedirectPath` (`APP_ROUTES`).
     - `apps/api`: паритет фильтрации и пагинации in-memory fallback в `PrismaService` (`category`/`sortBy` для `/api/knowledge/metrics/paginated` и `eventType`/cursor для `/api/telemetry/events`), timing-safe проверка в `AuthService`.
-- [ ] **E2E Playwright Suite:** проверка ключевых пользовательских и RBAC-флоу (`GuestPassModal` → `HttpOnly` кука → чтение `.mdx` + живой осмотр `/[locale]/system-status`, включая пагинацию лидерборда и `Capability Gated` матрицу) + джоба `e2e` после `build` в `.github/workflows/ci.yml` и синхронизация карточки `playwright-vitest-ci` в `apps/web/src/entities/engineering-roadmap/engineering-roadmap.ts`.
-- [ ] **Quick-Win (`S`) — расширение стартового seed статей (`apps/api/src/migrations/scripts/seed-data.ts`):** увеличить `INITIAL_ARTICLE_SEEDS` с текущих 4 записей до 8–10 реальных слагов из `apps/web/content/` по разным категориям, чтобы Offset-пагинация (`limit=5`, `Page 1 / Page 2`) и фильтр по категориям на `/system-status` работали «из коробки» на чистом запуске без предварительного просмотра новых статей.
+- [x] **E2E Playwright Suite:** проверка ключевых пользовательских и RBAC-флоу (`apps/web/e2e/`: POM + `test.step`, `GuestPassModal` ➔ `HttpOnly` кука ➔ чтение `.mdx` + живой осмотр `/[locale]/system-status`, включая пагинацию лидерборда и `Capability Gated` матрицу) + джоба `e2e` после `build` в `.github/workflows/ci.yml` (`actions/upload-artifact@v7` при падении) + статья в Базе Знаний (`this-project/testing-qa`) и статус `shipped` на карточке `playwright-vitest-ci` в `apps/web/src/entities/engineering-roadmap/engineering-roadmap.ts`.
+- [x] **Quick-Win (`S`) — расширение стартового seed статей (`apps/api/src/migrations/scripts/seed-data.ts`):** `INITIAL_ARTICLE_SEEDS` увеличен с 4 до 10 реальных слагов из `apps/web/content/` по 8 категориям `KnowledgeCategory`, так что Offset-пагинация (`limit=5`, `Page 1 / Page 2`) и фильтр по категориям на `/system-status` работают «из коробки».
 
 ### Приоритет №2: Внедрение Redis (Distributed Rate Limiting, Response Cache & Session Revocation)
 
@@ -75,7 +75,7 @@
 
 ### 1. CI/CD, Turborepo Cache & DX Optimization
 
-- [ ] **CI Security & Workflow Hardening _(Parallel Quick-Win `S` для Приоритета №1/№2)_:** добавить еженедельный `schedule:` крон для `pnpm audit --prod --audit-level=high` + `.github/dependabot.yml` (`npm` и `github-actions`), выставить `persist-credentials: false` на `actions/checkout@v6`, добавить `actionlint` в `lint` и при росте UI-кита подключить кэш `.turbo` в джобу `storybook`.
+- [ ] **CI Security & Workflow Hardening _(Parallel Quick-Win `S`)_:** добавить еженедельный `schedule:` крон для `pnpm audit --prod --audit-level=high` + `.github/dependabot.yml` (`npm` и `github-actions`), добавить `actionlint` в `lint` и при росте UI-кита подключить кэш `.turbo` в джобу `storybook`. _(`persist-credentials: false` на всех шагах `actions/checkout@v6` уже внедрён.)_
 
 ### 2. Security & Production Hardening (`apps/web`, `apps/api`)
 

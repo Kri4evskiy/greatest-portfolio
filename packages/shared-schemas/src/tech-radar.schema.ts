@@ -40,16 +40,18 @@ export const TECH_RADAR_ITEMS_RU: readonly TechRadarItem[] = [
   {
     id: 'ts-biome-lefthook',
     adrNumber: 2,
-    name: 'TypeScript (Strict) + Biome.js + Lefthook',
+    name: 'TypeScript (Strict) + Biome.js + Lefthook + Vitest/Playwright',
     category: 'DevOps & DX',
     experienceYears: 5,
     level: 'Core',
-    summary: 'Линтинг и форматирование на Rust за ~50 мс + строгий pre-commit гейт без лишних мутаций кэша.',
+    summary:
+      'Линтинг и форматирование на Rust за ~50 мс, pre-commit гейты и 3-уровневая пирамида тестов (Vitest + Supertest + Playwright).',
     adrWhy:
-      'Связка ESLint + Prettier медленная. Biome.js на Rust заменяет оба инструмента одним бинарником, а Lefthook физически не пропускает сломанный код в git.',
-    adrWhere: 'Глобально во всех пакетах и приложениях монорепозитория на этапе git commit и в CI.',
+      'Связка ESLint + Prettier медленная, а Jest/ts-jest несовместимы с TypeScript 7 и NestJS 12 ESM. Biome.js закрывает стиль за миллисекунды, Lefthook держит локальный гейт, а Vitest (нативный ESM + SWC) + MSW + Supertest + Playwright автоматизируют unit, integration и E2E-проверки в CI.',
+    adrWhere:
+      'Глобально во всех пакетах и приложениях монорепозитория (git commit, Vitest проекты и GitHub Actions CI).',
     adrHow:
-      'В tsconfig.base.json включены strict, noUncheckedIndexedAccess, exactOptionalPropertyTypes. В lefthook.yml: biome check -> turbo typecheck (кэши FULL TURBO и --affected не сбрасываются).',
+      'В tsconfig.base.json включены strict, noUncheckedIndexedAccess, exactOptionalPropertyTypes; lefthook.yml гоняет biome + typecheck; Vitest (jsdom/MSW на фронте и unplugin-swc/Supertest на бэке) + Playwright POM (data-testid) в Stage 1/2 CI.',
   },
   {
     id: 'nextjs-app-router',
@@ -266,16 +268,18 @@ export const TECH_RADAR_ITEMS_EN: readonly TechRadarItem[] = [
   {
     id: 'ts-biome-lefthook',
     adrNumber: 2,
-    name: 'TypeScript (Strict) + Biome.js + Lefthook',
+    name: 'TypeScript (Strict) + Biome.js + Lefthook + Vitest/Playwright',
     category: 'DevOps & DX',
     experienceYears: 5,
     level: 'Core',
-    summary: 'Rust-powered linting and formatting in ~50ms + cache-friendly pre-commit quality gates.',
+    summary:
+      'Rust-powered linting in ~50ms, pre-commit gates, and a 3-tier QA pyramid (Vitest + MSW + Supertest + Playwright).',
     adrWhy:
-      'ESLint + Prettier is slow and heavy. Biome.js (written in Rust) replaces both with a single binary, while Lefthook blocks broken code from entering Git.',
-    adrWhere: 'Globally across all packages and applications during git commit and CI.',
+      'ESLint + Prettier is slow, and Jest/ts-jest are incompatible with TypeScript 7 and NestJS 12 ESM. Biome.js replaces both, Lefthook guards commits, and Vitest (native ESM + SWC) + MSW + Supertest + Playwright automate unit, integration, and E2E checks in CI.',
+    adrWhere:
+      'Globally across all workspace packages and apps (git commit, Vitest project graph, and GitHub Actions CI).',
     adrHow:
-      'tsconfig.base.json enables strict, noUncheckedIndexedAccess, exactOptionalPropertyTypes. lefthook.yml runs biome check -> turbo typecheck without busting FULL TURBO or --affected caches.',
+      'tsconfig.base.json enforces strict/noUncheckedIndexedAccess/exactOptionalPropertyTypes; lefthook.yml runs biome + typecheck; Vitest (jsdom/MSW + unplugin-swc/Supertest) and Playwright POM (data-testid) run in Stage 1/2 CI.',
   },
   {
     id: 'nextjs-app-router',
@@ -493,16 +497,18 @@ export const TECH_RADAR_ITEMS_UK: readonly TechRadarItem[] = [
   {
     id: 'ts-biome-lefthook',
     adrNumber: 2,
-    name: 'TypeScript (Strict) + Biome.js + Lefthook',
+    name: 'TypeScript (Strict) + Biome.js + Lefthook + Vitest/Playwright',
     category: 'DevOps & DX',
     experienceYears: 5,
     level: 'Core',
-    summary: 'Лінтинг і форматування на Rust за ~50 мс + суворий pre-commit гейт без зайвих мутацій кешу.',
+    summary:
+      'Лінтинг і форматування на Rust за ~50 мс, pre-commit гейти та 3-рівнева піраміда тестів (Vitest + Supertest + Playwright).',
     adrWhy:
-      'Зв’язка ESLint + Prettier повільна. Biome.js на Rust замінює обидва інструменти одним бінарником, а Lefthook фізично не пропускає зламаний код у git.',
-    adrWhere: 'Глобально в усіх пакетах і застосунках монорепозиторію на етапі git commit та в CI.',
+      'Зв’язка ESLint + Prettier повільна, а Jest/ts-jest несумісні з TypeScript 7 та NestJS 12 ESM. Biome.js закриває стиль за мілісекунди, Lefthook тримає локальний гейт, а Vitest (нативний ESM + SWC) + MSW + Supertest + Playwright автоматизують unit, integration та E2E у CI.',
+    adrWhere:
+      'Глобально в усіх пакетах і застосунках монорепозиторію (git commit, Vitest проєкти та GitHub Actions CI).',
     adrHow:
-      'У tsconfig.base.json увімкнено strict, noUncheckedIndexedAccess, exactOptionalPropertyTypes. У lefthook.yml: biome check -> turbo typecheck (кеші FULL TURBO та --affected не скидаються).',
+      'У tsconfig.base.json увімкнено strict/noUncheckedIndexedAccess/exactOptionalPropertyTypes; lefthook.yml запускає biome + typecheck; Vitest (jsdom/MSW + unplugin-swc/Supertest) та Playwright POM (data-testid) працюють у Stage 1/2 CI.',
   },
   {
     id: 'nextjs-app-router',

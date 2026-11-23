@@ -9,7 +9,7 @@ readingTime: "12 min"
 publishedAt: "2026-11-11"
 order: 3
 tldr:
-  - "**Modular 5-job DAG over one monolith:** `lint`, `security`, and `typecheck` run in parallel before `build` and `storybook`, giving fail-fast clarity, privilege isolation, and clean slots for `Vitest` / `Playwright`."
+  - "**Modular 7-job DAG over one monolith:** `lint`, `security`, `typecheck`, and `unit-tests` (`Vitest` + `Supertest`) run in parallel before `build`, `storybook`, and Chromium `e2e` (`Playwright`)—giving fail-fast clarity and privilege isolation."
   - "**GitHub Actions reference built-in:** clear breakdown of `on`, `permissions`, `concurrency`, `needs`, `Composite Actions` (`inputs` / `outputs`), and passing state across isolated runner VMs."
   - "**Turborepo vs without Turborepo:** graph-aware `--affected` with `fetch-depth: '0'` and `TURBO_SCM_BASE` skips untouched apps without deadlocking Branch Protection and validates `packages/shared-schemas` consumers automatically."
   - "**Zero-`node_modules` `security` gate:** validates `docker compose config --quiet` and audits production dependencies straight off `pnpm-lock.yaml` via `pnpm audit --prod --audit-level=high`."
@@ -53,22 +53,19 @@ Because jobs run on separate VMs, you cannot share normal shell variables across
 
 ---
 
-## 2. Task Graph (DAG) & Why 5 Separate Jobs Beat One Monolith
+## 2. Task Graph (DAG) & Why 7 Separate Jobs Beat One Monolith
 
-Checks are wired as a two-stage **Directed Acyclic Graph (DAG)** designed to absorb future test suites without refactoring existing gates:
+Checks are wired as a two-stage **Directed Acyclic Graph (DAG)** with fast parallel gates in Stage 1 and heavy build/browser jobs in Stage 2:
 
 ```text
-Stage 1 (Parallel Fail-Fast & Graph Checks)       Stage 2 (Gated Heavy Artifacts)
-──────────────────────────────────────────       ───────────────────────────────
+Stage 1 (Parallel Fail-Fast & Graph Checks)       Stage 2 (Gated Builds & Browser E2E)
+──────────────────────────────────────────       ────────────────────────────────────
 [lint] (Biome 2.6, fetch-depth: 1) ──────────┐
-                                             ├──▶ [build] (Turborepo + .turbo + .next/cache)
+                                             ├──▶ [build] (Turborepo + .turbo + .next/cache) ──▶ [e2e] (Playwright Chromium)
 [typecheck] (tsc + prepare-codegen) ─────────┤
                                              └──▶ [storybook] (@repo/ui build-storybook)
+[unit-tests] (Vitest + Supertest E2E) ──────────▶ Parallel in Stage 1 (graph --affected on PR)
 [security] (Compose + pnpm audit, no install) ──▶ Independent supply-chain gate
-
-Planned Extension Slots (Zero Rewrite Needed):
-[unit-tests] (Vitest) ──────────────────────────▶ Parallel in Stage 1 (alongside lint / typecheck)
-[e2e] (Playwright + Chromium) ──────────────────▶ Stage 2/3 with needs: [ lint, typecheck, build ]
 ```
 
 ### Job Matrix & Execution Profiles
@@ -78,15 +75,17 @@ Planned Extension Slots (Zero Rewrite Needed):
 | **`lint`** | — | `'1'` (shallow) | Yes (no codegen) | `pnpm run lint` (`biome check .` across the repo in ~150 ms) |
 | **`security`** | — | `'1'` (shallow) | **No** | `docker compose config --quiet` → `pnpm audit --prod --audit-level=high` |
 | **`typecheck`** | — | PR: `'0'`, `main`: `'1'` | Yes + `prepare-codegen` | PR: `TURBO_SCM_BASE=...base.sha` + `--affected`; `main`: `pnpm run typecheck` |
+| **`unit-tests`** | — | PR: `'0'`, `main`: `'1'` | Yes + `prepare-codegen` | PR: `turbo run test --affected` + `@repo/api test:e2e`; `main`: `pnpm run test` + `@repo/api test:e2e` |
 | **`build`** | `lint`, `typecheck` | PR: `'0'`, `main`: `'1'` | Yes | PR: `TURBO_SCM_BASE=...base.sha` + `--affected`; `main`: `pnpm run build` |
 | **`storybook`** | `lint`, `typecheck` | PR: `'0'`, `main`: `'1'` | Yes | PR: `TURBO_SCM_BASE=...base.sha` + `--affected`; `main`: `turbo run build-storybook` |
+| **`e2e`** | `lint`, `typecheck`, `build` | `'1'` (shallow) | Yes + Chromium cache | Restores `.turbo` build cache + `~/.cache/ms-playwright`, runs `pnpm --filter @repo/web test:e2e` |
 
 ### Why a Multi-Job DAG Beats One Consolidated Job
 
 Collapsing all commands into one job saves ~15–30 seconds of per-VM bootstrap (`checkout` + `setup-workspace`), but we **deliberately rejected** the single-job shortcut for five concrete reasons:
 
-1. **Plug-and-Play `Vitest` & `Playwright` Slots:** `unit-tests` drops cleanly into Stage 1 parallel to `typecheck`, while heavy browser `e2e` hangs off `needs: [ lint, typecheck, build ]` with its own Chromium cache and database lifecycle—never delaying `lint`, `security`, or `storybook`.
-2. **Clear Fail-Fast Signals in PR Checks:** reviewers immediately see *which* domain failed (`Lint`, `Security`, `Typecheck`, `Build`, or `Storybook`) without scanning one interleaved 2,000-line log, and `needs: [ lint, typecheck ]` prevents expensive Next.js/Storybook builds from booting when types or formatting are broken.
+1. **Isolated `Vitest` & `Playwright` Lifecycles:** `unit-tests` runs in parallel in Stage 1 alongside `typecheck`, while heavy browser `e2e` hangs off `needs: [ lint, typecheck, build ]` with its own `.turbo` restore, Chromium binary cache, and `webServer` lifecycle—never delaying `lint`, `security`, or `storybook`.
+2. **Clear Fail-Fast Signals in PR Checks:** reviewers immediately see *which* domain failed (`Lint`, `Security`, `Typecheck`, `Unit Tests`, `Build`, `Storybook`, or `E2E`) without scanning one interleaved 2,000-line log, and `needs: [ lint, typecheck ]` prevents expensive Next.js/Playwright runs when types or formatting are broken.
 3. **Privilege & Checkout Isolation:** `security` never downloads `node_modules` or executes third-party install scripts, and `lint`/`security` clone with `fetch-depth: 1`.
 4. **Atomic Required Status Checks:** GitHub Branch Protection can require each check individually (`Security`, `Typecheck`, `Build`, `Storybook`, and future test suites).
 5. **Non-Blocking Supply-Chain Visibility:** because `build` and `storybook` don't depend on `security`, a newly published upstream npm CVE still lets engineers see whether application code compiles and bundles cleanly.
@@ -235,9 +234,10 @@ Setting `prepare-codegen: "true"` generates those three artifacts before `turbo 
 - **Why `--prod --audit-level=high`:** `devDependencies` (Storybook, Vite, Biome, Turborepo) never ship inside our `docker/*.Dockerfile` runtime images (`pnpm prune --prod`). Scoping the blocking gate to `--prod` maximizes signal-to-noise without false alarms from build-only tooling.
 - **Documented Exceptions in `pnpm 12`:** if an unreachable false-positive advisory ever needs a temporary documented suppression, `pnpm@12.21.0` configures `audit.ignore` at the top level of `pnpm-workspace.yaml` (via `pnpm audit --ignore <GHSA>`).
 
-### Evolution Roadmap (Zero DAG Rewrite)
+### Implemented Test Gates & Evolution Roadmap (Zero DAG Rewrite)
 
-1. **`unit-tests` (`Vitest`):** parallel Stage 1 job (`needs: []`) with `prepare-codegen: "true"`, `fetch-depth: '0'` + `TURBO_SCM_BASE` on PRs, and `turbo run test --affected` to cover Zod schemas, `Zustand` stores, and `NestJS` services.
-2. **`e2e` (`Playwright`):** Stage 2 job (`needs: [ lint, typecheck, build ]`) caching Chromium browsers, verifying `GuestPassModal` → `HttpOnly` JWT cookie → `.mdx` unlock & `/system-status` flows, and uploading trace artifacts on `failure()`.
-3. **Additional Hardening:** weekly `schedule:` cron for `security` + `.github/dependabot.yml` (catching CVEs between commits), `persist-credentials: false` on `actions/checkout@v6`, and `actionlint` inside `lint`.
+1. **`unit-tests` (`Vitest` + `Supertest`) — Shipped:** parallel Stage 1 job (`needs: []`) with `prepare-codegen: "true"`, `fetch-depth: '0'` + `TURBO_SCM_BASE` on PRs, `turbo run test --affected`, and `pnpm --filter @repo/api test:e2e` covering Zod contracts, `Zustand` stores, RTL + `MSW v3` components, and NestJS `AppModule`.
+2. **`e2e` (`Playwright` Chromium) — Shipped:** Stage 2 job (`needs: [ lint, typecheck, build ]`) restoring `.turbo` build outputs and caching `~/.cache/ms-playwright` keyed to the locked Playwright version, verifying `GuestPassModal` → `HttpOnly` JWT cookie → `.mdx` unlock & `/system-status`, and uploading HTML trace artifacts via `actions/upload-artifact@v7` on `failure()`.
+3. **Workflow Hardening:** `persist-credentials: false` is enforced on every `actions/checkout@v6` step; next hardening steps are a weekly `schedule:` cron for `security` + `.github/dependabot.yml` (catching CVEs between commits) and `actionlint` inside `lint`.
+4. **Independent CD (Continuous Delivery):** separate per-service deployment workflows (`apps/web` to Vercel with Remote Cache; `apps/api` and `apps/telemetry-ms` via `docker/*.Dockerfile` using `turbo prune --docker`) so `.mdx` content edits never rebuild backend Docker images.
 4. **Decoupled Continuous Deployment (CD):** separate per-service CD workflows (`apps/web` to Vercel with Remote Cache; `apps/api` and `apps/telemetry-ms` via `docker/*.Dockerfile` + `turbo prune --docker`) so editing `.mdx` notes never rebuilds backend Docker images.

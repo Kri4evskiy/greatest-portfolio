@@ -71,8 +71,13 @@ pnpm run lint:fix
 # Run TypeScript typecheck across all 5 workspace packages via Turborepo
 pnpm run typecheck
 
-# Full production build
+# Run unit/integration tests across the monorepo (Vitest) and NestJS Supertest HTTP E2E
+pnpm run test
+pnpm --filter @repo/api test:e2e
+
+# Full production build & Playwright Chromium E2E
 pnpm run build
+pnpm --filter @repo/web test:e2e
 
 # Prune old local Turborepo cache archives (pass -- --all for a full reset)
 pnpm run clean-cache
@@ -98,4 +103,4 @@ We follow the [Conventional Commits](https://www.conventionalcommits.org/) speci
 2. **Sync Architecture Docs:** If your changes affect APIs, schemas, or security boundaries, make sure to update:
    - Corresponding `.mdx` articles in `apps/web/content/`
    - Architecture diagrams or tables in [`README.md`](./README.md)
-3. **CI Pipeline:** Ensure all GitHub Actions jobs pass (`lint`, `typecheck`, `build`, `security`).
+3. **CI Pipeline:** Ensure all GitHub Actions jobs pass (`lint`, `typecheck`, `unit-tests`, `build`, `storybook`, `e2e`, `security`).

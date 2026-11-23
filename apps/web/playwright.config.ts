@@ -4,8 +4,9 @@ const DEFAULT_E2E_JWT_SECRET = process.env.JWT_SECRET ?? 'workfolio-super-secret
 
 export default defineConfig({
   testDir: './e2e/specs',
-  fullyParallel: false,
-  workers: 1,
+  // Scale parallel workers cleanly; specs sharing in-memory API state declare `test.describe.configure({ mode: 'serial' })`.
+  fullyParallel: true,
+  ...(process.env.CI ? { workers: 2 } : {}),
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 2 : 0,
   reporter: process.env.CI ? [['github'], ['html', { open: 'never' }]] : [['list'], ['html', { open: 'never' }]],

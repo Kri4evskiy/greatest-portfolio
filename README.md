@@ -135,6 +135,9 @@ docker compose -f docker-compose.prod.yml --env-file .env.prod up --build -d
 | `pnpm run typecheck:pnpm`          | Typechecks packages directly via `pnpm -r typecheck`                                                                         |
 | `pnpm run lint`                    | Blazing fast linting and formatting verification via `Biome.js` (Rust)                                                       |
 | `pnpm run lint:fix`                | Automatically fixes linting and formatting issues via `Biome.js`                                                             |
+| `pnpm run test`                    | Runs all `Vitest` unit & integration suites across `@repo/shared-schemas`, `@repo/web`, and `@repo/api` via `Turborepo`      |
+| `pnpm --filter @repo/api test:e2e` | Runs full `AppModule` + `Supertest` HTTP E2E integration tests in `apps/api/test/`                                           |
+| `pnpm --filter @repo/web test:e2e` | Runs `Playwright` POM end-to-end browser verification against compiled production `@repo/api` + `@repo/web` servers          |
 | `pnpm --filter @repo/ui storybook` | Starts the interactive `Storybook` component showcase on port `6006`                                                         |
 
 ### 🛡️ DX Resilience & Windows Smart App Control (SAC)
@@ -151,7 +154,7 @@ The repository is engineered according to the **Zero-Friction Onboarding** princ
 ## 🏛️ Architectural Stack (16 Architecture Decision Records — ADRs)
 
 1. **Monorepo Orchestration:** `pnpm` Workspaces + `Turborepo`
-2. **DX & Code Quality:** `TypeScript (Strict)` + `Biome.js` + `Lefthook` (lean `pre-commit` gate preserving caching)
+2. **DX & Code Quality:** `TypeScript (Strict)` + `Biome.js` + `Lefthook` + `Vitest/Playwright` (lean `pre-commit` gate preserving caching + 3-tier testing pyramid)
 3. **Frontend Platform:** `Next.js 16 (App Router)` — hybrid SSG + SSR + RSC + Edge Proxy (`src/proxy.ts`)
 4. **State Separation:** `TanStack Query v5` (server cache) + `Zustand` (client UI state)
 5. **Browser Database:** `IndexedDB` (`idb-keyval` + TanStack Query Persister with 24h TTL)
@@ -176,6 +179,7 @@ greatest-portfolio/
 ├── .agents/                    # Hierarchical AI context and ADR documentation system
 │   ├── tech-debt-backlog.md    # Product backlog, tech debt, and Post-MVP roadmap
 │   ├── architecture/           # ADR catalog, CI/CD, shared contracts, Docker & Observability
+│   ├── testing/                # Testing pyramid guide (Vitest, SWC ESM, MSW v3, Supertest, Playwright)
 │   ├── frontend/               # Next.js rules, Workfolio UI, Storybook, State, Auth
 │   └── backend/                # NestJS standards, JWT Security, Prisma, Microservices & SSE
 ├── .github/                    # GitHub Actions CI/CD (ci.yml + setup-workspace composite action)
@@ -195,7 +199,8 @@ greatest-portfolio/
 ├── lefthook.yml                # Pre-commit Git hooks (Biome check + Typecheck)
 ├── pnpm-workspace.yaml         # Monorepo package boundaries and allowBuilds security list
 ├── tsconfig.base.json          # Root strict TypeScript configuration
-└── turbo.json                  # Turborepo task pipeline and caching rules
+├── turbo.json                  # Turborepo task pipeline and caching rules
+└── vitest.config.ts            # Root Vitest workspace projects config (for IDE Testing Explorer & root CLI runs)
 ```
 
 ## 🧭 Architecture Documentation Navigation
@@ -206,4 +211,5 @@ greatest-portfolio/
 - [FSD-Modular Frontend Architecture (`.agents/frontend/architecture-fsd-modular.md`)](./.agents/frontend/architecture-fsd-modular.md)
 - [NestJS Enterprise Modular Backend Architecture (`.agents/backend/architecture-enterprise-modular.md`)](./.agents/backend/architecture-enterprise-modular.md)
 - [Tech Debt & Post-MVP Roadmap (`.agents/tech-debt-backlog.md`)](./.agents/tech-debt-backlog.md)
+- [Testing Strategy & Enterprise Testing Guide (`.agents/testing/testing-strategy.md`)](./.agents/testing/testing-strategy.md)
 - [Full Catalog of 16 ADRs: Why, Where & How (`.agents/architecture/adr-stack.md`)](./.agents/architecture/adr-stack.md)

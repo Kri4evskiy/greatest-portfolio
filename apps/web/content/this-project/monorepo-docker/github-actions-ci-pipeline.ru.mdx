@@ -9,7 +9,7 @@ readingTime: "12 мин"
 publishedAt: "2026-11-11"
 order: 3
 tldr:
-  - "**Модульный DAG из 5 джоб вместо монолита:** `lint`, `security` и `typecheck` идут параллельно перед `build` и `storybook` — чёткий fail-fast, изоляция прав и готовые слоты под `Vitest` / `Playwright`."
+  - "**Модульный DAG из 7 джоб вместо монолита:** `lint`, `security`, `typecheck` и `unit-tests` (`Vitest` + `Supertest`) идут параллельно перед `build`, `storybook` и браузерным `e2e` (`Playwright`) — чёткий fail-fast и изоляция прав."
   - "**Справочник GitHub Actions:** детальный разбор `on`, `permissions`, `concurrency`, `needs`, `Composite Actions` (`inputs` / `outputs`) и передачи данных между изолированными VM-раннерами."
   - "**С Turborepo vs без него:** графовый `--affected` с `fetch-depth: '0'` и `TURBO_SCM_BASE` пропускает незатронутые сервисы без зависания Branch Protection и автоматически проверяет зависимых от `packages/shared-schemas`."
   - "**Независимый шлюз `security` без `node_modules`:** валидирует `docker compose config --quiet` и аудирует прод-граф `pnpm-lock.yaml` через `pnpm audit --prod --audit-level=high`."
@@ -53,40 +53,39 @@ tldr:
 
 ---
 
-## 2. Граф задач (DAG) и почему выбраны 5 отдельных Jobs
+## 2. Граф задач (DAG) и почему выбраны 7 отдельных Jobs
 
-Вместо одного длинного скрипта проверки выстроены в **двухступенчатый направленный ациклический граф (DAG)**, куда без переделок встраиваются будущие автотесты:
+Вместо одного длинного скрипта проверки выстроены в **двухступенчатый направленный ациклический граф (DAG)** с быстрыми параллельными шлюзами в Stage 1 и тяжёлыми сборками / браузерным E2E в Stage 2:
 
 ```text
-Stage 1 (Параллельный Fail-Fast и граф типов)     Stage 2 (Тяжёлые сборки после гейтов)
+Stage 1 (Параллельный Fail-Fast и граф типов)     Stage 2 (Тяжёлые сборки и Browser E2E)
 ──────────────────────────────────────────────     ─────────────────────────────────────
 [lint] (Biome 2.6, shallow) ──────────────────┐
-                                              ├──▶ [build] (Turborepo + .turbo + .next/cache)
+                                              ├──▶ [build] (Turborepo + .turbo + .next/cache) ──▶ [e2e] (Playwright Chromium)
 [typecheck] (tsc + prepare-codegen) ──────────┤
                                               └──▶ [storybook] (@repo/ui build-storybook)
+[unit-tests] (Vitest + Supertest E2E) ───────────▶ Параллельно Stage 1 (графовый --affected на PR)
 [security] (Compose + pnpm audit, без install) ──▶ Независимый supply-chain шлюз
-
-Слоты под расширение (без перестройки DAG):
-[unit-tests] (Vitest) ───────────────────────────▶ Параллельно Stage 1 (рядом с lint / typecheck)
-[e2e] (Playwright + Chromium) ───────────────────▶ Stage 2/3 с needs: [ lint, typecheck, build ]
 ```
 
-### Профили всех 5 Jobs
+### Профили всех 7 Jobs
 
 | Job | Зависимости (`needs`) | Git `fetch-depth` | Ставит `node_modules`? | Команда (`pull_request` vs `main`) |
 | :--- | :--- | :--- | :--- | :--- |
 | **`lint`** | — | `'1'` (shallow) | Да (без кодогенерации) | `pnpm run lint` (`biome check .` по всему репозиторию за ~150 мс) |
 | **`security`** | — | `'1'` (shallow) | **Нет** | `docker compose config --quiet` → `pnpm audit --prod --audit-level=high` |
 | **`typecheck`** | — | PR: `'0'`, `main`: `'1'` | Да + `prepare-codegen` | PR: `TURBO_SCM_BASE=...base.sha` + `--affected`; `main`: `pnpm run typecheck` |
+| **`unit-tests`** | — | PR: `'0'`, `main`: `'1'` | Да + `prepare-codegen` | PR: `turbo run test --affected` + `@repo/api test:e2e`; `main`: `pnpm run test` + `@repo/api test:e2e` |
 | **`build`** | `lint`, `typecheck` | PR: `'0'`, `main`: `'1'` | Да | PR: `TURBO_SCM_BASE=...base.sha` + `--affected`; `main`: `pnpm run build` |
 | **`storybook`** | `lint`, `typecheck` | PR: `'0'`, `main`: `'1'` | Да | PR: `TURBO_SCM_BASE=...base.sha` + `--affected`; `main`: `turbo run build-storybook` |
+| **`e2e`** | `lint`, `typecheck`, `build` | `'1'` (shallow) | Да + кэш Chromium | Восстанавливает `.turbo` + `~/.cache/ms-playwright`, запускает `pnpm --filter @repo/web test:e2e` |
 
 ### Почему Multi-Job DAG лучше одного монолитного Job
 
 Объединение всех команд в один общий job экономит ~15–30 секунд на старте виртуальных машин (`checkout` + `setup-workspace`), но мы **осознанно выбрали** модульный граф:
 
-1. **Готовые слоты под `Vitest` и `Playwright` E2E:** быстрые unit-тесты встают в Stage 1 параллельно `typecheck`, а тяжёлый браузерный `Playwright` подключается после `build` со своим кэшем Chromium и БД, не тормозя `lint`, `security` и `storybook`.
-2. **Мгновенный Fail-Fast и экономия сборок:** в PR Checks сразу видно, какой контур упал (`Lint`, `Security`, `Typecheck`, `Build` или `Storybook`), а `needs: [ lint, typecheck ]` физически не даёт запускать сборки Next.js и Storybook, если сломан синтаксис или типы TypeScript.
+1. **Изолированные контуры `Vitest` и `Playwright` E2E:** быстрые unit-тесты идут в Stage 1 параллельно `typecheck`, а тяжёлый браузерный `Playwright` подключается после `build` (`needs: [ lint, typecheck, build ]`) со своим кэшем `.turbo`, Chromium и `webServer`-контуром, не тормозя `lint`, `security` и `storybook`.
+2. **Мгновенный Fail-Fast и экономия сборок:** в PR Checks сразу видно, какой контур упал (`Lint`, `Security`, `Typecheck`, `Unit Tests`, `Build`, `Storybook` или `E2E`), а `needs: [ lint, typecheck ]` физически не даёт запускать сборки Next.js/Playwright, если сломан синтаксис или типы TypeScript.
 3. **Разделение прав и изоляция `node_modules`:** `security` вообще не ставит `node_modules` и не исполняет скрипты пакетов, а `lint` и `security` скачивают только последний коммит (`fetch-depth: 1`).
 4. **Атомарные обязательные проверки (Branch Protection):** каждый job выступает отдельным Required Status Check перед мерджем в `main`.
 5. **Независимый сигнал по безопасности:** `security` не блокирует `build` и `storybook` — при выходе нового CVE в сторонней библиотеке разработчик всё равно видит, собирается ли код.
@@ -235,9 +234,9 @@ concurrency:
 - **Почему именно `--prod --audit-level=high`:** инструменты разработки (`Storybook`, `Vite`, `Biome`, `Turbo`) не попадают в финальные runtime-контейнеры `docker/*.Dockerfile` (`pnpm prune --prod`). Проверка только `--prod` держит высокий уровень сигнал/шум без ложных блокировок из-за dev-утилит.
 - **Управляемые исключения в `pnpm 12`:** если когда-либо потребуется временно задокументировать недостижимую или ложноположительную уязвимость, используется блок `audit.ignore` в `pnpm-workspace.yaml` (через `pnpm audit --ignore <GHSA>`).
 
-### Дорожная карта расширения CI/CD
+### Внедрённые тестовые шлюзы и дальнейший roadmap CI/CD
 
-1. **`unit-tests` (`Vitest`):** параллельный job в Stage 1 (`needs: []`) с `prepare-codegen: "true"`, `fetch-depth: '0'` / `TURBO_SCM_BASE` на PR и `turbo run test --affected` для проверки Zod-контрактов, `Zustand`-сторов и сервисов NestJS.
-2. **`e2e` (`Playwright`):** job после `build` (`needs: [ lint, typecheck, build ]`) с кэшем Chromium, проверкой RBAC-флоу (`GuestPassModal` → `HttpOnly` кука → открытие `.mdx` и `/system-status`) и загрузкой отчётов/трейсов (`actions/upload-artifact`) по `if: failure()`.
-3. **Дополнительный hardening:** еженедельный `schedule:` крон для `security` + `.github/dependabot.yml` (чтобы новые CVE ловились даже в недели без коммитов), `persist-credentials: false` на `actions/checkout@v6` и `actionlint` внутри `lint`.
+1. **`unit-tests` (`Vitest` + `Supertest`) — Внедрено:** параллельный job в Stage 1 (`needs: []`) с `prepare-codegen: "true"`, `fetch-depth: '0'` / `TURBO_SCM_BASE` на PR, `turbo run test --affected` и `pnpm --filter @repo/api test:e2e` для проверки Zod-контрактов, `Zustand`-сторов, RTL + `MSW v3` интеграций и `AppModule` NestJS.
+2. **`e2e` (`Playwright` Chromium) — Внедрено:** job в Stage 2 (`needs: [ lint, typecheck, build ]`) с восстановлением `.turbo` кэша и кэшированием `~/.cache/ms-playwright` по точной версии Playwright, проверкой RBAC-флоу (`GuestPassModal` → `HttpOnly` кука → открытие `.mdx` и `/system-status`) и загрузкой отчётов/трейсов (`actions/upload-artifact@v7`) по `if: failure()`.
+3. **Дополнительный hardening:** на всех шагах `actions/checkout@v6` уже выставлен `persist-credentials: false`; следующие шаги — еженедельный `schedule:` крон для `security` + `.github/dependabot.yml` (чтобы новые CVE ловились даже в недели без коммитов) и `actionlint` внутри `lint`.
 4. **Раздельный CD (Continuous Delivery):** отдельные per-service деплои (`apps/web` на Vercel с Remote Cache; `apps/api` и `apps/telemetry-ms` через `docker/*.Dockerfile` с `turbo prune --docker`), чтобы добавление новых `.mdx`-конспектов не пересобирало Docker-образы бэкенда.

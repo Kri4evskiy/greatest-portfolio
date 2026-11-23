@@ -17,24 +17,23 @@
 ## 2. Граф задач (DAG), роли Jobs и почему выбрана модульная архитектура
 
 ```text
-  [lint] (Biome 2.6, shallow) ──────┐
-                                    ├──▶ [build] (Turborepo + .turbo + .next/cache)
-  [typecheck] (TS + Codegen) ───────┤
-                                    └──▶ [storybook] (@repo/ui via Turborepo)
-  [security] (Compose + pnpm audit) ───▶ независимый supply-chain шлюз (без node_modules)
-
-  --- Планируемое расширение (без ломки графа) ---
-  [unit-tests] (Vitest) ───────────────▶ параллельно Stage 1 (рядом с lint / typecheck)
-  [e2e] (Playwright) ──────────────────▶ Stage 2/3 с needs: [ lint, typecheck, build ]
+  [lint] (Biome 2.6, shallow) ─────────┐
+                                       ├──▶ [build] (Turborepo + .turbo + .next/cache) ──▶ [e2e] (Playwright Chromium)
+  [typecheck] (TS + Codegen) ──────────┤
+                                       └──▶ [storybook] (@repo/ui via Turborepo)
+  [unit-tests] (Vitest + Supertest) ──────▶ параллельно Stage 1 (рядом с lint / typecheck)
+  [security] (Compose + pnpm audit) ──────▶ независимый supply-chain шлюз (без node_modules)
 ```
 
-| Job         | Назначение                                         | Зависимости (`needs`) | `fetch-depth`            | Установка deps         | Ключевая логика (PR vs `main`)                                                                |
-| :---------- | :------------------------------------------------- | :-------------------- | :----------------------- | :--------------------- | :-------------------------------------------------------------------------------------------- |
-| `lint`      | Форматирование и статанализ `Biome 2.6`            | —                     | `'1'`                    | Да                     | `pnpm run lint` (весь репозиторий за ~150 мс)                                                 |
-| `security`  | `docker compose config -q` + `pnpm audit`          | —                     | `'1'`                    | **Нет**                | Валидация Compose и `pnpm audit --prod --audit-level=high` по `pnpm-lock.yaml`                |
-| `typecheck` | Строгий `tsc --noEmit` (с кодогенерацией)          | —                     | PR: `'0'`, `main`: `'1'` | Да + `prepare-codegen` | PR: `TURBO_SCM_BASE=...base.sha` + `--affected`; `main`: `pnpm run typecheck`                 |
-| `build`     | Продакшен-сборка через `Turborepo`                 | `lint`, `typecheck`   | PR: `'0'`, `main`: `'1'` | Да                     | PR: `TURBO_SCM_BASE=...base.sha` + `--affected`; `main`: полный билд + `.turbo`/`.next/cache` |
-| `storybook` | Сборка витрины UI-кита `@repo/ui` (`Storybook 10`) | `lint`, `typecheck`   | PR: `'0'`, `main`: `'1'` | Да                     | PR: `TURBO_SCM_BASE=...base.sha` + `--affected`; `main`: `turbo run build-storybook`          |
+| Job          | Назначение                                         | Зависимости (`needs`)        | `fetch-depth`            | Установка deps         | Ключевая логика (PR vs `main`)                                                                |
+| :----------- | :------------------------------------------------- | :--------------------------- | :----------------------- | :--------------------- | :-------------------------------------------------------------------------------------------- |
+| `lint`       | Форматирование и статанализ `Biome 2.6`            | —                            | `'1'`                    | Да                     | `pnpm run lint` (весь репозиторий за ~150 мс)                                                 |
+| `security`   | `docker compose config -q` + `pnpm audit`          | —                            | `'1'`                    | **Нет**                | Валидация Compose и `pnpm audit --prod --audit-level=high` по `pnpm-lock.yaml`                |
+| `typecheck`  | Строгий `tsc --noEmit` (с кодогенерацией)          | —                            | PR: `'0'`, `main`: `'1'` | Да + `prepare-codegen` | PR: `TURBO_SCM_BASE=...base.sha` + `--affected`; `main`: `pnpm run typecheck`                 |
+| `unit-tests` | Unit/Integration (`Vitest`) + API HTTP E2E         | —                            | PR: `'0'`, `main`: `'1'` | Да + `prepare-codegen` | PR: `turbo run test --affected` + `@repo/api test:e2e`; `main`: полный `pnpm run test`        |
+| `build`      | Продакшен-сборка через `Turborepo`                 | `lint`, `typecheck`          | PR: `'0'`, `main`: `'1'` | Да                     | PR: `TURBO_SCM_BASE=...base.sha` + `--affected`; `main`: полный билд + `.turbo`/`.next/cache` |
+| `storybook`  | Сборка витрины UI-кита `@repo/ui` (`Storybook 10`) | `lint`, `typecheck`          | PR: `'0'`, `main`: `'1'` | Да                     | PR: `TURBO_SCM_BASE=...base.sha` + `--affected`; `main`: `turbo run build-storybook`          |
+| `e2e`        | Браузерный E2E (`Playwright` Chromium + WebServer) | `lint`, `typecheck`, `build` | `'1'`                    | Да + Playwright Cache  | Поднимает собранный контур `api` + `web` и прогоняет `pnpm --filter @repo/web test:e2e`       |
 
 ### Почему выбран Multi-Job DAG, а не один объединённый «быстрый» job
 
@@ -92,13 +91,13 @@ concurrency:
 
 ---
 
-## 4. Расширение под тесты (`Vitest`, `Playwright`), hardening и CD
+## 4. Тестовые джобы (`Vitest`, `Playwright`), hardening и будущий CD
 
-- **`unit-tests` (`Vitest`):** добавить job в Stage 1 (параллельно с `lint`, `security` и `typecheck`) с `uses: ./.github/actions/setup-workspace`, `prepare-codegen: "true"` (при необходимости импорта из `@repo/shared-schemas` / Prisma) и `fetch-depth: ${{ github.event_name == 'pull_request' && '0' || '1' }}` (именно строкой `'0'`, так как число `0` в выражениях GitHub Actions считается falsy!) для `turbo run test --affected`.
-- **`e2e` (`Playwright`):** добавить job после `build` (`needs: [ lint, typecheck, build ]`) с кэшем браузеров Playwright, сборкой или поднятием тестируемого контура (`web` + `api` / тестовый Postgres service container или In-Memory fallback), прогоном RBAC/MDX-сценариев (`GuestPassModal` -> `HttpOnly` cookie -> `/knowledge-base/*`) и загрузкой отчёта/трейсов (`actions/upload-artifact`) только при `failure()`.
-- **Харденинг CI и гигиена безопасности (следующие улучшения):**
-  1. **Регулярный скан CVE (`schedule` + Dependabot):** добавить еженедельный `schedule: - cron: ...` для триггера `security` и `.github/dependabot.yml` (для экосистем `npm` и `github-actions`), чтобы новые уязвимости ловились даже в недели без коммитов.
-  2. **`persist-credentials: false` на `actions/checkout@v6`:** дополнительная Defense-in-Depth изоляция токена `.git/config` поверх уже заданного `permissions: contents: read`.
+- **`unit-tests` (`Vitest` + `Supertest`):** работает в Stage 1 (параллельно с `lint`, `security` и `typecheck`) с `uses: ./.github/actions/setup-workspace`, `prepare-codegen: "true"` (для `@repo/shared-schemas` и Prisma-клиента), `fetch-depth: ${{ github.event_name == 'pull_request' && '0' || '1' }}` (строкой `'0'`, так как число `0` в выражениях GitHub Actions считается falsy!), `turbo run test --affected` на PR (полный `pnpm run test` на `main`) и прогоном `pnpm --filter @repo/api test:e2e`.
+- **`e2e` (`Playwright`):** работает в Stage 2 (`needs: [ lint, typecheck, build ]`), восстанавливает `.turbo` кэш сборки (`pnpm turbo build`), кэширует бинарник Chromium по точной версии `@playwright/test` из `pnpm-lock.yaml` (`~/.cache/ms-playwright`), устанавливает системные зависимости `--with-deps chromium`, прогоняет `pnpm --filter @repo/web test:e2e` (с `webServer` для `@repo/api` + `@repo/web` и `NODE_OPTIONS` без IPv6 Happy Eyeballs) и загружает HTML-отчёт/трейсы через `actions/upload-artifact@v7` только при `if: failure()`.
+- **Реализованный и планируемый hardening CI:**
+  1. **`persist-credentials: false` на всех `actions/checkout@v6`:** уже внедрено для дополнительной Defense-in-Depth изоляции токена `.git/config` поверх `permissions: contents: read`.
+  2. **Регулярный скан CVE (`schedule` + Dependabot):** добавить еженедельный `schedule: - cron: ...` для триггера `security` и `.github/dependabot.yml` (для экосистем `npm` и `github-actions`), чтобы новые уязвимости ловились даже в недели без коммитов.
   3. **`actionlint` в `lint`:** лёгкая проверка синтаксиса `.github/workflows/*.yml`, которую `Biome` не инспектирует.
   4. **Pinning экшенов по commit SHA (опционально):** жёсткая фиксация SHA-хэшей сторонних экшенов в паре с Dependabot для максимальной supply-chain неизменяемости.
 - **CD (деплой сервисов):** выносить отдельными workflow per-service (`web` на Vercel с Remote Cache, `api` и `telemetry-ms` через `docker/*.Dockerfile` с `turbo prune`), чтобы правка фронтенда или статей `.mdx` не перезапускала сборку Docker-образов бэкенда.

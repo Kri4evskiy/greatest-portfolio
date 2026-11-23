@@ -191,45 +191,49 @@ export const ENGINEERING_ROADMAP_ITEMS: readonly EngineeringRoadmapItem[] = [
   },
   {
     id: 'playwright-vitest-ci',
-    status: 'planned',
+    status: 'shipped',
     kind: 'devops',
-    priority: 'P2',
+    priority: 'P1',
     effort: 'M',
     title: {
-      en: 'Vitest Unit Suite + Playwright E2E RBAC Tests in GitHub Actions CI',
-      uk: 'Vitest Unit-тести + Playwright E2E тести RBAC у GitHub Actions CI',
-      ru: 'Vitest Unit-тесты + Playwright E2E-тесты RBAC в пайплайне GitHub Actions CI',
+      en: '3-Tier Testing Pyramid (Vitest + MSW + Supertest + Playwright E2E) in GitHub Actions CI',
+      uk: '3-рівнева піраміда тестування (Vitest + MSW + Supertest + Playwright E2E) у GitHub Actions CI',
+      ru: '3-уровневая пирамида тестирования (Vitest + MSW + Supertest + Playwright E2E) в GitHub Actions CI',
     },
     summary: {
-      en: 'Extend the live GitHub Actions CI (Biome lint, Docker/audit security, TypeScript 7 typecheck, Turborepo build, Storybook 10) with Vitest unit tests and Playwright E2E coverage for 1-Click Guest Pass -> HttpOnly Cookie -> MDX unlock.',
-      uk: 'Доповнити активний GitHub Actions CI (Biome, Docker/audit security, TS 7 typecheck, build, Storybook 10) юніт-тестами на Vitest і Playwright E2E перевіркою видачі гостьової куки та відкриття статей.',
-      ru: 'Дополнить работающий GitHub Actions CI (Biome, Docker/audit security, TS 7 typecheck, build, Storybook 10) unit-тестами на Vitest и Playwright E2E-сценарием выдачи HttpOnly куки и открытия MDX-конспектов.',
+      en: 'Shipped full automated QA across the monorepo: Vitest unit & MSW integration tests (shared-schemas, web, api via SWC ESM), NestJS Supertest HTTP E2E, Playwright POM E2E (data-testid + test.step) against production builds, and Stage 1/2 CI jobs.',
+      uk: 'Впроваджено автоматизовану піраміду QA у монорепозиторії: unit та MSW integration-тести на Vitest (shared-schemas, web, api через SWC ESM), NestJS Supertest HTTP E2E, Playwright POM E2E (data-testid + test.step) проти prod-збірок та джоби Stage 1/2 у CI.',
+      ru: 'Внедрена автоматизированная пирамида QA в монорепозитории: unit- и MSW integration-тесты на Vitest (shared-schemas, web, api через SWC ESM), NestJS Supertest HTTP E2E, Playwright POM E2E (data-testid + test.step) против prod-сборок и джобы Stage 1/2 в CI.',
     },
     rationale: {
-      en: 'Lint, security audit, TS 7 typecheck, Next.js build, and Storybook CI gates are already active; adding Vitest (native TS 7 compatible) and Playwright locks in runtime RBAC and Zod contract safety.',
-      uk: 'Гейти lint, security, TS 7 typecheck, build і Storybook у CI вже працюють; Vitest (сумісний із TS 7) та Playwright закриють поведінкові й RBAC-регресії.',
-      ru: 'Базовые гейты lint, security, TS 7 typecheck, build и Storybook в CI уже работают; добавление Vitest (совместим с TS 7) и Playwright закроет регрессии RBAC и Zod-контрактов.',
+      en: 'Replaces Jest/ts-jest (incompatible with TypeScript 7 & NestJS 12 ESM) with Vitest + unplugin-swc, pairs network-boundary MSW mocking with real NestJS Supertest HTTP checks, and locks in RBAC Guest Pass & /system-status pagination via Playwright.',
+      uk: 'Замінює Jest/ts-jest (несумісні з TypeScript 7 та NestJS 12 ESM) на Vitest + unplugin-swc, поєднує мережеві моки MSW із живими Supertest HTTP-перевірками та фіксує RBAC Guest Pass і пагінацію /system-status через Playwright.',
+      ru: 'Заменяет Jest/ts-jest (несовместимые с TypeScript 7 и NestJS 12 ESM) на связку Vitest + unplugin-swc, соединяет сетевые моки MSW с реальными Supertest HTTP-проверками и защищает RBAC Guest Pass и пагинацию /system-status через Playwright.',
     },
     pros: {
       en: [
-        'Prevents regressions in Edge Proxy cookie redirects, Zustand sync, and NestJS AuthService',
-        'Demonstrates full automated QA pyramid directly in the public repo',
+        '46 Vitest unit/integration tests + NestJS Supertest HTTP E2E + Playwright Chromium E2E wired into GitHub Actions (--affected on PR)',
+        'Strict zero-cruft data-testid policy, Radix UI Portal handling, and 10-article INITIAL_ARTICLE_SEEDS parity out of the box',
       ],
       uk: [
-        'Унеможливлює регресії в Edge Proxy редіректах, Zustand і NestJS AuthService',
-        'Наочно демонструє повну піраміду автотестів у публічному репозиторії',
+        '46 Vitest unit/integration тестів + NestJS Supertest HTTP E2E + Playwright Chromium E2E інтегровані в GitHub Actions (--affected на PR)',
+        'Суворе правило data-testid без сміття, робота з Radix UI Portals та 10 сід-статей для пагінації «з коробки»',
       ],
       ru: [
-        'Исключает регрессии в редиректах Edge Proxy, сторах Zustand и NestJS AuthService',
-        'Наглядно демонстрирует полную пирамиду автотестирования в репозитории',
+        '46 Vitest unit/integration тестов + NestJS Supertest HTTP E2E + Playwright Chromium E2E встроены в GitHub Actions (--affected на PR)',
+        'Строгое правило data-testid без лишнего мусора, поддержка Radix UI Portals и 10 стартовых seed-статей для пагинации «из коробки»',
       ],
     },
     constraints: {
-      en: ['Strict Vitest only (no Jest/ts-jest due to TypeScript 7 compatibility); CI must cache Playwright cleanly'],
-      uk: [
-        'Суворо Vitest (без Jest/ts-jest через сумісність із TypeScript 7); потрібне кешування браузерів Playwright',
+      en: [
+        'Starter Playwright suite keeps 1 focused POM flow until UI v2 visual redesign lands; Windows Node 24 proxy requires IPv4-first DNS flags',
       ],
-      ru: ['Строго Vitest (без Jest/ts-jest из-за TypeScript 7); в CI нужно аккуратно кэшировать браузеры Playwright'],
+      uk: [
+        'Стартовий Playwright E2E тримає 1 ключовий POM-сценарій до візуального редизайну UI v2; локальний Windows Node 24 потребує IPv4-first DNS прапорців',
+      ],
+      ru: [
+        'Стартовый Playwright E2E покрывает 1 ключевой POM-сценарий до визуального редизайна UI v2; локальный Windows Node 24 требует флагов IPv4-first DNS',
+      ],
     },
   },
   {

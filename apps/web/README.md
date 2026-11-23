@@ -15,7 +15,14 @@ apps/web/
 ├── config/
 │   └── security-headers.config.ts        # Генератор CSP, HSTS, X-Frame-Options, Permissions-Policy
 ├── content/                              # Colocated MDX-статьи (*.{en,uk,ru}.mdx) по категориям
+├── e2e/                                  # Playwright E2E (Page Object Model + test.step)
+│   ├── fixtures/app.fixture.ts           # Типизированные фикстуры страниц
+│   ├── pages/                            # Page Objects (guest-pass.page.ts, system-status.page.ts)
+│   └── specs/                            # Спеки сценариев (rbac-and-observability.spec.ts)
 ├── messages/                             # Словари UI-переводов next-intl (en.json, uk.json, ru.json)
+├── playwright.config.ts                  # Конфигурация Playwright + multi-service WebServer
+├── vitest.config.ts                      # Конфигурация Vitest + jsdom + tsconfig paths
+├── vitest.setup.ts                       # @testing-library/jest-dom + afterEach(cleanup)
 └── src/
     ├── proxy.ts                          # Next.js 16 Edge Proxy: Web Crypto JWT + next-intl роутинг
     │
@@ -50,6 +57,7 @@ apps/web/
     │   ├── search/                       # CommandPaletteModal (на базе @repo/ui Dialog) + search-index-client.ts
     │   ├── telemetry-stream/             # FooterSseStatus + use-telemetry-stream.ts + queries/use-system-observability.ts
     │   │                                 # + lib/system-status-helpers.ts + ui/{system-status-dashboard,capabilities-matrix-card,live-event-log-card,knowledge-leaderboard-card,observability-data-table}.tsx
+    │   │                                 # + ui/__tests__/knowledge-leaderboard-card.integration.test.tsx (RTL + MSW v3)
     │   └── kb-sandboxes/ui/              # Ленивые клиентские острова (mdx-client-widgets.tsx, D3, MCP)
     │
     ├── entities/                         # [Слой 4: Business Data Representation]
@@ -60,10 +68,10 @@ apps/web/
     │
     └── shared/                           # [Слой 5: Infrastructure & Common Tools]
         ├── hooks/                        # Чистые браузерные DOM/ScrollSpy-хуки (use-section-navigation.ts)
-        ├── i18n/                         # app-routes.ts (APP_ROUTES, resolveHeaderRouteBadge, buildKnowledgeBasePath), routing.ts, request.ts, navigation.ts
-        ├── lib/                          # api-client.ts (Axios + interceptors + AbortSignal + Zod), edge-jwt.ts, seo.ts, palette.ts, analytics.ts (PostHog + prod-only Sentry captureClientException)
-        ├── providers/                    # ThemeProvider (next-themes), QueryProvider (TanStack + IndexedDB)
-        └── store/                        # useUIStore (Zustand — модалки, фильтры, папки сайдбара, palette)
+        ├── i18n/                         # app-routes.ts (+ __tests__/app-routes.test.ts), routing.ts, request.ts, navigation.ts
+        ├── lib/                          # api-client.ts (+ __tests__/api-client.test.ts), edge-jwt.ts, seo.ts, palette.ts, analytics.ts (PostHog + prod-only Sentry captureClientException)
+        ├── providers/                    # ThemeProvider (next-themes), QueryProvider (+ __tests__/query-provider.test.tsx)
+        └── store/                        # useUIStore (Zustand — модалки, фильтры, папки сайдбара, palette + __tests__/use-ui-store.test.ts)
 ```
 
 ### Почему нет плоских папок `components/`, `hooks/`, `lib/` и как разделены хуки
@@ -167,9 +175,11 @@ apps/web/
 # Запуск dev-сервера Next.js на порту 3000 (из корня монорепозитория)
 pnpm --filter @repo/web dev
 
-# Проверка типов TypeScript и линтер/форматтер Biome
+# Проверка типов TypeScript, линтер/форматтер Biome и тесты (Vitest + Playwright E2E)
 pnpm --filter @repo/web typecheck
 pnpm --filter @repo/web lint
+pnpm --filter @repo/web test
+pnpm --filter @repo/web test:e2e
 
 # Форматирование всего монорепозитория через Biome
 pnpm biome check --write .

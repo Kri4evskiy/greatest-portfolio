@@ -36,3 +36,8 @@
 - Глобальный префикс API: `/api`, лимит тела запроса `100kb` (`json` и `urlencoded`), активирован `app.enableShutdownHooks()`.
 - Включен `cookie-parser`, `LoggingInterceptor`, `LoggingMiddleware` и строгий `CORS` с `credentials: true` и `exposedHeaders: ['X-Request-Id']`, разрешающий обмен `HttpOnly` куками с `apps/web`.
 - Все исключения проходят через `SentryExceptionFilter` (с возвратом `requestId` и интеграцией в `Sentry`).
+
+## 4. Тестирование (`Vitest` + `unplugin-swc` + `Supertest`)
+
+- Colocated unit-тесты лежат в `src/**/__tests__/*.spec.ts` (`config/__tests__/app.config.spec.ts`, `prisma/__tests__/prisma.service.spec.ts`, `modules/auth/__tests__/auth.{service,controller}.spec.ts`), а HTTP E2E-тесты полного `AppModule` через `Supertest` — в `test/auth-and-observability.e2e-spec.ts`.
+- Правила компиляции ESM + `emitDecoratorMetadata` через `unplugin-swc` и `vitest.base.ts` (включая `SWC_NATIVE_BINDING_CACHE`) описаны в `.agents/testing/testing-strategy.md`.

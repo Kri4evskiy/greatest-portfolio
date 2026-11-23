@@ -71,6 +71,7 @@ const LOCALIZED_CATEGORY_LABELS: Record<SupportedLocale, Record<KnowledgeCategor
 const LOCALIZED_SUBTOPIC_LABELS: Record<SupportedLocale, Record<string, string>> = {
   en: {
     'monorepo-docker': 'Monorepo, Configs & Docker',
+    'testing-qa': 'Testing & QA Pyramid',
     'design-system': 'Design System & Navigation',
     'mobile-first-ui': 'Design System & Navigation',
     'knowledge-engine': 'MDX & Search Engine',
@@ -97,6 +98,7 @@ const LOCALIZED_SUBTOPIC_LABELS: Record<SupportedLocale, Record<string, string>>
   },
   uk: {
     'monorepo-docker': 'Монорепо, Конфіги та Docker',
+    'testing-qa': 'Тестування та QA-піраміда',
     'design-system': 'Дизайн-система та Навігація',
     'mobile-first-ui': 'Дизайн-система та Навігація',
     'knowledge-engine': 'Рушій MDX та Пошук',
@@ -123,6 +125,7 @@ const LOCALIZED_SUBTOPIC_LABELS: Record<SupportedLocale, Record<string, string>>
   },
   ru: {
     'monorepo-docker': 'Монорепо, Конфиги и Docker',
+    'testing-qa': 'Тестирование и QA-пирамида',
     'design-system': 'Дизайн-система и Навигация',
     'mobile-first-ui': 'Дизайн-система и Навигация',
     'knowledge-engine': 'Движок MDX и Поиск',

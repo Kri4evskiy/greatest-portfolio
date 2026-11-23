@@ -9,51 +9,63 @@
 Исходный код в `src/` разделён на чёткие слои по ответственности:
 
 ```text
-apps/api/src/
-├── main.ts                     # Bootstrap: Helmet, CORS (exposedHeaders: X-Request-Id), enableShutdownHooks(), CookieParser
-├── app.module.ts               # Root Module: ThrottlerModule, APP_GUARD (ThrottlerGuard), APP_INTERCEPTOR (TimeoutInterceptor), LoggingMiddleware
-├── app.controller.ts           # Healthcheck (GET /api/health) и матрица возможностей (GET /api/capabilities)
+apps/api/
+├── vitest.base.ts              # Общая база Vitest + unplugin-swc + ESM (.js->.ts) + SWC_NATIVE_BINDING_CACHE
+├── vitest.config.ts            # Конфигурация unit-тестов (src/**/*.spec.ts)
+├── vitest.e2e.config.ts        # Конфигурация HTTP E2E-тестов (test/*.e2e-spec.ts)
+├── vitest.setup.ts             # reflect-metadata для декораторов NestJS
+├── test/
+│   └── auth-and-observability.e2e-spec.ts # Full AppModule + Supertest E2E
 │
-├── common/                     # Сквозные механизмы фреймворка (Cross-Cutting Concerns)
-│   ├── decorators/             # @Public() и @SkipTimeout()
-│   ├── dto/                    # PaginationQuerySchema / PaginationQueryDto (заготовка под пагинацию логов и MCP)
-│   ├── filters/                # SentryExceptionFilter (глобальный @Catch(), маскирует 5xx детали и возвращает requestId)
-│   ├── guards/                 # Директория для общих гардов (.gitkeep)
-│   ├── interceptors/           # LoggingInterceptor (debug) и TimeoutInterceptor (15s с обходом SSE)
-│   ├── middleware/             # LoggingMiddleware (Express-уровень на '{*path}')
-│   ├── pipes/                  # ZodValidationPipe (точечная валидация через схемы @repo/shared-schemas)
-│   └── utils/                  # request-id.util.ts (генерация и защита X-Request-Id от CRLF Log Injection)
+└── src/
+    ├── main.ts                     # Bootstrap: Helmet, CORS (exposedHeaders: X-Request-Id), enableShutdownHooks(), CookieParser
+    ├── app.module.ts               # Root Module: ThrottlerModule, APP_GUARD (ThrottlerGuard), APP_INTERCEPTOR (TimeoutInterceptor), LoggingMiddleware
+    ├── app.controller.ts           # Healthcheck (GET /api/health) и матрица возможностей (GET /api/capabilities)
 │
-├── config/                     # Типизированная Fail-Fast конфигурация (Zod)
-│   ├── app.config.ts           # PORT, WEB_ORIGIN, WORKFOLIO_DEMO_MODE, JWT_SECRET, ADMIN_SECRET_PASSCODE, TELEMETRY_MS_*, SENTRY_DSN, integration flags
-│   └── database.config.ts      # DATABASE_URL, DIRECT_URL, парсер ?schema=
-│
-├── generated/prisma/           # Автогенерируемый ESM-клиент Prisma 7 (игнорируется Git и Biome)
-│
-├── migrations/                 # Слой управления сидированием БД
-│   └── scripts/
-│       ├── seed-data.ts        # Единый источник INITIAL_ARTICLE_SEEDS (для seed.ts и In-Memory fallback)
-│       └── seed.ts             # Идемпотентный CLI-скрипт (Pool + PrismaPg, upsert в ArticleMetrics)
-│
-├── prisma/                     # Доступ к данным (@Global() PrismaModule)
-│   ├── prisma.module.ts
-│   └── prisma.service.ts       # Композиция PrismaClient + @prisma/adapter-pg + In-Memory fallback без DATABASE_URL
-│
-└── modules/                    # Изолированные доменные модули (Domain Modules)
-    ├── auth/                   # JWT в HttpOnly Cookies, Guest Pass, RBAC
-    │   ├── decorators/         # @Roles(...)
-    │   ├── dto/                # Реэкспорт схем/типов из @repo/shared-schemas
-    │   ├── guards/             # JwtRolesGuard
-    │   ├── auth.controller.ts
-    │   ├── auth.service.ts
-    │   └── auth.module.ts
-    ├── knowledge/              # Метрики и реакции статей Базы Знаний
-    │   ├── dto/                # Реэкспорт схем/типов из @repo/shared-schemas
-    │   ├── knowledge.controller.ts
-    │   ├── knowledge.service.ts
-    │   └── knowledge.module.ts
-    └── telemetry/              # Прокси к apps/telemetry-ms (TCP :4001) + Cursor-лог + SSE-стрим
-        ├── dto/                # telemetry.dto.ts (SystemEventsQuerySchema)
+    │
+    ├── common/                     # Сквозные механизмы фреймворка (Cross-Cutting Concerns)
+    │   ├── decorators/             # @Public() и @SkipTimeout()
+    │   ├── dto/                    # PaginationQuerySchema / PaginationQueryDto (заготовка под пагинацию логов и MCP)
+    │   ├── filters/                # SentryExceptionFilter (глобальный @Catch(), маскирует 5xx детали и возвращает requestId)
+    │   ├── guards/                 # Директория для общих гардов (.gitkeep)
+    │   ├── interceptors/           # LoggingInterceptor (debug) и TimeoutInterceptor (15s с обходом SSE)
+    │   ├── middleware/             # LoggingMiddleware (Express-уровень на '{*path}')
+    │   ├── pipes/                  # ZodValidationPipe (точечная валидация через схемы @repo/shared-schemas)
+    │   └── utils/                  # request-id.util.ts (генерация и защита X-Request-Id от CRLF Log Injection)
+    │
+    ├── config/                     # Типизированная Fail-Fast конфигурация (Zod)
+    │   ├── __tests__/              # app.config.spec.ts
+    │   ├── app.config.ts           # PORT, WEB_ORIGIN, WORKFOLIO_DEMO_MODE, JWT_SECRET, ADMIN_SECRET_PASSCODE, TELEMETRY_MS_*, SENTRY_DSN, integration flags
+    │   └── database.config.ts      # DATABASE_URL, DIRECT_URL, парсер ?schema=
+    │
+    ├── generated/prisma/           # Автогенерируемый ESM-клиент Prisma 7 (игнорируется Git и Biome)
+    │
+    ├── migrations/                 # Слой управления сидированием БД
+    │   └── scripts/
+    │       ├── seed-data.ts        # Единый источник INITIAL_ARTICLE_SEEDS (10 слагов для seed.ts и In-Memory fallback)
+    │       └── seed.ts             # Идемпотентный CLI-скрипт (Pool + PrismaPg, upsert в ArticleMetrics)
+    │
+    ├── prisma/                     # Доступ к данным (@Global() PrismaModule)
+    │   ├── __tests__/              # prisma.service.spec.ts (тесты In-Memory fallback, пагинации и фильтрации)
+    │   ├── prisma.module.ts
+    │   └── prisma.service.ts       # Композиция PrismaClient + @prisma/adapter-pg + In-Memory fallback без DATABASE_URL
+    │
+    └── modules/                    # Изолированные доменные модули (Domain Modules)
+        ├── auth/                   # JWT в HttpOnly Cookies, Guest Pass, RBAC
+        │   ├── __tests__/          # auth.service.spec.ts, auth.controller.spec.ts
+        │   ├── decorators/         # @Roles(...)
+        │   ├── dto/                # Реэкспорт схем/типов из @repo/shared-schemas
+        │   ├── guards/             # JwtRolesGuard
+        │   ├── auth.controller.ts
+        │   ├── auth.service.ts
+        │   └── auth.module.ts
+        ├── knowledge/              # Метрики и реакции статей Базы Знаний
+        │   ├── dto/                # Реэкспорт схем/типов из @repo/shared-schemas
+        │   ├── knowledge.controller.ts
+        │   ├── knowledge.service.ts
+        │   └── knowledge.module.ts
+        └── telemetry/              # Прокси к apps/telemetry-ms (TCP :4001) + Cursor-лог + SSE-стрим
+            ├── dto/                # telemetry.dto.ts (SystemEventsQuerySchema)
         ├── telemetry.controller.ts
         ├── telemetry.service.ts
         └── telemetry.module.ts
@@ -156,9 +168,11 @@ apps/api/src/
 # Запуск в dev-режиме (из корня монорепозитория или apps/api)
 pnpm --filter @repo/api dev
 
-# Проверка типов и линтер Biome
+# Проверка типов, линтер Biome и тесты (Vitest Unit + Supertest HTTP E2E)
 pnpm --filter @repo/api typecheck
 pnpm --filter @repo/api lint
+pnpm --filter @repo/api test
+pnpm --filter @repo/api test:e2e
 
 # Сборка (prisma generate + tsc -p tsconfig.build.json)
 pnpm --filter @repo/api build

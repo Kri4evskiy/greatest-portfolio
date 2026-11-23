@@ -79,3 +79,7 @@
 
 - `SystemCapabilitiesSchema` (`status: 'ok'`, `mode: 'demo' | 'development' | 'production'`, `persistence: 'postgresql' | 'in-memory-fallback'`, `rateLimiter: 'redis' | 'in-memory'`, `telemetryTcpConnected: boolean`, `integrations: { redisCache, s3ObjectStorage, telegramBotAuth, sentryObservability }`, `timestamp: z.iso.datetime()`).
 - `API_ENDPOINTS`, типы `ApiEndpointPath` / `EndpointPathParams` и универсальный резолвер `resolveEndpoint(template, pathParams)` — единый реестр клиентских `/api/*` путей (включая параметризованные шаблоны вроде `/api/knowledge/:slug/view`), потребляемый Axios-клиентом `apiClient` (`apps/web/src/shared/lib/api-client.ts`).
+
+### 9. Тестирование контрактов (`src/__tests__/`)
+
+- Регрессионные unit-тесты на `Vitest` (`api-routes.test.ts` и `contracts.test.ts`) покрывают `resolveEndpoint`, валидацию `SystemCapabilitiesSchema`, `PaginatedArticleMetricsQuerySchema` (defaults & bounds), `SystemEventsQuerySchema` и целостность 16 локализованных ADR в `tech-radar.schema.ts` (см. `.agents/testing/testing-strategy.md`).

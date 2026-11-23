@@ -38,6 +38,8 @@
   "editor.codeActionsOnSave": {
     "source.fixAll.biome": "explicit"
   },
+  "vitest.maximumConfigs": 10,
+  "playwright.config": "apps/web/playwright.config.ts",
   "cSpell.words": [
     "biomejs",
     "Callout",
