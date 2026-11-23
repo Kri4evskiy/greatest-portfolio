@@ -121,25 +121,26 @@ docker compose -f docker-compose.prod.yml --env-file .env.prod up --build -d
 
 ## 🛠️ Monorepo Commands (Root Directory)
 
-| Command                            | Description                                                                                                                   |
-| :--------------------------------- | :---------------------------------------------------------------------------------------------------------------------------- |
-| `pnpm install`                     | Installs all `apps/*` and `packages/*` dependencies + triggers `setup`                                                        |
-| `pnpm run setup`                   | Syncs `.env`, builds `@repo/shared-schemas`, and generates `Prisma Client`                                                    |
-| `pnpm run dev`                     | **Adaptive runner:** Turborepo with automatic graceful fallback to `pnpm workspaces`                                          |
-| `pnpm run dev:pnpm`                | Force runs all services via `pnpm --parallel` (bypassing `turbo.exe`)                                                         |
-| `pnpm run dev:turbo`               | Explicitly runs via `Turborepo` (`turbo run dev`)                                                                             |
-| `pnpm run build`                   | Production build across all packages and apps via `Turborepo`                                                                 |
-| `pnpm run build:pnpm`              | Builds the monorepo directly via `pnpm -r build` in topological dependency order                                              |
-| `pnpm run clean-cache`             | Prunes old local `.turbo/cache` archives while preserving recent cache hits (supports `--all`, `--keep=N`, `--keep-heavy=N`)  |
-| `pnpm run typecheck`               | Strict TypeScript validation (`tsc --noEmit`) across all packages via `Turborepo`                                             |
-| `pnpm run typecheck:pnpm`          | Typechecks packages directly via `pnpm -r typecheck`                                                                          |
-| `pnpm run lint`                    | Blazing fast linting and formatting verification via `Biome.js` (Rust)                                                        |
-| `pnpm run lint:fix`                | Automatically fixes linting and formatting issues via `Biome.js`                                                              |
-| `pnpm run test`                    | Runs all `Vitest` unit & integration suites across `@repo/shared-schemas`, `@repo/web`, `@repo/api`, and `@repo/telemetry-ms` |
-| `pnpm run test:coverage`           | Generates V8 coverage (`text`, `html` ➔ `coverage/index.html`, `lcov.info`) per workspace via `Turborepo`                     |
-| `pnpm --filter @repo/api test:e2e` | Runs full `AppModule` + `Supertest` HTTP E2E integration tests in `apps/api/test/`                                            |
-| `pnpm --filter @repo/web test:e2e` | Runs `Playwright` POM end-to-end browser verification against compiled production `@repo/api` + `@repo/web` servers           |
-| `pnpm --filter @repo/ui storybook` | Starts the interactive `Storybook` component showcase on port `6006`                                                          |
+| Command                            | Description                                                                                                                        |
+| :--------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm install`                     | Installs all `apps/*` and `packages/*` dependencies + triggers `setup`                                                             |
+| `pnpm run setup`                   | Syncs `.env`, builds `@repo/shared-schemas`, and generates `Prisma Client`                                                         |
+| `pnpm run dev`                     | **Adaptive runner:** Turborepo with automatic graceful fallback to `pnpm workspaces`                                               |
+| `pnpm run dev:pnpm`                | Force runs all services via `pnpm --parallel` (bypassing `turbo.exe`)                                                              |
+| `pnpm run dev:turbo`               | Explicitly runs via `Turborepo` (`turbo run dev`)                                                                                  |
+| `pnpm run build`                   | Production build across all packages and apps via `Turborepo`                                                                      |
+| `pnpm run build:pnpm`              | Builds the monorepo directly via `pnpm -r build` in topological dependency order                                                   |
+| `pnpm run clean-cache`             | Prunes old local `.turbo/cache` archives while preserving recent cache hits (supports `--all`, `--keep=N`, `--keep-heavy=N`)       |
+| `pnpm run typecheck`               | Strict TypeScript validation (`tsc --noEmit`) across all packages via `Turborepo`                                                  |
+| `pnpm run typecheck:pnpm`          | Typechecks packages directly via `pnpm -r typecheck`                                                                               |
+| `pnpm run lint`                    | Blazing fast linting and formatting verification via `Biome.js` (Rust)                                                             |
+| `pnpm run lint:fix`                | Automatically fixes linting and formatting issues via `Biome.js`                                                                   |
+| `pnpm run test`                    | Runs all `Vitest` unit & integration suites across `@repo/shared-schemas`, `@repo/web`, `@repo/api`, and `@repo/telemetry-ms`      |
+| `pnpm run test:coverage`           | Generates V8 coverage (`text`, `html` ➔ `coverage/index.html`, `lcov.info`) per workspace via `Turborepo`                          |
+| `pnpm run test:ui`                 | Starts interactive **Vitest UI** dashboard + live V8 coverage viewer on [http://localhost:5124](http://localhost:5124/__vitest__/) |
+| `pnpm --filter @repo/api test:e2e` | Runs full `AppModule` + `Supertest` HTTP E2E integration tests in `apps/api/test/`                                                 |
+| `pnpm --filter @repo/web test:e2e` | Runs `Playwright` POM end-to-end browser verification against compiled production `@repo/api` + `@repo/web` servers                |
+| `pnpm --filter @repo/ui storybook` | Starts the interactive `Storybook` component showcase on port `6006`                                                               |
 
 ### 🧪 Testing, Coverage & Quality Gates
 
@@ -155,6 +156,9 @@ pnpm run test
 # 3. Code Coverage via V8 (per-package via Turborepo, or unified report from repo root ➔ opens coverage/index.html)
 pnpm run test:coverage
 pnpm exec vitest run --coverage
+
+# (Optional) Interactive Vitest UI browser dashboard + module graph + Coverage tab on port 5124
+pnpm run test:ui
 
 # 4. Backend HTTP E2E (Full NestJS AppModule + Guards + Pipes + HttpOnly Cookies via Supertest)
 pnpm --filter @repo/api test:e2e

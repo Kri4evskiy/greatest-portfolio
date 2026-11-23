@@ -113,6 +113,7 @@ greatest-portfolio/
 ```bash
 pnpm run test                         # Все Unit & Integration тесты через Turborepo
 pnpm run test:coverage                # V8 Coverage по воркспейсам через Turborepo (или pnpm exec vitest run --coverage из корня)
+pnpm run test:ui                      # Интерактивный Vitest UI + Coverage на http://localhost:5124/__vitest__/ (порт вне резервов Hyper-V)
 pnpm run test:watch                   # Watch-режим (внутри конкретного воркспейса)
 pnpm --filter @repo/api test:e2e      # Backend HTTP E2E (AppModule + Supertest)
 pnpm run build && pnpm run test:e2e   # Full-Stack Playwright E2E против prod-сборок
