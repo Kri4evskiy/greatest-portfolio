@@ -16,6 +16,9 @@
       "!**/dist",
       "!**/src/generated",
       "!**/storybook-static",
+      "!**/coverage",
+      "!**/playwright-report",
+      "!**/test-results",
       "!**/pnpm-lock.yaml",
       "!**/*.min.js",
       "!**/next-env.d.ts"

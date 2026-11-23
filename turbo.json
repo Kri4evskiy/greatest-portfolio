@@ -20,6 +20,22 @@
     "lint": {
       "dependsOn": ["^lint"]
     },
+    "test": {
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", ".env*"],
+      "passThroughEnv": ["SWC_NATIVE_BINDING_CACHE"]
+    },
+    "test:coverage": {
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", ".env*"],
+      "outputs": ["coverage/**"],
+      "passThroughEnv": ["SWC_NATIVE_BINDING_CACHE"]
+    },
+    "test:e2e": {
+      "dependsOn": ["build"],
+      "cache": false,
+      "passThroughEnv": ["SWC_NATIVE_BINDING_CACHE", "CI", "WORKFOLIO_DEMO_MODE"]
+    },
     "dev": {
       "dependsOn": ["^build"],
       "cache": false,

@@ -17,6 +17,8 @@
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "format": "biome format --write .",
+    "test": "turbo run test",
+    "test:e2e": "pnpm --filter @repo/web test:e2e",
     "typecheck": "turbo run typecheck",
     "typecheck:pnpm": "pnpm -r typecheck",
     "setup": "node scripts/bootstrap-env.mjs",
