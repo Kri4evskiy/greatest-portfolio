@@ -38,8 +38,8 @@ This repository implements a multi-tier, zero-trust security architecture design
 ### 6. Supply Chain & Build Security
 
 - **Strict Dependency Isolation:** Powered by **pnpm 12** and [`pnpm-workspace.yaml`](./pnpm-workspace.yaml). Unapproved native package build scripts are blocked via strict `allowBuilds` allowlisting.
-- **Zero Secrets Commitment:** No API keys, database credentials, or secret keys are committed to the repository. The `.gitignore` prevents leaks of `.env` files.
-- **Automated Security Gates:** Every push and pull request triggers automated dependency vulnerability audits (`pnpm audit`) and static analysis in GitHub Actions.
+- **Zero Secrets Commitment:** No API keys, database credentials, or real secret keys are committed to the repository. Both `.gitignore` and `.dockerignore` block `.env` and all `.env.*` variants (including `.env.prod`, allowing only `.env.example`).
+- **Automated Security Gates:** Every push and pull request enforces `persist-credentials: false` on `actions/checkout@v6`, runs isolated `docker compose config --quiet` + `pnpm audit --prod --audit-level=high` (`security` job with zero `node_modules` installed), and executes `Vitest` security regression suites (`edge-jwt`, `jwt-roles.guard`, `request-id.util`, `app.config`).
 
 ---
 

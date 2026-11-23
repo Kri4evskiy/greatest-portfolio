@@ -19,18 +19,17 @@ coverage/
 playwright-report/
 test-results/
 blob-report/
+.vitest/
 
 # Prisma generated & SQLite/local DBs
 apps/api/src/generated/prisma/
 *.db
 *.db-journal
 
-# Environment variables
+# Environment variables (block all .env.* including .env.prod; keep template only)
 .env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+.env.*
+!.env.example
 
 # Logs & Debug
 npm-debug.log*

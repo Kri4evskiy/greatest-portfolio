@@ -1,6 +1,7 @@
 import { defineConfig, devices } from '@playwright/test'
+import { resolveJwtSecret } from '@repo/shared-schemas'
 
-const DEFAULT_E2E_JWT_SECRET = process.env.JWT_SECRET ?? 'workfolio-super-secret-jwt-key-2026'
+const DEFAULT_E2E_JWT_SECRET = resolveJwtSecret(process.env.JWT_SECRET)
 
 export default defineConfig({
   testDir: './e2e/specs',
