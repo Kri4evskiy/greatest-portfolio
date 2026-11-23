@@ -7,6 +7,5 @@ export default defineConfig({
     clearMocks: true,
     unstubEnvs: true,
     unstubGlobals: true,
-    passWithNoTests: true,
   },
 })
