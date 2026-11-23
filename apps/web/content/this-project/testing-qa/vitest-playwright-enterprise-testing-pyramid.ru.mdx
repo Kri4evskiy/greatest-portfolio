@@ -42,6 +42,28 @@ tldr:
 | **API HTTP E2E (`Tier 2`)** | `Vitest` + `Supertest` | `apps/api/test/*.e2e-spec.ts` | Полный `AppModule` (`CORS`, `CookieParser`, `ThrottlerGuard`, `ValidationPipe`, `HttpOnly` JWT) |
 | **Browser E2E (`Tier 3`)** | `Playwright` Chromium | `apps/web/e2e/{fixtures,pages,specs}/` | Edge `src/proxy.ts` JWT-верификация, разблокировка `GuestPassModal`, инспектор `/system-status` |
 
+### Кто за что отвечает: различия между `Vitest`, `SWC`, `MSW v3`, `Supertest` и `Playwright`
+
+Удобнее всего представить тестовую систему как конвейер, где каждый инструмент решает строго одну задачу и не подменяет остальные:
+
+1. **`Vitest` (тест-раннер и движок проверок):**
+   Находит тестовые файлы, предоставляет `describe / it / expect`, изолирует воркеры и собирает отчёты покрытия V8. Сам по себе он не компилирует метаданные NestJS, не перехватывает HTTP-запросы и не открывает браузер.
+2. **`SWC` (`@swc/core` + `unplugin-swc` — Rust-компилятор для NestJS-тестов):**
+   Это не тестовый фреймворк, а быстрый компилятор `TypeScript ➔ JavaScript`. Стандартный транспилятор внутри Vite вырезает метаданные декораторов (`emitDecoratorMetadata`), из-за чего NestJS ломается при внедрении зависимостей (DI). `SWC` сохраняет эти метаданные на скорости Rust, позволяя запускать реальные NestJS-модули внутри `Vitest`.
+3. **`MSW v3` (Mock Service Worker — сетевой перехватчик для фронтенда):**
+   Используется в интеграционных тестах `apps/web` (`React 19` + `TanStack Query` + `Axios`). Компонент честно отправляет настоящий HTTP-запрос на `/api/knowledge/metrics/paginated`, а `MSW` перехватывает его на границе сети в памяти и возвращает заготовленный JSON. Это позволяет проверить реальную пагинацию, фильтры, ретраи и кэширование UI без поднятого бэкенда.
+4. **`Supertest` (in-memory HTTP-клиент для бэкенда):**
+   Используется в HTTP E2E-тестах `apps/api`. Поднимает реальный `AppModule` NestJS в памяти и отправляет настоящие HTTP-запросы (`GET /api/capabilities`, `POST /api/auth/guest-pass`), проверяя статус-коды, `Set-Cookie`, `ZodValidationPipe`, `JwtRolesGuard` и фильтры ошибок — без запуска браузера и фронтенда.
+5. **`Playwright` (настоящий браузер Chromium):**
+   Запускает собранные production-серверы Next.js и NestJS и проходит пользовательские сценарии целиком: от редиректов Edge Proxy и `HttpOnly`-кук до рендера `.mdx`-статей и пагинации `/system-status`.
+
+**Если коротко:**
+- **`Vitest`** — запускает тесты и проверяет `expect(...)`.
+- **`SWC`** — компилирует NestJS TypeScript-код для `Vitest` с сохранением декораторов.
+- **`MSW v3`** — подменяет ответы сервера на уровне сети для тестов фронтенда.
+- **`Supertest`** — шлёт HTTP-запросы в настоящий NestJS `AppModule` без фронтенда.
+- **`Playwright`** — открывает реальный браузер и тестирует весь стек целиком.
+
 > [!NOTE]
 > **Роль `Storybook 10` (`@repo/ui`) vs `Vitest` / `Playwright`:** UI-примитивы изолированы в `packages/ui/` и визуально тестируются в Storybook без привязки к бизнес-API. Сетевые сценарии, кэширование, RBAC-редиректы и гидрация живут в `Vitest` + `Playwright`.
 
@@ -132,7 +154,7 @@ export default defineConfig({
 })
 ```
 
-В паре с `.vscode/extensions.json` (`vitest.explorer`, `ms-playwright.playwright`) и `.vscode/settings.json` (`playwright.config: "apps/web/playwright.config.ts"`) все 46+ unit/интеграционных тестов `Vitest` и браузерные спеки `Playwright` видны прямо во вкладке Testing.
+В паре с `.vscode/extensions.json` (`vitest.explorer`, `ms-playwright.playwright`) и `.vscode/settings.json` (`playwright.config: "apps/web/playwright.config.ts"`) все unit- и интеграционные тесты `Vitest` и браузерные спеки `Playwright` видны прямо во вкладке Testing. Кроме того, `pnpm run test:coverage` (или `pnpm exec vitest run --coverage`) формирует V8 HTML/LCOV-отчёты, а `pnpm run test:ui` поднимает интерактивный Vitest UI на `http://localhost:5124/__vitest__/`.
 
 ### Интеграция в GitHub Actions CI
 

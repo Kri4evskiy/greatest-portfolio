@@ -42,6 +42,28 @@ Rather than relying on slow UI tests for logic checks or mocking away entire fra
 | **API HTTP E2E (`Tier 2`)** | `Vitest` + `Supertest` | `apps/api/test/*.e2e-spec.ts` | Full `AppModule` bootstrap (`CORS`, `CookieParser`, `ThrottlerGuard`, `ValidationPipe`, `HttpOnly` JWT) |
 | **Browser E2E (`Tier 3`)** | `Playwright` Chromium | `apps/web/e2e/{fixtures,pages,specs}/` | Edge `src/proxy.ts` JWT verification, `GuestPassModal` unlock flow, `/system-status` inspection |
 
+### Tool Roles: How `Vitest`, `SWC`, `MSW v3`, `Supertest`, and `Playwright` Divide Responsibilities
+
+Think of the stack as an assembly line where each library owns one isolated job and never overlaps with the others:
+
+1. **`Vitest` (Test Runner & Assertion Engine):**
+   Discovers test files, provides `describe / it / expect` primitives, isolates workers, and collects V8 coverage metrics. On its own, Vitest neither simulates HTTP backends, launches real browsers, nor emits TypeScript decorator metadata for NestJS.
+2. **`SWC` (`@swc/core` + `unplugin-swc` — Fast Rust Compiler for NestJS):**
+   Not a testing framework—it is a high-speed `TypeScript ➔ JavaScript` compiler. Vite's default transpiler strips TypeScript `emitDecoratorMetadata` (`design:paramtypes`), which breaks NestJS Dependency Injection (`@Inject`, `@Controller`, constructor services). `unplugin-swc` preserves decorator metadata at Rust speed so real NestJS modules boot inside `Vitest`.
+3. **`MSW v3` (Mock Service Worker — Network-Boundary Mock for Frontend):**
+   Used inside `apps/web` integration tests (`React 19` + `TanStack Query` + `Axios`). Components dispatch real HTTP requests (`/api/knowledge/metrics/paginated`), while `MSW` intercepts them at the network boundary in memory and returns deterministic JSON—testing real pagination, filters, retries, and cache invalidation without starting the backend server.
+4. **`Supertest` (In-Memory HTTP Client for Backend E2E):**
+   Used inside `apps/api` HTTP E2E suites. It boots the real NestJS `AppModule` in memory and fires real HTTP requests (`GET /api/capabilities`, `POST /api/auth/guest-pass`) to validate HTTP status codes, `Set-Cookie` attributes, `ZodValidationPipe`, `JwtRolesGuard`, and `SentryExceptionFilter`—without needing a browser or frontend.
+5. **`Playwright` (Real Chromium Browser Automation):**
+   Drives compiled Next.js and NestJS production servers end-to-end as a real user, verifying Edge Proxy redirects, `HttpOnly` cookies across page reloads, RSC/MDX hydration, and live dashboard interactions.
+
+**In short:**
+- **`Vitest`** — runs tests and evaluates `expect(...)`.
+- **`SWC`** — compiles NestJS TypeScript code for `Vitest` while preserving DI decorator metadata.
+- **`MSW v3`** — intercepts and stubs HTTP responses for frontend integration tests.
+- **`Supertest`** — sends real HTTP requests into an in-memory NestJS `AppModule` without a frontend.
+- **`Playwright`** — launches a real browser to verify the entire stack together.
+
 > [!NOTE]
 > **Storybook 10 (`@repo/ui`) vs Vitest / Playwright:** UI primitives live in `packages/ui/` and are visually inspected in Storybook without coupling business API state into design-system stories. Logic, caching, RBAC redirects, and full-stack hydration stay inside `Vitest` + `Playwright`.
 
@@ -132,7 +154,7 @@ export default defineConfig({
 })
 ```
 
-Paired with `"vitest.explorer"` + `"ms-playwright.playwright"` in `.vscode/extensions.json` and `.vscode/settings.json` (`"playwright.config": "apps/web/playwright.config.ts"`), both the **Vitest tree** and **Playwright specs** appear side-by-side in the IDE Testing sidebar—while Turborepo continues caching package tests independently.
+Paired with `"vitest.explorer"` + `"ms-playwright.playwright"` in `.vscode/extensions.json` and `.vscode/settings.json` (`"playwright.config": "apps/web/playwright.config.ts"`), both the **Vitest suite tree** and **Playwright specs** appear side-by-side in the IDE Testing sidebar—while Turborepo caches package runs independently. You can also generate V8 HTML/LCOV coverage via `pnpm run test:coverage` (or `pnpm exec vitest run --coverage`) or launch the interactive Vitest UI dashboard on `http://localhost:5124/__vitest__/` via `pnpm run test:ui`.
 
 ### GitHub Actions CI Integration
 
