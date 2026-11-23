@@ -197,7 +197,7 @@ jobs:
       - name: Read @playwright/test version
         id: playwright-version
         run: |
-          VERSION=$(node -e "const pkg = require('./apps/web/package.json'); console.log(pkg.devDependencies['@playwright/test'])")
+          VERSION=$(node -e "const pkg = require('./apps/web/node_modules/@playwright/test/package.json'); console.log(pkg.version)")
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Cache Playwright Chromium binaries
