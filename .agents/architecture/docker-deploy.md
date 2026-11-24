@@ -5,6 +5,7 @@
 ## 1. Multi-stage Dockerfiles с `turbo prune`
 
 Каждое приложение (`apps/web`, `apps/api`, `apps/telemetry-ms`) собирается по 3-ступенчатому шаблону в папке `docker/`:
+
 1. **Stage 1 (`pruner`):** Использует `turbo prune @repo/<app-name> --docker`, чтобы вырезать из монорепозитория только те пакеты (`packages/shared-schemas`, `packages/ui`), от которых зависит конкретный сервис, и сформировать изолированный lockfile.
 2. **Stage 2 (`installer & builder`):** Предварительно прогревает бинарник `pnpm@12.21.0` в кэшируемом слое (`corepack prepare ... && pnpm --version`), ставит зависимости через `pnpm install --frozen-lockfile --ignore-scripts` с использованием BuildKit Cache Mount (`--mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store`), запускает `pnpm turbo run build --filter=@repo/<app-name>...` и очищает `devDependencies` (`pnpm prune --prod --ignore-scripts`). Для `api` на базе Rust-free Prisma 7 не требуется обход с `/tmp/.prisma`: сгенерированный ESM-клиент компилируется `tsc` прямо в `apps/api/dist/generated/prisma/`, а WASM-рантайм остаётся в production-зависимостях `@prisma/client`.
 3. **Stage 3 (`runner`):** Чистый `node:22-alpine` образ, работающий от непривилегированного пользователя (`USER node` / `nextjs`), содержащий только скомпилированный артефакт (`standalone` для Next.js, `dist` + production `node_modules` для NestJS — без `openssl` в рантайме для `api`).
@@ -25,6 +26,7 @@
    - Порт `postgres` (`5432`) **не публикуется** на хост-машину и доступен исключительно внутри закрытой сети `backend-network`.
 
 Сетевая сегментация (Zero-Trust Network Segmentation):
+
 - **`backend-network` (полностью закрытый контур):**
   - `postgres`: `postgres:16-alpine` с healthcheck (`pg_isready`) и volume. В локальном `docker-compose.yml` порт `127.0.0.1:5432:5432` привязан строго к loopback-интерфейсу хоста (для DBeaver/DataGrip); в `docker-compose.prod.yml` секция `ports` удалена полностью.
   - `redis` **[Planned — Приоритет №2, ещё не добавлен в `docker-compose.yml`]:** планируемый in-memory кэш и distributed rate limiter (`redis:7-alpine`) с healthcheck (`redis-cli ping`). Будет привязан к `127.0.0.1:6379:6379` локально для Redis Insight и изолирован строго внутри `backend-network` в продакшене (с graceful in-memory fallback без `REDIS_URL`).

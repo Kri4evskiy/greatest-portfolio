@@ -7,6 +7,7 @@ description: Official Vercel Engineering React & Next.js Best Practices (vercel-
 # React & Next.js Best Practices (Vercel Engineering + Next.js AI Agents Guide)
 
 Источники:
+
 - `https://nextjs.org/docs/app/guides/ai-agents`
 - `https://github.com/vercel-labs/agent-skills/blob/main/skills/react-best-practices/SKILL.md`
 

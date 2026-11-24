@@ -80,6 +80,7 @@ pnpm run dev
 ```
 
 Once running, open in your browser:
+
 - 🌐 **Frontend (Workfolio CV & Knowledge Base):** [http://localhost:3000](http://localhost:3000)
 - ⚙️ **Backend API Healthcheck:** [http://localhost:4000/api/health](http://localhost:4000/api/health)
 - 📡 **Live SSE Telemetry Stream:** [http://localhost:4000/api/telemetry/stream](http://localhost:4000/api/telemetry/stream)
@@ -176,6 +177,7 @@ pnpm run build && pnpm run test:e2e
 Modern Windows 11 installations enforce **Smart App Control (SAC)**, which may block unsigned ecosystem binaries (such as `turbo.exe` inside `@turbo/windows-64`, raising error `spawn UNKNOWN / 0x800711C7`).
 
 The repository is engineered according to the **Zero-Friction Onboarding** principle:
+
 - The `scripts/dev-runner.mjs` script performs a pre-flight probe on Turborepo availability.
 - If the system blocks the binary, the runner logs a clear warning and **transparently falls back to native `pnpm workspaces`**, guaranteeing any reviewer or engineer can run the project in a single command on any machine.
 - In CI/CD and Docker (Linux), native `Turborepo`, `turbo prune`, and Vercel remote caching operate unconditionally at 100% speed.

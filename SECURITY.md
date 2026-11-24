@@ -65,6 +65,7 @@ If you discover a potential security vulnerability in this project, please **do 
 2. **Direct Contact:** Alternatively, reach out directly to the maintainer via GitHub profile [@Kri4evskiy](https://github.com/Kri4evskiy).
 
 Please include:
+
 - A clear description of the vulnerability and potential impact.
 - Steps to reproduce or proof-of-concept (PoC).
 - Suggested remediation, if available.
