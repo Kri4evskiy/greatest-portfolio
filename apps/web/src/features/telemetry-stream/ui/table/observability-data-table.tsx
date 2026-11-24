@@ -1,17 +1,27 @@
 'use client'
 
-import { type ColumnDef, flexRender, getCoreRowModel, type RowData, useReactTable } from '@tanstack/react-table'
+import { type ColumnDef, metaHelper, type RowData, tableFeatures, useTable } from '@tanstack/react-table'
 
-declare module '@tanstack/react-table' {
-  interface ColumnMeta<TData extends RowData, TValue> {
-    headerClassName?: string
-    cellClassName?: string
-  }
+export interface ObservabilityColumnMeta {
+  headerClassName?: string
+  cellClassName?: string
 }
 
-interface ObservabilityDataTableProps<TData> {
-  data: TData[]
-  columns: ColumnDef<TData>[]
+/**
+ * Tree-shaken TanStack Table v9 feature set for server-paginated observability tables:
+ * registers zero client-side sorting/filtering/pagination bundles and scopes
+ * `ColumnMeta` typing strictly to this table via `metaHelper`.
+ */
+export const observabilityTableFeatures = tableFeatures({
+  columnMeta: metaHelper<ObservabilityColumnMeta>(),
+})
+
+export type ObservabilityTableFeatures = typeof observabilityTableFeatures
+export type ObservabilityColumnDef<TData extends RowData> = ColumnDef<ObservabilityTableFeatures, TData>
+
+interface ObservabilityDataTableProps<TData extends RowData> {
+  data: readonly TData[]
+  columns: ObservabilityColumnDef<TData>[]
   emptyState: string
   getRowId?: (row: TData) => string
   getRowClassName?: (row: TData) => string
@@ -21,13 +31,12 @@ interface ObservabilityDataTableProps<TData> {
 }
 
 /**
- * Isolated TanStack Table v8 boundary:
- * `useReactTable` returns a stable object reference with interior mutability,
- * which `babel-plugin-react-compiler` marks as `knownIncompatible`.
+ * Isolated TanStack Table v9 boundary:
+ * `useTable` returns a stable table object backed by TanStack Store atoms.
  * Isolating it here with `'use no memo'` keeps parent dashboard cards fully
- * compiled by React Compiler while unifying table rendering across modules.
+ * compiled by React Compiler while ensuring `table.getRowModel()` always reads fresh rows.
  */
-export function ObservabilityDataTable<TData>({
+export function ObservabilityDataTable<TData extends RowData>({
   data,
   columns,
   emptyState,
@@ -39,13 +48,11 @@ export function ObservabilityDataTable<TData>({
 }: ObservabilityDataTableProps<TData>) {
   'use no memo'
 
-  const table = useReactTable({
+  const table = useTable({
+    features: observabilityTableFeatures,
     data,
     columns,
-    manualPagination: true,
-    manualSorting: true,
     ...(getRowId ? { getRowId } : {}),
-    getCoreRowModel: getCoreRowModel(),
   })
 
   return (
@@ -65,7 +72,7 @@ export function ObservabilityDataTable<TData>({
                 const headerClassName = header.column.columnDef.meta?.headerClassName
                 return (
                   <th key={header.id} className={headerClassName ?? 'px-3 py-2.5 font-medium'}>
-                    {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
+                    {header.isPlaceholder ? null : <table.FlexRender header={header} />}
                   </th>
                 )
               })}
@@ -83,11 +90,11 @@ export function ObservabilityDataTable<TData>({
                     : 'bg-background transition-colors hover:bg-surface-subtle/60'
                 }
               >
-                {row.getVisibleCells().map((cell) => {
+                {row.getAllCells().map((cell) => {
                   const cellClassName = cell.column.columnDef.meta?.cellClassName
                   return (
                     <td key={cell.id} className={cellClassName ?? 'px-3 py-2.5 align-top'}>
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      <table.FlexRender cell={cell} />
                     </td>
                   )
                 })}

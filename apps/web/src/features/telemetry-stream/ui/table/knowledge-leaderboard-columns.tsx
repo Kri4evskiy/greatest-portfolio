@@ -7,8 +7,8 @@ import {
   type SupportedLocale,
 } from '@repo/shared-schemas'
 import { Badge } from '@repo/ui'
-import type { ColumnDef } from '@tanstack/react-table'
 import { ArrowDown } from 'lucide-react'
+import type { ObservabilityColumnDef } from './observability-data-table'
 
 export interface KnowledgeLeaderboardColumnLabels {
   articleSlug: string
@@ -31,7 +31,7 @@ export function createKnowledgeLeaderboardColumns({
   sortBy,
   onSortChange,
   labels,
-}: CreateKnowledgeLeaderboardColumnsParams): ColumnDef<ArticleMeta>[] {
+}: CreateKnowledgeLeaderboardColumnsParams): ObservabilityColumnDef<ArticleMeta>[] {
   return [
     {
       id: 'rank',

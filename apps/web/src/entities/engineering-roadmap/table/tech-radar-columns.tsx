@@ -2,8 +2,8 @@
 
 import type { TechRadarItem } from '@repo/shared-schemas'
 import { Badge, Button } from '@repo/ui'
-import type { ColumnDef } from '@tanstack/react-table'
 import { ArrowUpDown, BookOpenCheck } from 'lucide-react'
+import type { TechRadarColumnDef } from './tech-radar-data-table'
 
 export interface TechRadarColumnLabels {
   colTech: string
@@ -19,10 +19,7 @@ interface CreateTechRadarColumnsParams {
   onInspectAdr: (item: TechRadarItem) => void
 }
 
-export function createTechRadarColumns({
-  labels,
-  onInspectAdr,
-}: CreateTechRadarColumnsParams): ColumnDef<TechRadarItem>[] {
+export function createTechRadarColumns({ labels, onInspectAdr }: CreateTechRadarColumnsParams): TechRadarColumnDef[] {
   return [
     {
       accessorKey: 'adrNumber',

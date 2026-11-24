@@ -2,9 +2,9 @@
 
 import type { SupportedLocale, SystemEventLogItem } from '@repo/shared-schemas'
 import { Badge } from '@repo/ui'
-import type { ColumnDef } from '@tanstack/react-table'
 import { Sparkles } from 'lucide-react'
 import { formatSystemTimestamp, getTelemetryEventBadgeVariant } from '../../lib/system-status-helpers'
+import type { ObservabilityColumnDef } from './observability-data-table'
 
 export interface LiveEventLogColumnLabels {
   eventType: string
@@ -23,7 +23,7 @@ export function createLiveEventLogColumns({
   locale,
   liveIds,
   labels,
-}: CreateLiveEventLogColumnsParams): ColumnDef<SystemEventLogItem>[] {
+}: CreateLiveEventLogColumnsParams): ObservabilityColumnDef<SystemEventLogItem>[] {
   return [
     {
       accessorKey: 'type',

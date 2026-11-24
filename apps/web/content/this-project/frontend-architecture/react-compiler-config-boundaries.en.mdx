@@ -10,7 +10,7 @@ publishedAt: "2026-11-10"
 order: 3
 tldr:
   - "Configures `compilationMode: 'infer'`, `panicThreshold: 'none'`, and `experimental.optimizePackageImports: ['lucide-react', 'd3', '@repo/ui', '@repo/shared-schemas']` in `apps/web/next.config.ts`."
-  - "Isolates `@tanstack/react-table` (`useReactTable`) inside dedicated `'use no memo'` components: `DesktopTechRadarDataTable` (`table/tech-radar-data-table.tsx`) and generic `ObservabilityDataTable` (`features/telemetry-stream/ui/table/observability-data-table.tsx`)."
+  - "Isolates `@tanstack/react-table` v9 (`useTable` + tree-shaken `tableFeatures`) inside dedicated `'use no memo'` components: `DesktopTechRadarDataTable` (`table/tech-radar-data-table.tsx`) and generic `ObservabilityDataTable` (`features/telemetry-stream/ui/table/observability-data-table.tsx`)."
   - "Keeps `use-ui-store.ts` 100% React-Compiler-friendly via private `useUIStoreBase`, explicit atomic `use*` hooks, and `useUIActions()` (no `createSelectors` `.use.field()` proxy getters)."
 ---
 
@@ -50,36 +50,43 @@ const nextConfig: NextConfig = {
 Inside `babel-plugin-react-compiler` (`DefaultModuleTypeProvider`), the compiler maintains a registry of third-party APIs that rely on interior mutability:
 
 1. **`react-hook-form` (`useForm().watch`)**: because `watch()` mutates internal subscriptions without changing its function identity, the compiler flags it as `knownIncompatible`. In `apps/web/src/features/auth/guest-pass-modal.tsx`, we subscribe via **`useWatch({ control, name: 'visitorType' })`**, keeping `GuestPassModal` 100% compatible with automatic memoization.
-2. **`@tanstack/react-table` (`useReactTable`)**: returns a single stable table reference and mutates its properties in place. Whenever `useReactTable` is called inside a component, the compiler bails out of optimizing that entire component function.
+2. **`@tanstack/react-table` v9 (`useTable`)**: returns a single stable table reference backed by TanStack Store atoms. Calling `table.getRowModel()` directly inside a React Compiler-memoized component can stale-cache rendered rows unless isolated behind `'use no memo'`.
 
 ---
 
-## 3. Extracted `'use no memo'` Table Boundaries
+## 3. Extracted `'use no memo'` Table Boundaries (TanStack Table v9)
 
 ### A. `TechRadarTable` + Extracted `table/` Submodules
-`TechRadarTable` (`apps/web/src/entities/engineering-roadmap/tech-radar-table.tsx`) renders search, category filters, mobile cards (`< md`), the desktop table (`>= md`), and the ADR inspector `Dialog`. To keep the parent component fully compiled, the TanStack Table layer is split into two focused files under `apps/web/src/entities/engineering-roadmap/table/`:
+`TechRadarTable` (`apps/web/src/entities/engineering-roadmap/tech-radar-table.tsx`) renders search, category filters, mobile cards (`< md`), the desktop table (`>= md`), and the ADR inspector `Dialog`. To keep the parent component fully compiled and tree-shake unused table features, the TanStack Table v9 layer is split into two focused files under `apps/web/src/entities/engineering-roadmap/table/`:
 
-- **`table/tech-radar-columns.tsx`** — pure `createTechRadarColumns({ labels, onInspectAdr })` factory returning typed `ColumnDef<TechRadarItem>[]`.
-- **`table/tech-radar-data-table.tsx`** — thin `'use no memo'` wrapper encapsulating `useReactTable` and local `sorting` state:
+- **`table/tech-radar-columns.tsx`** — pure `createTechRadarColumns({ labels, onInspectAdr })` factory returning typed `TechRadarColumnDef[]`.
+- **`table/tech-radar-data-table.tsx`** — static `tableFeatures({ rowSortingFeature, sortedRowModel: createSortedRowModel(), sortFns })` plus a thin `'use no memo'` wrapper calling `useTable` and `<table.FlexRender />`:
 
 ```tsx title="apps/web/src/entities/engineering-roadmap/table/tech-radar-data-table.tsx"
+export const techRadarTableFeatures = tableFeatures({
+  rowSortingFeature,
+  sortedRowModel: createSortedRowModel(),
+  sortFns: {
+    alphanumeric: sortFn_alphanumeric,
+    basic: sortFn_basic,
+  },
+})
+
 export function DesktopTechRadarDataTable({ data, columns, emptyResultLabel }: DesktopTechRadarDataTableProps) {
   'use no memo'
 
-  const [sorting, setSorting] = useState<SortingState>([{ id: 'adrNumber', desc: false }])
-
-  const table = useReactTable({
+  const table = useTable({
+    features: techRadarTableFeatures,
     data,
     columns,
-    state: { sorting },
-    onSortingChange: setSorting,
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
+    initialState: {
+      sorting: [{ id: 'adrNumber', desc: false }],
+    },
   })
 
   return (
     <div className="hidden overflow-x-auto rounded-lg border border-border bg-card shadow-xs md:block">
-      {/* TanStack Table header and row rendering */}
+      {/* Renders headers & cells via <table.FlexRender header={header} /> and <table.FlexRender cell={cell} /> */}
     </div>
   )
 }
@@ -87,18 +94,20 @@ export function DesktopTechRadarDataTable({ data, columns, emptyResultLabel }: D
 
 In the parent `TechRadarTable`, `filteredData` and `columns` (built via `createTechRadarColumns`) are wrapped in `useMemo` alongside `useCallback` for `handleInspectAdr` so that props crossing the `'use no memo'` boundary into `DesktopTechRadarDataTable` retain stable object identities when unrelated state (such as opening the ADR `Dialog`) updates. Meanwhile, filters, mobile cards, `activeDialogItem`, and the `Dialog` JSX stay auto-memoized by React Compiler.
 
-### B. Reusable `ObservabilityDataTable` with Typed `ColumnMeta`
-For `/system-status` telemetry and leaderboard views, `apps/web/src/features/telemetry-stream/ui/table/observability-data-table.tsx` provides a generic `'use no memo'` TanStack Table v8 shell configured for server-driven pagination (`manualPagination: true`, `manualSorting: true`, optional `getRowId`). It also declares strict TypeScript module augmentation for per-column styling metadata:
+### B. Reusable `ObservabilityDataTable` with Scoped `metaHelper`
+For `/system-status` telemetry and leaderboard views, `apps/web/src/features/telemetry-stream/ui/table/observability-data-table.tsx` provides a generic `'use no memo'` TanStack Table v9 shell that registers **zero** client-side sorting/filtering/pagination bundles (all pagination & sorting is server-driven) and scopes per-column styling metadata directly to the table via v9's `metaHelper<ObservabilityColumnMeta>()` (no global declaration merging needed):
 
 ```tsx title="apps/web/src/features/telemetry-stream/ui/table/observability-data-table.tsx"
-declare module '@tanstack/react-table' {
-  interface ColumnMeta<TData extends RowData, TValue> {
-    headerClassName?: string
-    cellClassName?: string
-  }
+export interface ObservabilityColumnMeta {
+  headerClassName?: string
+  cellClassName?: string
 }
 
-export function ObservabilityDataTable<TData>({
+export const observabilityTableFeatures = tableFeatures({
+  columnMeta: metaHelper<ObservabilityColumnMeta>(),
+})
+
+export function ObservabilityDataTable<TData extends RowData>({
   data,
   columns,
   emptyState,
@@ -110,15 +119,13 @@ export function ObservabilityDataTable<TData>({
 }: ObservabilityDataTableProps<TData>) {
   'use no memo'
 
-  const table = useReactTable({
+  const table = useTable({
+    features: observabilityTableFeatures,
     data,
     columns,
-    manualPagination: true,
-    manualSorting: true,
     ...(getRowId ? { getRowId } : {}),
-    getCoreRowModel: getCoreRowModel(),
   })
-  // ...
+  // Renders cells via row.getAllCells() + <table.FlexRender cell={cell} />
 }
 ```
 
