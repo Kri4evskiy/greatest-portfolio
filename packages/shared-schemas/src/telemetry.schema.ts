@@ -45,3 +45,17 @@ export const TelemetryStatsResponseSchema = z.object({
   microserviceConnected: z.boolean(),
 })
 export type TelemetryStatsResponse = z.infer<typeof TelemetryStatsResponseSchema>
+
+export const TelemetryAdminDiagnosticsSchema = z.object({
+  status: z.literal('ok'),
+  activeSseStreams: z.number().int().nonnegative(),
+  maxSseStreamsGlobal: z.number().int().positive(),
+  maxSseStreamsPerIp: z.number().int().positive(),
+  trackedSessionsInMemory: z.number().int().nonnegative(),
+  trackedMetricsInMemory: z.number().int().nonnegative(),
+  totalEventsProcessed: z.number().int().nonnegative(),
+  databaseConnected: z.boolean(),
+  uptimeSeconds: z.number().int().nonnegative(),
+  timestamp: z.iso.datetime(),
+})
+export type TelemetryAdminDiagnostics = z.infer<typeof TelemetryAdminDiagnosticsSchema>

@@ -1,6 +1,7 @@
 import { type CallHandler, type ExecutionContext, Injectable, Logger, type NestInterceptor } from '@nestjs/common'
 import type { Request, Response } from 'express'
 import { type Observable, tap } from 'rxjs'
+import { sanitizeLogValue } from '../utils/log-sanitizer.util.js'
 
 /**
  * Cross-cutting interceptor that logs HTTP request completion time and status code.
@@ -22,7 +23,9 @@ export class LoggingInterceptor implements NestInterceptor {
     return next.handle().pipe(
       tap(() => {
         const durationMs = Date.now() - startedAt
-        this.logger.debug(`${request.method} ${request.originalUrl} ${response.statusCode} (${durationMs}ms)`)
+        this.logger.debug(
+          `${request.method} ${sanitizeLogValue(request.originalUrl)} ${response.statusCode} (${durationMs}ms)`,
+        )
       }),
     )
   }

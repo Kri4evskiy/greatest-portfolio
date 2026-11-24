@@ -1,5 +1,6 @@
 import { Injectable, Logger, type NestMiddleware } from '@nestjs/common'
 import type { NextFunction, Response } from 'express'
+import { sanitizeLogValue } from '../utils/log-sanitizer.util.js'
 import {
   REQUEST_ID_HEADER,
   type RequestWithCorrelationId,
@@ -24,7 +25,7 @@ export class LoggingMiddleware implements NestMiddleware {
     res.on('finish', () => {
       const durationMs = Date.now() - startedAt
       this.logger.verbose(
-        `${req.method} ${req.originalUrl} -> ${res.statusCode} (${durationMs}ms) [reqId:${requestId}]`,
+        `${req.method} ${sanitizeLogValue(req.originalUrl)} -> ${res.statusCode} (${durationMs}ms) [reqId:${requestId}]`,
       )
     })
     next()

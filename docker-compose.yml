@@ -8,11 +8,11 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: ${POSTGRES_DB:-workfolio_db}
     # Security & Port Mapping:
-    # - Local: 127.0.0.1:5432 exposes DB exclusively to host machine (DBeaver/DataGrip), blocked from external LAN.
-    # - Production: Remove 'ports' completely. The database must live exclusively inside 'backend-network'
-    #   or be hosted on a managed cloud service (e.g. Neon.tech) with encrypted TLS connections.
+    # - Local: 127.0.0.1 loopback-only (blocked from external LAN) with overridable host port
+    #   via POSTGRES_HOST_PORT to avoid collisions with an existing local Postgres instance.
+    # - Production: Zero host 'ports:' (docker-compose.prod.yml isolates DB inside backend-network).
     ports:
-      - "127.0.0.1:5432:5432"
+      - "127.0.0.1:${POSTGRES_HOST_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
@@ -62,7 +62,7 @@ services:
     # Production Note: In a production VPS setup behind Nginx/Caddy or Cloud Ingress (e.g. AWS ALB),
     # use docker-compose.prod.yml which enforces strict non-default secrets and unpublishes Postgres host ports.
     ports:
-      - "127.0.0.1:4000:4000"
+      - "127.0.0.1:${API_HOST_PORT:-4000}:4000"
     healthcheck:
       test: [ "CMD-SHELL", "wget -qO- http://127.0.0.1:4000/api/health || exit 1" ]
       interval: 5s
@@ -84,12 +84,13 @@ services:
         condition: service_healthy
     environment:
       NODE_ENV: production
+      WORKFOLIO_DEMO_MODE: ${WORKFOLIO_DEMO_MODE:-true}
       PORT: 3000
       NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-http://localhost:3000}
       API_INTERNAL_URL: http://api:4000
       JWT_SECRET: ${JWT_SECRET:-}
     ports:
-      - "3000:3000"
+      - "127.0.0.1:${WEB_HOST_PORT:-3000}:3000"
     networks:
       - frontend-network
 

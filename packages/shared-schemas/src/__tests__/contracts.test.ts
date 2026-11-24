@@ -6,6 +6,8 @@ import {
   GuestPassFormSchema,
   getKnowledgeCategoryLabel,
   getTechRadarItems,
+  JwtSessionPayloadSchema,
+  KB_COOKIE_MAX_AGE_MS,
   LOCALE_METADATA,
   PaginatedArticleMetricsQuerySchema,
   PaginatedArticleMetricsResponseSchema,
@@ -16,6 +18,7 @@ import {
   SystemCapabilitiesSchema,
   SystemEventsQuerySchema,
   TechRadarItemSchema,
+  TelemetryAdminDiagnosticsSchema,
 } from '../index.js'
 
 const VALID_UUID = '550e8400-e29b-41d4-a716-446655440000'
@@ -96,6 +99,7 @@ describe('PaginatedArticleMetricsQuerySchema & ResponseSchema', () => {
     expect(PaginatedArticleMetricsQuerySchema.safeParse({ limit: 0 }).success).toBe(false)
     expect(PaginatedArticleMetricsQuerySchema.safeParse({ limit: 101 }).success).toBe(false)
     expect(PaginatedArticleMetricsQuerySchema.safeParse({ offset: -1 }).success).toBe(false)
+    expect(PaginatedArticleMetricsQuerySchema.safeParse({ offset: 501 }).success).toBe(false)
     expect(PaginatedArticleMetricsQuerySchema.safeParse({ category: 'unknown-topic' }).success).toBe(false)
     expect(PaginatedArticleMetricsQuerySchema.safeParse({ sortBy: 'createdAt' }).success).toBe(false)
   })
@@ -193,6 +197,31 @@ describe('Auth, Knowledge, Locale & TechRadar contracts', () => {
   })
 
   it('resolves JWT secret with dev fallback when blank', () => {
+    expect(KB_COOKIE_MAX_AGE_MS).toBe(1000 * 60 * 60 * 24)
+    expect(
+      JwtSessionPayloadSchema.safeParse({
+        sub: VALID_UUID,
+        displayName: 'Alex • Team Lead',
+        visitorType: 'TEAM_LEAD',
+        role: 'USER',
+        expiresAt: VALID_ISO,
+      }).success,
+    ).toBe(true)
+    expect(
+      TelemetryAdminDiagnosticsSchema.safeParse({
+        status: 'ok',
+        activeSseStreams: 1,
+        maxSseStreamsGlobal: 50,
+        maxSseStreamsPerIp: 2,
+        trackedSessionsInMemory: 3,
+        trackedMetricsInMemory: 10,
+        totalEventsProcessed: 12,
+        databaseConnected: false,
+        uptimeSeconds: 42,
+        timestamp: VALID_ISO,
+      }).success,
+    ).toBe(true)
+
     expect(resolveJwtSecret()).toBe(DEFAULT_DEV_JWT_SECRET)
     expect(resolveJwtSecret('   ')).toBe(DEFAULT_DEV_JWT_SECRET)
     expect(resolveJwtSecret('  custom-prod-secret-value  ')).toBe('custom-prod-secret-value')

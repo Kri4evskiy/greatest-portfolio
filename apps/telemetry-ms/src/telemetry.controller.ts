@@ -1,6 +1,7 @@
 import { Controller, Logger } from '@nestjs/common'
 import { EventPattern, MessagePattern, Payload } from '@nestjs/microservices'
 import { TelemetryEvent, TelemetryEventSchema } from '@repo/shared-schemas'
+import { sanitizeTelemetryLog } from './utils/log-sanitizer.util.js'
 
 @Controller()
 export class TelemetryMicroserviceController {
@@ -27,7 +28,7 @@ export class TelemetryMicroserviceController {
       this.recentEvents.pop()
     }
 
-    this.logger.log(`[Event #${this.totalEventsProcessed}] ${enriched.type}: ${enriched.message}`)
+    this.logger.log(`[Event #${this.totalEventsProcessed}] ${enriched.type}: ${sanitizeTelemetryLog(enriched.message)}`)
 
     return enriched
   }

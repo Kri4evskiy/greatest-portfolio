@@ -1,3 +1,4 @@
+import { ForbiddenException } from '@nestjs/common'
 import { JwtModule } from '@nestjs/jwt'
 import { Test } from '@nestjs/testing'
 import { describe, expect, it, vi } from 'vitest'
@@ -28,7 +29,8 @@ function createTestingModule(overrides?: {
     imports: [
       JwtModule.register({
         secret: appConfig.jwtSecret,
-        signOptions: { expiresIn: '7d' },
+        signOptions: { algorithm: 'HS256', expiresIn: '1d' },
+        verifyOptions: { algorithms: ['HS256'] },
       }),
     ],
     providers: [
@@ -65,15 +67,36 @@ describe('AuthService (NestJS DI + timing-safe passcode + JWT session)', () => {
     })
   })
 
-  it('issues USER pass on empty or mismatched passcode without throwing on different lengths', async () => {
+  it('issues USER pass on empty passcode and rejects wrong non-empty adminPasscode with 403 Forbidden', async () => {
+    const createVisitorSession = vi.fn(
+      async (data: { displayName: string; visitorType: string; role: string; expiresAt: Date }) => ({
+        id: '550e8400-e29b-41d4-a716-446655440000',
+        displayName: data.displayName,
+        visitorType: data.visitorType,
+        role: data.role,
+        userAgent: null,
+        createdAt: new Date(),
+        expiresAt: data.expiresAt,
+      }),
+    )
     const publishEvent = vi.fn(async () => undefined)
-    const moduleRef = await createTestingModule({ publishEvent })
+    const moduleRef = await createTestingModule({ createVisitorSession, publishEvent })
     const authService = moduleRef.get(AuthService)
 
+    // Wrong non-empty admin passcode must fail closed with 403 (no silent downgrade, no DB write)
+    await expect(
+      authService.issueGuestPass({
+        displayName: 'Alex • Team Lead',
+        visitorType: 'TEAM_LEAD',
+        adminPasscode: 'wrong-len',
+      }),
+    ).rejects.toThrow(ForbiddenException)
+    expect(createVisitorSession).not.toHaveBeenCalled()
+
+    // Empty/omitted passcode issues standard USER pass
     const { profile, accessToken } = await authService.issueGuestPass({
       displayName: 'Alex • Team Lead',
       visitorType: 'TEAM_LEAD',
-      adminPasscode: 'wrong-len',
     })
 
     expect(profile.role).toBe('USER')

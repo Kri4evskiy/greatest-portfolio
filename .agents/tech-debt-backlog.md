@@ -20,44 +20,46 @@
 
 > Выполняется в **3 изолированных сессиях** (каждая заканчивается зелёными `pnpm lint`, `pnpm typecheck`, `pnpm test` и отдельным коммитом), чтобы не смешивать контекст и гарантировать чистую базу перед первым деплоем и внедрением Redis.
 
-#### Сессия 1 — Backend Security, Stability & Free-Tier Hardening *(Recommended Effort: **High**)*
-*Область:* `packages/shared-schemas/**`, `apps/api/**`, `apps/telemetry-ms/**`, `docker-compose*.yml`.
-- [ ] **Unbounded Memory & DB Bloat (`apps/api/src/prisma/prisma.service.ts`, `apps/api/src/modules/knowledge/*`):**
+#### Сессия 1 — Backend Security, Stability & Free-Tier Hardening _(Recommended Effort: **High** — ✅ Завершена)_
+
+_Область:_ `packages/shared-schemas/**`, `apps/api/**`, `apps/telemetry-ms/**`, `docker-compose*.yml`.
+- [x] **Unbounded Memory & DB Bloat (`apps/api/src/prisma/prisma.service.ts`, `apps/api/src/modules/knowledge/*`):**
   - Ввести лимиты `MAX_MEMORY_SESSIONS = 200` и `MAX_MEMORY_METRICS = 200` + очистку просроченных сессий в in-memory fallback.
   - Валидировать `:slug` на `POST /api/knowledge/:slug/view` и `/:slug/helpful` по allowlist реальных слагов статей (`404 NotFoundException` для неизвестных слагов) + дедупликация `helpful` по `(sessionId, slug)` против накрутки и засорения `ArticleMetrics`.
-- [ ] **Uncaught Async RxJS Error & Counter Cap (`apps/api/src/modules/telemetry/telemetry.service.ts`):**
+- [x] **Uncaught Async RxJS Error & Counter Cap (`apps/api/src/modules/telemetry/telemetry.service.ts`):**
   - Заменить синхронный `try/catch` вокруг `this.telemetryClient.emit('telemetry.event', rawEvent)` на `.pipe(takeUntil(this.shutdown$)).subscribe({ error: ... })`, чтобы падение `telemetry-ms` не роняло процесс асинхронной ошибкой RxJS.
   - Заменить `totalEventsProcessed: this.recentEvents.length` (упирается в потолок `25`) на монотонный счётчик.
-- [ ] **SSE DoS & Free-Tier Protection (`apps/api/src/modules/telemetry/telemetry.controller.ts`, `telemetry.service.ts`):**
+- [x] **SSE DoS & Free-Tier Protection (`apps/api/src/modules/telemetry/telemetry.controller.ts`, `telemetry.service.ts`):**
   - Убрать `@SkipThrottle()` с `GET /api/telemetry/stream`; поставить connect-limit **`5 req / min` на IP**.
   - Ввести лимиты одновременных SSE-стримов: **макс. `2` на IP**, **макс. `50` глобально**, плюс **max stream TTL = `15 минут`** с `finalize()` очисткой счётчиков и `429`/`503` при превышении.
-- [ ] **Configurable `TRUST_PROXY_HOPS` (`apps/api/src/config/app.config.ts`, `apps/api/src/main.ts`):**
+- [x] **Configurable `TRUST_PROXY_HOPS` (`apps/api/src/config/app.config.ts`, `apps/api/src/main.ts`):**
   - Вынести `TRUST_PROXY_HOPS` в Zod `AppEnvSchema` (`z.coerce.number().int().min(0).max(5).default(1)`) вместо хардкода `app.set('trust proxy', 1)`.
-- [ ] **CSRF & Helmet Hardening (`apps/api/src/main.ts`):**
+- [x] **CSRF & Helmet Hardening (`apps/api/src/main.ts`):**
   - Удалить `app.useBodyParser('urlencoded', ...)` (API принимает только JSON — закрывает Login/Logout CSRF через HTML-формы).
   - Добавить `CsrfOriginMiddleware` для всех `POST`/`PUT`/`PATCH`/`DELETE`: проверка `Sec-Fetch-Site === 'same-origin'` либо совпадение `Origin` с `appConfig.allowedOrigins` + обязательный `Content-Type: application/json` для мутаций с телом.
   - Включить `contentSecurityPolicy: { directives: { defaultSrc: ["'none'"], frameAncestors: ["'none'"] } }` на JSON API в Helmet; снизить глобальный `@Throttle` до **`60 req / min`**.
-- [ ] **JWT Hardening, `1d` TTL, Admin Passcode & Admin Stub (`apps/api/src/modules/auth/*`, `app.config.ts`):**
+- [x] **JWT Hardening, `1d` TTL, Admin Passcode & Admin Stub (`apps/api/src/modules/auth/*`, `app.config.ts`):**
   - Сократить срок жизни токена с `7d` до **`1d`** (`KB_COOKIE_MAX_AGE_MS = 1000 * 60 * 60 * 24`).
   - Закрепить `signOptions: { algorithm: 'HS256', expiresIn: '1d' }` и `verifyOptions: { algorithms: ['HS256'] }` + валидировать расшифрованный JWT payload через Zod-схему.
   - Объединить rate-limit бакет для `/api/auth/guest-pass` и `/api/auth/login` (`5 req / min` суммарно).
   - При передаче непустого неверного `adminPasscode` возвращать **`403 Forbidden`** + структурированный аудит-лог `ADMIN_ESCALATION_FAILED` (без тихого даунгрейда в `USER`).
   - В `app.config.ts` требовать `ADMIN_SECRET_PASSCODE.length >= 16` в `production` (вне demo mode).
   - Добавить заготовку `@Roles('ADMIN')` эндпоинта (например, `GET /api/telemetry/admin-diagnostics` или `POST /api/telemetry/cache-reset`) для будущего расширения прав `ADMIN`.
-- [ ] **UUID Deduplication Fix (`apps/api/src/prisma/prisma.service.ts`):**
+- [x] **UUID Deduplication Fix (`apps/api/src/prisma/prisma.service.ts`):**
   - Передавать `id: rawEvent.id` в `prisma.systemEventLog.create({ data: { id, eventType, payload } })`, чтобы живые SSE-события и записи БД на `/system-status` не дублировались.
-- [ ] **Microservice, RBAC, Validation & Error Filter Hygiene:**
+- [x] **Microservice, RBAC, Validation & Error Filter Hygiene:**
   - В `apps/telemetry-ms/src/main.ts` сменить дефолт `TELEMETRY_MS_HOST` с `'0.0.0.0'` на `'127.0.0.1'` (Docker Compose явно задаёт `0.0.0.0` внутри приватной сети), добавить Zod-валидацию `TELEMETRY_MS_PORT` и `.catch()` в `bootstrap()` (и в `apps/api/src/main.ts`).
   - Согласовать RBAC между `GET /api/knowledge/metrics` и `GET /api/knowledge/metrics/paginated` (оба либо `@Public()` как публичная статистика лидерборда, либо оба защищены).
   - В `packages/shared-schemas/src/pagination.schema.ts` ограничить `offset` сверху (`.max(500)`).
   - В `apps/api/src/common/filters/sentry-exception.filter.ts` добавить `if (response.headersSent) return` **с подробным комментарием** (защита от `ERR_HTTP_HEADERS_SENT` при обрыве SSE/стриминга), санитизировать `\r\n`/ANSI в `req.originalUrl` и `enriched.message` в логах (защита от log forging), и не раскрывать `requiredRoles` в production 403-ответах.
   - Убрать raw `as` касты в `prisma.service.ts` (через Zod `safeParse`) и в `jwt-roles.guard.ts` (через Express `declare module` augmentation).
-- [ ] **Docker Hardening & Zero-Friction Team Lead Demo (`docker-compose.yml`, `docker-compose.prod.yml`):**
+- [x] **Docker Hardening & Zero-Friction Team Lead Demo (`docker-compose.yml`, `docker-compose.prod.yml`):**
   - В локальном `docker-compose.yml`: добавить `WORKFOLIO_DEMO_MODE: ${WORKFOLIO_DEMO_MODE:-true}` в сервис `web` (чтобы `docker compose up --build` работал у тимлида без ручной настройки `.env`), привязать `web` к `127.0.0.1:${WEB_HOST_PORT:-3000}:3000`, сделать хост-порты БД и API параметризуемыми на loopback (`127.0.0.1:${POSTGRES_HOST_PORT:-5432}:5432`, `127.0.0.1:${API_HOST_PORT:-4000}:4000`) против локальных коллизий портов.
   - В `docker-compose.prod.yml`: добавить `security_opt: ["no-new-privileges:true"]`, `cap_drop: ["ALL"]`, `read_only: true` + `tmpfs: [/tmp]`, `pids_limit`, а также `healthcheck` для `web` (`:3000`) и `telemetry-ms`.
 
-#### Сессия 2 — Frontend Security, Auth Modal UX, Cache/SSE/Race Fixes & SEO *(Recommended Effort: **High**)*
-*Область:* `apps/web/config/security-headers.config.ts`, `apps/web/src/{proxy.ts,shared/*,features/auth/*,features/search/*,features/telemetry-stream/*,entities/knowledge-article/queries/*,app/{sitemap.ts,robots.ts,llms.txt}}`.
+#### Сессия 2 — Frontend Security, Auth Modal UX, Cache/SSE/Race Fixes & SEO _(Recommended Effort: **High**)_
+
+_Область:_ `apps/web/config/security-headers.config.ts`, `apps/web/src/{proxy.ts,shared/*,features/auth/*,features/search/*,features/telemetry-stream/*,entities/knowledge-article/queries/*,app/{sitemap.ts,robots.ts,llms.txt}}`.
 - [ ] **Frontend Zod Env Validation & Fail-Closed Edge JWT (`apps/web/src/shared/config/env.ts`, `edge-jwt.ts`, `proxy.ts`):**
   - Создать Zod-валидатор серверных и клиентских env-переменных фронтенда (`JWT_SECRET`, `WORKFOLIO_DEMO_MODE`, `API_INTERNAL_URL` со стриппингом trailing `/`, `NEXT_PUBLIC_SITE_URL`, `NEXT_PUBLIC_POSTHOG_HOST`).
   - Сделать `verifyEdgeJwtHs256()` **строго fail-closed** при `NODE_ENV === 'production' && WORKFOLIO_DEMO_MODE !== 'true'` (отклонять пустой, `< 32` символов или `DEFAULT_DEV_JWT_SECRET`); добавить проверку claims `sub`, `role` (`'USER' | 'ADMIN'`), `nbf`; сбрасывать `cachedHmacKeyPromise` в `.catch()`.
@@ -82,8 +84,9 @@
   - В `security-headers.config.ts`: валидировать `publicApiUrl` через `new URL(...).origin`, сузить `connect-src` до явных origin'ов, добавить `Cross-Origin-Resource-Policy: same-origin` (плюс SHA-256 hash для `PALETTE_INIT_SCRIPT` вместо `'unsafe-inline'`, если совместимо с Next.js 16 SSG).
   - В `link-sanitizer.ts`: запретить `/\` (`!trimmed.startsWith('/\\')`). В `mdx-ast-parser.ts`: явно отключить JS-движки в `gray-matter`.
 
-#### Сессия 3A — Frontend RSC/Streaming, Bundle & CWV Optimization *(Recommended Effort: **High**)*
-*Область:* `packages/shared-schemas/package.json`, `packages/ui/*`, `apps/web/next.config.ts`, `apps/web/src/app/**`, `CvDocumentShowcase`, `D3`, `scrollspy`.
+#### Сессия 3A — Frontend RSC/Streaming, Bundle & CWV Optimization _(Recommended Effort: **High**)_
+
+_Область:_ `packages/shared-schemas/package.json`, `packages/ui/*`, `apps/web/next.config.ts`, `apps/web/src/app/**`, `CvDocumentShowcase`, `D3`, `scrollspy`.
 - [ ] **Устранение утечек клиентского бандла (`H5`, `I4`):**
   - Добавить `"sideEffects": false` в `packages/shared-schemas/package.json` и `packages/ui/package.json` + `'@repo/shared-schemas'` в `optimizePackageImports` (или subpath exports `@repo/shared-schemas/locale`, `@repo/shared-schemas/tech-radar`), чтобы 43.6 КБ `tech-radar.schema.ts` не утекали в клиентский бандл.
   - Заменить `import * as d3 from 'd3'` на точечные импорты (`select`, `hierarchy`, `tree`, `linkHorizontal`), добавить cleanup в `useEffect`, keyboard a11y (`role="button"`, `tabIndex={0}`), убрать мёртвый `pulseCounterRef` и хардкод русских строк в D3-виджетах.
@@ -100,10 +103,11 @@
   - Перевести `useActiveWorkfolioSection` и `useActiveHeading` (TOC) с `getBoundingClientRect()` на `IntersectionObserver`.
   - Добавить `'use client'` в `packages/ui/src/components/dialog.tsx` и `tabs.tsx`; ключи `segments.join('/')` в `React.cache` (`mdx-fs-loader.ts`); FIFO-вытеснение в `shiki-highlighter.ts`; убрать `router.prefetch` закрытого KB для гостя; стабилизировать `columns` + типизировать `ColumnMeta` в `ObservabilityDataTable`; убрать `useLocale() as SupportedLocale` в `language-switcher.tsx`; локализовать `opengraph-image.tsx` со шрифтом `Inter`.
 
-#### Сессия 3B — Синхронизация `this-project` MDX (42 файла), Docs & CI Quick-Wins *(Recommended Effort: **Medium**)*
-*Область:* `apps/web/content/this-project/**`, `.github/**`, `README.md`, `.agents/**`, `SECURITY.md`.
+#### Сессия 3B — Синхронизация `this-project` MDX (42 файла), Docs & CI Quick-Wins _(Recommended Effort: **Medium**)_
+
+_Область:_ `apps/web/content/this-project/**`, `.github/**`, `README.md`, `.agents/**`, `SECURITY.md`.
 - [ ] **Фактчекинг и полная синхронизация всех 14 статей (42 файла) `apps/web/content/this-project/**`** под итоговый код после Сессий 1–3A:
-  - Поправить расхождения в типах `GET /api/capabilities` и `nextOffset` (`nestjs-12-esm-prisma-7-sse-graceful-architecture`), битые относительные ссылки и укр. слово `«активних»` в `.ru.mdx` (`multi-theme-tokens-tailwind-preset`), сниппет scrollspy/классы (`programmatic-scrollspy-section-nav`), сигнатуру/порядок проверок `verifyEdgeJwtHs256` (`edge-web-crypto-jwt-proxy`), `LOCALE_METADATA` и `/system-status` (`production-seo-i18n-sitemap-architecture`), строки/классы `TechRadarTable` (`react-compiler-config-boundaries`), пропсы `CaseStudyReadButton`/`FooterSseStatus`/файл `bfcache`/`use-ui-store` (`rsc-locale-slicing-client-islands`), префиксы `/en/` и `/uk/`, `theme.css` и `codeToHtml` (`server-mdx-ast-dual-theme-shiki`), актуальные имена функций (`static-search-index-cmdk-palette`), `prepare-codegen`/`allowBuilds`/дубль пункта `4.` в `.en.mdx` (`github-actions-ci-pipeline`), `pnpm prune` в `web.Dockerfile` (`multi-stage-buildkit-docker`), актуальный `turbo.json` (`pnpm-turborepo-tsconfig-biome`), актуальный `main.ts`/SSE `@SkipTimeout()`/актуальное число SSG-роутов/matcher `proxy.ts` (`production-security-hardening-csp-helmet-throttler`), актуальный `vitest.base.ts`/4 `test.step`/Playwright cache key (`vitest-playwright-enterprise-testing-pyramid`).
+  - Поправить расхождения в типах `GET /api/capabilities` и `nextOffset` (`nestjs-12-esm-prisma-7-sse-graceful-architecture`), битые относительные ссылки и укр. слово `«активних»` в `.ru.mdx` (`multi-theme-tokens-tailwind-preset`), сниппет scrollspy/классы (`programmatic-scrollspy-section-nav`), сигнатуру/порядок проверок `verifyEdgeJwtHs256` (`edge-web-crypto-jwt-proxy`), `LOCALE_METADATA` и `/system-status` (`production-seo-i18n-sitemap-architecture`), строки/классы `TechRadarTable` (`react-compiler-config-boundaries`), пропсы `CaseStudyReadButton`/`FooterSseStatus`/файл `bfcache`/`use-ui-store` (`rsc-locale-slicing-client-islands`), префиксы `/en/` и `/uk/`, `theme.css` и `codeToHtml` (`server-mdx-ast-dual-theme-shiki`), актуальные имена функций (`static-search-index-cmdk-palette`), `prepare-codegen`/`allowBuilds`/дубль пункта `4.` в `.en.mdx` (`github-actions-ci-pipeline`), `pnpm prune` в `web.Dockerfile` (`multi-stage-buildkit-docker`), актуальный `turbo.json` (`pnpm-turborepo-tsconfig-biome`), актуальный `main.ts`/SSE `@SkipTimeout()`/актуальное число SSG-роутов/matcher `proxy.ts` + разбор `CsrfOriginMiddleware` и паттернов безопасного расширения под загрузку медиа (Presigned R2 URLs vs scoped multipart allowlist + запрет inline SVG от Stored XSS) (`production-security-hardening-csp-helmet-throttler`), актуальный `vitest.base.ts`/4 `test.step`/Playwright cache key (`vitest-playwright-enterprise-testing-pyramid`).
 - [ ] **Синхронизация системной документации** по чеклисту `AGENTS.md` (`apps/web/README.md`, `apps/api/README.md`, `.agents/frontend/*`, `.agents/backend/*`, `SECURITY.md`).
 - [ ] **CI Security & Workflow Hardening:** добавить еженедельный `schedule:` крон `pnpm audit --prod --audit-level=high`, `.github/dependabot.yml` (`npm` + `github-actions`) и `actionlint` в `lint`.
 
@@ -194,7 +198,7 @@
     1. **Прямая маршрутизация `/api/*` из Nginx в `api:4000` (УБИРАЕМ ХОП Next.js `rewrites()`!):**
        - `/` ➔ `http://web:3000`
        - `/api/*` ➔ `http://api:4000` (напрямую, минуя Next.js!).
-       - *Зачем:* если проксировать `/api/*` по цепочке `Client -> Nginx -> Next.js rewrites -> NestJS`, появляется **2 прокси-хопа** (ломает `TRUST_PROXY_HOPS=1`, либо все клиенты делят один IP-бакет в `@nestjs/throttler`/Redis) и тратятся лишние сокеты Next.js на долгоживущий SSE-стрим. Прямой роут `/api/* -> api:4000` сохраняет ровно **1 хоп** (`TRUST_PROXY_HOPS=1`) и разгружает фронтенд-контейнер.
+       - _Зачем:_ если проксировать `/api/*` по цепочке `Client -> Nginx -> Next.js rewrites -> NestJS`, появляется **2 прокси-хопа** (ломает `TRUST_PROXY_HOPS=1`, либо все клиенты делят один IP-бакет в `@nestjs/throttler`/Redis) и тратятся лишние сокеты Next.js на долгоживущий SSE-стрим. Прямой роут `/api/* -> api:4000` сохраняет ровно **1 хоп** (`TRUST_PROXY_HOPS=1`) и разгружает фронтенд-контейнер.
     2. **Полное удаление хост-портов бэкенда и фронтенда в `docker-compose.prod.yml`:**
        - После добавления `nginx` (`ports: ["80:80", "443:443"]`) **полностью удалить** секции `ports:` у `api` и `web` (по аналогии с `postgres` и `telemetry-ms`). Единственная входная точка — Nginx; остальные сервисы общаются строго внутри приватных Docker-сетей (`frontend-network` / `backend-network`).
     3. **Заголовки доверия и защита от спуфинга IP:** передавать `proxy_set_header X-Real-IP $remote_addr;`, `proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;`, `proxy_set_header X-Forwarded-Proto $scheme;`, `proxy_set_header Host $host;` (отбрасывая недоверенный входящий `X-Forwarded-Host`).
@@ -202,8 +206,8 @@
     5. **Порядок старта (`HEALTHCHECK`):** `nginx` обязан ждать `depends_on: web: { condition: service_healthy }` и `api: { condition: service_healthy }`, чтобы не отдавать `502` в первую секунду старта (сами `healthcheck` для `web` и `telemetry-ms` добавляются уже в Сессии 1).
     6. **Дополнительные кейсы Nginx:** TLS Termination, Static Asset / Edge Caching (`/_next/static/`), L7 Rate Limiting (`limit_req_zone`) перед Node.js.
 - [ ] **Re-Scoped DB-Backed Knowledge Base Search & Metadata Index (опционально — Фаза 2 CMS):**
-  - *Рекомендуемый прагматичный вариант:* хранить `.mdx` в Git/SSG, а в PostgreSQL (`Prisma 7`) синхронизировать таблицы метаданных (`KnowledgeTopic`, `KnowledgeSubtopic`, `KnowledgeArticle`, `KnowledgeTag`, `KnowledgeArticleTag`) с `tsvector` + GIN-индексом для серверной пагинации (`useInfiniteQuery`: 6 разделов / 4 статьи / Топ-10 тегов) и полнотекстового SQL-поиска.
-  - *Полный CMS-вариант (только если нужен учебный шоукейс R2-хранения текстов):* перенос тел `.mdx` в `Cloudflare R2`/`MinIO` по `storageKey` + `contentHash` (SHA-256) + Admin CRUD (`@Roles('ADMIN')`) + `sync:mdx-to-cms` + On-Demand ISR (`revalidateTag`) + Dual-Source Air-Gapped Fallback.
+  - _Рекомендуемый прагматичный вариант:_ хранить `.mdx` в Git/SSG, а в PostgreSQL (`Prisma 7`) синхронизировать таблицы метаданных (`KnowledgeTopic`, `KnowledgeSubtopic`, `KnowledgeArticle`, `KnowledgeTag`, `KnowledgeArticleTag`) с `tsvector` + GIN-индексом для серверной пагинации (`useInfiniteQuery`: 6 разделов / 4 статьи / Топ-10 тегов) и полнотекстового SQL-поиска.
+  - _Полный CMS-вариант (только если нужен учебный шоукейс R2-хранения текстов):_ перенос тел `.mdx` в `Cloudflare R2`/`MinIO` по `storageKey` + `contentHash` (SHA-256) + Admin CRUD (`@Roles('ADMIN')`) + `sync:mdx-to-cms` + On-Demand ISR (`revalidateTag`) + Dual-Source Air-Gapped Fallback.
 
 ---
 

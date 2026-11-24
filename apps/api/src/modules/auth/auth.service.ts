@@ -1,31 +1,26 @@
 import { createHash, timingSafeEqual } from 'node:crypto'
-import { Inject, Injectable } from '@nestjs/common'
+import { ForbiddenException, Inject, Injectable, Logger } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
 import {
   type GuestPassFormInput,
+  type JwtSessionPayload,
+  JwtSessionPayloadSchema,
   KB_ACCESS_COOKIE_NAME,
   KB_COOKIE_MAX_AGE_MS,
   type Role,
   type SessionProfile,
   VISITOR_ROLE_LABELS,
-  type VisitorRoleType,
 } from '@repo/shared-schemas'
 import { appConfig } from '../../config/app.config.js'
 import { PrismaService } from '../../prisma/prisma.service.js'
 import { TelemetryService } from '../telemetry/telemetry.service.js'
 
-export { KB_ACCESS_COOKIE_NAME, KB_COOKIE_MAX_AGE_MS }
-
-export interface JwtSessionPayload {
-  sub: string
-  displayName: string
-  visitorType: VisitorRoleType
-  role: Role
-  expiresAt: string
-}
+export { type JwtSessionPayload, KB_ACCESS_COOKIE_NAME, KB_COOKIE_MAX_AGE_MS }
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name)
+
   constructor(
     @Inject(JwtService) private readonly jwtService: JwtService,
     @Inject(PrismaService) private readonly prisma: PrismaService,
@@ -52,9 +47,18 @@ export class AuthService {
     input: GuestPassFormInput,
     userAgent?: string | undefined,
   ): Promise<{ profile: SessionProfile; accessToken: string }> {
-    const isAdmin =
-      Boolean(input.adminPasscode) && this.isPasscodeMatch(input.adminPasscode ?? '', appConfig.adminSecretPasscode)
-    const assignedRole: Role = isAdmin ? 'ADMIN' : 'USER'
+    const providedPasscode = input.adminPasscode?.trim() ?? ''
+    let assignedRole: Role = 'USER'
+
+    if (providedPasscode.length > 0) {
+      if (!this.isPasscodeMatch(providedPasscode, appConfig.adminSecretPasscode)) {
+        this.logger.warn(
+          `[Security] ADMIN_ESCALATION_FAILED: invalid admin passcode attempt (visitorType=${input.visitorType})`,
+        )
+        throw new ForbiddenException('Invalid admin passcode')
+      }
+      assignedRole = 'ADMIN'
+    }
 
     const expiresAt = new Date(Date.now() + KB_COOKIE_MAX_AGE_MS)
     const session = await this.prisma.createVisitorSession({
@@ -73,7 +77,10 @@ export class AuthService {
       expiresAt: session.expiresAt.toISOString(),
     }
 
-    const accessToken = await this.jwtService.signAsync(payload)
+    const accessToken = await this.jwtService.signAsync(payload, {
+      algorithm: 'HS256',
+      expiresIn: '1d',
+    })
 
     await this.telemetry.publishEvent({
       type: 'GUEST_PASS_ISSUED',
@@ -99,13 +106,19 @@ export class AuthService {
     }
 
     try {
-      const verified = await this.jwtService.verifyAsync<JwtSessionPayload>(token)
+      const verified: unknown = await this.jwtService.verifyAsync(token, {
+        algorithms: ['HS256'],
+      })
+      const parsed = JwtSessionPayloadSchema.safeParse(verified)
+      if (!parsed.success) {
+        return this.getGuestProfile()
+      }
       return {
-        id: verified.sub,
-        displayName: verified.displayName,
-        visitorType: verified.visitorType,
-        role: verified.role,
-        expiresAt: verified.expiresAt,
+        id: parsed.data.sub,
+        displayName: parsed.data.displayName,
+        visitorType: parsed.data.visitorType,
+        role: parsed.data.role,
+        expiresAt: parsed.data.expiresAt,
       }
     } catch {
       return this.getGuestProfile()

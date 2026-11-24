@@ -3,11 +3,13 @@ import { z } from 'zod'
 
 const DEFAULT_DEV_ADMIN_PASSCODE = 'workfolio-admin-2026'
 const MIN_PROD_JWT_SECRET_LENGTH = 32
+const MIN_PROD_ADMIN_PASSCODE_LENGTH = 16
 
 const AppEnvSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   WORKFOLIO_DEMO_MODE: z.enum(['true', 'false']).optional().default('false'),
   PORT: z.coerce.number().int().min(1).max(65535).default(4000),
+  TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(5).default(1),
   WEB_ORIGIN: z.string().trim().min(1).default('http://localhost:3000'),
   JWT_SECRET: z.string().trim().optional(),
   ADMIN_SECRET_PASSCODE: z.string().trim().min(1).default(DEFAULT_DEV_ADMIN_PASSCODE),
@@ -27,6 +29,7 @@ export interface AppConfig {
   isProduction: boolean
   isDemoMode: boolean
   port: number
+  trustProxyHops: number
   webOrigin: string
   allowedOrigins: string[]
   jwtSecret: string
@@ -60,9 +63,12 @@ export function loadAppConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
       )
     }
 
-    if (data.ADMIN_SECRET_PASSCODE === DEFAULT_DEV_ADMIN_PASSCODE) {
+    if (
+      data.ADMIN_SECRET_PASSCODE === DEFAULT_DEV_ADMIN_PASSCODE ||
+      data.ADMIN_SECRET_PASSCODE.length < MIN_PROD_ADMIN_PASSCODE_LENGTH
+    ) {
       throw new Error(
-        'Security violation: ADMIN_SECRET_PASSCODE must be explicitly overridden when NODE_ENV=production',
+        `Security violation: ADMIN_SECRET_PASSCODE must be explicitly overridden with a strong secret (>= ${MIN_PROD_ADMIN_PASSCODE_LENGTH} chars) when NODE_ENV=production`,
       )
     }
   } else if (isProduction && isDemoMode) {
@@ -91,6 +97,7 @@ export function loadAppConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     isProduction,
     isDemoMode,
     port: data.PORT,
+    trustProxyHops: data.TRUST_PROXY_HOPS,
     webOrigin: data.WEB_ORIGIN,
     allowedOrigins,
     jwtSecret: resolveJwtSecret(data.JWT_SECRET),

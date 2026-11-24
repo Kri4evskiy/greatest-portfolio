@@ -67,12 +67,21 @@ describe('loadAppConfig (Zod env validation & production security guard)', () =>
         JWT_SECRET: STRONG_PROD_SECRET,
       }),
     ).toThrow(/ADMIN_SECRET_PASSCODE/i)
+
+    expect(() =>
+      loadAppConfig({
+        NODE_ENV: 'production',
+        JWT_SECRET: STRONG_PROD_SECRET,
+        ADMIN_SECRET_PASSCODE: 'short-pass',
+      }),
+    ).toThrow(/ADMIN_SECRET_PASSCODE/i)
   })
 
-  it('accepts strong production secrets and locks allowedOrigins to configured WEB_ORIGIN', () => {
+  it('accepts strong production secrets, parses TRUST_PROXY_HOPS, and locks allowedOrigins to configured WEB_ORIGIN', () => {
     const cfg = loadAppConfig({
       NODE_ENV: 'production',
       WORKFOLIO_DEMO_MODE: 'false',
+      TRUST_PROXY_HOPS: '2',
       WEB_ORIGIN: 'https://workfolio.example, https://preview.workfolio.example',
       JWT_SECRET: STRONG_PROD_SECRET,
       ADMIN_SECRET_PASSCODE: 'custom-admin-pass-2026',
@@ -80,6 +89,7 @@ describe('loadAppConfig (Zod env validation & production security guard)', () =>
 
     expect(cfg.isProduction).toBe(true)
     expect(cfg.isDemoMode).toBe(false)
+    expect(cfg.trustProxyHops).toBe(2)
     expect(cfg.allowedOrigins).toEqual(['https://workfolio.example', 'https://preview.workfolio.example'])
     expect(cfg.allowedOrigins).not.toContain('http://localhost:3000')
   })

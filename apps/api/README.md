@@ -18,40 +18,40 @@ apps/api/
 │   └── auth-and-observability.e2e-spec.ts # Full AppModule + Supertest E2E
 │
 └── src/
-    ├── main.ts                     # Bootstrap: Helmet, CORS (exposedHeaders: X-Request-Id), enableShutdownHooks(), CookieParser
-    ├── app.module.ts               # Root Module: ThrottlerModule, APP_GUARD (ThrottlerGuard), APP_INTERCEPTOR (TimeoutInterceptor), LoggingMiddleware
+    ├── main.ts                     # Bootstrap: JSON-only bodyParser, Helmet (strict CSP), CORS (exposedHeaders: X-Request-Id), TRUST_PROXY_HOPS, enableShutdownHooks(), CookieParser
+    ├── app.module.ts               # Root Module: ThrottlerModule (60 req/min + shared auth bucket), APP_GUARD, APP_INTERCEPTOR, LoggingMiddleware + CsrfOriginMiddleware
     ├── app.controller.ts           # Healthcheck (GET /api/health) и матрица возможностей (GET /api/capabilities)
 │
     │
     ├── common/                     # Сквозные механизмы фреймворка (Cross-Cutting Concerns)
     │   ├── decorators/             # @Public() и @SkipTimeout()
     │   ├── dto/                    # PaginationQuerySchema / PaginationQueryDto (заготовка под пагинацию логов и MCP)
-    │   ├── filters/                # SentryExceptionFilter (глобальный @Catch(), маскирует 5xx детали и возвращает requestId)
+    │   ├── filters/                # SentryExceptionFilter (глобальный @Catch(), guard headersSent для SSE, санитизация URL, requestId)
     │   ├── guards/                 # Директория для общих гардов (.gitkeep)
-    │   ├── interceptors/           # LoggingInterceptor (debug) и TimeoutInterceptor (15s с обходом SSE)
-    │   ├── middleware/             # LoggingMiddleware (Express-уровень на '{*path}')
+    │   ├── interceptors/           # LoggingInterceptor (debug + log-sanitization) и TimeoutInterceptor (15s с обходом SSE)
+    │   ├── middleware/             # LoggingMiddleware + CsrfOriginMiddleware (JSON Content-Type + Origin/Sec-Fetch-Site на мутациях)
     │   ├── pipes/                  # ZodValidationPipe (точечная валидация через схемы @repo/shared-schemas)
-    │   └── utils/                  # request-id.util.ts (генерация и защита X-Request-Id от CRLF Log Injection + __tests__/request-id.util.spec.ts)
+    │   └── utils/                  # request-id.util.ts, log-sanitizer.util.ts, express-request.util.ts (+ __tests__/request-id.util.spec.ts)
     │
     ├── config/                     # Типизированная Fail-Fast конфигурация (Zod)
     │   ├── __tests__/              # app.config.spec.ts
-    │   ├── app.config.ts           # PORT, WEB_ORIGIN, WORKFOLIO_DEMO_MODE, JWT_SECRET, ADMIN_SECRET_PASSCODE, TELEMETRY_MS_*, SENTRY_DSN, integration flags
+    │   ├── app.config.ts           # PORT, TRUST_PROXY_HOPS, WEB_ORIGIN, WORKFOLIO_DEMO_MODE, JWT_SECRET, ADMIN_SECRET_PASSCODE (>=16), TELEMETRY_MS_*, SENTRY_DSN, integration flags
     │   └── database.config.ts      # DATABASE_URL, DIRECT_URL, парсер ?schema=
     │
     ├── generated/prisma/           # Автогенерируемый ESM-клиент Prisma 7 (игнорируется Git и Biome)
     │
     ├── migrations/                 # Слой управления сидированием БД
     │   └── scripts/
-    │       ├── seed-data.ts        # Единый источник INITIAL_ARTICLE_SEEDS (10 слагов для seed.ts и In-Memory fallback)
+    │       ├── seed-data.ts        # Единый источник INITIAL_ARTICLE_SEEDS (10 слагов) + KNOWN_KNOWLEDGE_SLUGS allowlist (30 слагов)
     │       └── seed.ts             # Идемпотентный CLI-скрипт (Pool + PrismaPg, upsert в ArticleMetrics)
     │
     ├── prisma/                     # Доступ к данным (@Global() PrismaModule)
-    │   ├── __tests__/              # prisma.service.spec.ts (тесты In-Memory fallback, пагинации и фильтрации)
+    │   ├── __tests__/              # prisma.service.spec.ts (тесты In-Memory fallback, лимитов 200 записей, пагинации и фильтрации)
     │   ├── prisma.module.ts
-    │   └── prisma.service.ts       # Композиция PrismaClient + @prisma/adapter-pg + In-Memory fallback без DATABASE_URL
+    │   └── prisma.service.ts       # Композиция PrismaClient + @prisma/adapter-pg + bounded In-Memory fallback (cap 200) без DATABASE_URL
     │
     └── modules/                    # Изолированные доменные модули (Domain Modules)
-        ├── auth/                   # JWT в HttpOnly Cookies, Guest Pass, RBAC
+        ├── auth/                   # JWT (HS256, 1d) в HttpOnly Cookies, Guest Pass, RBAC
         │   ├── __tests__/          # auth.service.spec.ts, auth.controller.spec.ts, jwt-roles.guard.spec.ts
         │   ├── decorators/         # @Roles(...)
         │   ├── dto/                # Реэкспорт схем/типов из @repo/shared-schemas
@@ -59,16 +59,17 @@ apps/api/
         │   ├── auth.controller.ts
         │   ├── auth.service.ts
         │   └── auth.module.ts
-        ├── knowledge/              # Метрики и реакции статей Базы Знаний
+        ├── knowledge/              # Метрики и реакции статей Базы Знаний (slug allowlist + helpful dedup)
         │   ├── dto/                # Реэкспорт схем/типов из @repo/shared-schemas
         │   ├── knowledge.controller.ts
         │   ├── knowledge.service.ts
         │   └── knowledge.module.ts
-        └── telemetry/              # Прокси к apps/telemetry-ms (TCP :4001) + Cursor-лог + SSE-стрим
+        └── telemetry/              # Прокси к apps/telemetry-ms (TCP :4001) + Cursor-лог + SSE-стрим (2/IP, 50 global, 15m TTL) + ADMIN diagnostics
+            ├── __tests__/          # telemetry.service.spec.ts
             ├── dto/                # telemetry.dto.ts (SystemEventsQuerySchema)
-        ├── telemetry.controller.ts
-        ├── telemetry.service.ts
-        └── telemetry.module.ts
+            ├── telemetry.controller.ts
+            ├── telemetry.service.ts
+            └── telemetry.module.ts
 ```
 
 ---
@@ -81,10 +82,10 @@ apps/api/
 Входящий HTTP-запрос
   │
   ▼ 1. Express Middleware (main.ts + AppModule.configure)
-       helmet() ➔ cookieParser() ➔ CORS ➔ LoggingMiddleware ('{*path}')
+       helmet() ➔ cookieParser() ➔ CORS ➔ LoggingMiddleware + CsrfOriginMiddleware ('{*path}')
   │
   ▼ 2. Guards (глобальный APP_GUARD ➔ контроллерный @UseGuards)
-       ThrottlerGuard (100 req/min глобально, 5 req/min на auth)
+       ThrottlerGuard (60 req/min глобально, общий 5 req/min на auth, 5 req/min на SSE handshake)
        ➔ JwtRolesGuard (читает HttpOnly cookie kb_access_token, проверяет @Public() и @Roles())
   │
   ▼ 3. Interceptors (Before)
@@ -144,21 +145,22 @@ apps/api/
 
 ## 5. Эндпоинты API (префикс `/api`)
 
-| Метод и путь                           | Доступ / Лимит                      | Назначение                                                                        |
-| :------------------------------------- | :---------------------------------- | :-------------------------------------------------------------------------------- |
-| `GET /api/health`                      | Public (`100/min`)                  | Проверка состояния сервиса и подключения к PostgreSQL                             |
-| `GET /api/capabilities`                | Public (`100/min`)                  | Безопасная матрица возможностей системы (`SystemCapabilities`, без секретов)      |
-| `POST /api/auth/guest-pass`            | Public (`5/min`)                    | Выдача `Guest Pass` (`USER` или `ADMIN` по пасскоду), установка `HttpOnly` cookie |
-| `POST /api/auth/login`                 | Public (`5/min`)                    | Алиас `guest-pass`                                                                |
-| `GET /api/auth/me`                     | Public (`100/min`)                  | Чтение текущего профиля из cookie (возвращает `GUEST`, если cookie нет)           |
-| `POST /api/auth/logout`                | Public (`100/min`)                  | Очистка `kb_access_token` cookie                                                  |
-| `GET /api/knowledge/metrics`           | `@Roles('USER', 'ADMIN')`           | Список метрик статей Базы Знаний                                                  |
-| `GET /api/knowledge/metrics/paginated` | Public (`100/min`, Read-Only)       | Offset-пагинация рейтинга статей (`limit`, `offset`, `category`, `sortBy`)        |
-| `POST /api/knowledge/:slug/view`       | `@Roles('USER', 'ADMIN')`           | Атомарный инкремент просмотров + событие в `telemetry-ms`                         |
-| `POST /api/knowledge/:slug/helpful`    | `@Roles('USER', 'ADMIN')`           | Атомарный инкремент «полезно» + событие в `telemetry-ms`                          |
-| `GET /api/telemetry/stream`            | `@SkipThrottle()`, `@SkipTimeout()` | Постоянный SSE-поток событий телеметрии                                           |
-| `GET /api/telemetry/events`            | Public (`100/min`)                  | Cursor-пагинация системных событий (`limit`, `cursor`, `eventType`)               |
-| `GET /api/telemetry/stats`             | Public (`100/min`)                  | Статистика из TCP-микросервиса `apps/telemetry-ms`                                |
+| Метод и путь                             | Доступ / Лимит                                   | Назначение                                                                               |
+| :--------------------------------------- | :----------------------------------------------- | :--------------------------------------------------------------------------------------- |
+| `GET /api/health`                        | Public (`60/min`)                                | Проверка состояния сервиса и подключения к PostgreSQL                                    |
+| `GET /api/capabilities`                  | Public (`60/min`)                                | Безопасная матрица возможностей системы (`SystemCapabilities`, без секретов)             |
+| `POST /api/auth/guest-pass`              | Public (`5/min` общий бакет с `/login`)          | Выдача `Guest Pass` (`USER` или `ADMIN` по пасскоду, `403` на неверный код), `1d` cookie |
+| `POST /api/auth/login`                   | Public (`5/min` общий бакет с `/guest-pass`)     | Алиас `guest-pass`                                                                       |
+| `GET /api/auth/me`                       | Public (`60/min`)                                | Чтение текущего профиля из cookie (возвращает `GUEST`, если cookie нет)                  |
+| `POST /api/auth/logout`                  | Public (`60/min`, CSRF Origin guard)             | Очистка `kb_access_token` cookie                                                         |
+| `GET /api/knowledge/metrics`             | Public (`60/min`, Read-Only)                     | Список метрик статей Базы Знаний                                                         |
+| `GET /api/knowledge/metrics/paginated`   | Public (`60/min`, Read-Only, `offset <= 500`)    | Offset-пагинация рейтинга статей (`limit`, `offset`, `category`, `sortBy`)               |
+| `POST /api/knowledge/:slug/view`         | `@Roles('USER', 'ADMIN')` + slug allowlist       | Атомарный инкремент просмотров (`404` для неизвестных слагов) + событие в `telemetry-ms` |
+| `POST /api/knowledge/:slug/helpful`      | `@Roles('USER', 'ADMIN')` + slug allowlist/dedup | Атомарный инкремент «полезно» (дедупликация на сессию) + событие в `telemetry-ms`        |
+| `GET /api/telemetry/stream`              | `5/min` handshake, `@SkipTimeout()`              | SSE-поток событий телеметрии (макс. `2`/IP, `50` глобально, TTL `15 мин`)                |
+| `GET /api/telemetry/events`              | Public (`60/min`)                                | Cursor-пагинация системных событий (`limit`, `cursor`, `eventType`)                      |
+| `GET /api/telemetry/stats`               | Public (`60/min`)                                | Статистика из TCP-микросервиса `apps/telemetry-ms`                                       |
+| `GET /api/telemetry/admin-diagnostics`   | `@Roles('ADMIN')`                                | Диагностика SSE-слотов, in-memory буферов и БД (заготовка прав `ADMIN`)                  |
 
 ---
 

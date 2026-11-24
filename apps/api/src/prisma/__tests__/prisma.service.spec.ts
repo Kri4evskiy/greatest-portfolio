@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
 import { INITIAL_ARTICLE_SEEDS } from '../../migrations/scripts/seed-data.js'
-import { PrismaService } from '../prisma.service.js'
+import { MAX_MEMORY_SESSIONS, PrismaService } from '../prisma.service.js'
 
 describe('PrismaService (In-Memory fallback parity)', () => {
   it('seeds all INITIAL_ARTICLE_SEEDS and paginates with offset, category filter, and sortBy parity', async () => {
@@ -136,5 +136,30 @@ describe('PrismaService (In-Memory fallback parity)', () => {
     })
     expect(session.id).toMatch(/^[0-9a-f-]{36}$/i)
     expect(session.role).toBe('USER')
+  })
+
+  it('bounds memorySessions at MAX_MEMORY_SESSIONS and prunes expired sessions', async () => {
+    const prisma = new PrismaService()
+
+    // Insert expired sessions first
+    await prisma.createVisitorSession({
+      displayName: 'Expired',
+      visitorType: 'OTHER',
+      role: 'USER',
+      expiresAt: new Date(Date.now() - 1000),
+    })
+
+    const future = new Date(Date.now() + 60_000)
+    for (let i = 0; i < MAX_MEMORY_SESSIONS + 25; i += 1) {
+      await prisma.createVisitorSession({
+        displayName: `User #${i}`,
+        visitorType: 'DEVELOPER',
+        role: 'USER',
+        expiresAt: future,
+      })
+    }
+
+    const stats = prisma.getMemoryStoreStats()
+    expect(stats.sessions).toBe(MAX_MEMORY_SESSIONS)
   })
 })

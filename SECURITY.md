@@ -17,17 +17,17 @@ This repository implements a multi-tier, zero-trust security architecture design
 - **HSTS:** Strict-Transport-Security enforced in production with `max-age=63072000; includeSubDomains; preload` (2 years).
 - **Permissions-Policy:** Explicitly disabling `camera`, `microphone`, `geolocation`, and `browsing-topics`.
 
-### 3. API Gateway Hardening & Rate Limiting (`apps/api`)
+### 3. API Gateway Hardening, CSRF & Rate Limiting (`apps/api`)
 
-- **Helmet Integration:** Configured with `crossOriginResourcePolicy: { policy: 'cross-origin' }` to allow seamless SSE telemetry streams without compromising HTTP protection, alongside `trust proxy` (1 hop) and environment-strict CORS (`WEB_ORIGIN`).
-- **Brute-Force Protection (`@nestjs/throttler`):** Sliding window rate limiting protecting authentication endpoints (`POST /api/auth/guest-pass`, `POST /api/auth/login`) with a max quota of 5 requests per minute per IP. Only `@Sse('stream')` is exempt via `@SkipThrottle()`, keeping `GET /api/telemetry/stats` protected by the global quota.
+- **Helmet & JSON-Only CSRF Defense:** Configured with strict `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'` on JSON API responses, `crossOriginResourcePolicy: { policy: 'cross-origin' }` for explicit cross-domain CORS (`WEB_ORIGIN`), configurable `TRUST_PROXY_HOPS` (`0..5`, default `1`), disabled `application/x-www-form-urlencoded` body parser, and `CsrfOriginMiddleware` validating `Content-Type: application/json`, `Origin`, and `Sec-Fetch-Site` on all mutating routes.
+- **Brute-Force & SSE DoS Protection (`@nestjs/throttler`):** Global Free-Tier quota of `60 req/min` per IP; `/api/auth/guest-pass` and `/api/auth/login` share a single `5 req/min` per-IP bucket; `HS256` JWT TTL is bounded to `1d` with explicit `algorithms: ['HS256']` pinning and Zod claim validation; wrong non-empty `adminPasscode` fails closed with `403 Forbidden`. `GET /api/telemetry/stream` enforces `5 handshakes/min` per IP, max `2` concurrent streams/IP, max `50` global streams, and a `15-minute` max stream lifetime.
 
 ### 4. Zero-Trust Backend & Microservice Isolation
 
-- **Private Docker Network:** The `apps/telemetry-ms` microservice runs within an isolated internal Docker bridge (`backend-network`) communicating exclusively over TCP (`:4001`). No host ports are exposed to the public internet.
+- **Private Docker Network & Loopback Defaults:** `apps/telemetry-ms` defaults to `127.0.0.1:4001` locally (overridden to `0.0.0.0` only inside Docker's isolated `backend-network`) with zero host ports published. All `docker-compose.prod.yml` containers enforce `no-new-privileges:true`, `cap_drop: [ALL]`, `pids_limit: 256`, `read_only: true` + `tmpfs` (for Node services), and Docker `healthcheck`s.
 - **Reviewer Demo vs. Strict Production Compose Split:**
-  - `docker-compose.yml` enables `WORKFOLIO_DEMO_MODE=true` (falling back via `resolveJwtSecret()` to the shared `DEFAULT_DEV_JWT_SECRET` in `@repo/shared-schemas` when `.env` is absent) and HTTP-compatible cookie flags (`Secure: false` on `localhost`) for zero-friction evaluation without an `.env` file.
-  - `docker-compose.prod.yml` omits `WORKFOLIO_DEMO_MODE`, enforces mandatory non-default `JWT_SECRET` (`>= 32` chars), `ADMIN_SECRET_PASSCODE`, and `POSTGRES_PASSWORD` at both Compose parse time (`${VAR:?}`) and NestJS startup (`loadAppConfig`), sets `Secure: true` on `HttpOnly` cookies, and unpublishes PostgreSQL port `5432` from the host.
+  - `docker-compose.yml` enables `WORKFOLIO_DEMO_MODE=true` across both `api` and `web` (falling back via `resolveJwtSecret()` to the shared `DEFAULT_DEV_JWT_SECRET` in `@repo/shared-schemas` when `.env` is absent), binds all local ports strictly to `127.0.0.1` (parameterizable via `*_HOST_PORT`), and uses HTTP-compatible cookie flags (`Secure: false` on `localhost`) for zero-friction evaluation without an `.env` file.
+  - `docker-compose.prod.yml` omits `WORKFOLIO_DEMO_MODE`, enforces mandatory non-default `JWT_SECRET` (`>= 32` chars), `ADMIN_SECRET_PASSCODE` (`>= 16` chars), and `POSTGRES_PASSWORD` at both Compose parse time (`${VAR:?}`) and NestJS startup (`loadAppConfig`), sets `Secure: true` on `HttpOnly` cookies, and unpublishes PostgreSQL port `5432` from the host.
 - **Controlled Ingress & Anonymized Telemetry:** All external HTTP and SSE traffic enters through the public gateway (`apps/web` rewrites or `apps/api`), preventing direct probing of internal microservices. Public SSE telemetry (`GET /api/telemetry/stream`) strips personal `actorName` values and internal privilege roles (`ADMIN`).
 
 ### 5. Contract Validation & Input Sanitization

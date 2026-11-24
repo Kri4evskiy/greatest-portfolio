@@ -4,10 +4,12 @@ import { PrismaPg } from '@prisma/adapter-pg'
 import {
   type ArticleMeta,
   type KnowledgeCategory,
+  KnowledgeCategoryEnum,
   type PaginatedArticleMetricsQuery,
   type PaginatedArticleMetricsResponse,
   type PaginatedSystemEventsResponse,
   type Role,
+  RoleEnum,
   type SystemEventLogItem,
   type SystemEventsQuery,
   TelemetryEventTypeEnum,
@@ -31,6 +33,25 @@ export interface StoredVisitorSession {
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const MAX_MEMORY_SYSTEM_EVENTS = 200
+export const MAX_MEMORY_SESSIONS = 200
+export const MAX_MEMORY_METRICS = 200
+
+const SEEDED_METRIC_SLUGS = new Set(INITIAL_ARTICLE_SEEDS.map((item) => item.slug))
+
+function parseKnowledgeCategory(raw: unknown, fallback: KnowledgeCategory = 'others'): KnowledgeCategory {
+  const parsed = KnowledgeCategoryEnum.safeParse(raw)
+  return parsed.success ? parsed.data : fallback
+}
+
+function parseRole(raw: unknown, fallback: Role = 'USER'): Role {
+  const parsed = RoleEnum.safeParse(raw)
+  return parsed.success ? parsed.data : fallback
+}
+
+function parseVisitorRole(raw: unknown, fallback: VisitorRoleType = 'OTHER'): VisitorRoleType {
+  const parsed = VisitorRoleTypeEnum.safeParse(raw)
+  return parsed.success ? parsed.data : fallback
+}
 
 function buildOffsetMetricsPage(
   items: ArticleMeta[],
@@ -140,6 +161,48 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return this.dbConnected
   }
 
+  getMemoryStoreStats(): { sessions: number; metrics: number; events: number } {
+    this.pruneExpiredMemorySessions()
+    return {
+      sessions: this.memorySessions.size,
+      metrics: this.memoryMetrics.size,
+      events: this.memoryEvents.length,
+    }
+  }
+
+  private pruneExpiredMemorySessions(): void {
+    const nowMs = Date.now()
+    for (const [id, session] of this.memorySessions) {
+      if (session.expiresAt.getTime() <= nowMs) {
+        this.memorySessions.delete(id)
+      }
+    }
+  }
+
+  private storeMemorySession(session: StoredVisitorSession): void {
+    this.pruneExpiredMemorySessions()
+    while (this.memorySessions.size >= MAX_MEMORY_SESSIONS) {
+      const oldestKey = this.memorySessions.keys().next().value
+      if (!oldestKey) {
+        break
+      }
+      this.memorySessions.delete(oldestKey)
+    }
+    this.memorySessions.set(session.id, session)
+  }
+
+  private storeMemoryMetric(slug: string, metric: ArticleMeta): void {
+    if (!this.memoryMetrics.has(slug) && this.memoryMetrics.size >= MAX_MEMORY_METRICS) {
+      for (const existingSlug of this.memoryMetrics.keys()) {
+        if (!SEEDED_METRIC_SLUGS.has(existingSlug)) {
+          this.memoryMetrics.delete(existingSlug)
+          break
+        }
+      }
+    }
+    this.memoryMetrics.set(slug, metric)
+  }
+
   async createVisitorSession(data: {
     displayName: string
     visitorType: VisitorRoleType
@@ -161,8 +224,8 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
         return {
           id: created.id,
           displayName: created.displayName,
-          visitorType: created.visitorType as VisitorRoleType,
-          role: created.role as Role,
+          visitorType: parseVisitorRole(created.visitorType, data.visitorType),
+          role: parseRole(created.role, data.role),
           userAgent: created.userAgent,
           createdAt: created.createdAt,
           expiresAt: created.expiresAt,
@@ -181,7 +244,7 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
       createdAt: new Date(),
       expiresAt: data.expiresAt,
     }
-    this.memorySessions.set(session.id, session)
+    this.storeMemorySession(session)
     return session
   }
 
@@ -194,7 +257,7 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
         if (rows.length > 0) {
           return rows.map((r) => ({
             slug: r.slug,
-            category: r.category as KnowledgeCategory,
+            category: parseKnowledgeCategory(r.category),
             viewsCount: r.viewsCount,
             helpfulCount: r.helpfulCount,
             updatedAt: r.updatedAt.toISOString(),
@@ -206,6 +269,36 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     }
 
     return Array.from(this.memoryMetrics.values())
+  }
+
+  async getArticleMetricBySlug(slug: string, fallbackCategory: KnowledgeCategory): Promise<ArticleMeta> {
+    if (this.dbConnected && this.client) {
+      try {
+        const row = await this.client.articleMetrics.findUnique({ where: { slug } })
+        if (row) {
+          return {
+            slug: row.slug,
+            category: parseKnowledgeCategory(row.category, fallbackCategory),
+            viewsCount: row.viewsCount,
+            helpfulCount: row.helpfulCount,
+            updatedAt: row.updatedAt.toISOString(),
+          }
+        }
+      } catch (err) {
+        this.logger.warn(`Prisma getArticleMetricBySlug fallback: ${String(err)}`)
+      }
+    }
+
+    const existing = this.memoryMetrics.get(slug)
+    return (
+      existing ?? {
+        slug,
+        category: fallbackCategory,
+        viewsCount: 0,
+        helpfulCount: 0,
+        updatedAt: new Date().toISOString(),
+      }
+    )
   }
 
   async getPaginatedArticleMetrics(query: PaginatedArticleMetricsQuery): Promise<PaginatedArticleMetricsResponse> {
@@ -232,7 +325,7 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
         if (total > 0 || (query.category && allRowsCount > 0)) {
           const items: ArticleMeta[] = rows.map((r) => ({
             slug: r.slug,
-            category: r.category as KnowledgeCategory,
+            category: parseKnowledgeCategory(r.category),
             viewsCount: r.viewsCount,
             helpfulCount: r.helpfulCount,
             updatedAt: r.updatedAt.toISOString(),
@@ -276,7 +369,7 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
         })
         return {
           slug: updated.slug,
-          category: updated.category as KnowledgeCategory,
+          category: parseKnowledgeCategory(updated.category, category),
           viewsCount: updated.viewsCount,
           helpfulCount: updated.helpfulCount,
           updatedAt: updated.updatedAt.toISOString(),
@@ -290,11 +383,11 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     const next: ArticleMeta = {
       slug,
       category: existing?.category ?? category,
-      viewsCount: (existing?.viewsCount ?? 100) + 1,
-      helpfulCount: existing?.helpfulCount ?? 25,
+      viewsCount: (existing?.viewsCount ?? 0) + 1,
+      helpfulCount: existing?.helpfulCount ?? 0,
       updatedAt: new Date().toISOString(),
     }
-    this.memoryMetrics.set(slug, next)
+    this.storeMemoryMetric(slug, next)
     return next
   }
 
@@ -315,7 +408,7 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
         })
         return {
           slug: updated.slug,
-          category: updated.category as KnowledgeCategory,
+          category: parseKnowledgeCategory(updated.category, category),
           viewsCount: updated.viewsCount,
           helpfulCount: updated.helpfulCount,
           updatedAt: updated.updatedAt.toISOString(),
@@ -329,11 +422,11 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     const next: ArticleMeta = {
       slug,
       category: existing?.category ?? category,
-      viewsCount: existing?.viewsCount ?? 100,
-      helpfulCount: (existing?.helpfulCount ?? 25) + 1,
+      viewsCount: existing?.viewsCount ?? 1,
+      helpfulCount: (existing?.helpfulCount ?? 0) + 1,
       updatedAt: new Date().toISOString(),
     }
-    this.memoryMetrics.set(slug, next)
+    this.storeMemoryMetric(slug, next)
     return next
   }
 
@@ -385,8 +478,11 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     }
     try {
       const jsonPayload = JSON.parse(JSON.stringify(payload)) as Prisma.InputJsonValue
+      // Persist the exact UUID broadcast over SSE so client-side `seenIds` deduplication
+      // prevents duplicate rows when merging live SSE events with GET /api/telemetry/events.
       await this.client.systemEventLog.create({
         data: {
+          id: eventId,
           eventType,
           payload: jsonPayload,
         },

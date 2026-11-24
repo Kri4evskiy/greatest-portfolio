@@ -30,7 +30,7 @@ export class KnowledgeController {
   ) {}
 
   @Get('metrics')
-  @Roles('USER', 'ADMIN')
+  @Public()
   async getMetrics(): Promise<ArticleMeta[]> {
     return this.knowledgeService.getAllMetrics()
   }

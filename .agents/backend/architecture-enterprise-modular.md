@@ -24,28 +24,28 @@ apps/api/
     ├── common/                     # Общий код фреймворка (Cross-Cutting Concerns)
     │   ├── decorators/             # public.decorator.ts (@Public), skip-timeout.decorator.ts (@SkipTimeout)
     │   ├── dto/                    # pagination-query.dto.ts
-    │   ├── filters/                # sentry-exception.filter.ts
+    │   ├── filters/                # sentry-exception.filter.ts (headersSent guard + log sanitization)
     │   ├── interceptors/           # logging.interceptor.ts, timeout.interceptor.ts
-    │   ├── middleware/             # logging.middleware.ts
+    │   ├── middleware/             # logging.middleware.ts, csrf-origin.middleware.ts
     │   ├── pipes/                  # zod-validation.pipe.ts
-    │   └── utils/                  # request-id.util.ts (X-Request-Id Correlation ID + защита от Log Injection + __tests__/request-id.util.spec.ts)
+    │   └── utils/                  # request-id.util.ts, log-sanitizer.util.ts, express-request.util.ts (+ __tests__/request-id.util.spec.ts)
     │
     ├── config/                     # Типизированная конфигурация окружения (Zod)
     │   ├── __tests__/              # app.config.spec.ts
-    │   ├── app.config.ts           # Порты, URL-ы, секреты с production-проверкой JWT_SECRET
+    │   ├── app.config.ts           # Порты, TRUST_PROXY_HOPS, URL-ы, секреты с production-проверкой JWT_SECRET (>=32) и ADMIN_SECRET_PASSCODE (>=16)
     │   └── database.config.ts      # DATABASE_URL / DIRECT_URL
     │
     ├── migrations/                 # Слой управления миграциями и сидированием БД
-    │   └── scripts/                # seed-data.ts, seed.ts (pnpm --filter @repo/api prisma:seed)
+    │   └── scripts/                # seed-data.ts (INITIAL_ARTICLE_SEEDS + KNOWN_KNOWLEDGE_SLUGS), seed.ts (pnpm --filter @repo/api prisma:seed)
     │
     ├── prisma/                     # Слой доступа к данным (Database Persistence)
-    │   ├── __tests__/              # prisma.service.spec.ts (In-Memory fallback и фильтрация)
+    │   ├── __tests__/              # prisma.service.spec.ts (In-Memory fallback, caps 200 и фильтрация)
     │   ├── prisma.module.ts
     │   └── prisma.service.ts
     │
     └── modules/                    # Доменные модули (Domain Modules)
         │
-        ├── auth/                   # Модуль аутентификации и сессий
+        ├── auth/                   # Модуль аутентификации и сессий (HS256, 1d)
         │   ├── __tests__/          # auth.service.spec.ts, auth.controller.spec.ts, jwt-roles.guard.spec.ts
         │   ├── guards/             # jwt-roles.guard.ts
         │   ├── decorators/         # roles.decorator.ts (@Roles)
@@ -54,13 +54,14 @@ apps/api/
         │   ├── auth.service.ts
         │   └── auth.module.ts
         │
-        ├── knowledge/              # Модуль Базы Знаний и метрик
+        ├── knowledge/              # Модуль Базы Знаний и метрик (allowlist + helpful dedup)
         │   ├── dto/                # knowledge.dto.ts (реэкспорт из @repo/shared-schemas)
         │   ├── knowledge.controller.ts
         │   ├── knowledge.service.ts
         │   └── knowledge.module.ts
         │
-        └── telemetry/              # Модуль телеметрии и SSE
+        └── telemetry/              # Модуль телеметрии, SSE (2/IP, 50 global, 15m TTL) и ADMIN diagnostics
+            ├── __tests__/          # telemetry.service.spec.ts
             ├── dto/                # telemetry.dto.ts (SystemEventsQuerySchema из @repo/shared-schemas)
             ├── telemetry.controller.ts
             ├── telemetry.service.ts

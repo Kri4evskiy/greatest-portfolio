@@ -1,19 +1,47 @@
 import { randomUUID } from 'node:crypto'
-import { Inject, Injectable, Logger, MessageEvent, OnModuleDestroy } from '@nestjs/common'
+import {
+  HttpException,
+  HttpStatus,
+  Inject,
+  Injectable,
+  Logger,
+  MessageEvent,
+  OnModuleDestroy,
+  ServiceUnavailableException,
+} from '@nestjs/common'
 import { ClientProxy } from '@nestjs/microservices'
 import {
   type PaginatedSystemEventsResponse,
   type SystemEventsQuery,
+  type TelemetryAdminDiagnostics,
+  TelemetryAdminDiagnosticsSchema,
   type TelemetryEvent,
   TelemetryEventSchema,
   type TelemetryEventType,
   type TelemetryStatsResponse,
   type VisitorRoleType,
 } from '@repo/shared-schemas'
-import { firstValueFrom, interval, map, merge, Observable, of, Subject, takeUntil, timeout } from 'rxjs'
+import {
+  finalize,
+  firstValueFrom,
+  interval,
+  map,
+  merge,
+  Observable,
+  of,
+  Subject,
+  takeUntil,
+  timeout,
+  timer,
+} from 'rxjs'
 import { PrismaService } from '../../prisma/prisma.service.js'
 
 export const TELEMETRY_MS_CLIENT = 'TELEMETRY_MS_CLIENT'
+
+// Strict Free-Tier SSE capacity bounds (prevents FD exhaustion and Render/Koyeb memory spikes)
+export const MAX_SSE_STREAMS_GLOBAL = 50
+export const MAX_SSE_STREAMS_PER_IP = 2
+export const MAX_SSE_STREAM_LIFETIME_MS = 15 * 60 * 1000 // 15 minutes
 
 @Injectable()
 export class TelemetryService implements OnModuleDestroy {
@@ -21,6 +49,10 @@ export class TelemetryService implements OnModuleDestroy {
   private readonly events$ = new Subject<TelemetryEvent>()
   private readonly shutdown$ = new Subject<void>()
   private readonly recentEvents: TelemetryEvent[] = []
+  private localEventsCounter = 0
+
+  private activeSseStreamsGlobal = 0
+  private readonly activeSseStreamsByIp = new Map<string, number>()
 
   constructor(
     @Inject(TELEMETRY_MS_CLIENT) private readonly telemetryClient: ClientProxy,
@@ -31,6 +63,8 @@ export class TelemetryService implements OnModuleDestroy {
     this.shutdown$.next()
     this.shutdown$.complete()
     this.events$.complete()
+    this.activeSseStreamsGlobal = 0
+    this.activeSseStreamsByIp.clear()
     try {
       await this.telemetryClient.close()
     } catch {
@@ -53,6 +87,7 @@ export class TelemetryService implements OnModuleDestroy {
       timestamp: new Date().toISOString(),
     })
 
+    this.localEventsCounter += 1
     this.recentEvents.unshift(rawEvent)
     if (this.recentEvents.length > 25) {
       this.recentEvents.pop()
@@ -61,11 +96,17 @@ export class TelemetryService implements OnModuleDestroy {
     this.events$.next(rawEvent)
     await this.prisma.logSystemEvent(rawEvent.type, rawEvent)
 
-    try {
-      this.telemetryClient.emit('telemetry.event', rawEvent)
-    } catch (err) {
-      this.logger.debug(`Telemetry MS emit skipped (local mode): ${String(err)}`)
-    }
+    // ClientProxy.emit() returns a hot Observable whose TCP ECONNREFUSED failures happen
+    // asynchronously — subscribing with an error handler prevents unhandled RxJS exceptions
+    // when telemetry-ms is offline in local/fallback mode.
+    this.telemetryClient
+      .emit('telemetry.event', rawEvent)
+      .pipe(takeUntil(this.shutdown$))
+      .subscribe({
+        error: (err: unknown) => {
+          this.logger.debug(`Telemetry MS emit skipped (local mode): ${String(err)}`)
+        },
+      })
 
     return rawEvent
   }
@@ -95,14 +136,59 @@ export class TelemetryService implements OnModuleDestroy {
       }
     } catch {
       return {
-        totalEventsProcessed: this.recentEvents.length,
+        totalEventsProcessed: this.localEventsCounter,
         recentEvents: this.recentEvents.slice(0, 5),
         microserviceConnected: false,
       }
     }
   }
 
-  getEventStream(): Observable<MessageEvent> {
+  getAdminDiagnostics(): TelemetryAdminDiagnostics {
+    const memoryStats = this.prisma.getMemoryStoreStats()
+    return TelemetryAdminDiagnosticsSchema.parse({
+      status: 'ok',
+      activeSseStreams: this.activeSseStreamsGlobal,
+      maxSseStreamsGlobal: MAX_SSE_STREAMS_GLOBAL,
+      maxSseStreamsPerIp: MAX_SSE_STREAMS_PER_IP,
+      trackedSessionsInMemory: memoryStats.sessions,
+      trackedMetricsInMemory: memoryStats.metrics,
+      totalEventsProcessed: this.localEventsCounter,
+      databaseConnected: this.prisma.isDatabaseConnected(),
+      uptimeSeconds: Math.floor(process.uptime()),
+      timestamp: new Date().toISOString(),
+    })
+  }
+
+  private acquireSseSlot(clientIp: string): void {
+    if (this.activeSseStreamsGlobal >= MAX_SSE_STREAMS_GLOBAL) {
+      throw new ServiceUnavailableException('SSE telemetry stream capacity reached. Retry shortly.')
+    }
+
+    const currentForIp = this.activeSseStreamsByIp.get(clientIp) ?? 0
+    if (currentForIp >= MAX_SSE_STREAMS_PER_IP) {
+      throw new HttpException(
+        `Too many concurrent SSE streams from this IP (max ${MAX_SSE_STREAMS_PER_IP}).`,
+        HttpStatus.TOO_MANY_REQUESTS,
+      )
+    }
+
+    this.activeSseStreamsGlobal += 1
+    this.activeSseStreamsByIp.set(clientIp, currentForIp + 1)
+  }
+
+  private releaseSseSlot(clientIp: string): void {
+    this.activeSseStreamsGlobal = Math.max(0, this.activeSseStreamsGlobal - 1)
+    const currentForIp = this.activeSseStreamsByIp.get(clientIp) ?? 0
+    if (currentForIp <= 1) {
+      this.activeSseStreamsByIp.delete(clientIp)
+    } else {
+      this.activeSseStreamsByIp.set(clientIp, currentForIp - 1)
+    }
+  }
+
+  getEventStream(clientIp = 'unknown'): Observable<MessageEvent> {
+    this.acquireSseSlot(clientIp)
+
     const welcomeEvent: TelemetryEvent = {
       id: randomUUID(),
       type: 'SYSTEM_HEARTBEAT',
@@ -123,6 +209,10 @@ export class TelemetryService implements OnModuleDestroy {
 
     return merge(of(welcomeEvent), this.events$.asObservable(), heartbeat$).pipe(
       takeUntil(this.shutdown$),
+      takeUntil(timer(MAX_SSE_STREAM_LIFETIME_MS)),
+      finalize(() => {
+        this.releaseSseSlot(clientIp)
+      }),
       map((event) => ({
         id: event.id,
         type: 'message',

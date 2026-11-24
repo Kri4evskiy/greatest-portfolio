@@ -17,6 +17,9 @@ services:
     image: postgres:16-alpine
     container_name: workfolio-postgres-prod
     restart: always
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 256
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set strong POSTGRES_PASSWORD in environment or .env.prod}
@@ -37,10 +40,30 @@ services:
       dockerfile: docker/telemetry-ms.Dockerfile
     container_name: workfolio-telemetry-ms-prod
     restart: always
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    pids_limit: 256
     environment:
       NODE_ENV: production
       TELEMETRY_MS_HOST: 0.0.0.0
       TELEMETRY_MS_PORT: 4001
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "const net=require('node:net');const s=net.connect(4001,'127.0.0.1',()=>{s.end();process.exit(0)});s.on('error',()=>process.exit(1));setTimeout(()=>process.exit(1),2000)",
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
     networks:
       - backend-network
 
@@ -50,18 +73,27 @@ services:
       dockerfile: docker/api.Dockerfile
     container_name: workfolio-api-prod
     restart: always
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    pids_limit: 256
     depends_on:
       postgres:
         condition: service_healthy
       telemetry-ms:
-        condition: service_started
+        condition: service_healthy
     environment:
       NODE_ENV: production
       PORT: 4000
+      TRUST_PROXY_HOPS: ${TRUST_PROXY_HOPS:-1}
       DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-workfolio_db}?schema=public}
       DIRECT_URL: ${DIRECT_URL:-postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-workfolio_db}?schema=public}
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET (>=32 chars, non-default) in environment or .env.prod}
-      ADMIN_SECRET_PASSCODE: ${ADMIN_SECRET_PASSCODE:?Set non-default ADMIN_SECRET_PASSCODE in environment or .env.prod}
+      ADMIN_SECRET_PASSCODE: ${ADMIN_SECRET_PASSCODE:?Set non-default ADMIN_SECRET_PASSCODE (>=16 chars) in environment or .env.prod}
       TELEMETRY_MS_HOST: telemetry-ms
       TELEMETRY_MS_PORT: 4001
       WEB_ORIGIN: ${WEB_ORIGIN:?Set WEB_ORIGIN (e.g. https://your-domain.com) in environment or .env.prod}
@@ -84,6 +116,15 @@ services:
       dockerfile: docker/web.Dockerfile
     container_name: workfolio-web-prod
     restart: always
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /app/apps/web/.next/cache
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    pids_limit: 256
     depends_on:
       api:
         condition: service_healthy
@@ -98,6 +139,18 @@ services:
       NEXT_PUBLIC_POSTHOG_HOST: ${NEXT_PUBLIC_POSTHOG_HOST:-https://app.posthog.com}
     ports:
       - "127.0.0.1:3000:3000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/robots.txt').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
     networks:
       - frontend-network
 

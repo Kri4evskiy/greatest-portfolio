@@ -11,7 +11,11 @@ import { JwtRolesGuard } from './guards/jwt-roles.guard.js'
     JwtModule.register({
       secret: appConfig.jwtSecret,
       signOptions: {
-        expiresIn: '7d',
+        algorithm: 'HS256',
+        expiresIn: '1d',
+      },
+      verifyOptions: {
+        algorithms: ['HS256'],
       },
     }),
   ],

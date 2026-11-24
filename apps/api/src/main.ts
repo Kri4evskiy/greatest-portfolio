@@ -15,19 +15,26 @@ async function bootstrap(): Promise<void> {
     bodyParser: false,
   })
   app.useBodyParser('json', { limit: '100kb' })
-  app.useBodyParser('urlencoded', { limit: '100kb', extended: true })
 
-  // Behind Next.js rewrites or a single cloud/Nginx reverse proxy, trust exactly 1 proxy hop
-  // so ThrottlerGuard reads the real client IP from X-Forwarded-For without allowing spoofing.
-  if (appConfig.isProduction) {
-    app.set('trust proxy', 1)
+  // Configure exact reverse-proxy hop count from validated env (TRUST_PROXY_HOPS, default 1)
+  // so ThrottlerGuard extracts the real client IP from X-Forwarded-For without IP spoofing
+  // or shared-proxy bucket collisions across topologies (Render/Koyeb = 1, Nginx + Next.js rewrite = 2).
+  if (appConfig.isProduction && appConfig.trustProxyHops > 0) {
+    app.set('trust proxy', appConfig.trustProxyHops)
   }
 
   app.setGlobalPrefix('api')
   app.use(
     helmet({
+      // Cross-origin CORP permits intentional cross-domain Vercel -> Render API fetches
+      // governed by strict CORS allowedOrigins, while strict CSP blocks active rendering of API responses.
       crossOriginResourcePolicy: { policy: 'cross-origin' },
-      contentSecurityPolicy: false,
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'none'"],
+          frameAncestors: ["'none'"],
+        },
+      },
     }),
   )
   app.use(cookieParser())
@@ -47,4 +54,7 @@ async function bootstrap(): Promise<void> {
   logger.log(`NestJS API running on http://localhost:${appConfig.port}/api`)
 }
 
-void bootstrap()
+bootstrap().catch((error: unknown) => {
+  console.error('[NestAPI] Fatal startup error:', error)
+  process.exit(1)
+})

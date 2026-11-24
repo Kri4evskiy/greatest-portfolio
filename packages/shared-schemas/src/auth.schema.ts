@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { RoleEnum, VisitorRoleTypeEnum } from './roles.schema.js'
 
 export const KB_ACCESS_COOKIE_NAME = 'kb_access_token'
-export const KB_COOKIE_MAX_AGE_MS = 1000 * 60 * 60 * 24 * 7 // 7 days
+export const KB_COOKIE_MAX_AGE_MS = 1000 * 60 * 60 * 24 // 1 day
 export const DEFAULT_DEV_JWT_SECRET = 'workfolio-super-secret-jwt-key-2026'
 
 export function resolveJwtSecret(envSecret?: string): string {
@@ -27,3 +27,13 @@ export const SessionProfileSchema = z.object({
 })
 
 export type SessionProfile = z.infer<typeof SessionProfileSchema>
+
+export const JwtSessionPayloadSchema = z.object({
+  sub: z.uuid(),
+  displayName: z.string().trim().min(1).max(100),
+  visitorType: VisitorRoleTypeEnum,
+  role: RoleEnum,
+  expiresAt: z.iso.datetime(),
+})
+
+export type JwtSessionPayload = z.infer<typeof JwtSessionPayloadSchema>

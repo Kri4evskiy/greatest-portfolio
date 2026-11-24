@@ -1,8 +1,9 @@
 import { type CanActivate, type ExecutionContext, ForbiddenException, Inject, Injectable } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
 import type { Role } from '@repo/shared-schemas'
-import type { Request } from 'express'
 import { IS_PUBLIC_KEY } from '../../../common/decorators/public.decorator.js'
+import { extractCookieString, type RequestWithSession } from '../../../common/utils/express-request.util.js'
+import { appConfig } from '../../../config/app.config.js'
 import { AuthService, KB_ACCESS_COOKIE_NAME } from '../auth.service.js'
 import { ROLES_KEY } from '../decorators/roles.decorator.js'
 
@@ -31,19 +32,20 @@ export class JwtRolesGuard implements CanActivate {
       return true
     }
 
-    const request = context.switchToHttp().getRequest<Request>()
-    const token = request.cookies?.[KB_ACCESS_COOKIE_NAME] as string | undefined
+    const request = context.switchToHttp().getRequest<RequestWithSession>()
+    const token = extractCookieString(request, KB_ACCESS_COOKIE_NAME)
     const profile = await this.authService.resolveSessionFromToken(token)
 
     if (!requiredRoles.includes(profile.role)) {
+      const exposeRoleHints = !appConfig.isProduction || appConfig.isDemoMode
       throw new ForbiddenException({
-        message: 'Protected Knowledge Base resource. Issue a 1-click Guest Pass first.',
+        message: 'Protected resource. Issue an authorized session pass first.',
         currentRole: profile.role,
-        requiredRoles,
+        ...(exposeRoleHints ? { requiredRoles } : {}),
       })
     }
 
-    ;(request as Request & { sessionProfile?: unknown }).sessionProfile = profile
+    request.sessionProfile = profile
     return true
   }
 }

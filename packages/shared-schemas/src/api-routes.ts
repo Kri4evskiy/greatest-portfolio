@@ -12,6 +12,7 @@ export const API_ENDPOINTS = {
   telemetryStats: '/api/telemetry/stats',
   telemetryEvents: '/api/telemetry/events',
   telemetryStream: '/api/telemetry/stream',
+  telemetryAdminDiagnostics: '/api/telemetry/admin-diagnostics',
 } as const
 
 export type ApiEndpointPath = (typeof API_ENDPOINTS)[keyof typeof API_ENDPOINTS]
