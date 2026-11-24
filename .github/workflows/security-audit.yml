@@ -1,0 +1,43 @@
+name: Weekly Security Audit
+
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CI: true
+  LEFTHOOK: 0
+  DO_NOT_TRACK: 1
+
+jobs:
+  audit:
+    name: Scheduled Production Dependency & Compose Audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository (shallow)
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+
+      - name: Validate Docker Compose configuration
+        run: docker compose config --quiet
+
+      - name: Audit production dependencies
+        run: pnpm audit --prod --audit-level=high

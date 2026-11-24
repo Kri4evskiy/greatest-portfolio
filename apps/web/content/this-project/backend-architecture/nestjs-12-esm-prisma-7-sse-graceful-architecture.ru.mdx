@@ -1,17 +1,18 @@
 ---
-title: "Архитектура Бэкенда NestJS 12 ESM: 4-слойная декомпозиция, Prisma 7 Wasm, Graceful SSE Shutdown и X-Request-Id"
+title: "Архитектура Бэкенда NestJS 12 ESM: 4-слойная декомпозиция, Prisma 7 Wasm, ограниченный SSE и X-Request-Id"
 sidebarLabel: "NestJS 12 ESM и Prisma 7"
-summary: "Инженерный справочник по устройству бэкенда apps/api и микросервиса apps/telemetry-ms: 4-компонентная Enterprise-структура, жизненный цикл HTTP/SSE-запроса, защита от Log Injection в X-Request-Id, Rust-free Prisma 7 с In-Memory фолбэком и Graceful Shutdown."
+summary: "Инженерный справочник по устройству бэкенда apps/api и микросервиса apps/telemetry-ms: 4-слойная Enterprise-структура, жизненный цикл HTTP/SSE-запроса, TRUST_PROXY_HOPS, CRLF-безопасный X-Request-Id, Rust-free Prisma 7 с ограниченным In-Memory фолбэком и Graceful SSE Shutdown."
 category: "this-project"
 format: "deep-dive"
 tags: ["nestjs", "prisma", "backend", "microservices", "sse", "security", "architecture"]
-readingTime: "8 мин"
-publishedAt: "2026-11-21"
+readingTime: "9 мин"
+publishedAt: "2026-11-24"
 order: 1
 tldr:
-  - "Исходный код `apps/api/src` разделён на 4 изолированных слоя (`common`, `config`, `migrations`, `modules`) с отказом от `class-validator` в пользу единых контрактов `Zod v4` из `@repo/shared-schemas` и жёстким лимитом тела запроса `100kb`."
-  - "Каждый запрос получает валидированный корреляционный заголовок `X-Request-Id` (`resolveCorrelationRequestId` с защитой от CRLF / Log Injection), который пробрасывается в логи и ответы ошибок `SentryExceptionFilter`."
-  - "`PrismaService` построен на Rust-free `Prisma 7` (`@prisma/adapter-pg` + `pg.Pool`) с автоматическим откатом на `In-Memory` хранилище, а `enableShutdownHooks()` + RxJS `takeUntil(this.shutdown$)` завершают бесконечные `SSE`-стримы при `SIGTERM` за `< 200 мс`."
+  - "Исходный код `apps/api/src` разделён на 4 изолированных слоя (`common`, `config`, `migrations`, `modules`) с отказом от `class-validator` в пользу единых контрактов `Zod v4` из `@repo/shared-schemas`, JSON-only лимитом `100kb` и параметром `TRUST_PROXY_HOPS` (`0..5`, по умолчанию `1`)."
+  - "Каждый HTTP-запрос получает CRLF-безопасный `X-Request-Id` (`resolveCorrelationRequestId`), проходит `CsrfOriginMiddleware`, глобальный/общий `ThrottlerGuard` (`60/мин` база, `5/мин` на auth и SSE-хэндшейки) и `SentryExceptionFilter` (с защитой `headersSent` и `sanitizeLogValue`)."
+  - "`PrismaService` построен на Rust-free `Prisma 7` (`@prisma/adapter-pg` + `pg.Pool`) с ограниченным по памяти `In-Memory` фолбэком (`MAX_MEMORY_SESSIONS = 200`, `MAX_MEMORY_METRICS = 200`, `200` событий) и явной записью `id: eventId` для дедупликации SSE/REST."
+  - "`TelemetryService` ограничивает SSE-ресурсы (`2/IP`, `50` глобально, `15 мин` макс. TTL + освобождение слота в `finalize()`), ведёт монотонный `localEventsCounter`, безопасно подписывается на `emit().pipe(takeUntil(this.shutdown$))`, предоставляет `@Roles('ADMIN')` диагностику, а `apps/telemetry-ms` слушает loopback `127.0.0.1:4001`."
 ---
 
 ## 1. Четырёхслойная Enterprise-структура (`common`, `config`, `migrations`, `modules`)
@@ -20,33 +21,36 @@ tldr:
 
 | Слой в `apps/api/src/` | Зона ответственности | Ключевые модули |
 | :--- | :--- | :--- |
-| **`common/`** | Сквозные механизмы фреймворка (`Cross-Cutting Concerns`), не привязанные к бизнес-доменам | `middleware/logging.middleware.ts`, `utils/request-id.util.ts`, `interceptors/timeout.interceptor.ts`, `filters/sentry-exception.filter.ts`, `pipes/zod-validation.pipe.ts`, `decorators/` (`@Public`, `@SkipTimeout`) |
-| **`config/`** | Fail-Fast валидация `process.env` при старте процесса (прямое чтение `process.env` в сервисах запрещено) | `app.config.ts` (`loadAppConfig`, `WORKFOLIO_DEMO_MODE`), `database.config.ts` |
-| **`migrations/` & `prisma/`** | Доступ к данным (`Prisma 7` + `@prisma/adapter-pg`), In-Memory фолбэк и CLI-сидирование | `prisma.service.ts`, `migrations/scripts/seed.ts`, `seed-data.ts` |
-| **`modules/`** | Изолированные доменные модули со своими контроллерами, сервисами, гардами и DTO | `auth/` (`JwtRolesGuard`, `AuthService`), `knowledge/` (метрики и Offset-пагинация), `telemetry/` (TCP-клиент `:4001`, `@Sse('stream')` и Cursor-пагинация) |
+| **`common/`** | Сквозные механизмы фреймворка (`Cross-Cutting Concerns`), без горизонтальных импортов между соседними папками (общие хелперы живут в `common/utils/*`) | `middleware/{logging,csrf-origin}.middleware.ts`, `utils/{request-id,log-sanitizer,express-request}.util.ts`, `interceptors/{logging,timeout}.interceptor.ts`, `filters/sentry-exception.filter.ts`, `pipes/zod-validation.pipe.ts`, `decorators/` (`@Public`, `@SkipTimeout`) |
+| **`config/`** | Fail-Fast валидация `process.env` при старте процесса (прямое чтение `process.env` в сервисах запрещено) | `app.config.ts` (`loadAppConfig`, `TRUST_PROXY_HOPS`, `WORKFOLIO_DEMO_MODE`), `database.config.ts` |
+| **`migrations/` & `prisma/`** | Доступ к данным (`Prisma 7` + `@prisma/adapter-pg`), ограниченный In-Memory фолбэк и CLI-сидирование | `prisma.service.ts`, `migrations/scripts/seed.ts`, `seed-data.ts` |
+| **`modules/`** | Изолированные доменные модули со своими контроллерами, сервисами, гардами и DTO | `auth/` (`JwtRolesGuard`, `AuthService`, `@Roles`), `knowledge/` (метрики и Offset-пагинация), `telemetry/` (TCP-клиент `:4001`, `@Sse('stream')`, Cursor-пагинация и `@Roles('ADMIN')` диагностика) |
 
 ---
 
-## 2. Жизненный цикл HTTP-запроса, `100kb` Body Limit и защита `X-Request-Id` от Log Injection
+## 2. Жизненный цикл HTTP-запроса, `TRUST_PROXY_HOPS`, лимит JSON `100kb` и `X-Request-Id`
 
 Любой запрос к `apps/api` проходит через 6 детерминированных барьеров:
 
 ```text
 Входящий HTTP-запрос
   │
-  ▼ 1. Express Hardening (main.ts): JSON/URL-encoded limit 100kb ➔ helmet() ➔ cookieParser() ➔ CORS
-  ▼ 2. LoggingMiddleware ('{*path}'): resolveCorrelationRequestId() ➔ заголовок ответа X-Request-Id
-  ▼ 3. Guards: глобальный ThrottlerGuard (100 req/min; 5 req/min на auth) ➔ JwtRolesGuard (HttpOnly cookie)
+  ▼ 1. Express Hardening (main.ts): JSON-only парсер (100kb) ➔ trust proxy (TRUST_PROXY_HOPS)
+       ➔ строгий helmet() (CSP default-src 'none') ➔ cookieParser() ➔ CORS (exposedHeaders: X-Request-Id)
+  ▼ 2. Middleware ('{*path}'): LoggingMiddleware (X-Request-Id) ➔ CsrfOriginMiddleware (JSON + Origin + Sec-Fetch-Site)
+  ▼ 3. Guards: ThrottlerGuard (60/мин база; общий бакет 5/мин на auth; 5/мин на SSE-коннект) ➔ JwtRolesGuard
   ▼ 4. Interceptors: LoggingInterceptor ➔ TimeoutInterceptor (15s; пропускает @Sse() и @SkipTimeout())
   ▼ 5. Pipes: ZodValidationPipe(Schema) — валидация Body / Query / Param по схемам @repo/shared-schemas
-  ▼ 6. Controller ➔ Service ➔ Prisma 7 / TCP :4001 (или SentryExceptionFilter с возвратом requestId)
+  ▼ 6. Controller ➔ Service ➔ Prisma 7 / TCP :4001 (или SentryExceptionFilter с headersSent-гвардом и requestId)
 ```
 
-### Защита от DoS на парсинге JSON и от CRLF Log Injection
-1. **Ограничение `100kb` на размер тела запроса (`apps/api/src/main.ts`):**
-   По умолчанию Express разрешает отправку больших JSON-тел, что позволяет вызвать пиковую нагрузку на CPU и сборщик мусора V8 одним POST-запросом. В `main.ts` установлен жёсткий порог `app.useBodyParser('json', { limit: '100kb' })`.
-2. **Валидация `X-Request-Id` в `apps/api/src/common/utils/request-id.util.ts`:**
-   Если сервер без проверки логирует клиентский заголовок `X-Request-Id`, злоумышленник может передать в нём символы перевода строки (`\r\n`) и внедрить фальшивые записи в серверный лог (**Log Injection**). Хелпер `resolveCorrelationRequestId()` принимает внешний ID только при соответствии строгому шаблону `/^[A-Za-z0-9_-]{8,64}$/`, иначе генерирует новый `randomUUID()`:
+### Топология прокси, защита от JSON DoS и от CRLF Log Injection
+1. **Валидируемый `TRUST_PROXY_HOPS` (`apps/api/src/config/app.config.ts` и `main.ts`):**
+   `AppEnvSchema` ограничивает `TRUST_PROXY_HOPS` целым числом `0..5` (по умолчанию `1`). В продакшене при `appConfig.trustProxyHops > 0` в `main.ts` вызывается `app.set('trust proxy', appConfig.trustProxyHops)`, чтобы Express и `ThrottlerGuard` извлекали реальный IP клиента из `X-Forwarded-For` без подмены IP и коллизий лимитов в разных топологиях (Render/Koyeb = `1`, Nginx + Next.js rewrite = `2`).
+2. **Строгий JSON-only лимит `100kb` (`apps/api/src/main.ts`):**
+   Инициализация `NestFactory.create(..., { bodyParser: false })` и `app.useBodyParser('json', { limit: '100kb' })` полностью отключает парсер `urlencoded` (закрывая классический HTML `<form>` CSRF) и защищает V8 от перегрузки памяти огромными JSON-телами.
+3. **Валидация `X-Request-Id` в `apps/api/src/common/utils/request-id.util.ts`:**
+   Логирование непроверенного клиентского `X-Request-Id` открывает вектор **CRLF / Log Injection**. Хелпер `resolveCorrelationRequestId()` принимает внешний ID только при соответствии `/^[A-Za-z0-9_-]{8,64}$/`, иначе генерирует новый `randomUUID()`:
 
 ```typescript title="apps/api/src/common/utils/request-id.util.ts"
 export const REQUEST_ID_HEADER = 'X-Request-Id'
@@ -60,53 +64,104 @@ export function resolveCorrelationRequestId(incomingHeaderValue?: string): strin
 }
 ```
 
-Этот `requestId` возвращается клиенту в HTTP-заголовке `X-Request-Id` (открытом через `exposedHeaders` в CORS), пишется в лог времени ответа и при любой ошибке включается в JSON-ответ `SentryExceptionFilter`.
+Этот `requestId` возвращается клиенту в заголовке `X-Request-Id` (`exposedHeaders` в CORS), пишется в лог времени ответа и включается в JSON-ответ `SentryExceptionFilter` (при этом `sanitizeLogValue()` вырезает ANSI-последовательности и управляющие символы из URL и заголовков перед записью в лог).
 
 ---
 
-## 3. Почему `ZodValidationPipe` вместо `class-validator` и как работают Offset / Cursor пагинации
+## 3. Единые контракты `Zod v4`, матрица Capabilities, двойная пагинация и Admin Diagnostics
 
-В классических проектах на NestJS DTO описывают дважды: на бэкенде через декораторы `class-validator` и на фронтенде через `Zod`. В нашем монорепозитории действует принцип **Single Source of Truth**:
+Вместо дублирования DTO между бэкенд-декораторами `class-validator` и фронтенд-схемами `Zod` в монорепозитории действует принцип **Single Source of Truth** (`@repo/shared-schemas` + `ZodValidationPipe`):
 
-- Все контракты (`GuestPassFormSchema`, `SystemCapabilitiesSchema`, `PaginatedArticleMetricsQuerySchema`, `SystemEventsQuerySchema`, `ArticleReactionInputSchema`) описаны один раз на **`Zod v4`** в пакете `@repo/shared-schemas`.
-- В контроллерах NestJS используется наш `ZodValidationPipe`:
-  - **`GET /api/capabilities`** — отдаёт безопасные булевы флаги рантайма (`persistence`, `rateLimiter`, `telemetryTcpConnected`, `integrations`) для матрицы Capability-Gated UI на `/[locale]/system-status` без утечки секретов и портов.
-  - **`GET /api/knowledge/metrics/paginated`** — публичное Read-Only чтение (`@Public()` под защитой глобального `ThrottlerGuard` 100 req/min) с **Offset-пагинацией** (`limit`, `offset`, `category`, `sortBy: 'viewsCount' | 'helpfulCount'`), возвращающее `{ items, total, limit, offset, hasMore }`.
-  - **`GET /api/telemetry/events`** — применяет **Cursor-пагинацию** (`take: limit + 1` по UUID курсору с опциональным фильтром `eventType` и `orderBy: [{ createdAt: 'desc' }, { id: 'desc' }]`), что исключает смещение строк при высокочастотной записи новых событий телеметрии.
+- **`GET /api/capabilities` (`SystemCapabilitiesSchema`):**
+  Отдаёт безопасный срез флагов рантайма для Capability-Gated UI на `/[locale]/system-status` без утечки секретов и внутренних портов:
+
+```json title="GET /api/capabilities — контракт SystemCapabilities"
+{
+  "status": "ok",
+  "mode": "demo",
+  "persistence": "postgresql",
+  "rateLimiter": "in-memory",
+  "telemetryTcpConnected": true,
+  "integrations": {
+    "redisCache": false,
+    "s3ObjectStorage": false,
+    "telegramBotAuth": false,
+    "sentryObservability": false
+  },
+  "timestamp": "2026-11-24T12:00:00.000Z"
+}
+```
+
+- **`GET /api/knowledge/metrics/paginated` (Offset-пагинация):**
+  Публичное Read-Only чтение (`@Public()`, глобальный `ThrottlerGuard` `60 req/min`) с валидацией `OffsetPaginationQuerySchema` (`limit: 1..100`, `offset: 0..500`, опциональные `category` и `sortBy: 'viewsCount' | 'helpfulCount'`). Возвращает `{ items, total, limit, offset, hasMore, nextOffset }`, где `nextOffset` равен `offset + items.length` при `hasMore: true` и `null` на последней странице.
+- **`GET /api/telemetry/events` (Cursor-пагинация):**
+  Валидируется через `CursorPaginationQuerySchema` (`limit: 1..50`, опциональный UUID `cursor`, фильтр `eventType`), использует `take: limit + 1` и `orderBy: [{ createdAt: 'desc' }, { id: 'desc' }]`, возвращая `{ items, limit, hasMore, nextCursor }` без смещения страниц при потоковой записи событий.
+- **`GET /api/telemetry/admin-diagnostics` (`@Roles('ADMIN')` операционная точка):**
+  Защищён `@UseGuards(JwtRolesGuard)` и `@Roles('ADMIN')`, валидирует ответ по `TelemetryAdminDiagnosticsSchema` (`activeSseStreams`, `maxSseStreamsGlobal`, `maxSseStreamsPerIp`, `trackedSessionsInMemory`, `trackedMetricsInMemory`, `totalEventsProcessed`, `databaseConnected`, `uptimeSeconds`, `timestamp`). Выступает проверенным RBAC-плацдармом для будущих административных операций (сброс Redis-кэша, модерация).
 
 ---
 
-## 4. Rust-Free `Prisma 7` (`@prisma/adapter-pg`) и отказоустойчивый In-Memory Fallback
+## 4. Rust-Free `Prisma 7` (`@prisma/adapter-pg`), ограниченный фолбэк и дедупликация по UUID
 
-В версии `Prisma 7.10.1` мы полностью отказались от устаревшего бинарного Rust-движка (`query-engine`), перейдя на Wasm-компилятор запросов и драйверный адаптер `@prisma/adapter-pg` поверх пула `pg.Pool`:
+В `Prisma 7.10.1` мы отказались от бинарного Rust-движка (`query-engine`), перейдя на Wasm-компилятор запросов и адаптер `@prisma/adapter-pg` поверх `pg.Pool`:
 
-1. **Проба `SELECT 1` при старте (`PrismaService.onModuleInit`):**
-   Если `DATABASE_URL` не задан или локальный PostgreSQL не запущен, `PrismaService` аккуратно закрывает `pg.Pool` и переключается в режим **In-Memory Fallback** (используя те же начальные сиды `INITIAL_ARTICLE_SEEDS`), сохраняя работоспособность всех эндпоинтов, включая Offset и Cursor пагинацию.
-2. **Преимущество для Docker (`docker/api.Dockerfile`):**
-   Сгенерированный ESM-клиент компилируется `tsc` напрямую в `apps/api/dist/generated/prisma/`, благодаря чему команда `pnpm prune --prod --ignore-scripts` очищает все dev-зависимости без временных `/tmp`-костылей, а финальному контейнеру `node:22-alpine` не требуется пакет `openssl`.
+1. **Проба `SELECT 1` при старте и ограниченный In-Memory Fallback (`PrismaService`):**
+   Если `DATABASE_URL` не задан или PostgreSQL недоступен, `PrismaService` закрывает `pg.Pool` и переходит на детерминированное хранилище в памяти с жёсткими лимитами (засидированное `INITIAL_ARTICLE_SEEDS`):
+   - `MAX_MEMORY_SESSIONS = 200` — сначала очищает просроченные сессии, затем вытесняет самую старую запись, исключая утечку RAM при массовых гостевых входах.
+   - `MAX_MEMORY_METRICS = 200` — вытесняет незасидированные записи, сохраняя `SEEDED_METRIC_SLUGS`.
+   - `MAX_MEMORY_SYSTEM_EVENTS = 200` — ограничивает ленту событий для cursor-пагинации.
+2. **Явная запись `id: eventId` для дедупликации SSE и REST:**
+   В `PrismaService.logSystemEvent()` вызов `systemEventLog.create` сохраняет в БД тот же UUID, который ушёл в SSE (`data: { id: eventId, eventType, payload: jsonPayload }`). Благодаря совпадению `id` клиентская дедупликация `seenIds` на `/system-status` полностью исключает дубли строк при слиянии live-стрима и `GET /api/telemetry/events`.
+3. **Преимущество для Docker (`docker/api.Dockerfile`):**
+   Сгенерированный ESM-клиент компилируется `tsc` напрямую в `apps/api/dist/generated/prisma/`, поэтому `pnpm prune --prod --ignore-scripts` удаляет dev-зависимости без костылей и без пакета `openssl` в рантайм-образе.
 
 ---
 
-## 5. Graceful Shutdown для бесконечных SSE-потоков (`takeUntil(this.shutdown$)`) и TCP `:4001`
+## 5. Лимитированные SSE-стримы, асинхронный TCP `emit()`, Graceful Shutdown и loopback `telemetry-ms`
 
-Неочевидная архитектурная ловушка любого сервера с **Server-Sent Events (`@Sse('stream')`)**:
-Когда Docker Compose или облачный оркестратор останавливает контейнер, он посылает процессу сигнал `SIGTERM`. Даже если в `main.ts` включён `app.enableShutdownHooks()`, открытое браузером SSE-соединение в `TelemetryService` подписано на бесконечный таймер пульса `interval(15000)`:
+Долгоживущие **Server-Sent Events (`@Sse('stream')`)** несут три классических риска в продакшене: штормы переподключений и исчерпание файловых дескрипторов, необработанные асинхронные TCP-исключения при офлайн-микросервисе и 10-секундные зависания на `SIGTERM`.
+
+### 1. Лимит коннектов, квоты параллельных потоков и максимальный TTL стрима
+В `TelemetryController` метод `streamEvents()` объединяет `@Throttle({ default: { limit: 5, ttl: 60000 } })` (максимум `5` хэндшейков в минуту на IP) и `@SkipTimeout()` (чтобы 15-секундный `TimeoutInterceptor` не обрывал открытый стрим). В `TelemetryService` каждый поток занимает слот в жёстких границах Free Tier и гарантированно освобождает его через `finalize()`:
 
 ```typescript title="apps/api/src/modules/telemetry/telemetry.service.ts"
-async onModuleDestroy(): Promise<void> {
-  this.shutdown$.next()
-  this.shutdown$.complete()
-  this.events$.complete()
-  await this.telemetryClient.close()
-}
+export const MAX_SSE_STREAMS_GLOBAL = 50
+export const MAX_SSE_STREAMS_PER_IP = 2
+export const MAX_SSE_STREAM_LIFETIME_MS = 15 * 60 * 1000 // 15 минут
 
-getEventStream(): Observable<MessageEvent> {
-  // ...
+getEventStream(clientIp = 'unknown'): Observable<MessageEvent> {
+  this.acquireSseSlot(clientIp) // 503 при >= 50 глобально; 429 при >= 2 с одного IP
+
+  // ... welcomeEvent + interval(15000) heartbeat$
   return merge(of(welcomeEvent), this.events$.asObservable(), heartbeat$).pipe(
     takeUntil(this.shutdown$),
+    takeUntil(timer(MAX_SSE_STREAM_LIFETIME_MS)),
+    finalize(() => {
+      this.releaseSseSlot(clientIp)
+    }),
     map((event) => ({ id: event.id, type: 'message', data: event })),
   )
 }
 ```
 
-В RxJS оператор `merge(...)` не завершает HTTP-ответ, пока активен хотя бы один из его внутренних потоков. Оператор **`takeUntil(this.shutdown$)`** гарантирует, что в момент вызова `onModuleDestroy()` все открытые SSE-стримы мгновенно завершаются, TCP-клиент к микросервису `apps/telemetry-ms` (`:4001`) и пул соединений `PrismaService` штатно закрываются, и контейнер останавливается за **`< 200 мс`** вместо 10-секундного зависания до принудительного `SIGKILL`.
+### 2. Монотонный счётчик и безопасный асинхронный `emit()`
+В `TelemetryService.publishEvent()` отдельный монотонный счётчик `localEventsCounter` инкрементируется на каждое событие (хотя массив `recentEvents` ограничен 25 элементами), сохраняя точность `totalEventsProcessed` в локальном fallback-режиме. Так как `ClientProxy.emit()` возвращает горячий Observable, чья ошибка TCP `ECONNREFUSED` возникает асинхронно, поток явно завершается по `shutdown$` и подписывается с обработчиком `error`:
+
+```typescript title="apps/api/src/modules/telemetry/telemetry.service.ts"
+this.localEventsCounter += 1
+this.events$.next(rawEvent)
+await this.prisma.logSystemEvent(rawEvent.type, rawEvent)
+
+this.telemetryClient
+  .emit('telemetry.event', rawEvent)
+  .pipe(takeUntil(this.shutdown$))
+  .subscribe({
+    error: (err: unknown) => {
+      this.logger.debug(`Telemetry MS emit skipped (local mode): ${String(err)}`)
+    },
+  })
+```
+
+### 3. Graceful Shutdown (`< 200 мс`) и loopback `apps/telemetry-ms` (`127.0.0.1:4001`)
+- При получении `SIGTERM` хук `app.enableShutdownHooks()` вызывает `TelemetryService.onModuleDestroy()`, который шлёт сигнал в `this.shutdown$`, завершает `shutdown$` и `events$`, сбрасывает счётчики SSE-слотов и закрывает `telemetryClient`. Все активные SSE-потоки мгновенно закрываются, `PrismaService` завершает `pg.Pool`, и контейнер останавливается за **`< 200 мс`** вместо принудительного `SIGKILL`.
+- На стороне микросервиса `apps/telemetry-ms/src/config/telemetry-ms.config.ts` валидирует `TELEMETRY_MS_HOST` и `TELEMETRY_MS_PORT` через Zod (`loadTelemetryMsConfig`), по умолчанию привязываясь строго к loopback **`127.0.0.1:4001`**, чтобы локальный запуск никогда не открывал неаутентифицированный TCP-порт в локальную сеть. Переопределение `TELEMETRY_MS_HOST=0.0.0.0` задаётся исключительно внутри изолированной сети `backend-network` в Docker Compose.

@@ -1,32 +1,34 @@
 ---
 title: "Серверний рушій MDX: роутинг [locale]/[...slug], Zero-Eval HAST та Dual-Theme Shiki (0 КБ JS)"
 sidebarLabel: "Рушій MDX, HAST та Shiki"
-summary: "Архітектурний шаблон побудови багатомовної бази знань у Next.js App Router: рекурсивний catch-all маршрут [locale]/knowledge-base/[...slug], серверний конвеєр remark/rehype HAST через hast-util-to-jsx-runtime та підсвічування Shiki v4 на CSS-змінних."
+summary: "Архітектурний шаблон багатомовної бази знань у Next.js App Router: catch-all маршрут [locale]/knowledge-base/[...slug] із dynamicParams = false, примітивний React.cache, Zero-Eval HAST і санітайзер посилань, FIFO-кеш Shiki v4 у theme.css та ліниві D3-віджети через next/dynamic."
 category: "this-project"
 format: "deep-dive"
-tags: ["mdx", "nextjs", "remark", "shiki", "routing", "ssg"]
-readingTime: "7 хв"
+tags: ["mdx", "nextjs", "remark", "shiki", "routing", "ssg", "d3"]
+readingTime: "8 хв"
 publishedAt: "2026-11-10"
 order: 1
 tldr:
-  - "Один універсальний catch-all маршрут `/[locale]/knowledge-base/[...slug]` обслуговує і оглядові хаби розділів/підрозділів, і кінцеві статті, повністю збираючись у статику через `generateStaticParams`."
-  - "Конвеєр `gray-matter` + `unified` (`remark-parse` + `remark-gfm` + `remark-directive` ➔ `remark-rehype` `HastRoot`) розбирає `.mdx` на сервері та рендерить React-вузли через `hast-util-to-jsx-runtime` (`toJsxRuntime`) з `0 КБ` клієнтських парсерів і `mtimeMs`-кешуванням."
-  - "Підсвічування синтаксису `Shiki v4` генерує парні CSS-змінні (`github-light-default` + `github-dark-default`, `defaultColor: false`), перемикаючи тему миттєво без клієнтського JS."
+  - "Єдиний catch-all маршрут `app/[locale]/knowledge-base/[...slug]/page.tsx` із `export const dynamicParams = false` обслуговує хаби та статті за публічними префіксами (`en` без префікса, `/ua` для `uk`, `/ru` для `ru`), обгортаючи `<MdxArticleRenderer>` у `<Suspense fallback={<ArticleBodySkeleton />}>`."
+  - "Парсинг `.mdx` виконується на сервері з вимкненими JS eval-рушіями `gray-matter`, примітивно-ключованим `React.cache` (`segments.join('/')`), конвеєром `remark-directive` ➔ `remark-rehype` HAST і перевіркою `/\\` у `link-sanitizer.ts`."
+  - "Підсвічування коду працює через top-level `codeToHtml` у `Shiki v4` (FIFO-кеш `MAX_SHIKI_CACHE_ENTRIES = 1000` + `.catch()` евікція) зі стилями в `packages/ui/src/styles/theme.css`, а всі 4 MDX-віджети вантажаться ліниво через `next/dynamic` із tree-shaken імпортами `d3`."
 ---
 
-## 1. Архітектура маршруту `/[locale]/knowledge-base/[...slug]`
+## 1. Архітектура маршруту `/[locale]/knowledge-base/[...slug]` і потоковий `Suspense`
 
-Конспекти зберігаються у файловій системі за шаблоном `apps/web/content/<topic>/<subtopic>/<slug>.<locale>.mdx`. Щоб масштабувати базу знань на будь-яку глибину вкладеності без дублювання `page.tsx`, використовується єдиний catch-all маршрут `app/[locale]/knowledge-base/[...slug]/page.tsx`:
+Конспекти зберігаються на диску за шаблоном `apps/web/content/<topic>/<subtopic>/<slug>.<locale>.mdx`. Публічні URL підпорядковуються режиму `as-needed` у `next-intl` (англійська `en` за замовчуванням **без префікса**, українська `uk` використовує **`/ua`**, російська `ru` — **`/ru`**). Один catch-all маршрут `apps/web/src/app/[locale]/knowledge-base/[...slug]/page.tsx` обслуговує будь-яку глибину вкладеності:
 
-| Глибина `slug` | Приклад URL | Що рендерить `page.tsx` |
+| Глибина `slug` | Приклад публічного URL (UA) | Що рендерить `page.tsx` |
 | :--- | :--- | :--- |
-| **1 сегмент (`[topic]`)** | `/uk/knowledge-base/this-project` | **Хаб теми:** вкладки підтем (`TopicSubtopicTabs`), картки підрозділів та список усіх статей розділу |
-| **2 сегменти (`[topic, subtopic]`)** | `/uk/knowledge-base/this-project/knowledge-engine` | **Хаб підтеми:** активна вкладка підтеми та відфільтровані картки конспектів цієї папки |
-| **3 сегменти (`[...path, article]`)** | `/uk/knowledge-base/this-project/knowledge-engine/server-mdx-ast-dual-theme-shiki` | **Сторінка статті:** `TL;DR`, рендер `MdxArticleRenderer`, правий `TOC` і навігація `Prev / Next` |
+| **1 сегмент (`[topic]`)** | `/ua/knowledge-base/this-project` | **Хаб теми:** вкладки підтем (`TopicSubtopicTabs`), картки підрозділів та список усіх статей розділу |
+| **2 сегменти (`[topic, subtopic]`)** | `/ua/knowledge-base/this-project/knowledge-engine` | **Хаб підтеми:** активна вкладка підтеми та відфільтровані картки конспектів цієї папки |
+| **3 сегменти (`[...path, article]`)** | `/ua/knowledge-base/this-project/knowledge-engine/server-mdx-ast-dual-theme-shiki` | **Сторінка статті:** `TL;DR`, `<Suspense fallback={<ArticleBodySkeleton />}>`, `MdxArticleRenderer`, правий `TOC` і `Prev / Next` |
 
-На етапі збірки `generateStaticParams()` перемножує `SUPPORTED_LOCALES` (`en`, `uk`, `ru`) на всі шляхи папок і статей (`getAllStaticKnowledgeSlugArrays()`), передгенеруючи 100% маршрутів у `SSG`:
+На етапі збірки `export const dynamicParams = false` жорстко обмежує маршрутизацію шляхами з `generateStaticParams()` (миттєво віддаючи `404` для невідомих слагів), а `<MdxArticleRenderer>` обгорнутий у `<Suspense fallback={<ArticleBodySkeleton />}>` (із `apps/web/src/entities/knowledge-article/ui/knowledge-skeletons.tsx`):
 
-```typescript title="apps/web/src/app/[locale]/knowledge-base/[...slug]/page.tsx"
+```tsx title="apps/web/src/app/[locale]/knowledge-base/[...slug]/page.tsx"
+export const dynamicParams = false
+
 export function generateStaticParams() {
   const slugArrays = getAllStaticKnowledgeSlugArrays()
   return SUPPORTED_LOCALES.flatMap((locale) =>
@@ -36,83 +38,133 @@ export function generateStaticParams() {
     })),
   )
 }
+
+// У гілці рендера статті всередині KnowledgeCatchAllPage:
+<Suspense fallback={<ArticleBodySkeleton />}>
+  <MdxArticleRenderer hast={article.hast} codeBlocks={article.codeBlocks} />
+</Suspense>
 ```
 
-При запиті сторінки сервер спершу перевіряє, чи є шлях кінцевою статтею (`getArticleByPathSegments`, який запускає парсинг HAST точково лише для однієї запитаної статті), а якщо ні — шукає вузол директорії (`getFolderByPathSegments`) у полегшеному фронтматер-дереві `getKnowledgeTree(locale)`. Для типобезпечних переходів між локалями використовується `Link` із `@/shared/i18n/navigation`.
+### Дедуплікація через примітивно-ключований `React.cache` (`mdx-fs-loader.ts`)
+Next.js передає в `generateMetadata()` та `Page()` різні екземпляри масиву `slug: string[]`, через що пряме кешування за масивом у `React.cache` дає промах за посиланням. В `apps/web/src/entities/knowledge-content/lib/mdx-fs-loader.ts` сегменти спершу склеюються в примітивний рядковий ключ (`segments.join('/')`), завдяки чому обидва виклики ділять один і той самий мемоїзований документ поверх міжзапитного `mtimeMs`-кешу:
 
----
+```typescript title="apps/web/src/entities/knowledge-content/lib/mdx-fs-loader.ts"
+const getArticleByRouteKey = cache((targetRoute: string, locale: SupportedLocale): MdxArticleDocument | null => {
+  const entries = getAllCachedFrontmatterEntriesByLocale(locale)
+  const matchedEntry = entries.find((e) => e.frontmatter.routePath === targetRoute)
+  if (!matchedEntry) return null
+  return loadCachedDocumentFromEntry(matchedEntry)
+})
 
-## 2. Серверний Zero-Eval HAST-конвеєр (`remark-directive` ➔ `remark-rehype` ➔ `toJsxRuntime`)
-
-Парсинг `.mdx`-файлів виконується виключно на сервері в модулях `apps/web/src/entities/knowledge-content/lib/mdx-ast-parser.ts` та `mdx-fs-loader.ts`:
-
-1. **`parseFrontmatterOnly` (`gray-matter`)** витягує YAML-фронтматер (`title`, `sidebarLabel`, `summary`, `category`, `format`, `tags`, `readingTime`, `order`, `tldr`) із міжзапитним кешуванням за `mtimeMs`, тому для побудови дерева сайдбару та хабів розділів парсинг тіла статей узагалі не запускається.
-2. **`unified().use(remarkParse).use(remarkGfm).use(remarkDirective)`** будує синтаксичне дерево `mdast`, розмічає заголовки `h2–h4`, GitHub Alerts і блоки коду, а також перетворює теги `<Widget />` і директиви `::sandbox{name="..."}` / `:::sandbox{name="..."}` на типізовані вузли `div[data-mdx-widget]`, вирізаючи будь-який довільний сирий HTML (`Zero-Eval CSP`).
-3. **`unified().use(remarkRehype)`** переводить `mdast` у стандартне дерево `HastRoot`, яке в серверному компоненті напряму конвертується в React-елементи через `toJsxRuntime` із `hast-util-to-jsx-runtime`:
-
-```typescript title="apps/web/src/entities/knowledge-content/lib/mdx-ast-parser.ts"
-const markdownParser = unified().use(remarkParse).use(remarkGfm).use(remarkDirective)
-const mdastToHastProcessor = unified().use(remarkRehype)
-
-export function parseRawMdx(
-  raw: string,
-  fallbackCategory: KnowledgeCategory,
-  leafSlug: string,
-  relativeSubSegments: readonly string[],
-  locale: SupportedLocale,
-  isFallback: boolean,
-): MdxArticleDocument {
-  const { frontmatter, content } = parseFrontmatterOnly(
-    raw,
-    fallbackCategory,
-    leafSlug,
-    relativeSubSegments,
-    locale,
-    isFallback,
-  )
-
-  const mdastRoot = markdownParser.parse(content) as MdastRoot
-  const toc: ArticleTocEntry[] = []
-  const codeBlocks: MdxCodeBlockMeta[] = []
-  const usedHeadingIds = new Map<string, number>()
-
-  transformMdastChildren(mdastRoot.children, usedHeadingIds, toc, codeBlocks, false)
-  const hast = mdastToHastProcessor.runSync(mdastRoot) as HastRoot
-
-  return { ...frontmatter, toc, hast, codeBlocks }
+export function getArticleByPathSegments(segments: readonly string[], localeInput?: string): MdxArticleDocument | null {
+  return getArticleByRouteKey(segments.join('/'), normalizeLocale(localeInput))
 }
 ```
 
-Завдяки стандартному конвеєру `mdast` ➔ `HAST` рушій нативно підтримує:
-- Вкладені блоки коду та чеклісти всередині GitHub-style плашок `> [!TIP]`, `> [!IMPORTANT]`, `> [!WARNING]`.
-- Вкладене інлайн-форматування (`**жирний текст із `кодом` усередині посилання**`) та фігури зображень `![Підпис](/path.webp)`.
-- Декларативне вбудовування інтерактивних клієнтських островів (`::sandbox{name="NestAiMcpDiagram" defaultMode="ai"}` або `<ReactRenderGraphD3 />`) через реєстр `MDX_WIDGET_REGISTRY` в `apps/web/src/features/kb-sandboxes/ui/mdx-client-widgets.tsx`.
+---
+
+## 2. Загартований Zero-Eval HAST-конвеєр і санітайзер посилань
+
+Парсинг `.mdx`-файлів виконується виключно на сервері в `apps/web/src/entities/knowledge-content/lib/mdx-ast-parser.ts`:
+
+1. **RCE-захист `gray-matter` (`parseFrontmatterOnly`):** явно вимикає legacy-рушії `js` та `javascript` для виконання коду в YAML-фронтматері (defense-in-depth):
+   ```typescript title="apps/web/src/entities/knowledge-content/lib/mdx-ast-parser.ts"
+   const parsedMatter = matter(raw, {
+     engines: {
+       js: () => ({}),
+       javascript: () => ({}),
+     },
+   })
+   ```
+2. **Zero-Eval `mdast` ➔ `HAST` (`unified`):** `remarkParse` + `remarkGfm` + `remarkDirective` розмічає заголовки `h2–h4`, GitHub Alerts (`> [!TIP]`, `> [!IMPORTANT]`, `> [!WARNING]`), чеклісти й блоки коду, конвертує зареєстровані теги `<Widget />` і директиви `::sandbox` / `:::sandbox` у `div[data-mdx-widget]` та вирізає довільний сирий HTML перед передачею в `remarkRehype` і `toJsxRuntime`.
+3. **Захист від protocol-relative та `/\` обходів (`apps/web/src/entities/knowledge-content/lib/link-sanitizer.ts`):** `classifySafeMarkdownLink()` і `isSafeMarkdownImageSrc()` блокують як `//`, так і шляхи зі зворотним слешем `/\` (`!trimmed.startsWith('//') && !trimmed.startsWith('/\\')`), дозволяючи лише `http:`, `https:`, `mailto:` (для посилань) та `http:`, `https:` (для зображень).
 
 ---
 
-## 3. Dual-Theme підсвічування коду `Shiki v4` (`0 КБ` клієнтського JS)
+## 3. Dual-Theme `Shiki v4` із FIFO-кешем і стилями в `theme.css` (`0 КБ` клієнтського JS)
 
-Серверний компонент `MdxArticleRenderer` (`apps/web/src/entities/knowledge-article/ui/mdx-article-renderer.tsx`) підсвічує всі блоки коду статті паралельно через `Promise.all` та `highlightCodeServer` (`apps/web/src/entities/knowledge-content/lib/shiki-highlighter.ts`) перед викликом `toJsxRuntime(hast, { Fragment, jsx, jsxs, components })`:
+`MdxArticleRenderer` підсвічує всі `codeBlocks` паралельно через `Promise.all` і `highlightCodeServer` (`apps/web/src/entities/knowledge-content/lib/shiki-highlighter.ts`):
 
 ```typescript title="apps/web/src/entities/knowledge-content/lib/shiki-highlighter.ts"
-const html = await highlighter.codeToHtml(trimmed, {
-  lang: safeLang,
-  themes: {
-    light: 'github-light-default',
-    dark: 'github-dark-default',
-  },
-  defaultColor: false,
+const SHIKI_THEMES = {
+  light: 'github-light-default',
+  dark: 'github-dark-default',
+} as const
+
+const MAX_SHIKI_CACHE_ENTRIES = 1000
+
+async function renderHighlightedHtml(code: string, lang: string): Promise<string> {
+  try {
+    return await codeToHtml(code, { lang, themes: SHIKI_THEMES, defaultColor: false })
+  } catch {
+    try {
+      return await codeToHtml(code, { lang: 'text', themes: SHIKI_THEMES, defaultColor: false })
+    } catch {
+      return `<pre class="shiki"><code>${escapeHtmlFallback(code)}</code></pre>`
+    }
+  }
+}
+
+export function highlightCodeServer(code: string, rawLanguage: string): Promise<string> {
+  const normalized = rawLanguage.trim().toLowerCase()
+  const lang = LANGUAGE_ALIASES[normalized] ?? (normalized || 'typescript')
+  const cacheKey = `${lang}\0${code}`
+
+  const existing = shikiCache.get(cacheKey)
+  if (existing) return existing
+
+  const promise = renderHighlightedHtml(code, lang).catch((error: unknown) => {
+    shikiCache.delete(cacheKey)
+    throw error
+  })
+
+  // FIFO-витіснення запобігає різкій просадці (cold-start cliff) при повному скиданні кешу
+  if (shikiCache.size >= MAX_SHIKI_CACHE_ENTRIES) {
+    const oldestKey = shikiCache.keys().next().value
+    if (oldestKey !== undefined) {
+      shikiCache.delete(oldestKey)
+    }
+  }
+  shikiCache.set(cacheKey, promise)
+  return promise
+}
+```
+
+- **FIFO-витіснення (`MAX_SHIKI_CACHE_ENTRIES = 1000`):** при заповненні видаляє лише найстаріший ключ замість очищення всієї `Map`, виключаючи стрибки латентності.
+- **Самоочищення через `.catch()`:** миттєво видаляє відхилений проміс із кешу, щоб поодинокий збій не отруїв ключ сніпета назавжди.
+- **Zero-JS CSS-каскад (`packages/ui/src/styles/theme.css`):** із `defaultColor: false` Shiki записує змінні `--shiki-light` та `--shiki-dark`, які перемикаються чистим CSS у `@layer components`:
+
+```css title="packages/ui/src/styles/theme.css"
+@layer components {
+  .shiki,
+  .shiki span {
+    color: var(--shiki-light);
+    background-color: transparent;
+    font-style: var(--shiki-light-font-style, inherit);
+    font-weight: var(--shiki-light-font-weight, inherit);
+  }
+
+  .dark .shiki,
+  .dark .shiki span {
+    color: var(--shiki-dark);
+    background-color: transparent;
+    font-style: var(--shiki-dark-font-style, inherit);
+    font-weight: var(--shiki-dark-font-weight, inherit);
+  }
+}
+```
+
+---
+
+## 4. Ліниві MDX-віджети (`next/dynamic`) і tree-shaken імпорти `d3`
+
+Усі 4 інтерактивні віджети в `apps/web/src/features/kb-sandboxes/ui/mdx-client-widgets.tsx` (`ReactRenderGraphD3`, `ArchitectureFlowD3`, `NestAiMcpDiagram`, `ArticleImageGrid`) завантажуються динамічно з `ssr: false` та скелетонами фіксованої висоти (`min-h-[420px]` / `min-h-[320px]`), тому текстові статті без віджетів отримують рівно **0 КБ** коду діаграм і D3:
+
+```tsx title="apps/web/src/features/kb-sandboxes/ui/mdx-client-widgets.tsx"
+const ReactRenderGraphD3 = dynamic(() => import('./d3-react-render-graph').then((m) => m.ReactRenderGraphD3), {
+  ssr: false,
+  loading: () => <Skeleton className="my-6 min-h-[420px] w-full rounded-xl" />,
 })
 ```
 
-Опція `defaultColor: false` змушує `Shiki` записувати в кожен `<span>` лише дві CSS-змінні (`--shiki-light` і `--shiki-dark`). У `globals.css` перемикання теми відбувається миттєво силами браузерного CSS-каскаду без перемальовування DOM і з `0 КБ` JavaScript на клієнті:
-
-```css title="packages/ui/src/styles/globals.css"
-.shiki span {
-  color: var(--shiki-light);
-}
-
-.dark .shiki span {
-  color: var(--shiki-dark);
-}
-```
+Усередині D3-пісочниць (`d3-react-render-graph.tsx`, `d3-architecture-flow.tsx`) замість повного `import * as d3` використовуються **іменовані tree-shaken імпорти** (`import { hierarchy, linkHorizontal, select, tree } from 'd3'` та `import { select } from 'd3'`), підсилені опцією `experimental.optimizePackageImports: ['lucide-react', 'd3', '@repo/ui', '@repo/shared-schemas']` в `apps/web/next.config.ts`.

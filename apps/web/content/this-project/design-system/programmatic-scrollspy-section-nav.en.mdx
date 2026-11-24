@@ -1,88 +1,141 @@
 ---
-title: "Floating Section Navigator, Deterministic #hash Scroll in Next.js & 60 FPS ScrollSpy"
+title: "Floating Section Navigator, Deterministic #hash Scroll & Zero-Layout-Thrashing IntersectionObserver ScrollSpy"
 sidebarLabel: "Section Navigator & ScrollSpy"
-summary: "How to build editorial in-page navigation: programmatic #hash scrolling in Next.js App Router, passive requestAnimationFrame ScrollSpy, and thumb-zone mobile ergonomics."
+summary: "How we built editorial in-page navigation: programmatic #hash scrolling in Next.js App Router, zero-layout-thrashing IntersectionObserver ScrollSpy for both Workfolio sections and Article TOC, and thumb-zone mobile ergonomics."
 category: "this-project"
 format: "deep-dive"
-tags: ["navigation", "scrollspy", "nextjs", "ux", "performance"]
-readingTime: "5 min"
-publishedAt: "2026-11-10"
+tags: ["navigation", "scrollspy", "intersection-observer", "nextjs", "ux", "performance"]
+readingTime: "6 min"
+publishedAt: "2026-11-24"
 order: 2
 tldr:
   - "Implements `useSectionNavigation` via `element.scrollIntoView` + `history.replaceState` so repeated clicks on the same `#hash` always scroll reliably in Next.js App Router."
-  - "Tracks the active section (`useActiveWorkfolioSection`) using a `{ passive: true }` scroll listener throttled with `requestAnimationFrame` (`60 FPS`)."
-  - "Adapts `PageSectionNavigator` between a floating side outline on `xl+` and a bottom-right thumb-zone pill (`bottom-4 right-4`) on `< xl`."
+  - "Migrated both `useActiveWorkfolioSection` (`apps/web/src/shared/hooks/use-section-navigation.ts`) and `useActiveHeading` (`article-toc.tsx`) from scroll-tick `getBoundingClientRect()` + `requestAnimationFrame` loops to zero-layout-thrashing `IntersectionObserver`."
+  - "Uses a dedicated bottom observer on `#roadmap` (`threshold: 0.85`) so short final sections highlight accurately, and adapts `PageSectionNavigator` between a desktop rail (`right-4 top-1/2`, `2xl:right-6`) and a mobile `Popover` pill (`bottom-4 right-4`)."
 ---
 
 ## 1. Deterministic `#hash` Scrolling in Next.js App Router
 
 Standard Next.js `<Link href="/#projects">` navigation skips scrolling if `window.location.hash` already equals `#projects` after the user manually scrolls back up and clicks the link again.
 
-To make section jumps deterministic, `useSectionNavigation` separates cross-route transitions (`router.push`) from in-page programmatic scrolling:
+To make section jumps deterministic, `useSectionNavigation` handles in-page smooth scrolling directly when already on `/`, falling back to `router.push` for cross-route transitions:
 
 ```typescript title="apps/web/src/shared/hooks/use-section-navigation.ts"
 const scrollToSection = useCallback(
   (sectionId: WorkfolioSectionId) => {
-    if (pathname !== '/') {
-      router.push(`/#${sectionId}`)
-      return
+    if (pathname === '/') {
+      const element = document.getElementById(sectionId)
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        window.history.replaceState(null, '', `#${sectionId}`)
+        return
+      }
     }
-
-    const element = document.getElementById(sectionId)
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      window.history.replaceState(null, '', `#${sectionId}`)
-    }
+    router.push(`/#${sectionId}`)
   },
   [pathname, router],
 )
 ```
 
-Every target `<section id="...">` includes `scroll-mt-20` so the sticky top header (`h-14`) never obscures section headings after the smooth scroll finishes.
+Every target `<section id="...">` pairs with `scroll-padding-top: 5rem` (and `scroll-mt-20`) so the sticky top header (`h-14`) never obscures section headings after the smooth scroll finishes.
 
 ---
 
-## 2. Passive `requestAnimationFrame` ScrollSpy (`60 FPS`)
+## 2. Zero-Layout-Thrashing `IntersectionObserver` ScrollSpy
 
-To highlight the currently visible section without blocking the main thread, `useActiveWorkfolioSection` combines a `{ passive: true }` scroll listener with `requestAnimationFrame` throttling:
+Polling `el.getBoundingClientRect()` on every `scroll` tick (even inside `requestAnimationFrame`) forces repeated synchronous layout reads during fast scrolls. Both our CV landing page (`useActiveWorkfolioSection`) and Knowledge Base TOC (`useActiveHeading`) therefore use browser-native **`IntersectionObserver`**, reading `entry.boundingClientRect.top` asynchronously only when thresholds cross.
+
+### Workfolio Landing Sections + Bottom `#roadmap` Observer
+
+`useActiveWorkfolioSection` combines a primary reading-band observer (`rootMargin: '-112px 0px -55% 0px'`, `threshold: 0`) with a dedicated bottom observer on `#roadmap` (`threshold: 0.85`) so the short final section reliably activates when scrolled to the bottom of the page:
 
 ```typescript title="apps/web/src/shared/hooks/use-section-navigation.ts"
-useEffect(() => {
-  let rafId: number | null = null
-
-  const updateActiveSection = () => {
-    rafId = null
-    const triggerLine = window.innerHeight * 0.28
-    let currentSection: WorkfolioSectionId = WORKFOLIO_SECTION_IDS[0]
-
-    for (const id of WORKFOLIO_SECTION_IDS) {
-      const el = document.getElementById(id)
-      if (!el) continue
-      if (el.getBoundingClientRect().top <= triggerLine) {
-        currentSection = id
+const sectionObserver = new IntersectionObserver(
+  (entries) => {
+    for (const entry of entries) {
+      const id = entry.target.id as WorkfolioSectionId
+      lastTopMap.set(id, entry.boundingClientRect.top)
+      if (entry.isIntersecting) {
+        visibleSet.add(id)
+      } else {
+        visibleSet.delete(id)
       }
     }
-    setActiveSection((prev) => (prev === currentSection ? prev : currentSection))
-  }
+    resolveActive()
+  },
+  {
+    rootMargin: '-112px 0px -55% 0px',
+    threshold: 0,
+  },
+)
 
-  const onScroll = () => {
-    if (rafId === null) {
-      rafId = window.requestAnimationFrame(updateActiveSection)
-    }
-  }
-
-  window.addEventListener('scroll', onScroll, { passive: true })
-  return () => window.removeEventListener('scroll', onScroll)
-}, [])
+// Ensure the short bottom section (`roadmap`) activates reliably when scrolled to the bottom
+const roadmapEl = document.getElementById('roadmap')
+const bottomObserver = roadmapEl
+  ? new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0]
+        if (!entry) return
+        isLastSectionFullyVisible = entry.isIntersecting
+        resolveActive()
+      },
+      { threshold: 0.85 },
+    )
+  : null
 ```
+
+When no section intersects the upper reading band (e.g., while scrolling through tall content between section boundaries), `resolveActive()` falls back to the last section whose cached `lastTopMap` coordinate passed `top <= 160`.
+
+### Knowledge Base Article TOC (`useActiveHeading`)
+
+In `apps/web/src/entities/knowledge-article/ui/article-toc.tsx`, `DesktopArticleToc` uses the same zero-layout-thrashing pattern tuned for dense article headings (`rootMargin: '-88px 0px -65% 0px'`, `threshold: [0, 1]`):
+
+```typescript title="apps/web/src/entities/knowledge-article/ui/article-toc.tsx"
+const observer = new IntersectionObserver(
+  (entries) => {
+    for (const entry of entries) {
+      const id = entry.target.id
+      lastTopById.set(id, entry.boundingClientRect.top)
+      if (entry.isIntersecting) {
+        visibleIds.add(id)
+      } else {
+        visibleIds.delete(id)
+      }
+    }
+
+    for (const item of items) {
+      if (visibleIds.has(item.id)) {
+        setActiveId(item.id)
+        return
+      }
+    }
+
+    // Keep the last heading passed above the upper reading band while reading body prose
+    let current = firstId
+    for (const item of items) {
+      const top = lastTopById.get(item.id)
+      if (top !== undefined && top <= 140) {
+        current = item.id
+      }
+    }
+    setActiveId(current)
+  },
+  {
+    rootMargin: '-88px 0px -65% 0px',
+    threshold: [0, 1],
+  },
+)
+```
+
+Clicking any entry in `DesktopArticleToc` or `MobileArticleToc` invokes `scrollToHeadingId(id)` (`scrollIntoView({ behavior: 'smooth', block: 'start' })` + `window.history.replaceState(null, '', '#' + id)`).
 
 ---
 
 ## 3. `PageSectionNavigator` Ergonomics (`< xl` vs `xl+`)
 
-Rather than crowding `WorkfolioHeader` with in-page links, section navigation lives in a dedicated responsive component:
+Rather than crowding `WorkfolioHeader` with in-page links, section navigation lives in `apps/web/src/widgets/section-nav/page-section-navigator.tsx`:
 
 | Breakpoint | Form Factor | Engineering Detail |
 | :--- | :--- | :--- |
-| **Desktop (`xl+`)** | Floating vertical rail on the right (`right-5 top-1/2`) | Displays reading progress and expands section labels on hover |
-| **Mobile & Tablet (`< xl`)** | Floating pill in the bottom-right thumb zone (`bottom-4 right-4`) | `WorkfolioFooter` adds `pb-20 xl:pb-10` so the floating trigger never overlaps copyright or live SSE status |
+| **Desktop (`xl+`)** | Floating vertical rail on the right (`fixed right-4 top-1/2 z-30 -translate-y-1/2 xl:block 2xl:right-6`) | Renders step indices `01`–`05`, active pill indicator (`w-4 bg-primary`), `aria-current="location"`, expands labels on `group-hover/rail`, and stays permanently expanded on ultrawide displays (`min-[1560px]:block`, `min-[1600px]:inline`) |
+| **Mobile & Tablet (`< xl`)** | `@repo/ui` `Popover` floating pill in the bottom-right thumb zone (`fixed bottom-4 right-4 z-40 xl:hidden`) | Shows active index + truncated label; `WorkfolioFooter` reserves `pb-20 xl:pb-10` so the floating pill never overlaps copyright or live SSE status |

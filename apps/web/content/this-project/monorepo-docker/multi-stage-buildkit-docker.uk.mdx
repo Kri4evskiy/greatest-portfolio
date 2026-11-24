@@ -1,17 +1,17 @@
 ---
-title: "Multi-Stage Docker у монорепозиторії: BuildKit Cache Mounts, pnpm prune та Prisma"
+title: "Multi-Stage Docker у монорепозиторії: BuildKit Cache Mounts, Standalone-трейсинг, Prisma 7 та Hardened Compose"
 sidebarLabel: "Multi-Stage Docker та BuildKit"
-summary: "Архітектура контейнеризації Full-Stack монорепозиторію: 3-стадійна збірка Next.js standalone та NestJS, спільний кеш пакетів BuildKit, очищення devDependencies з Rust-free Prisma 7 Wasm та запуск від непривілейованого користувача."
+summary: "Архітектура контейнеризації Full-Stack монорепозиторію: 3-стадійна збірка (Next.js output: 'standalone' vs NestJS pnpm prune), спільний кеш пакетів BuildKit, Rust-free Prisma 7 Wasm, zero-friction локальний Compose і загартований продакшен Compose."
 category: "this-project"
 format: "deep-dive"
 tags: ["docker", "buildkit", "pnpm-12", "prisma", "devops"]
-readingTime: "6 хв"
+readingTime: "7 хв"
 publishedAt: "2026-11-10"
 order: 2
 tldr:
-  - "Збірка кожного сервісу (`web`, `api`, `telemetry-ms`) розділена на 3 ізольовані стадії `pruner -> builder -> runner` на базі `node:22-alpine`."
-  - "`turbo prune @repo/<app> --docker` відсікає зайві пакети, а `--mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store` розділяє кеш пакетів між усіма контейнерами."
-  - "Команда `pnpm prune --prod --ignore-scripts` видаляє dev-інструменти (TypeScript, Biome, Turbo, Prisma CLI) без `/tmp`-костилів: Prisma 7 компілює ESM-клієнт у `dist/generated/prisma/`, а Rust-free Wasm-рантайм залишається в `@prisma/client`."
+  - "Збірка кожного сервісу (`web`, `api`, `telemetry-ms`) розділена на 3 ізольовані стадії `pruner -> builder -> runner` на базі `node:22-alpine` із `turbo prune @repo/<app> --docker` і спільним кешем BuildKit (`/root/.local/share/pnpm/store`)."
+  - "`api` та `telemetry-ms` очищають dev-інструменти через `pnpm prune --prod --ignore-scripts` (із Rust-free Prisma 7 Wasm у `@prisma/client`), тоді як `web` використовує Next.js `DOCKER_STANDALONE=true` (`output: 'standalone'`) без `pnpm prune`."
+  - "`docker-compose.yml` дає zero-friction демо (`WORKFOLIO_DEMO_MODE=true` на `api` та `web` + loopback-порти `127.0.0.1:${*_HOST_PORT}`), а `docker-compose.prod.yml` вмикає `read_only`, `tmpfs`, `cap_drop: [ALL]`, `no-new-privileges:true`, `pids_limit: 256`, `TRUST_PROXY_HOPS` і healthcheck для всіх 4 сервісів."
 ---
 
 ## 1. Тристадійний конвеєр збірки (`pruner -> builder -> runner`)
@@ -19,8 +19,8 @@ tldr:
 Щоб у продакшен-контейнери не потрапляли сирці, компілятори та чужі пакети монорепозиторію, кожен Dockerfile у папці `docker/` будує образ у три кроки:
 
 1. **`pruner`:** запускає `turbo prune @repo/<app> --docker`, формуючи мінімальний підграф (`out/json/`, `out/full/`, `out/pnpm-lock.yaml`) лише для цільового сервісу.
-2. **`builder`:** активує `pnpm@12.21.0`, ставить залежності через `--frozen-lockfile --ignore-scripts` зі спільним кешем BuildKit, запускає `pnpm turbo run build --filter=@repo/<app>...` та очищає `devDependencies`.
-3. **`runner`:** копіює лише скомпільовані артефакти (`dist/` або `.next/standalone`) і запускає процес від непривілейованого користувача (`USER node` / `USER nextjs`).
+2. **`builder`:** активує `pnpm@12.21.0`, ставить залежності через `--frozen-lockfile --ignore-scripts` зі спільним кешем BuildKit і запускає `pnpm turbo run build --filter=@repo/<app>...`. Бекенд-образи (`api`, `telemetry-ms`) далі виконують `pnpm prune --prod --ignore-scripts`; фронтенд-образ (`web`) виставляє `DOCKER_STANDALONE=true`, щоб Next.js `output: 'standalone'` сам відстежив мінімальний набір файлів для `server.js` (без кроку `pnpm prune`).
+3. **`runner`:** копіює лише скомпільовані runtime-артефакти і запускає процес від непривілейованого користувача (`USER node` для `api`/`telemetry-ms`, `USER nextjs` UID `1001` для `web`).
 
 ---
 
@@ -53,9 +53,11 @@ RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
 
 ---
 
-## 3. Очищення `devDependencies` та Rust-free Prisma 7
+## 3. Дві стратегії оптимізації: `pnpm prune` (Backend) та `output: 'standalone'` (Web)
 
-У стадії `builder` команда `pnpm turbo run build --filter=@repo/api...` генерує ESM-клієнт Prisma 7 (`prisma-client`) у `apps/api/src/generated/prisma/` і компілює його через `tsc` прямо в `apps/api/dist/generated/prisma/`. Оскільки Prisma 7 замінила нативний Rust-рушій у `.prisma/client` на Wasm-компілятор запитів усередині production-пакета `@prisma/client` (у парі з `@prisma/adapter-pg` та `pg`), очищення `pnpm prune --prod --ignore-scripts` виконується без тимчасового буфера `/tmp`, а стадії `runner` більше не потрібен `openssl`:
+### Бекенд (`api` та `telemetry-ms`): `pnpm prune --prod` і Rust-free Prisma 7
+
+У `docker/api.Dockerfile` (і аналогічно без `openssl` у `docker/telemetry-ms.Dockerfile`) команда `pnpm turbo run build --filter=@repo/api...` генерує ESM-клієнт Prisma 7 (`prisma-client`) у `apps/api/src/generated/prisma/` і компілює його через `tsc` у `apps/api/dist/generated/prisma/`. Оскільки Prisma 7 замінила нативний Rust-рушій у `.prisma/client` на Wasm-компілятор запитів усередині production-пакета `@prisma/client` (у парі з `@prisma/adapter-pg` та `pg`), очищення `pnpm prune --prod --ignore-scripts` виконується без `/tmp`-костилів, а стадії `runner` більше не потрібен `openssl`:
 
 ```dockerfile title="docker/api.Dockerfile"
 RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
@@ -69,27 +71,79 @@ ENV NODE_ENV=production
 ENV PORT=4000
 ```
 
+### Фронтенд (`web`): `turbo prune @repo/web --docker` + Next.js `output: 'standalone'`
+
+У `docker/web.Dockerfile` команда `pnpm prune` **не викликається**. Натомість `builder` задає `ENV DOCKER_STANDALONE=true` і `ENV API_INTERNAL_URL=http://api:4000` для `pnpm turbo run build --filter=@repo/web...`. Next.js збирає автономний `.next/standalone`, а стадія `runner` копіює лише standalone-сервер, статичні чанки, `public/` та `apps/web/content/` (для читання MDX у рантаймі):
+
+```dockerfile title="docker/web.Dockerfile"
+COPY --from=pruner /app/out/full/ .
+COPY tsconfig.base.json ./tsconfig.base.json
+ENV DOCKER_STANDALONE=true
+ENV API_INTERNAL_URL=http://api:4000
+RUN pnpm turbo run build --filter=@repo/web...
+
+# Stage 3: Production non-root runner
+FROM node:22-alpine AS runner
+...
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/static ./apps/web/.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/public ./apps/web/public
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/content ./apps/web/content
+
+USER nextjs
+EXPOSE 3000
+CMD ["node", "apps/web/server.js"]
+```
+
 ### Характеристики фінальних продакшен-образів
 
-| Контейнер | Базовий образ | Експонований порт | Користувач рантайму |
-| :--- | :---: | :---: | :---: |
-| `workfolio-telemetry-ms` | `node:22-alpine` | `4001` (лише внутрішня мережа) | `node` (не-root) |
-| `workfolio-api` | `node:22-alpine` | `4000` | `node` (не-root) |
-| `workfolio-web` (`standalone`) | `node:22-alpine` | `3000` | `nextjs` (`UID 1001`) |
+| Контейнер | Базовий образ | Спосіб оптимізації | Експонований порт | Користувач рантайму |
+| :--- | :---: | :--- | :---: | :---: |
+| `workfolio-telemetry-ms` | `node:22-alpine` | `turbo prune` + `pnpm prune --prod --ignore-scripts` | `4001` (лише внутрішня мережа) | `node` (не-root) |
+| `workfolio-api` | `node:22-alpine` | `turbo prune` + `pnpm prune --prod --ignore-scripts` | `4000` | `node` (не-root) |
+| `workfolio-web` | `node:22-alpine` | `turbo prune` + Next.js `output: 'standalone'` | `3000` | `nextjs` (`UID 1001`) |
 
 > [!TIP]
 > Оскільки продакшен-образ `api` не містить `Prisma CLI`, міграції схеми БД (`prisma migrate deploy`) виконуються окремим кроком у CI/CD перед перемиканням трафіку.
 
 ---
 
-## 4. Розділення `docker-compose.yml` (Zero-Friction Reviewer Demo) та `docker-compose.prod.yml` (Strict Production)
+## 4. `docker-compose.yml` (Zero-Friction Demo) vs `docker-compose.prod.yml` (Hardened Production)
 
-Щоб тімлід або СТО міг розгорнути весь стек однією командою `docker compose up --build` без ручного створення `.env`, але бойовий деплой на VPS залишався суворо захищеним від дефолтних секретів, оркестрацію розділено на два файли:
+Оркестрацію розділено на два файли, щоб тімлід або СТО міг розгорнути весь стек однією командою `docker compose up --build -d` без ручного `.env`, а бойовий деплой на VPS залишався суворо захищеним на рівні ядра контейнерів і секретів:
 
-| Параметр | `docker-compose.yml` (Local Reviewer Demo) | `docker-compose.prod.yml` (Strict Production) |
+| Параметр | `docker-compose.yml` (Local Reviewer Demo) | `docker-compose.prod.yml` (Hardened Production) |
 | :--- | :--- | :--- |
 | **Команда запуску** | `docker compose up --build -d` | `docker compose -f docker-compose.prod.yml --env-file .env.prod up --build -d` |
-| **`WORKFOLIO_DEMO_MODE`** | `"true"` (дозволяє fallback на єдиний `DEFAULT_DEV_JWT_SECRET` із `@repo/shared-schemas` і виводить `console.warn`) | Не заданий (`"false"` — жорсткий fail-fast у `loadAppConfig` при порожніх або дефолтних секретах) |
-| **Перевірка секретів на рівні Compose** | `${JWT_SECRET:-}` (авто-резолв через `resolveJwtSecret()` без `.env`) | Обов’язкова інтерполяція `${JWT_SECRET:?}`, `${ADMIN_SECRET_PASSCODE:?}`, `${POSTGRES_PASSWORD:?}` |
-| **Прапорець `Secure` у `HttpOnly` куці `kb_access_token`** | `false` (`appConfig.isProduction && !appConfig.isDemoMode` — працює по `http://localhost:3000`) | `true` (працює суворо поверх HTTPS / TLS) |
-| **Порт `postgres` (`5432`)** | `127.0.0.1:5432:5432` (доступний лише з localhost для DBeaver / DataGrip) | **Не опублікований на хост** (100% ізольований усередині приватної мережі `backend-network`) |
+| **`WORKFOLIO_DEMO_MODE`** | `${WORKFOLIO_DEMO_MODE:-true}` на **обох сервісах `api` і `web`** (спільний fallback на `DEFAULT_DEV_JWT_SECRET` + попередження) | Не заданий (`"false"` — жорсткий fail-fast у `loadAppConfig`) |
+| **Публікація портів хоста** | Лише loopback + змінювані порти: `127.0.0.1:${POSTGRES_HOST_PORT:-5432}:5432`, `127.0.0.1:${API_HOST_PORT:-4000}:4000`, `127.0.0.1:${WEB_HOST_PORT:-3000}:3000` | `postgres` і `telemetry-ms` **не опубліковані** (лише `backend-network`); `api` (`127.0.0.1:4000:4000`) та `web` (`127.0.0.1:3000:3000`) суворо на loopback за reverse proxy |
+| **Перевірка секретів та origin** | `${JWT_SECRET:-}` (авто-резолв через `resolveJwtSecret()` без `.env`) | Обов'язкова інтерполяція `${POSTGRES_PASSWORD:?}`, `${JWT_SECRET:?}` (на `api` і `web`), `${ADMIN_SECRET_PASSCODE:?}`, `${WEB_ORIGIN:?}`, `${NEXT_PUBLIC_SITE_URL:?}` |
+| **Довіра reverse proxy** | Прямий localhost (`TRUST_PROXY_HOPS` не заданий) | `TRUST_PROXY_HOPS: ${TRUST_PROXY_HOPS:-1}` на `api` для коректного IP клієнта в rate limiter за Nginx/Caddy/ALB |
+| **Прапорець `Secure` у `kb_access_token`** | `false` (`isProduction && !isDemoMode` — працює по `http://localhost:3000`) | `true` (суворо поверх HTTPS / TLS) |
+
+### Матриця hardening і healthcheck у `docker-compose.prod.yml`
+
+Кожен продакшен-контейнер працює з обмеженнями ядра Linux і явними перевірками готовності (`depends_on` очікує `condition: service_healthy` за ланцюжком `postgres -> api`, `telemetry-ms -> api`, `api -> web`):
+
+```yaml title="docker-compose.prod.yml (фрагмент)"
+  web:
+    restart: always
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /app/apps/web/.next/cache
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    pids_limit: 256
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/robots.txt').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+```
+
+| Сервіс | Директиви hardening ядра | Read-Only ФС + `tmpfs` | Healthcheck-проба |
+| :--- | :--- | :--- | :--- |
+| **`postgres`** | `no-new-privileges:true`, `pids_limit: 256` | Дані у volume `postgres_prod_data` | `pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-workfolio_db}` |
+| **`telemetry-ms`** | `no-new-privileges:true`, `cap_drop: [ALL]`, `pids_limit: 256` | `read_only: true`, `tmpfs: [/tmp]` | Node `node:net` TCP-підключення до `127.0.0.1:4001` |
+| **`api`** | `no-new-privileges:true`, `cap_drop: [ALL]`, `pids_limit: 256` | `read_only: true`, `tmpfs: [/tmp]` | `wget -qO- http://127.0.0.1:4000/api/health \|\| exit 1` |
+| **`web`** | `no-new-privileges:true`, `cap_drop: [ALL]`, `pids_limit: 256` | `read_only: true`, `tmpfs: [/tmp, /app/apps/web/.next/cache]` | Node `fetch('http://127.0.0.1:3000/robots.txt')` |

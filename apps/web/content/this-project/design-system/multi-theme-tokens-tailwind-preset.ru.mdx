@@ -1,17 +1,17 @@
 ---
 title: "Матрица мульти-темных CSS-токенов, Tailwind v4 @theme и архитектура пакета @repo/ui"
 sidebarLabel: "Дизайн-токены и Tailwind v4"
-summary: "Как спроектировать масштабируемую дизайн-систему в монорепозитории: 2D-матрица тем (Mode × Palette) с Zero-FOUC переключением, Cascade Layers в Tailwind CSS v4 и @repo/ui/theme.css, Zero-CLS шрифты, @container queries и 100% покрытие в Storybook 10."
+summary: "Как спроектировать масштабируемую дизайн-систему в монорепозитории: 2D-матрица тем (Mode × Palette) с Zero-FOUC переключением, Cascade Layers в Tailwind CSS v4 и @repo/ui/theme.css, RSC-безопасная сборка @repo/ui, Zero-CLS шрифты, @container queries и 100% покрытие в Storybook 10."
 category: "this-project"
 format: "deep-dive"
 tags: ["design-tokens", "tailwind", "ui-system", "storybook", "architecture"]
 readingTime: "8 мин"
-publishedAt: "2026-11-10"
+publishedAt: "2026-11-24"
 order: 1
 tldr:
   - "Полная 2D-матрица семантических HSL-токенов (`Light / Dark / System` × `Warm Paper / Graphite / Sepia`) описана в `packages/ui/src/styles/theme.css` через `@theme inline` и управляется из `ThemeToggle` с Zero-FOUC скриптом в `<head>` (`PALETTE_INIT_SCRIPT`)."
-  - "Слои каскада Tailwind CSS v4 разделены осознанно: Baseline-правила (`scrollbar-gutter: stable`, `text-wrap: balance/pretty`) живут в `@layer base`, `.shiki` + `@starting-style` для `Dialog` и синхронизированные с Radix Popper CSS `@keyframes` для `Popover` и `Tooltip` — в `@layer components`, а `prefers-reduced-motion: reduce` — вне слоёв без `!important`."
-  - "Инверсия зависимостей (`@repo/ui/theme.css` ➔ `apps/web/src/app/globals.css` с `@source`), современные таргеты `browserslist`, локальные Zero-CLS шрифты `Inter` + `JetBrains Mono` через `next/font/google`, точечные `@container` queries и 100% покрытие в Storybook 10."
+  - "Слои каскада Tailwind CSS v4 разделены осознанно: Baseline-правила (`scrollbar-gutter: stable` + `html:has(body[data-scroll-locked])`, `text-wrap: balance/pretty`) живут в `@layer base`, `.shiki` + `@starting-style` для `Dialog` и синхронизированные с Radix Popper CSS `@keyframes` для `Popover` и `Tooltip` — в `@layer components`, а `prefers-reduced-motion: reduce` — вне слоёв без `!important`."
+  - "Инверсия зависимостей (`@repo/ui/theme.css` ➔ `apps/web/src/app/globals.css` с `@source`), `\"sideEffects\": [\"*.css\"]` в `packages/ui/package.json` и явные директивы `'use client'` на Radix-примитивах (`dialog.tsx`, `tabs.tsx`), современные таргеты `browserslist` и 100% покрытие в Storybook 10."
 ---
 
 ## 1. Двумерная матрица семантических токенов (`Mode` × `Palette`)
@@ -57,7 +57,7 @@ tldr:
 
 ### Живой 2D-переключатель оформления и Zero-FOUC гидратация
 
-В хедере [`ThemeToggle`](apps/web/src/widgets/header/theme-toggle.tsx) собран на примитивах `@repo/ui` (`Button`, `Tooltip` + `Popover`) и выступает чистым UI-контролом для управления обеими ортогональными осями одновременно:
+В хедере `ThemeToggle` (`apps/web/src/widgets/header/theme-toggle.tsx`) собран на примитивах `@repo/ui` (`Button`, `Tooltip` + `Popover`) и выступает чистым UI-контролом для управления обеими ортогональными осями одновременно:
 - **Тема (`Light / Dark / System`):** через `next-themes` и класс `.dark`.
 - **Палитра (`Palette`):** `Warm Paper` (`default`), `Graphite` или `Sepia` (хранится в `localStorage['workfolio-palette']` и синхронизируется с `html[data-palette]` через `@/shared/store/use-ui-store`).
 
@@ -68,11 +68,11 @@ tldr:
 
 ---
 
-## 2. CSS-first архитектура, Cascade Layers и Baseline UX
+## 2. CSS-first архитектура, Cascade Layers, границы RSC и Tree-Shaking
 
 Чтобы пакет `@repo/ui` оставался полностью независимым и не знал о файловой структуре `apps/web`, он экспортирует чистый слой токенов и каскадных правил `@repo/ui/theme.css` (без `@import "tailwindcss";`), а витрина Storybook в `packages/ui/src/styles/globals.css` собирается нативным плагином `@tailwindcss/vite`.
 
-В `apps/web` файл [`globals.css`](apps/web/src/app/globals.css) выступает точкой сборки (**Composition Root**) для `@tailwindcss/postcss`:
+В `apps/web` файл `globals.css` (`apps/web/src/app/globals.css`) выступает точкой сборки (**Composition Root**) для `@tailwindcss/postcss`:
 
 ```css title="apps/web/src/app/globals.css"
 @import "tailwindcss";
@@ -83,9 +83,13 @@ tldr:
 @source "../../../../packages/ui/src";
 ```
 
-Внутри `theme.css` стили разложены по **CSS Cascade Layers**:
-1. **`@layer base`:** задаёт дефолтный `border-color: hsl(var(--border))`, `cursor: pointer` на активних кнопках, `scrollbar-gutter: stable` (убирает сдвиг макета на 15px при открытии модалок на Windows), `scrollbar-width: thin`, `scroll-padding-top: 5rem`, плавный скролл (в связке с `data-scroll-behavior="smooth"` на `<html>` в `LocaleRootLayout`) и `text-wrap: balance` / `text-wrap: pretty`.
-2. **`@layer components`:** изолирует `.shiki`, GPU-анимации входа `@starting-style` (`opacity` + `scale`) для `[data-dialog-overlay]` / `[data-dialog-content]` и чистые CSS `@keyframes` (`ui-popper-in` / `ui-popper-out` через `data-state`, `data-side` и `--radix-popper-transform-origin`) для `[data-popover-content]` и `[data-tooltip-content]` — синхронизированные с Radix Popper `isPositioned` (`animation: none` на время замера) и выходом `<Presence>`.
+### Гарантии упаковки пакета (`packages/ui`)
+- **Tree-Shaking и CSS Side Effects (`packages/ui/package.json`):** поле `"sideEffects": ["*.css"]` позволяет сборщикам агрессивно вырезать неиспользуемые JS-компоненты, гарантируя сохранность импортов таблиц стилей `@repo/ui/theme.css` и `@repo/ui/globals.css`.
+- **Явные границы `'use client'` для Radix-примитивов:** интерактивные компоненты на базе Radix UI (включая `packages/ui/src/components/dialog.tsx` и `packages/ui/src/components/tabs.tsx`) явно объявляют `'use client'` в первой строке файла, благодаря чему серверные компоненты `apps/web` безопасно импортируют чистые UI-примитивы из `@repo/ui` без попадания клиентских хуков в RSC-граф.
+
+Внутри `packages/ui/src/styles/theme.css` стили разложены по **CSS Cascade Layers**:
+1. **`@layer base`:** задаёт дефолтный `border-color: hsl(var(--border))`, `cursor: pointer` на активных кнопках, `scrollbar-gutter: stable` (в паре с `html:has(body[data-scroll-locked]) { scrollbar-gutter: auto; }`, чтобы фиксированные оверлеи Radix Dialog занимали 100% ширины без пустой полосы справа при блокировке прокрутки), `scrollbar-width: thin`, `scroll-padding-top: 5rem`, плавный скролл (в связке с `data-scroll-behavior="smooth"` на `<html>` в `LocaleRootLayout`) и `text-wrap: balance` / `text-wrap: pretty`.
+2. **`@layer components`:** изолирует `.shiki`, GPU-анимации входа `@starting-style` (`opacity` + `scale`) для `[data-dialog-overlay]` / `[data-dialog-content]` и чистые CSS `@keyframes` (`ui-popper-in` / `ui-popper-out` через `data-state`, `data-side` и `--radix-popper-transform-origin`) для `[data-popover-content]` и `[data-tooltip-content]` — синхронизированные с позиционированием Radix Popper и выходом `<Presence>`.
 3. **Unlayered override:** `@media (prefers-reduced-motion: reduce)` вынесен *вне* слоёв — по спецификации Cascade Layers неслоёвые правила всегда перекрывают `@layer utilities` (`transition-*`, `animate-*`) без использования `!important`.
 
 Оба пакета (`apps/web/package.json` и `packages/ui/package.json`) фиксируют современные таргеты `"browserslist": ["Chrome >= 111", "Edge >= 111", "Firefox >= 128", "Safari >= 16.4"]`, запрещая `Lightning CSS` и `Next.js SWC` генерировать лишние полифилы под `@property` и `color-mix()`.

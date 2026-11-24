@@ -39,7 +39,7 @@ This repository implements a multi-tier, zero-trust security architecture design
 
 - **Strict Dependency Isolation:** Powered by **pnpm 12** and [`pnpm-workspace.yaml`](./pnpm-workspace.yaml). Unapproved native package build scripts are blocked via strict `allowBuilds` allowlisting.
 - **Zero Secrets Commitment:** No API keys, database credentials, or real secret keys are committed to the repository. Both `.gitignore` and `.dockerignore` block `.env` and all `.env.*` variants (including `.env.prod`, allowing only `.env.example`).
-- **Automated Security Gates:** Every push and pull request enforces `persist-credentials: false` on `actions/checkout@v6`, runs isolated `docker compose config --quiet` + `pnpm audit --prod --audit-level=high` (`security` job with zero `node_modules` installed), and executes `Vitest` security regression suites (`edge-jwt`, `jwt-roles.guard`, `request-id.util`, `app.config`).
+- **Automated Security Gates:** Every push and pull request enforces `persist-credentials: false` on `actions/checkout@v6`, runs `actionlint` + `Biome noImportCycles` in `lint`, runs isolated `docker compose config --quiet` + `pnpm audit --prod --audit-level=high` (`security` job with zero `node_modules` installed, plus a weekly scheduled `.github/workflows/security-audit.yml` and `.github/dependabot.yml` for `npm` + `github-actions`), and executes `Vitest` security regression suites (`edge-jwt`, `jwt-roles.guard`, `request-id.util`, `app.config`, `telemetry-ms.config`).
 
 ---
 

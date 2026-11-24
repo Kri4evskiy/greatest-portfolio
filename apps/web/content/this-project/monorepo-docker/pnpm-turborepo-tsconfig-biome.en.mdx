@@ -1,22 +1,22 @@
 ---
 title: "Monorepo Configuration Blueprint: pnpm 12, Turborepo, Strict tsconfig & Biome"
 sidebarLabel: "pnpm 12, tsconfig & Biome"
-summary: "Reference blueprint for configuring a modern Full-Stack monorepo: pnpm 12 workspace layout with allowBuilds supply-chain protection, Turborepo task graph, strict TypeScript cascade, and single-binary Biome.js."
+summary: "Reference blueprint for configuring a modern Full-Stack monorepo: pnpm 12.21.0 workspace layout with allowBuilds in pnpm-workspace.yaml, sideEffects tree-shaking, complete Turborepo task graph, strict TypeScript cascade, and single-binary Biome 2.6.4 with noImportCycles."
 category: "this-project"
 format: "deep-dive"
 tags: ["monorepo", "pnpm-12", "turborepo", "typescript", "biome"]
-readingTime: "6 min"
+readingTime: "7 min"
 publishedAt: "2026-11-10"
 order: 1
 tldr:
-  - "Splits the workspace into applications (`apps/web`, `apps/api`, `apps/telemetry-ms`) and shared packages (`packages/ui`, `packages/shared-schemas`) managed by `pnpm 12.21.0` with an explicit `allowBuilds` whitelist."
-  - "Configures `turbo.json` with topological `^build` dependencies for `build`, `build-storybook`, and `dev`, while `^typecheck` lets packages typecheck in parallel."
-  - "Enforces `strict`, `noUncheckedIndexedAccess`, and `exactOptionalPropertyTypes` via `tsconfig.base.json` and replaces `ESLint + Prettier` with a single Rust-powered `biome.json`."
+  - "Manages `apps/*` and `packages/*` with `pnpm@12.21.0`, enforcing `allowBuilds` strictly in `pnpm-workspace.yaml` (never in `package.json`) and explicit `sideEffects` tree-shaking on `@repo/shared-schemas` (`false`) and `@repo/ui` (`[\"*.css\"]`)."
+  - "Configures `turbo.json` with `globalEnv: [\"API_INTERNAL_URL\", \"NEXT_PUBLIC_SITE_URL\"]` and 8 deterministic tasks (`build`, `build-storybook`, `typecheck`, `lint`, `test`, `test:coverage`, `test:e2e`, `dev`)."
+  - "Enforces `strict`, `noUncheckedIndexedAccess`, and `exactOptionalPropertyTypes` via `tsconfig.base.json` and replaces `ESLint + Prettier` with `Biome 2.6.4` including `suspicious.noImportCycles: \"error\"`."
 ---
 
-## 1. `pnpm 12` Workspace Layout & `allowBuilds` Protection
+## 1. `pnpm 12.21.0` Workspace Layout, `allowBuilds` & Package `sideEffects`
 
-The root `pnpm-workspace.yaml` defines package boundaries and a strict `allowBuilds` allowlist. In **pnpm 12**, third-party `postinstall` scripts are blocked by default to prevent supply-chain attacks—only explicitly listed native packages are allowed to execute build scripts:
+Root `package.json` pins `"packageManager": "pnpm@12.21.0"` and `"engines": { "node": ">=22.0.0" }`, while all workspace topology and supply-chain settings live **strictly in `pnpm-workspace.yaml`**—never inside a legacy `"pnpm"` section (such as `onlyBuiltDependencies`) in `package.json`. In **pnpm 12**, third-party `postinstall` scripts are blocked by default; only explicitly listed native packages under `allowBuilds` may run build scripts:
 
 ```yaml title="pnpm-workspace.yaml"
 packages:
@@ -34,28 +34,34 @@ allowBuilds:
   sharp: true
 ```
 
-| Monorepo Layer | Package | Responsibility |
-| :--- | :--- | :--- |
-| **Applications (`apps/*`)** | `@repo/web`, `@repo/api`, `@repo/telemetry-ms` | Next.js 16 frontend, NestJS 12 REST API, and live SSE telemetry microservice |
-| **Contracts (`packages/shared-schemas`)** | `@repo/shared-schemas` | Single source of truth for Zod schemas, DTOs, cookie/locale constants, and RBAC permissions |
-| **Design System (`packages/ui`)** | `@repo/ui` | `theme.css` token matrix, Tailwind v4 `@theme inline`, `Radix UI` primitives, and `Storybook` |
+| Monorepo Layer | Package | Tree-Shaking (`sideEffects`) | Responsibility |
+| :--- | :--- | :---: | :--- |
+| **Applications (`apps/*`)** | `@repo/web`, `@repo/api`, `@repo/telemetry-ms` | — | Next.js 16 frontend, NestJS 12 REST API, and live SSE telemetry microservice |
+| **Contracts (`packages/shared-schemas`)** | `@repo/shared-schemas` | `false` | Pure ESM Zod schemas, DTOs, cookie/locale constants, and RBAC helpers compiled to `./dist/index.js` |
+| **Design System (`packages/ui`)** | `@repo/ui` | `["*.css"]` | `theme.css` / `globals.css` token matrix, Tailwind v4 `@theme inline`, `Radix UI` primitives, and `Storybook` |
+
+> [!TIP]
+> **Why `sideEffects` differs across internal packages:** `packages/shared-schemas/package.json` declares `"sideEffects": false` so bundlers can drop unused Zod schemas and helpers aggressively. `packages/ui/package.json` declares `"sideEffects": ["*.css"]` so importing `@repo/ui/globals.css` or `@repo/ui/theme.css` is never pruned while unused React components and Radix primitives remain fully tree-shakeable.
 
 ---
 
 ## 2. `Turborepo` Task Graph & Artifact Caching
 
-`turbo.json` orchestrates a deterministic pipeline: `"dependsOn": ["^build"]` on `build`, `build-storybook`, and `dev` compiles `@repo/shared-schemas` first, while `"dependsOn": ["^typecheck"]` lets workspace packages typecheck in parallel:
+`turbo.json` orchestrates all 8 workspace tasks with streaming output (`"ui": "stream"`), explicit cache invalidation on `globalDependencies` and `globalEnv`, topological `"dependsOn": ["^build"]` for build/test/dev pipelines, and parallel `"dependsOn": ["^typecheck"]` for type checking:
 
 ```json title="turbo.json"
 {
   "$schema": "https://turbo.build/schema.json",
+  "ui": "stream",
   "globalDependencies": ["tsconfig.base.json", "pnpm-workspace.yaml"],
-  "globalEnv": ["API_INTERNAL_URL"],
+  "globalEnv": ["API_INTERNAL_URL", "NEXT_PUBLIC_SITE_URL"],
+  "globalPassThroughEnv": ["FORCE_PNPM"],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
-      "outputs": [".next/**", "!.next/cache/**", "dist/**", "src/generated/**", "storybook-static/**"]
+      "outputs": [".next/**", "!.next/cache/**", "dist/**", "src/generated/**", "storybook-static/**"],
+      "passThroughEnv": ["SWC_NATIVE_BINDING_CACHE"]
     },
     "build-storybook": {
       "dependsOn": ["^build"],
@@ -67,6 +73,22 @@ allowBuilds:
     "lint": {
       "dependsOn": ["^lint"]
     },
+    "test": {
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", ".env*"],
+      "passThroughEnv": ["SWC_NATIVE_BINDING_CACHE"]
+    },
+    "test:coverage": {
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", ".env*"],
+      "outputs": ["coverage/**"],
+      "passThroughEnv": ["SWC_NATIVE_BINDING_CACHE"]
+    },
+    "test:e2e": {
+      "dependsOn": ["build"],
+      "cache": false,
+      "passThroughEnv": ["SWC_NATIVE_BINDING_CACHE", "CI", "WORKFOLIO_DEMO_MODE"]
+    },
     "dev": {
       "dependsOn": ["^build"],
       "cache": false,
@@ -75,6 +97,9 @@ allowBuilds:
   }
 }
 ```
+
+- **`globalEnv: ["API_INTERNAL_URL", "NEXT_PUBLIC_SITE_URL"]`** ensures changing the internal API origin or canonical public URL busts cached Next.js builds (SEO canonicals, Open Graph, proxy rewrites).
+- **`test` & `test:coverage`** depend on `^build` so `@repo/shared-schemas` is compiled before Vitest runs, while **`test:e2e`** depends on same-package `build` and disables caching (`cache: false`) with `CI` and `WORKFOLIO_DEMO_MODE` passed through.
 
 ---
 
@@ -89,6 +114,12 @@ To eliminate runtime `Cannot read properties of undefined` bugs, every workspace
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "moduleResolution": "Bundler",
+    "resolveJsonModule": true,
+    "allowJs": false,
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    "skipLibCheck": true,
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,
@@ -96,10 +127,7 @@ To eliminate runtime `Cannot read properties of undefined` bugs, every workspace
     "noFallthroughCasesInSwitch": true,
     "noImplicitReturns": true,
     "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "isolatedModules": true,
-    "noEmit": true,
-    "skipLibCheck": true
+    "noUnusedParameters": true
   }
 }
 ```
@@ -109,13 +137,18 @@ To eliminate runtime `Cannot read properties of undefined` bugs, every workspace
 
 ---
 
-## 4. Unified Linting & Formatting with `Biome.js`
+## 4. Unified Linting, Import-Cycle Guard & Formatting with `Biome 2.6.4`
 
-Instead of maintaining a fragile chain of `ESLint + Prettier` plugins, the entire codebase and Tailwind CSS stylesheets are formatted and linted in `~100 ms` via a single `biome.json`:
+Instead of maintaining a fragile chain of `ESLint + Prettier` plugins, the entire codebase and Tailwind v4 CSS stylesheets are formatted and linted in `~100 ms` via a single Rust binary (`@biomejs/biome` `2.6.4`) configured in `biome.json`:
 
 ```json title="biome.json"
 {
   "$schema": "https://biomejs.dev/schemas/2.6.4/schema.json",
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
+  },
   "assist": {
     "actions": {
       "source": { "organizeImports": "on" }
@@ -126,19 +159,33 @@ Instead of maintaining a fragile chain of `ESLint + Prettier` plugins, the entir
     "rules": {
       "preset": "recommended",
       "correctness": {
+        "noUnusedVariables": "error",
         "noUnusedImports": "error",
-        "noUnusedVariables": "error"
+        "useExhaustiveDependencies": "warn"
       },
       "suspicious": {
-        "noExplicitAny": "error"
+        "noExplicitAny": "error",
+        "noImportCycles": "error",
+        "noArrayIndexKey": "warn",
+        "noUnknownAtRules": "off"
       },
       "style": {
-        "noNonNullAssertion": "error"
+        "noNonNullAssertion": "error",
+        "useConst": "error",
+        "useImportType": "off"
       }
     }
+  },
+  "javascript": {
+    "parser": { "unsafeParameterDecoratorsEnabled": true }
   },
   "css": {
     "parser": { "tailwindDirectives": true }
   }
 }
 ```
+
+Key architectural safeguards in `biome.json`:
+- **`suspicious.noImportCycles: "error"`:** enforces an acyclic module dependency graph at lint time across both frontend FSD-Modular layers and NestJS backend modules, catching circular imports before they cause `undefined` DI tokens or bundler initialization glitches.
+- **`javascript.parser.unsafeParameterDecoratorsEnabled: true` & `style.useImportType: "off"`:** preserves NestJS constructor parameter decorators (`@Inject()`, `@Body()`) and runtime metadata reflection required by `emitDecoratorMetadata`.
+- **`css.parser.tailwindDirectives: true` & `noUnknownAtRules: "off"`:** natively parses Tailwind v4 `@theme inline` and `@custom-variant` rules without disabling CSS formatting.

@@ -1,29 +1,36 @@
 ---
 title: "React 19 Compiler в продакшене: настройка Next.js 16, изоляция use no memo и границы мутабельности"
 sidebarLabel: "React Compiler и use no memo"
-summary: "Как настроен и внедрён React 19 Compiler в этом проекте: опции compilationMode: 'infer' и panicThreshold: 'none' в next.config.ts, совместимость с React Hook Form (useWatch) и изоляция TanStack Table через 'use no memo'."
+summary: "Как настроен и внедрён React 19 Compiler в этом проекте: compilationMode: 'infer', panicThreshold: 'none' и optimizePackageImports в next.config.ts, совместимость с React Hook Form (useWatch), вынесенные 'use no memo' таблицы TanStack Table и атомарные хуки Zustand."
 category: "this-project"
 format: "deep-dive"
-tags: ["react-compiler", "react-19", "nextjs", "tanstack-table", "react-hook-form", "performance"]
-readingTime: "6 мин"
+tags: ["react-compiler", "react-19", "nextjs", "tanstack-table", "react-hook-form", "zustand", "performance"]
+readingTime: "7 мин"
 publishedAt: "2026-11-10"
 order: 3
 tldr:
-  - "В `apps/web/next.config.ts` явно заданы `compilationMode: 'infer'` (включающий быстрый SWC/Rust пре-фильтр Next.js перед вызовом Babel) и `panicThreshold: 'none'` для отказоустойчивой сборки."
-  - "В `GuestPassModal` вместо несовместимого метода `watch()` из `react-hook-form` используется хук `useWatch({ control, name })`, что сохраняет полную авто-мемоизацию формы."
-  - "В `TechRadarTable` вызов `useReactTable` (`@tanstack/react-table`) изолирован в дочернем компоненте `DesktopTechRadarDataTable` с директивой `'use no memo'`, чтобы родительский компонент, мобильные карточки и `Dialog` компилировались без ручных `useMemo`."
+  - "В `apps/web/next.config.ts` заданы `compilationMode: 'infer'`, `panicThreshold: 'none'` и `experimental.optimizePackageImports: ['lucide-react', 'd3', '@repo/ui', '@repo/shared-schemas']`."
+  - "Вызовы `@tanstack/react-table` (`useReactTable`) изолированы в выделенных `'use no memo'` компонентах: `DesktopTechRadarDataTable` (`table/tech-radar-data-table.tsx`) и универсальной `ObservabilityDataTable` (`features/telemetry-stream/ui/table/observability-data-table.tsx`)."
+  - "Стор `use-ui-store.ts` полностью совместим с React Compiler благодаря приватному `useUIStoreBase`, явным атомарным хукам `use*` и `useUIActions()` (без `createSelectors` и прокси `.use.field()`)."
 ---
 
-## 1. Конфигурация `reactCompiler` в `apps/web/next.config.ts`
+## 1. Конфигурация `reactCompiler` и оптимизация бандла в `apps/web/next.config.ts`
 
-В Next.js 16 настройка `reactCompiler` принимает типизированный объект `ReactCompilerOptions`. В проекте зафиксирована конфигурация:
+В Next.js 16 настройка `reactCompiler` принимает типизированный объект `ReactCompilerOptions` в связке с оптимизацией импортов из barrel-пакетов:
 
 ```typescript title="apps/web/next.config.ts"
 const nextConfig: NextConfig = {
+  ...(process.env.DOCKER_STANDALONE === 'true' ? { output: 'standalone' } : {}),
+  ...(process.env.NEXT_DIST_DIR ? { distDir: process.env.NEXT_DIST_DIR } : {}),
+  poweredByHeader: false,
   reactStrictMode: true,
   reactCompiler: {
     compilationMode: 'infer',
     panicThreshold: 'none',
+  },
+  transpilePackages: ['@repo/ui', '@repo/shared-schemas'],
+  experimental: {
+    optimizePackageImports: ['lucide-react', 'd3', '@repo/ui', '@repo/shared-schemas'],
   },
 }
 ```
@@ -32,8 +39,9 @@ const nextConfig: NextConfig = {
 
 | Параметр | Значение | Инженерное обоснование |
 | :--- | :---: | :--- |
-| **`compilationMode`** | `'infer'` | Next.js применяет собственные быстрые эвристики на Rust/SWC до вызова `babel-plugin-react-compiler`: компилятор запускается только для файлов с PascalCase-компонентами (JSX) и хуками `use*`, не тратя время сборки на утилиты (`mdx-ast-parser.ts`, `edge-jwt.ts`) |
+| **`compilationMode`** | `'infer'` | Next.js применяет быстрые эвристики на Rust/SWC до вызова `babel-plugin-react-compiler`: компилятор запускается только для файлов с PascalCase-компонентами (JSX) и хуками `use*`, не тратя время сборки на утилиты (`mdx-ast-parser.ts`, `edge-jwt.ts`) |
 | **`panicThreshold`** | `'none'` | При встрече со сложным мутабельным SDK компилятор безопасно пропускает оптимизацию конкретной функции вместо аварийной остановки `next build` в CI/CD |
+| **`optimizePackageImports`** | `['lucide-react', 'd3', '@repo/ui', '@repo/shared-schemas']` | Переписывает barrel-импорты в прямые пути подмодулей на этапе сборки, чтобы клиентские чанки включали только фактически используемые иконки, функции D3, UI-компоненты и схемы |
 
 ---
 
@@ -46,17 +54,20 @@ const nextConfig: NextConfig = {
 
 ---
 
-## 3. Паттерн граничной изоляции `'use no memo'` в `TechRadarTable`
+## 3. Вынесенные границы изоляции `'use no memo'` для таблиц
 
-Компонент `TechRadarTable` (`apps/web/src/entities/engineering-roadmap/tech-radar-table.tsx`) объединяет поиск, фильтр категорий, мобильный стек карточек (`< md`), десктопную таблицу (`>= md`) и модальное окно инспектора `ADR`.
+### А. `TechRadarTable` и вынесенные подмодули `table/`
+Компонент `TechRadarTable` (`apps/web/src/entities/engineering-roadmap/tech-radar-table.tsx`) объединяет поиск, фильтр категорий, мобильный стек карточек (`< md`), десктопную таблицу (`>= md`) и модальное окно инспектора `ADR`. Чтобы родительский компонент оставался скомпилированным, слой TanStack Table вынесен в два отдельных файла внутри `apps/web/src/entities/engineering-roadmap/table/`:
 
-Если вызывать `useReactTable` прямо в теле `TechRadarTable`, компилятор пропустит весь 360-строчный компонент. Чтобы сохранить автоматическую мемоизацию (`Memo ✨`) для фильтров, мобильных карточек и `Dialog`, сам `useReactTable` вынесен в узкий дочерний компонент с явной директивой `'use no memo'`:
+- **`table/tech-radar-columns.tsx`** — чистая фабрика `createTechRadarColumns({ labels, onInspectAdr })`, возвращающая типизированный массив `ColumnDef<TechRadarItem>[]`.
+- **`table/tech-radar-data-table.tsx`** — тонкая обёртка с директивой `'use no memo'`, инкапсулирующая `useReactTable` и локальный стейт `sorting`:
 
-```tsx title="apps/web/src/entities/engineering-roadmap/tech-radar-table.tsx"
-function DesktopTechRadarDataTable({ data, columns, emptyResultLabel }: DesktopTechRadarDataTableProps) {
+```tsx title="apps/web/src/entities/engineering-roadmap/table/tech-radar-data-table.tsx"
+export function DesktopTechRadarDataTable({ data, columns, emptyResultLabel }: DesktopTechRadarDataTableProps) {
   'use no memo'
 
   const [sorting, setSorting] = useState<SortingState>([{ id: 'adrNumber', desc: false }])
+
   const table = useReactTable({
     data,
     columns,
@@ -67,11 +78,65 @@ function DesktopTechRadarDataTable({ data, columns, emptyResultLabel }: DesktopT
   })
 
   return (
-    <div className="hidden overflow-x-auto rounded-lg border border-border bg-card shadow-sm md:block">
+    <div className="hidden overflow-x-auto rounded-lg border border-border bg-card shadow-xs md:block">
       {/* Рендер заголовков и строк TanStack Table */}
     </div>
   )
 }
 ```
 
-Благодаря этому разделению в родительском `TechRadarTable` полностью удалены ручные обёртки `useMemo` вокруг `filteredData`, `activeDialogItem` и `columns` — их кэширование по слотам `useMemoCache` берёт на себя `React 19 Compiler`.
+В родительском `TechRadarTable` значения `filteredData` и `columns` (создаваемые через `createTechRadarColumns`) осознанно обернуты в `useMemo`, а `handleInspectAdr` — в `useCallback`: это стабилизирует ссылки, пересекающие границу `'use no memo'` в `DesktopTechRadarDataTable`, чтобы открытие модалки ADR не вызывало пересчёт модели строк TanStack Table. Фильтры, мобильные карточки, `activeDialogItem` и JSX модального окна `Dialog` при этом полностью оптимизируются React Compiler.
+
+### Б. Универсальная `ObservabilityDataTable` с типизацией `ColumnMeta`
+Для таблиц телеметрии и лидерборда на `/system-status` модуль `apps/web/src/features/telemetry-stream/ui/table/observability-data-table.tsx` предоставляет обобщённый `'use no memo'` компонент поверх TanStack Table v8 для серверной пагинации (`manualPagination: true`, `manualSorting: true`, опциональный `getRowId`), дополненный строгим module augmentation для `ColumnMeta`:
+
+```tsx title="apps/web/src/features/telemetry-stream/ui/table/observability-data-table.tsx"
+declare module '@tanstack/react-table' {
+  interface ColumnMeta<TData extends RowData, TValue> {
+    headerClassName?: string
+    cellClassName?: string
+  }
+}
+
+export function ObservabilityDataTable<TData>({
+  data,
+  columns,
+  emptyState,
+  getRowId,
+  getRowClassName,
+  minTableWidthClass = 'min-w-[560px]',
+  isDimmed = false,
+  tableTestId,
+}: ObservabilityDataTableProps<TData>) {
+  'use no memo'
+
+  const table = useReactTable({
+    data,
+    columns,
+    manualPagination: true,
+    manualSorting: true,
+    ...(getRowId ? { getRowId } : {}),
+    getCoreRowModel: getCoreRowModel(),
+  })
+  // ...
+}
+```
+
+---
+
+## 4. Совместимая с React Compiler архитектура Zustand (`use-ui-store.ts`)
+
+Хелперы вроде `createSelectors` (создающие динамические геттеры `.use.field()` на объекте стора) маскируют вызовы хуков от статического анализа React Compiler и могут приводить к лишним отключениям оптимизации.
+
+Вместо этого `apps/web/src/shared/store/use-ui-store.ts` построен на явных атомарных хуках:
+- **Приватный базовый стор:** `useUIStoreBase` не экспортируется наружу — подписаться на весь стор целиком без селектора невозможно на уровне типов.
+- **Разделение `UIState` и `UIActions`:** все экшены собраны в единый ссылочно-стабильный объект `actions`, доступный через `useUIActions()`.
+- **Явные атомарные хуки:** каждый реактивный срез экспортирует собственный хук `use*` (`useIsGuestPassModalOpen`, `useTechRadarCategoryFilter`, `useTechRadarSearch`, `useSelectedAdrItem`, `useExpandedKbFolders`, `usePalette`, `useHasHydratedPalette`), плюс минимальный императивный хендл `uiStore` (`getState` / `subscribe`) для не-React контекстов и тестов:
+
+```typescript title="apps/web/src/shared/store/use-ui-store.ts"
+export const useUIActions = () => useUIStoreBase((s) => s.actions)
+export const useIsGuestPassModalOpen = () => useUIStoreBase((s) => s.isGuestPassModalOpen)
+export const useSelectedAdrItem = () => useUIStoreBase((s) => s.selectedAdrItem)
+export const useTechRadarCategoryFilter = () => useUIStoreBase((s) => s.techRadarCategoryFilter)
+export const useTechRadarSearch = () => useUIStoreBase((s) => s.techRadarSearch)
+```

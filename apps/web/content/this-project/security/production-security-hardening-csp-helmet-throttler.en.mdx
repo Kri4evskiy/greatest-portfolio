@@ -1,72 +1,72 @@
 ---
-title: "Production Security Hardening: Next.js CSP, NestJS Helmet, Throttler Rate Limiting, and Edge Web Crypto"
+title: "Production Security Hardening: Next.js CSP, CsrfOriginMiddleware, NestJS Helmet, Throttler & Fail-Closed Edge Web Crypto"
 sidebarLabel: "Security Hardening & Headers"
-summary: "A practical deep dive into monorepo production defense: strict Content-Security-Policy in Next.js 16 without theme FOUC, Helmet with cross-origin CORP for SSE in NestJS 12, brute-force protection with @nestjs/throttler, and Edge cryptography."
+summary: "A practical deep dive into monorepo production defense: narrowed CSP & CORP in Next.js 16, Hybrid KB Edge Web Crypto JWT with fail-closed secret guards, strict NestJS Helmet JSON CSP, CsrfOriginMiddleware (+ future upload patterns), and shared Throttler buckets."
 category: "this-project"
 format: "deep-dive"
-tags: ["security", "csp", "helmet", "throttler", "rate-limiting", "nextjs", "nestjs"]
-readingTime: "8 min"
-publishedAt: "2026-11-13"
+tags: ["security", "csp", "csrf", "helmet", "throttler", "rate-limiting", "nextjs", "nestjs"]
+readingTime: "10 min"
+publishedAt: "2026-11-24"
 order: 1
 tldr:
-  - "In `apps/web/next.config.ts`, a full suite of security headers is enabled: CSP, HSTS (`63072000s`), `nosniff`, `Referrer-Policy`, and `frame-ancestors 'none'`."
-  - "CSP directives are calibrated to support the `next-themes` + static allowlisted `PALETTE_INIT_SCRIPT` inline scripts, self-hosted `font-src 'self' data:`, and direct Server-Sent Events streaming without breaking isolation."
-  - "Integrated `helmet` in `apps/api` with custom `crossOriginResourcePolicy: cross-origin` to eliminate browser SSE stream blocks."
-  - "Authentication endpoints `POST /api/auth/guest-pass` and `POST /api/auth/login` are shielded by `@nestjs/throttler` (max 5 attempts per minute per IP)."
+  - "`apps/web/config/security-headers.config.ts` enforces A+ headers: narrowed production `connect-src` (zero blanket `https:` exfiltration), `Cross-Origin-Resource-Policy: same-origin`, `COOP: same-origin`, HSTS (`63072000s`), `nosniff`, and `frame-ancestors 'none'` (scoped `'self'` only on `/cv/:path+`)."
+  - "`apps/web/src/proxy.ts` enforces Hybrid KB access (public `/knowledge-base` + `/knowledge-base/this-project/**`, fail-closed Edge `HS256` JWT on all other categories) with an explicit static-extension matcher so dotted slugs never bypass auth."
+  - "`apps/api` pairs strict Helmet JSON CSP (`defaultSrc: [\"'none'\"]`), JSON-only `100kb` body parsing (no `urlencoded`), `TRUST_PROXY_HOPS`, `CsrfOriginMiddleware` (`415`/`403`), `1d` HS256-pinned JWTs (`403` on bad `adminPasscode`), and `headersSent` + `sanitizeLogValue` error handling."
+  - "`@nestjs/throttler` applies `60 req/min` globally, a shared `5 req/min` bucket across `/api/auth/guest-pass` + `/api/auth/login`, and `5 req/min` SSE handshake throttling (`@SkipTimeout()` + `2/IP`, `50` global, `15m` max stream TTL)."
 ---
 
 ## 1. Why Modern Full-Stack Applications Need Defense-in-Depth
 
-In typical web development, security is frequently deferred or reduced to installing default packages. However, in a monorepo architecture combining a public Next.js interface, a private NestJS API, microservices, and a PostgreSQL database, compromising a single node can jeopardize the entire system.
-
-Our project adheres to the **Defense-in-Depth** principle:
+In a monorepo combining a public Next.js frontend, a NestJS API, an internal TCP microservice, and PostgreSQL, compromising a single layer can cascade across the stack. Our architecture enforces **Defense-in-Depth** across five autonomous boundaries:
 
 ```text
 [ Browser ]
     │
-    ├── (1) HTTP Security Headers (Next.js): CSP, HSTS, X-Frame-Options, nosniff
+    ├── (1) HTTP Security Headers (Next.js): Narrowed CSP, HSTS, COOP, CORP: same-origin, X-Frame-Options
     │
-    ├── (2) Edge Auth Barrier (proxy.ts): Web Crypto HMAC-SHA256 JWT verification
+    ├── (2) Edge Auth Barrier (proxy.ts + edge-jwt.ts): Hybrid KB policy + Fail-Closed HS256 Web Crypto JWT
     │
-    ├── (3) API Gateway Hardening (NestJS): Helmet + CORS whitelist + Throttler Guard
+    ├── (3) API Gateway Hardening (NestJS): JSON-only 100kb parser + Strict Helmet CSP + CsrfOriginMiddleware
     │
-    └── (4) Microservice Isolation: TCP :4001 inside an internal Docker network
+    ├── (4) Rate Limiting & RBAC: Shared Throttler (60/min global, 5/min auth & SSE) + HS256 1d JWT + Roles
+    │
+    └── (5) Container & Network Isolation (docker-compose.prod.yml): read_only, cap_drop ALL, loopback 127.0.0.1, private TCP :4001
 ```
 
-Each tier is completely autonomous: if an attacker tries to bypass client validation, the backend Rate Limiter halts the attack; if they attempt an unauthorized iframe embed, `frame-ancestors 'none'` blocks the render.
+Each tier operates independently: if an attacker bypasses client validation, `CsrfOriginMiddleware`, `ZodValidationPipe`, and `ThrottlerGuard` halt the request on the API; if they attempt to frame the app, `frame-ancestors 'none'` blocks rendering.
 
 ---
 
 ## 2. HTTP Security Headers in Next.js 16 (`apps/web/config/security-headers.config.ts`)
 
-Configuring `Content-Security-Policy` (CSP) in modern frameworks poses intricate architectural challenges: React Server Components, SSR hydration, theme scripts preventing FOUC (Flash of Unstyled Content), and live SSE streams all require specific allowances.
-
-To keep the build configuration in `next.config.ts` lean and preserve clean boundaries between Next.js infrastructure config and FSD application source (`src/`), declarative generation of all security headers was extracted into a dedicated, strictly typed module outside `src/`: `apps/web/config/security-headers.config.ts`.
+To keep `apps/web/next.config.ts` concise and respect FSD boundaries, all security headers live in `apps/web/config/security-headers.config.ts`. Production `connect-src` intentionally omits blanket `https:` exfiltration—only `'self'` plus explicitly validated origins (`NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_POSTHOG_HOST`, `NEXT_PUBLIC_SENTRY_DSN` via `parseSafeHttpOrigin`) are allowed:
 
 ```typescript title="apps/web/config/security-headers.config.ts"
-export interface ContentSecurityPolicyOptions {
-  allowSameOriginFraming?: boolean
-}
-
 export function buildContentSecurityPolicy(
   isProduction: boolean,
   publicApiUrl = '',
   options: ContentSecurityPolicyOptions = {},
 ): string {
   const { allowSameOriginFraming = false } = options
-  const normalizedPublicApi = publicApiUrl.trim() ? ` ${publicApiUrl.trim()}` : ''
+  const allowedConnectOrigins = new Set<string>()
+  const safeApiOrigin = parseSafeHttpOrigin(publicApiUrl)
+  if (safeApiOrigin) allowedConnectOrigins.add(safeApiOrigin)
 
-  // In production, internal infrastructure ports are NEVER exposed in headers.
-  // In development, API ports, microservices, and HMR WebSockets (ws/wss) are enabled.
+  const posthogOrigin = parseSafeHttpOrigin(process.env.NEXT_PUBLIC_POSTHOG_HOST)
+  if (posthogOrigin) allowedConnectOrigins.add(posthogOrigin)
+  const sentryOrigin = parseSafeHttpOrigin(process.env.NEXT_PUBLIC_SENTRY_DSN)
+  if (sentryOrigin) allowedConnectOrigins.add(sentryOrigin)
+
+  const extraConnectSrc = allowedConnectOrigins.size > 0 ? ` ${Array.from(allowedConnectOrigins).join(' ')}` : ''
+
+  // In production, internal ports and blanket `https:` are NEVER allowed in connect-src.
   const connectSrc = isProduction
-    ? `'self' https:${normalizedPublicApi}`
-    : `'self' http://localhost:4000 http://localhost:4001 http://127.0.0.1:4000 http://127.0.0.1:4001 ws: wss: https:${normalizedPublicApi}`
+    ? `'self'${extraConnectSrc}`
+    : `'self' http://localhost:4000 http://localhost:4001 http://127.0.0.1:4000 http://127.0.0.1:4001 ws: wss:${extraConnectSrc}`
 
   // In production, 'unsafe-eval' is strictly disabled (MDX compiles to HAST without eval).
-  // In development, 'unsafe-eval' is required for Next.js Fast Refresh.
-  const scriptSrc = isProduction
-    ? "'self' 'unsafe-inline'"
-    : "'self' 'unsafe-inline' 'unsafe-eval'"
+  const scriptSrc = isProduction ? "'self' 'unsafe-inline'" : "'self' 'unsafe-inline' 'unsafe-eval'"
+  const frameAncestors = allowSameOriginFraming ? "'self'" : "'none'"
 
   const directives: string[] = [
     "default-src 'self'",
@@ -76,7 +76,7 @@ export function buildContentSecurityPolicy(
     "font-src 'self' data:",
     `connect-src ${connectSrc}`,
     "frame-src 'self'",
-    `frame-ancestors ${allowSameOriginFraming ? "'self'" : "'none'"}`,
+    `frame-ancestors ${frameAncestors}`,
     "form-action 'self'",
     "base-uri 'self'",
     "object-src 'self'",
@@ -87,210 +87,161 @@ export function buildContentSecurityPolicy(
 }
 ```
 
-In `apps/web/next.config.ts`, attaching headers, scoping inline PDF framing strictly to `/cv/:path+`, and stripping `X-Powered-By: Next.js` stays concise:
-
-```typescript title="apps/web/next.config.ts"
-import { getSecurityHeaders } from './config/security-headers.config'
-
-const nextConfig: NextConfig = {
-  poweredByHeader: false,
-  // ...
-  async headers() {
-    const cvPdfAssetHeaders = getSecurityHeaders(undefined, undefined, {
-      allowSameOriginFraming: true,
-    })
-
-    return [
-      { source: '/(.*)', headers: getSecurityHeaders() },
-      { source: '/cv/:path+', headers: cvPdfAssetHeaders },
-    ]
-  },
-}
-```
-
-### Directive Breakdown and Dev/Prod Isolation:
-- **Zero Port Leakage & Zero Eval in Production:** Production strips internal ports (`:4000`, `:4001`, `localhost`) from `connect-src` and disables `'unsafe-eval'` in `script-src` (our HAST MDX engine never relies on `eval` or `new Function`).
-- **`Cross-Origin-Opener-Policy: same-origin`:** Isolates the top-level browsing context, preventing Spectre / XS-Leaks and `window.opener` attacks.
-- **`frame-ancestors 'none'` and `X-Frame-Options: DENY`:** Protect the portfolio and knowledge base from Clickjacking attacks—preventing unauthorized third-party sites from framing the application.
-- **SPA-Safe `object-src 'self'`, `frame-src 'self'`, and Scoped `/cv/:path+` PDFs:** Because Next.js `<Link href="/cv">` performs soft client-side SPA navigation without reloading the initial document's CSP header, `object-src 'self'` and `frame-src 'self'` are set on document responses while `frame-ancestors 'none'` (`X-Frame-Options: DENY`) blocks framing on all routes except `/cv/:path+` (`frame-ancestors 'self'`, `X-Frame-Options: SAMEORIGIN`). This guarantees that `<object type="application/pdf">` always renders after client-side transitions while ensuring only internal `/cv/*.pdf` files can ever be embedded.
-- **`base-uri 'self'`:** Prevents unauthorized manipulation of `<base href="...">` tags.
-- **`Strict-Transport-Security (HSTS)`:** The `max-age=63072000; includeSubDomains; preload` header is sent strictly in production and mandates HTTPS for 2 continuous years.
-- **`Permissions-Policy`:** Explicitly disables browser sensors and interest cohort tracking (`camera=(), microphone=(), geolocation=(), browsing-topics=()`).
+### Key Hardening Directives in `getSecurityHeaders()`
+- **Narrowed Prod `connect-src` & Zero Eval:** Strips localhost ports (`:4000`, `:4001`), removes blanket `https:`, and disables `'unsafe-eval'` in production.
+- **`Cross-Origin-Opener-Policy: same-origin` & `Cross-Origin-Resource-Policy: same-origin`:** Isolates the top-level browsing context and blocks cross-origin reads of frontend assets (XS-Leaks / Spectre defense).
+- **Clickjacking & Scoped `/cv/:path+` PDFs:** `next.config.ts` sets `poweredByHeader: false`, applies `frame-ancestors 'none'` + `X-Frame-Options: DENY` globally on `/(.*)`, and relaxes framing to `'self'` / `SAMEORIGIN` **exclusively** on `/cv/:path+` so SPA `<Link href="/cv">` navigation renders `<object type="application/pdf">` without loosening any other route.
+- **`Strict-Transport-Security` (Prod only), `nosniff`, `Referrer-Policy`, `Permissions-Policy`:** `max-age=63072000; includeSubDomains; preload`, `X-Content-Type-Options: nosniff`, `strict-origin-when-cross-origin`, and `camera=(), microphone=(), geolocation=(), browsing-topics=()`.
 
 ---
 
-## 3. API Gateway Hardening in NestJS 12: Helmet with SSE Support
+## 3. Hybrid KB Access, Explicit Asset Matcher & Fail-Closed Edge JWT (`proxy.ts` & `edge-jwt.ts`)
 
-The `apps/api` service is built on NestJS 12 with Express. For standard HTTP header protection, we integrated `helmet`.
+In Next.js 16, `apps/web/src/proxy.ts` enforces a **Hybrid Knowledge Base** boundary using `isProtectedKnowledgeBasePath()`:
+- **Public & SEO-indexed:** `/knowledge-base` hub and `/knowledge-base/this-project/**` load directly with zero redirects for crawlers, recruiters, and Team Leads.
+- **Protected by Edge Web Crypto JWT:** all other domain study-note trees (`/knowledge-base/react/**`, etc.) require a valid `kb_access_token` cookie verified via `verifyEdgeJwtHs256()`.
 
-However, default `helmet()` applies `Cross-Origin-Resource-Policy: same-origin`. In our monorepo architecture where the frontend (Next.js on port `3000` or Vercel) queries the API (port `4000` or Render) and maintains an open `EventSource` connection to `@Sse('stream')`, the default policy causes browser stream blocking.
+```typescript title="apps/web/src/proxy.ts"
+// Explicitly exclude known static asset extensions instead of blanket `.*\..*`
+// so future Knowledge Base slugs containing dots (e.g. `next.js-16`) never bypass Edge Auth.
+export const config = {
+  matcher: [
+    '/((?!api|search-index|icon|apple-icon|_next|_vercel|.*opengraph-image.*|.*\\.(?:ico|png|jpg|jpeg|gif|svg|webp|avif|pdf|css|js|mjs|map|woff|woff2|ttf|otf|txt|xml|json|webmanifest)$).*)',
+  ],
+}
+```
 
-We resolved this in `apps/api/src/main.ts` alongside `trust proxy: 1` (single reverse-proxy hop for accurate IP rate limiting) and environment-strict CORS:
+Inside `apps/web/src/shared/lib/edge-jwt.ts`, `verifyEdgeJwtHs256()` is strictly **fail-closed**:
+1. Enforces `header.alg === 'HS256'`, valid `exp` and optional `nbf`, non-empty `sub`, and `role` in `{'USER', 'ADMIN'}`.
+2. Calls `resolveEdgeJwtSecretStrict()`, which returns `null` in production (outside explicit `WORKFOLIO_DEMO_MODE=true`) if `JWT_SECRET` is missing, shorter than 32 chars, or equals `DEFAULT_DEV_JWT_SECRET` — guaranteeing Edge Auth never falls back to a public dev key.
+3. Caches the imported Web Crypto `CryptoKey` per secret and evicts rejected promises on error so transient isolate failures never poison verification.
+
+---
+
+## 4. API Gateway Hardening (`main.ts`), `1d` HS256 JWTs & Safe Error Handling
+
+In `apps/api/src/main.ts`, Express runs with `bodyParser: false` and registers **only** a `100kb` JSON parser (removing `urlencoded` completely), configures `trust proxy` from validated `appConfig.trustProxyHops` (`0..5`, default `1`), and applies a **strict Helmet JSON CSP** alongside cross-origin CORP for authorized cross-domain Vercel ➔ Render API fetches:
 
 ```typescript title="apps/api/src/main.ts"
-import type { NestExpressApplication } from '@nestjs/platform-express'
-import cookieParser from 'cookie-parser'
-import helmet from 'helmet'
-
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule)
-  const isProduction = process.env.NODE_ENV === 'production'
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    bodyParser: false,
+  })
+  app.useBodyParser('json', { limit: '100kb' })
 
-  if (isProduction) {
-    app.set('trust proxy', 1)
+  if (appConfig.isProduction && appConfig.trustProxyHops > 0) {
+    app.set('trust proxy', appConfig.trustProxyHops)
   }
 
   app.setGlobalPrefix('api')
   app.use(
     helmet({
       crossOriginResourcePolicy: { policy: 'cross-origin' },
-      contentSecurityPolicy: false,
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'none'"],
+          frameAncestors: ["'none'"],
+        },
+      },
     }),
   )
   app.use(cookieParser())
-
-  const webOrigin = process.env.WEB_ORIGIN ?? 'http://localhost:3000'
-  const allowedOrigins = isProduction
-    ? webOrigin
-        .split(',')
-        .map((origin) => origin.trim())
-        .filter(Boolean)
-    : [webOrigin, 'http://127.0.0.1:3000']
+  app.useGlobalFilters(new SentryExceptionFilter())
+  app.useGlobalInterceptors(new LoggingInterceptor())
 
   app.enableCors({
-    origin: allowedOrigins,
+    origin: appConfig.allowedOrigins,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    exposedHeaders: ['X-Request-Id'],
   })
-
-  // ...
+  app.enableShutdownHooks()
 }
 ```
 
-> [!NOTE] Why `contentSecurityPolicy: false` on the API
-> The NestJS backend functions as a pure REST & SSE API, returning structured JSON and event payloads. CSP is strictly designed for browser HTML rendering, making backend CSP generation redundant while frontend Next.js headers provide comprehensive protection.
+### Auth Hardening & Safe Error Serialization
+- **`1d` TTL, `HS256` Pinning & Fail-Closed Admin Escalation (`AuthService`):**
+  `KB_COOKIE_MAX_AGE_MS` is pinned to **1 day** (`expiresIn: '1d'`), `jwtService.signAsync` pins `algorithm: 'HS256'`, and `jwtService.verifyAsync` pins `algorithms: ['HS256']` (preventing algorithm-confusion attacks). If a non-empty `adminPasscode` is supplied, `isPasscodeMatch()` compares SHA-256 digests with `crypto.timingSafeEqual()` and throws **`403 ForbiddenException`** on mismatch — never silently downgrading to `USER`.
+- **`headersSent` Guard & Log Sanitization (`SentryExceptionFilter`):**
+  If a client disconnects mid-stream during an active SSE response, HTTP headers are already flushed; `if (response.headersSent) return` prevents uncaught `ERR_HTTP_HEADERS_SENT` worker crashes. All user-controlled URLs and headers pass through `sanitizeLogValue()` (stripping ANSI escape codes, `\r\n`, and control characters) to prevent Log Forging.
+- **Zero-Eval MDX Sanitization (`apps/web/src/entities/knowledge-content/lib/`):**
+  `mdx-ast-parser.ts` disables `gray-matter`'s legacy `js`/`javascript` eval engines, strips arbitrary raw HTML blocks that are not registered widgets, and `link-sanitizer.ts` (`classifySafeMarkdownLink` / `isSafeMarkdownImageSrc`) blocks `javascript:`, `data:`, and protocol-relative `//` / `/\` links.
 
 ---
 
-## 4. Brute-Force Defense: `@nestjs/throttler`
+## 5. `CsrfOriginMiddleware` & Secure Extension Patterns for Future Media Uploads
 
-One of the most critical access points is the guest pass and admin login modal (`GuestPassModal`). Without rate limiting, an automated script or botnet could brute-force the administrator secret (`ADMIN_SECRET_PASSCODE`).
+Because `SameSite=Lax` cookies alone do not protect every cross-site state-changing vector (e.g., same-site subdomain attacks or simple HTML `<form>` submissions), `AppModule` applies `CsrfOriginMiddleware` across `'{*path}'` for all mutating HTTP methods (`POST`, `PUT`, `PATCH`, `DELETE`):
 
-To mitigate this risk, we implemented `@nestjs/throttler`:
+1. **JSON-Only Content-Type Gate (`415 Unsupported Media Type`):** Rejects any mutating request carrying a body whose `Content-Type` is not `application/json` — blocking all three CORS "simple request" types (`application/x-www-form-urlencoded`, `text/plain`, `multipart/form-data`) that cross-site HTML `<form>` tags can submit without a CORS preflight.
+2. **Strict `Origin` Allowlist (`403 Forbidden`):** Whenever browsers attach an `Origin` header, it must match `appConfig.allowedOrigins`.
+3. **`Sec-Fetch-Site` Guard (`403 Forbidden`):** Rejects `Sec-Fetch-Site` values other than `same-origin` or `none` unless `Origin` is explicitly allowlisted (preserving legitimate cross-domain Vercel ➔ Render requests when `WEB_ORIGIN` is configured).
 
-### 1. Global Module Setup in `AppModule`:
+### Architectural Extension Patterns for Future Media / File Uploads
+If the platform later adds user avatars, diagram attachments, or media uploads, `CsrfOriginMiddleware` documents two secure extension paths:
+- **Pattern A (Recommended — S3/R2 Presigned URLs):** The browser sends a standard JSON request (`POST /api/storage/presign`) that passes `CsrfOriginMiddleware` unchanged, receives a short-lived signed upload URL, and uploads binary media directly to Cloudflare R2 / MinIO — keeping the NestJS API 100% JSON-only with zero Node.js RAM pressure.
+- **Pattern B (Scoped Multipart Proxy):** If a NestJS route genuinely requires `multipart/form-data`, exempt **only** that explicit path via a narrow allowlist while still enforcing `Origin`, `Sec-Fetch-Site`, and a preflight-triggering custom header (e.g. `X-Requested-With`).
+- **Mandatory Upload XSS Rule:** Never accept or serve inline user-uploaded `.svg` files from the application origin (Stored XSS vector); allow only raster formats (`PNG`, `WebP`, `AVIF`, `JPEG`) verified by magic bytes and served from an isolated CDN/R2 domain or sandboxed CSP.
+
+---
+
+## 6. Brute-Force & DoS Defense: `@nestjs/throttler` Shared Buckets & Bounded SSE
+
+`AppModule` configures a global limit of **`60 req/min`** and a custom `generateKey` function so `/api/auth/guest-pass` (`issueGuestPass`) and its `/api/auth/login` (`login`) alias share a **single `5 req/min` bucket** — preventing attackers from doubling brute-force attempts across both endpoints:
 
 ```typescript title="apps/api/src/app.module.ts"
-import { APP_GUARD } from '@nestjs/core'
-import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler'
+const SHARED_AUTH_THROTTLE_HANDLERS = new Set(['issueGuestPass', 'login'])
 
-@Module({
-  imports: [
-    ThrottlerModule.forRoot([
-      {
-        ttl: 60000, // Sliding window: 60 seconds
-        limit: 100,  // Base limit for standard API calls
-      },
-    ]),
-    // ...
-  ],
-  providers: [
-    {
-      provide: APP_GUARD,
-      useClass: ThrottlerGuard,
-    },
-  ],
+ThrottlerModule.forRoot({
+  throttlers: [{ ttl: 60000, limit: 60 }],
+  generateKey: (context, trackerString, throttlerName) => {
+    const className = context.getClass().name
+    const handlerName = context.getHandler().name
+    if (className === 'AuthController' && SHARED_AUTH_THROTTLE_HANDLERS.has(handlerName)) {
+      return `AuthController:issuePass:${trackerString}:${throttlerName}`
+    }
+    return `${className}:${handlerName}:${trackerString}:${throttlerName}`
+  },
 })
-export class AppModule {}
 ```
 
-### 2. Strict Rate Limiting on Auth Endpoints:
+### Bounded SSE Instead of `@SkipThrottle()`
+Rather than exempting SSE from rate limiting completely, `TelemetryController.streamEvents()` applies **`@Throttle({ default: { limit: 5, ttl: 60000 } })`** to cap reconnect handshakes at `5/min/IP` while keeping **`@SkipTimeout()`** so `TimeoutInterceptor` never terminates healthy streams. Concurrently, `TelemetryService` caps active connections at **`2/IP`**, **`50` global**, and **`15 minutes` max stream TTL** (`finalize()` releases slots on disconnect).
 
-In `AuthController`, both `POST /api/auth/guest-pass` and `POST /api/auth/login` enforce a strict quota of **maximum 5 requests per 60 seconds**:
-
-```typescript title="apps/api/src/modules/auth/auth.controller.ts"
-@Throttle({ default: { limit: 5, ttl: 60000 } })
-@Post('guest-pass')
-@HttpCode(HttpStatus.OK)
-async issueGuestPass(
-  @Body(new ZodValidationPipe(GuestPassFormSchema)) body: GuestPassFormInput,
-  @Req() req: Request,
-  @Res({ passthrough: true }) res: Response,
-): Promise<SessionProfile> {
-  // Session issuance and HttpOnly cookie generation
-}
-
-@Throttle({ default: { limit: 5, ttl: 60000 } })
-@Post('login')
-@HttpCode(HttpStatus.OK)
-async login(
-  @Body(new ZodValidationPipe(GuestPassFormSchema)) body: GuestPassFormInput,
-  @Req() req: Request,
-  @Res({ passthrough: true }) res: Response,
-): Promise<SessionProfile> {
-  return this.issueGuestPass(body, req, res)
-}
-```
-
-### 3. Excluding the Persistent SSE Stream:
-
-The continuous Server-Sent Events connection (`GET /api/telemetry/stream`) must not be severed by request throttlers, so `@SkipThrottle()` is scoped **strictly to the `streamEvents()` handler**, leaving `GET /api/telemetry/stats` protected by the global quota:
-
-```typescript title="apps/api/src/modules/telemetry/telemetry.controller.ts"
-@Controller('telemetry')
-export class TelemetryController {
-  @SkipThrottle()
-  @Sse('stream')
-  streamEvents(): Observable<MessageEvent> {
-    return this.telemetryService.getEventStream()
-  }
-}
-```
-
-### 4. Architectural Evolution: In-Memory Throttler ➔ Distributed Redis Throttler
-
-In the current single-instance deployment, `@nestjs/throttler` keeps IP counters inside Node.js memory. This provides nanosecond lookups and zero infrastructure overhead ($0).
-
-However, during horizontal scaling (running multiple `apps/api` replicas behind a load balancer), instance memory is strictly isolated. To prevent adversaries from evading rate limits by spraying requests across replicas, the architecture is designed for a seamless upgrade to **Redis (Upstash / Docker)**:
-- Integrates `ThrottlerStorageRedisService` over `ioredis` with sliding windows;
-- All API replicas synchronize against a centralized atomic key-value store;
-- Implements a **Graceful Degradation** fallback: if `REDIS_URL` is omitted, the backend falls back to local In-Memory throttling without disruption.
+### Evolution Path: In-Memory ➔ Distributed Redis Throttler
+Single-instance deployments use zero-cost In-Memory counters. When scaling `apps/api` horizontally across replicas, plugging `ThrottlerStorageRedisService` over `REDIS_URL` synchronizes sliding-window counters atomically with graceful fallback to local memory when `REDIS_URL` is absent.
 
 ---
 
-## 5. Security Checklist & Matrix
+## 7. Security Checklist, Container Hardening & Conscious Trade-offs
 
-Our implemented defense stack achieves an **A+** grade on industry auditing standards:
+In `docker-compose.prod.yml`, every application container (`web`, `api`, `telemetry-ms`) runs with `read_only: true`, `cap_drop: [ALL]`, `no-new-privileges:true`, `pids_limit: 256`, host bindings restricted to `127.0.0.1`, mandatory non-default secret checks (`${JWT_SECRET:?...}`), and PostgreSQL + TCP `:4001` isolated inside `backend-network`.
 
-| Threat Vector                | Monorepo Defense Implementation                                           | Status     |
-| :--------------------------- | :------------------------------------------------------------------------- | :--------- |
-| **XSS Token Exfiltration**   | `HttpOnly` cookies + zero-eval HAST + `classifySafeMarkdownLink`           | 🛡️ Shielded |
-| **Clickjacking**             | `X-Frame-Options: DENY` + CSP `frame-ancestors 'none'` (scoped `/cv/:path+`) | 🛡️ Shielded |
-| **Passcode Brute-Force**     | `@nestjs/throttler`: 5 attempts / 60 sec per IP + HTTP 429 Too Many Requests | 🛡️ Shielded |
-| **MIME Sniffing**            | `X-Content-Type-Options: nosniff`                                          | 🛡️ Shielded |
-| **Man-in-the-Middle (MitM)** | HSTS (`max-age=63072000; includeSubDomains; preload`)                      | 🛡️ Shielded |
-| **Cross-Service Leakage**    | Private TCP `:4001` within internal Docker bridge networks                 | 🛡️ Shielded |
+| Threat Vector | Monorepo Defense Implementation | Status |
+| :--- | :--- | :--- |
+| **XSS Token Exfiltration** | `HttpOnly` cookies + Zero-Eval HAST (`gray-matter` JS engines disabled) + `classifySafeMarkdownLink` | 🛡️ Shielded |
+| **CSRF (Login/Logout/Mutations)** | `SameSite=Lax` + `CsrfOriginMiddleware` (JSON-only `415`, `Origin` + `Sec-Fetch-Site` `403`) + no `urlencoded` parser | 🛡️ Shielded |
+| **Clickjacking & XS-Leaks** | `X-Frame-Options: DENY`, CSP `frame-ancestors 'none'` (scoped `/cv/:path+`), `COOP: same-origin`, `CORP: same-origin` | 🛡️ Shielded |
+| **Brute-Force & SSE Floods** | Global `60/min`, shared `5/min` auth bucket, `403` on bad `adminPasscode`, SSE `5/min` + `2/IP` / `50` global / `15m` TTL | 🛡️ Shielded |
+| **Log Forging & Stream Crashes** | `resolveCorrelationRequestId` + `sanitizeLogValue` + `SentryExceptionFilter` `response.headersSent` guard | 🛡️ Shielded |
+| **Cross-Service & Container Escape** | Loopback `127.0.0.1:4001` default + `docker-compose.prod.yml` (`read_only`, `cap_drop: ALL`, private `backend-network`) | 🛡️ Shielded |
 
 ### Conscious Architectural Trade-offs
-
-No production architecture is free of trade-offs. Below are the three conscious engineering decisions made in the current baseline and how their residual risks are mitigated:
-
 1. **Static `SSG` (`'unsafe-inline'`) vs. Per-Request `CSP Nonce`:**
-   - *Trade-off:* Eliminating `'unsafe-inline'` from `script-src` requires generating a cryptographic `nonce` on every HTTP request. In Next.js 16, reading per-request headers to inject a `nonce` forces all 143 routes out of **Static Site Generation (`SSG`)** into dynamic per-request `SSR`, sacrificing edge CDN caching and sub-20ms TTFB.
-   - *Mitigation:* Because the platform does not render untrusted user-generated HTML (all `.mdx` files are repository-controlled, compiled via our Zero-Eval HAST pipeline with raw HTML stripped, and URLs sanitized via `classifySafeMarkdownLink`), and session tokens live strictly in `HttpOnly` cookies (`document.cookie` is inaccessible), keeping `SSG` is the right pragmatic choice.
-2. **Public `Cmd+K` Discovery Index (`/search-index/[locale]`) vs. Protected Article Bodies:**
-   - *Trade-off:* In `apps/web/src/proxy.ts`, the matcher (`'/((?!api|search-index|_next|_vercel|.*\\..*).*)'`) intentionally leaves `/search-index/[locale]` public so recruiters and engineers can search topics via `Cmd+K` directly from the landing page before requesting a `Guest Pass`.
-   - *Mitigation:* The static JSON index exposes only lightweight discovery metadata (`title`, `summary`, `#tags`, and `h2/h3` section titles), while full `.mdx` article bodies under `/knowledge-base/*` remain gated behind Edge `HMAC-SHA256` JWT verification.
-3. **Stateless Edge Verification vs. Instant Token Revocation (Pre-Redis):**
-   - *Trade-off:* `verifyEdgeJwtHs256` validates signatures and `exp` claims at the Edge in `< 0.2 ms` without a database round-trip. Consequently, an issued 7-day token cannot be individually revoked before expiration without rotating `JWT_SECRET`.
-   - *Mitigation:* The Post-MVP roadmap pairs **Upstash/Docker Redis** with short-lived `Access` (`15m`) + rotating `HttpOnly Refresh` (`7d`) tokens backed by `VisitorSession` in PostgreSQL.
+   - *Trade-off:* Removing `'unsafe-inline'` from `script-src` requires generating a per-request cryptographic `nonce`, forcing all **199** statically generated routes out of **SSG** into dynamic per-request `SSR` and sacrificing edge CDN caching.
+   - *Mitigation:* No untrusted user HTML is rendered (`.mdx` files are repository-controlled, compiled via Zero-Eval HAST with raw HTML stripped and URLs sanitized), and session JWTs live exclusively in `HttpOnly` cookies.
+2. **Hybrid Public Discovery (`/search-index/[locale]` & `/knowledge-base/this-project/**`) vs. Protected Study Notes:**
+   - *Trade-off:* `proxy.ts` intentionally leaves `/search-index/[locale]`, `/knowledge-base`, and `/knowledge-base/this-project/**` public for SEO and instant recruiter evaluation while keeping all other KB categories gated behind fail-closed Edge `HS256` JWT verification.
+3. **Stateless `1d` Edge Verification vs. Instant Token Revocation (Pre-Redis):**
+   - *Trade-off:* `verifyEdgeJwtHs256` verifies signatures and `exp` in `< 0.2 ms` with zero DB round-trips, so an issued **`1d`** token cannot be individually revoked at the Edge without rotating `JWT_SECRET`.
+   - *Mitigation:* Shortening the cookie/JWT TTL from 7 days to **`1d`** shrinks the exposure window, while the Post-MVP roadmap pairs **Redis** with short-lived `Access` (`15m`) + rotating `HttpOnly Refresh` tokens backed by `VisitorSession`.
 
 ---
 
-## 6. Official Standards & References
+## 8. Official Standards & References
 
 - **Next.js Content Security Policy Guide:** [nextjs.org/docs/app/guides/content-security-policy](https://nextjs.org/docs/app/guides/content-security-policy)
-- **OWASP HTTP Headers Cheat Sheet:** [cheatsheetseries.owasp.org/cheatsheets/HTTP_Headers_Cheat_Sheet.html](https://cheatsheetseries.owasp.org/cheatsheets/HTTP_Headers_Cheat_Sheet.html)
+- **OWASP HTTP Headers & CSRF Cheat Sheets:** [cheatsheetseries.owasp.org/cheatsheets/HTTP_Headers_Cheat_Sheet.html](https://cheatsheetseries.owasp.org/cheatsheets/HTTP_Headers_Cheat_Sheet.html)
 - **Mozilla Web Security Guidelines:** [infosec.mozilla.org/guidelines/web_security](https://infosec.mozilla.org/guidelines/web_security)
 - **MDN Content-Security-Policy:** [developer.mozilla.org/en-US/docs/Web/HTTP/CSP](https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP)
 - **NestJS Rate Limiting (`@nestjs/throttler`) & Helmet:** [docs.nestjs.com/security/rate-limiting](https://docs.nestjs.com/security/rate-limiting) · [docs.nestjs.com/security/helmet](https://docs.nestjs.com/security/helmet)

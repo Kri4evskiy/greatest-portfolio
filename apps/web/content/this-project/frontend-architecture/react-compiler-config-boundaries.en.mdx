@@ -1,29 +1,36 @@
 ---
 title: "React 19 Compiler in Production: Next.js 16 Config, use no memo Isolation & Mutability Boundaries"
 sidebarLabel: "React Compiler & use no memo"
-summary: "How React 19 Compiler is configured and architected in this project: compilationMode: 'infer' and panicThreshold: 'none' in next.config.ts, React Hook Form (useWatch) compatibility, and isolating TanStack Table via 'use no memo'."
+summary: "How React 19 Compiler is configured and architected in this project: compilationMode: 'infer', panicThreshold: 'none', and optimizePackageImports in next.config.ts, React Hook Form (useWatch), extracted TanStack Table 'use no memo' boundaries, and atomic Zustand selectors."
 category: "this-project"
 format: "deep-dive"
-tags: ["react-compiler", "react-19", "nextjs", "tanstack-table", "react-hook-form", "performance"]
-readingTime: "6 min"
+tags: ["react-compiler", "react-19", "nextjs", "tanstack-table", "react-hook-form", "zustand", "performance"]
+readingTime: "7 min"
 publishedAt: "2026-11-10"
 order: 3
 tldr:
-  - "Configures `compilationMode: 'infer'` (enabling Next.js's fast SWC/Rust pre-filter before invoking Babel) and `panicThreshold: 'none'` in `apps/web/next.config.ts`."
-  - "Uses `useWatch({ control, name })` instead of the incompatible `useForm().watch()` method in `GuestPassModal` so the entire auth modal stays compiler-optimized."
-  - "Isolates `useReactTable` (`@tanstack/react-table`) inside a child `DesktopTechRadarDataTable` marked with `'use no memo'`, allowing the parent `TechRadarTable`, mobile cards, and `Dialog` to be auto-memoized without manual `useMemo` hooks."
+  - "Configures `compilationMode: 'infer'`, `panicThreshold: 'none'`, and `experimental.optimizePackageImports: ['lucide-react', 'd3', '@repo/ui', '@repo/shared-schemas']` in `apps/web/next.config.ts`."
+  - "Isolates `@tanstack/react-table` (`useReactTable`) inside dedicated `'use no memo'` components: `DesktopTechRadarDataTable` (`table/tech-radar-data-table.tsx`) and generic `ObservabilityDataTable` (`features/telemetry-stream/ui/table/observability-data-table.tsx`)."
+  - "Keeps `use-ui-store.ts` 100% React-Compiler-friendly via private `useUIStoreBase`, explicit atomic `use*` hooks, and `useUIActions()` (no `createSelectors` `.use.field()` proxy getters)."
 ---
 
-## 1. `reactCompiler` Configuration in `apps/web/next.config.ts`
+## 1. `reactCompiler` & Bundle Optimization in `apps/web/next.config.ts`
 
-In Next.js 16, `reactCompiler` accepts a typed `ReactCompilerOptions` object:
+In Next.js 16, `reactCompiler` accepts a typed `ReactCompilerOptions` object alongside package-level barrel tree-shaking:
 
 ```typescript title="apps/web/next.config.ts"
 const nextConfig: NextConfig = {
+  ...(process.env.DOCKER_STANDALONE === 'true' ? { output: 'standalone' } : {}),
+  ...(process.env.NEXT_DIST_DIR ? { distDir: process.env.NEXT_DIST_DIR } : {}),
+  poweredByHeader: false,
   reactStrictMode: true,
   reactCompiler: {
     compilationMode: 'infer',
     panicThreshold: 'none',
+  },
+  transpilePackages: ['@repo/ui', '@repo/shared-schemas'],
+  experimental: {
+    optimizePackageImports: ['lucide-react', 'd3', '@repo/ui', '@repo/shared-schemas'],
   },
 }
 ```
@@ -34,6 +41,7 @@ const nextConfig: NextConfig = {
 | :--- | :---: | :--- |
 | **`compilationMode`** | `'infer'` | Next.js runs its own Rust/SWC heuristics before invoking `babel-plugin-react-compiler`, compiling only files that define PascalCase JSX components or `use*` hooks and skipping pure server/utility modules (`mdx-ast-parser.ts`, `edge-jwt.ts`) |
 | **`panicThreshold`** | `'none'` | Guarantees resilient CI/CD builds: if the compiler encounters a third-party hook with interior mutability, it safely skips optimizing that function instead of failing `next build` |
+| **`optimizePackageImports`** | `['lucide-react', 'd3', '@repo/ui', '@repo/shared-schemas']` | Rewrites barrel imports into direct submodule paths at build time so client chunks pull only the icons, D3 primitives, UI components, and schemas actually referenced |
 
 ---
 
@@ -46,17 +54,20 @@ Inside `babel-plugin-react-compiler` (`DefaultModuleTypeProvider`), the compiler
 
 ---
 
-## 3. `'use no memo'` Boundary Isolation in `TechRadarTable`
+## 3. Extracted `'use no memo'` Table Boundaries
 
-`TechRadarTable` (`apps/web/src/entities/engineering-roadmap/tech-radar-table.tsx`) renders the search bar, category filters, mobile card stack (`< md`), desktop table (`>= md`), and the ADR inspector `Dialog`.
+### A. `TechRadarTable` + Extracted `table/` Submodules
+`TechRadarTable` (`apps/web/src/entities/engineering-roadmap/tech-radar-table.tsx`) renders search, category filters, mobile cards (`< md`), the desktop table (`>= md`), and the ADR inspector `Dialog`. To keep the parent component fully compiled, the TanStack Table layer is split into two focused files under `apps/web/src/entities/engineering-roadmap/table/`:
 
-Calling `useReactTable` directly at the top of `TechRadarTable` would cause the compiler to skip the entire 360-line component. By extracting the desktop `<table />` into a dedicated child component with `'use no memo'`, only the thin table wrapper opts out:
+- **`table/tech-radar-columns.tsx`** — pure `createTechRadarColumns({ labels, onInspectAdr })` factory returning typed `ColumnDef<TechRadarItem>[]`.
+- **`table/tech-radar-data-table.tsx`** — thin `'use no memo'` wrapper encapsulating `useReactTable` and local `sorting` state:
 
-```tsx title="apps/web/src/entities/engineering-roadmap/tech-radar-table.tsx"
-function DesktopTechRadarDataTable({ data, columns, emptyResultLabel }: DesktopTechRadarDataTableProps) {
+```tsx title="apps/web/src/entities/engineering-roadmap/table/tech-radar-data-table.tsx"
+export function DesktopTechRadarDataTable({ data, columns, emptyResultLabel }: DesktopTechRadarDataTableProps) {
   'use no memo'
 
   const [sorting, setSorting] = useState<SortingState>([{ id: 'adrNumber', desc: false }])
+
   const table = useReactTable({
     data,
     columns,
@@ -67,11 +78,65 @@ function DesktopTechRadarDataTable({ data, columns, emptyResultLabel }: DesktopT
   })
 
   return (
-    <div className="hidden overflow-x-auto rounded-lg border border-border bg-card shadow-sm md:block">
+    <div className="hidden overflow-x-auto rounded-lg border border-border bg-card shadow-xs md:block">
       {/* TanStack Table header and row rendering */}
     </div>
   )
 }
 ```
 
-With `useReactTable` isolated inside `DesktopTechRadarDataTable`, the parent `TechRadarTable` needs zero manual `useMemo` hooks around `filteredData`, `activeDialogItem`, or `columns`—`React 19 Compiler` caches each derived value and JSX subtree automatically via `useMemoCache` slots.
+In the parent `TechRadarTable`, `filteredData` and `columns` (built via `createTechRadarColumns`) are wrapped in `useMemo` alongside `useCallback` for `handleInspectAdr` so that props crossing the `'use no memo'` boundary into `DesktopTechRadarDataTable` retain stable object identities when unrelated state (such as opening the ADR `Dialog`) updates. Meanwhile, filters, mobile cards, `activeDialogItem`, and the `Dialog` JSX stay auto-memoized by React Compiler.
+
+### B. Reusable `ObservabilityDataTable` with Typed `ColumnMeta`
+For `/system-status` telemetry and leaderboard views, `apps/web/src/features/telemetry-stream/ui/table/observability-data-table.tsx` provides a generic `'use no memo'` TanStack Table v8 shell configured for server-driven pagination (`manualPagination: true`, `manualSorting: true`, optional `getRowId`). It also declares strict TypeScript module augmentation for per-column styling metadata:
+
+```tsx title="apps/web/src/features/telemetry-stream/ui/table/observability-data-table.tsx"
+declare module '@tanstack/react-table' {
+  interface ColumnMeta<TData extends RowData, TValue> {
+    headerClassName?: string
+    cellClassName?: string
+  }
+}
+
+export function ObservabilityDataTable<TData>({
+  data,
+  columns,
+  emptyState,
+  getRowId,
+  getRowClassName,
+  minTableWidthClass = 'min-w-[560px]',
+  isDimmed = false,
+  tableTestId,
+}: ObservabilityDataTableProps<TData>) {
+  'use no memo'
+
+  const table = useReactTable({
+    data,
+    columns,
+    manualPagination: true,
+    manualSorting: true,
+    ...(getRowId ? { getRowId } : {}),
+    getCoreRowModel: getCoreRowModel(),
+  })
+  // ...
+}
+```
+
+---
+
+## 4. React Compiler-Safe Zustand Architecture (`use-ui-store.ts`)
+
+Helper utilities like `createSelectors` (which attach dynamic `.use.field()` getters onto a store object) obscure hook calls from React Compiler's static analysis and can cause unnecessary bailouts or over-subscriptions.
+
+Instead, `apps/web/src/shared/store/use-ui-store.ts` follows a strict atomic-hook architecture:
+- **Private Base Store:** `useUIStoreBase` is never exported directly, making accidental whole-store subscriptions (`const state = useUIStore()`) impossible at compile time.
+- **Separated `UIState` & `UIActions`:** every mutator lives inside a single referentially stable `actions` object returned by `useUIActions()`.
+- **Explicit Atomic Hooks:** each reactive slice exposes a dedicated `use*` hook (`useIsGuestPassModalOpen`, `useTechRadarCategoryFilter`, `useTechRadarSearch`, `useSelectedAdrItem`, `useExpandedKbFolders`, `usePalette`, `useHasHydratedPalette`), plus a minimal imperative `uiStore` (`getState` / `subscribe`) for non-React bridges and tests:
+
+```typescript title="apps/web/src/shared/store/use-ui-store.ts"
+export const useUIActions = () => useUIStoreBase((s) => s.actions)
+export const useIsGuestPassModalOpen = () => useUIStoreBase((s) => s.isGuestPassModalOpen)
+export const useSelectedAdrItem = () => useUIStoreBase((s) => s.selectedAdrItem)
+export const useTechRadarCategoryFilter = () => useUIStoreBase((s) => s.techRadarCategoryFilter)
+export const useTechRadarSearch = () => useUIStoreBase((s) => s.techRadarSearch)
+```

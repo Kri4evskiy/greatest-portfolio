@@ -50,6 +50,7 @@
       },
       "suspicious": {
         "noExplicitAny": "error",
+        "noImportCycles": "error",
         "noArrayIndexKey": "warn",
         "noUnknownAtRules": "off",
         "noConsole": {

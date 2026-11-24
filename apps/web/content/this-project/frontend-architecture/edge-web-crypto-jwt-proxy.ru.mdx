@@ -1,26 +1,26 @@
 ---
 title: "Криптографическая защита на Edge: проверка HS256 JWT через Web Crypto API и единые контракты"
 sidebarLabel: "Edge JWT и Web Crypto"
-summary: "Архитектурный шаблон защиты SSG-маршрутов в Next.js 16 proxy.ts: единый источник констант в @repo/shared-schemas, криптографическая верификация HMAC-SHA256 через crypto.subtle и кэширование CryptoKey."
+summary: "Архитектурный шаблон защиты гибридных SSG-маршрутов Базы Знаний в Next.js 16 proxy.ts: единые 1-дневные auth-контракты в @repo/shared-schemas, fail-closed проверка секрета на Edge, криптографическая верификация HS256 через crypto.subtle и явный matcher статики."
 category: "this-project"
 format: "deep-dive"
 tags: ["security", "jwt", "edge-runtime", "web-crypto", "nextjs"]
-readingTime: "6 мин"
+readingTime: "7 мин"
 publishedAt: "2026-11-10"
 order: 2
 tldr:
-  - "Имя куки (`KB_ACCESS_COOKIE_NAME`), срок жизни (`KB_COOKIE_MAX_AGE_MS`) и резолвер секрета (`resolveJwtSecret`) вынесены в `@repo/shared-schemas` как единый контракт между Next.js и NestJS."
-  - "Модуль `apps/web/src/shared/lib/edge-jwt.ts` проверяет подпись `HMAC-SHA256` и `exp` через встроенный в Edge Runtime `crypto.subtle` (`0 КБ` внешних npm-зависимостей) с кэшированием `CryptoKey`."
-  - "Файл `apps/web/src/proxy.ts` остаётся лаконичным (~40 строк), объединяя `next-intl` роутинг, проверку доступа к `/knowledge-base` и автоочистку невалидных кук."
+  - "Имя куки (`KB_ACCESS_COOKIE_NAME`), срок жизни (`KB_COOKIE_MAX_AGE_MS` = `1d` TTL) и `DEFAULT_DEV_JWT_SECRET` вынесены в `@repo/shared-schemas`, а строгий fail-closed резолвер `resolveEdgeJwtSecretStrict()` живёт в `apps/web/src/shared/config/env.ts`."
+  - "Модуль `apps/web/src/shared/lib/edge-jwt.ts` верифицирует `HS256` JWT через нативный `crypto.subtle.verify` (`0 КБ` внешних npm-пакетов), проверяя `alg`, `exp`, `nbf`, `sub`, `role` (`USER|ADMIN`) и самоочищаемый кэш `CryptoKey`."
+  - "Файл `apps/web/src/proxy.ts` реализует гибридную границу Базы Знаний (`this-project/**` и хаб публичны для SEO, остальные категории защищены Edge JWT) с явным перечнем расширений статики в `matcher`."
 ---
 
-## 1. Единый источник констант безопасности в `@repo/shared-schemas`
+## 1. Единые 1-дневные контракты и Fail-Closed резолвинг секрета в продакшене
 
-Чтобы фронтенд (`apps/web`) и бэкенд (`apps/api`) никогда не рассинхронизировались в названии `HttpOnly`-куки, времени её жизни или правилах чтения `JWT_SECRET`, эти примитивы экспортируются из общего пакета `@repo/shared-schemas`:
+Чтобы фронтенд (`apps/web`) и бэкенд (`apps/api`) никогда не рассинхронизировались в названии `HttpOnly`-куки, времени её жизни или базовых правилах секрета, общие auth-примитивы вынесены в `@repo/shared-schemas`:
 
 ```typescript title="packages/shared-schemas/src/auth.schema.ts"
 export const KB_ACCESS_COOKIE_NAME = 'kb_access_token'
-export const KB_COOKIE_MAX_AGE_MS = 1000 * 60 * 60 * 24 * 7 // 7 days
+export const KB_COOKIE_MAX_AGE_MS = 1000 * 60 * 60 * 24 // 1 day
 export const DEFAULT_DEV_JWT_SECRET = 'workfolio-super-secret-jwt-key-2026'
 
 export function resolveJwtSecret(envSecret?: string): string {
@@ -29,57 +29,122 @@ export function resolveJwtSecret(envSecret?: string): string {
 }
 ```
 
-В локальной разработке оба сервиса подхватывают общий фолбек без обязательной ручной настройки `.env`, а в продакшене единая функция `resolveJwtSecret` гарантирует идентичное чтение `JWT_SECRET` для подписи в NestJS и проверки в Next.js.
+Однако на Edge-периметре автоматический откат на публичный dev-секрет в продакшене стал бы критической уязвимостью. Поэтому в `apps/web/src/shared/config/env.ts` поверх базового контракта работает строгий `resolveEdgeJwtSecretStrict()`:
+
+```typescript title="apps/web/src/shared/config/env.ts"
+const MIN_PROD_JWT_SECRET_LENGTH = 32
+
+export function resolveEdgeJwtSecretStrict(env: NodeJS.ProcessEnv = process.env): string | null {
+  const parsed = WebEnvSchema.safeParse(env)
+  const nodeEnv = parsed.success ? parsed.data.NODE_ENV : process.env.NODE_ENV
+  const isProduction = nodeEnv === 'production'
+  const isDemoMode = (parsed.success ? parsed.data.WORKFOLIO_DEMO_MODE : env.WORKFOLIO_DEMO_MODE) === 'true'
+  const rawSecret = (parsed.success ? parsed.data.JWT_SECRET : env.JWT_SECRET)?.trim() ?? ''
+
+  if (isProduction && !isDemoMode) {
+    if (rawSecret.length < MIN_PROD_JWT_SECRET_LENGTH || rawSecret === DEFAULT_DEV_JWT_SECRET) {
+      return null
+    }
+    return rawSecret
+  }
+
+  return resolveJwtSecret(rawSecret || undefined)
+}
+```
+
+- **Продакшен (`NODE_ENV=production` без `WORKFOLIO_DEMO_MODE=true`):** строгая **fail-closed** политика — если `JWT_SECRET` не задан, короче `32` символов или совпадает с `DEFAULT_DEV_JWT_SECRET`, функция возвращает `null`, и Edge Proxy гарантированно отклоняет любой токен (`false`).
+- **Локальная разработка / тесты / Docker-демо (`WORKFOLIO_DEMO_MODE=true`):** сохраняется бесшовный старт без ручной настройки `.env` через делегирование в `resolveJwtSecret()`.
 
 ---
 
 ## 2. Верификация `HS256` через нативный Web Crypto API (`crypto.subtle`)
 
-Так как страницы Базы Знаний предгенерируются в статику (`SSG`), проверка доступа должна выполняться прямо на границе сети в Edge Runtime до отдачи HTML. Вместо подключения сторонних библиотек модуль `apps/web/src/shared/lib/edge-jwt.ts` использует встроенный стандарт **Web Crypto API**:
+Так как страницы Базы Знаний предгенерируются в статику (`SSG`), проверка доступа выполняется на границе сети в Edge Runtime до отдачи HTML. Вместо сторонних JWT-библиотек `apps/web/src/shared/lib/edge-jwt.ts` использует встроенный **Web Crypto API** с кэшированием `CryptoKey` на уровне изолята и сбросом отклонённого промиса:
 
 ```typescript title="apps/web/src/shared/lib/edge-jwt.ts"
-let cachedSecretString: string | null = null
+let cachedSecretValue: string | null = null
 let cachedHmacKeyPromise: Promise<CryptoKey> | null = null
 
+const ALLOWED_JWT_ROLES = new Set(['USER', 'ADMIN'])
+
 function getHmacKey(secret: string): Promise<CryptoKey> {
-  if (cachedSecretString === secret && cachedHmacKeyPromise !== null) {
+  if (cachedSecretValue === secret && cachedHmacKeyPromise) {
     return cachedHmacKeyPromise
   }
-  cachedSecretString = secret
-  cachedHmacKeyPromise = crypto.subtle.importKey(
-    'raw',
-    new TextEncoder().encode(secret),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['verify'],
-  )
+
+  cachedSecretValue = secret
+  cachedHmacKeyPromise = crypto.subtle
+    .importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['verify'])
+    .catch((error: unknown) => {
+      // Сбрасываем отклонённый промис, чтобы временный сбой Web Crypto не отравил изолят навсегда
+      cachedSecretValue = null
+      cachedHmacKeyPromise = null
+      throw error
+    })
   return cachedHmacKeyPromise
 }
 ```
 
-Функция `verifyEdgeJwtHs256(token, secret)` за `< 0.2 мс` выполняет 4 проверки:
-1. Разбивает токен на 3 сегмента (`header.payload.signature`) и декодирует Base64URL в `Uint8Array`.
-2. Убеждается, что заголовок явно указывает `alg === 'HS256'` (защита от подмены алгоритма `alg: "none"`).
-3. Вызывает константную по времени проверку подписи `crypto.subtle.verify('HMAC', key, signatureBytes, signingInput)`.
-4. Проверяет срок действия `payload.exp * 1000 > Date.now()`.
+### Точный порядок проверок в `verifyEdgeJwtHs256(token)`
+
+Функция `verifyEdgeJwtHs256(token: string | undefined): Promise<boolean>` за `< 0.2 мс` выполняет многоступенчатую валидацию, отсекая невалидные токены до криптографических вычислений:
+
+1. **Структура и строгий Base64URL:** разбивает токен ровно на 3 непустых сегмента (`header.payload.signature`) и декодирует их через `decodeBase64UrlToBytes()` (отбрасывая посторонние символы и некорректную длину `length % 4 === 1`) в `Uint8Array<ArrayBuffer>`.
+2. **Фиксация алгоритма в заголовке:** парсит JSON заголовка и полезной нагрузки как plain-объекты (`isPlainObject`) и требует строго `headerJson.alg === 'HS256'` (защита от `alg: "none"` и подмены алгоритма).
+3. **Валидация временных и ролевых claims:**
+   - Проверяет `typeof payloadJson.exp === 'number'` и `payloadJson.exp * 1000 > nowMs` (в соответствии с `1d` JWT TTL).
+   - Если указан `payloadJson.nbf`, требует `typeof payloadJson.nbf === 'number'` и `payloadJson.nbf * 1000 <= nowMs`.
+   - Проверяет наличие непустой строки `payloadJson.sub` (`sub.trim().length > 0`).
+   - Проверяет, что `payloadJson.role` входит в белый список `ALLOWED_JWT_ROLES` (`'USER' | 'ADMIN'`).
+4. **Fail-Closed секрет и константная проверка подписи:** вызывает `resolveEdgeJwtSecretStrict()` (в продакшене при `null` логирует ошибку и возвращает `false`), получает кэшированный ключ через `getHmacKey(secret)` и выполняет `crypto.subtle.verify('HMAC', hmacKey, signatureBytes, signingInput)`.
 
 ---
 
-## 3. Чистая композиция в `apps/web/src/proxy.ts`
+## 3. Гибридная граница Базы Знаний и явный matcher статики в `apps/web/src/proxy.ts`
 
-Вся криптографическая математика скрыта в `edge-jwt.ts`, поэтому сам `proxy.ts` отвечает исключительно за маршрутизацию:
+Политика доступа централизована в `apps/web/src/shared/i18n/app-routes.ts`, поэтому Edge Proxy, генератор `sitemap.xml`, `robots.ts` и клиентские кнопки опираются на единую логику:
+
+```typescript title="apps/web/src/shared/i18n/app-routes.ts"
+export const PUBLIC_KB_ROOT_SEGMENTS = ['this-project'] as const
+
+export function isPublicKnowledgeBasePath(pathname: string): boolean {
+  const normalized = stripLocalePrefix(pathname).replace(/\/+$/, '') || '/'
+  if (normalized === APP_ROUTES.knowledgeBase) {
+    return true
+  }
+  return PUBLIC_KB_ROOT_SEGMENTS.some(
+    (segment) =>
+      normalized === `${APP_ROUTES.knowledgeBase}/${segment}` ||
+      normalized.startsWith(`${APP_ROUTES.knowledgeBase}/${segment}/`),
+  )
+}
+
+export function isProtectedKnowledgeBasePath(pathname: string): boolean {
+  const normalized = stripLocalePrefix(pathname).replace(/\/+$/, '') || '/'
+  if (!isRouteActive(normalized, APP_ROUTES.knowledgeBase, true)) {
+    return false
+  }
+  return !isPublicKnowledgeBasePath(normalized)
+}
+```
+
+- **Публичные и индексируемые SEO-маршруты:** хаб `/knowledge-base` и ветка `/knowledge-base/this-project/**` (прозрачная архитектурная спецификация, открытая для краулеров, рекрутеров и тимлидов без `307`-редиректов).
+- **Защищённые Edge JWT маршруты:** все остальные доменные конспекты (например, `/knowledge-base/react/**`, `/knowledge-base/backend/**`, `/knowledge-base/others/**`) во всех локалях (`''`, `/ua`, `/ru`).
+
+Благодаря инкапсуляции криптографии и правил доступа `apps/web/src/proxy.ts` остаётся компактным и прозрачным:
 
 ```typescript title="apps/web/src/proxy.ts"
+const LOCALE_PREFIX_MATCH_REGEX = /^\/(en|ua|ru)(?=\/|$)/
+
 export async function proxy(request: NextRequest): Promise<NextResponse> {
   const { pathname } = request.nextUrl
-  const kbMatch = pathname.match(PROTECTED_KB_REGEX)
 
-  if (kbMatch) {
+  if (isProtectedKnowledgeBasePath(pathname)) {
     const token = request.cookies.get(KB_ACCESS_COOKIE_NAME)?.value
     const isValid = await verifyEdgeJwtHs256(token)
 
     if (!isValid) {
-      const matchedLocale = kbMatch[1]
+      const matchedLocale = pathname.match(LOCALE_PREFIX_MATCH_REGEX)?.[1]
       const homePath = matchedLocale && matchedLocale !== routing.defaultLocale ? `/${matchedLocale}` : '/'
       const redirectUrl = new URL(homePath, request.url)
       redirectUrl.searchParams.set('unlock', 'knowledge-base')
@@ -95,7 +160,18 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
 
   return handleI18nRouting(request)
 }
+
+// Явно исключаем известные расширения статики вместо широкого `.*\..*`,
+// чтобы слаги Базы Знаний с точкой (например, `next.js-16`) никогда не обходили Edge Auth.
+export const config = {
+  matcher: [
+    '/((?!api|search-index|icon|apple-icon|_next|_vercel|.*opengraph-image.*|.*\\.(?:ico|png|jpg|jpeg|gif|svg|webp|avif|pdf|css|js|mjs|map|woff|woff2|ttf|otf|txt|xml|json|webmanifest)$).*)',
+  ],
+}
 ```
+
+> [!IMPORTANT]
+> Замена шаблонного исключения `.*\..*` на **явный перечень расширений статических файлов** закрывает классический вектор обхода Next.js middleware: любые будущие слаги Базы Знаний с точками (например, `next.js-16` или `node.js-streams`) гарантированно проходят через `proxy()` и Edge JWT-валидацию.
 
 ---
 

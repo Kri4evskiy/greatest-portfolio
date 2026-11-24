@@ -1,17 +1,17 @@
 ---
-title: "Multi-Stage Docker in a Monorepo: BuildKit Cache Mounts, pnpm prune & Prisma"
+title: "Multi-Stage Docker in a Monorepo: BuildKit Cache Mounts, Standalone Tracing, Prisma 7 & Hardened Compose"
 sidebarLabel: "Multi-Stage Docker & BuildKit"
-summary: "Containerization blueprint for a Full-Stack monorepo: 3-stage builds for Next.js standalone and NestJS, shared BuildKit pnpm store cache mounts, devDependencies pruning with Rust-free Prisma 7 Wasm runtime, and non-root execution."
+summary: "Containerization blueprint for a Full-Stack monorepo: 3-stage builds (Next.js output: 'standalone' vs NestJS pnpm prune), shared BuildKit pnpm store cache mounts, Rust-free Prisma 7 Wasm runtime, zero-friction local Compose, and hardened production Compose."
 category: "this-project"
 format: "deep-dive"
 tags: ["docker", "buildkit", "pnpm-12", "prisma", "devops"]
-readingTime: "6 min"
+readingTime: "7 min"
 publishedAt: "2026-11-10"
 order: 2
 tldr:
-  - "Splits each service build (`web`, `api`, `telemetry-ms`) into 3 isolated stages `pruner -> builder -> runner` on top of `node:22-alpine`."
-  - "Uses `turbo prune @repo/<app> --docker` to strip unrelated workspace packages and shares `--mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store` across all containers."
-  - "Strips dev tooling (TypeScript, Biome, Turbo, Prisma CLI) via `pnpm prune --prod --ignore-scripts` with zero `/tmp` hacks because Prisma 7 compiles the ESM client into `dist/generated/prisma/` and loads its Rust-free Wasm runtime from `@prisma/client`."
+  - "Splits each service build (`web`, `api`, `telemetry-ms`) into 3 isolated stages `pruner -> builder -> runner` on top of `node:22-alpine` using `turbo prune @repo/<app> --docker` and a shared BuildKit cache mount (`/root/.local/share/pnpm/store`)."
+  - "`api` and `telemetry-ms` strip dev tooling via `pnpm prune --prod --ignore-scripts` (with Rust-free Prisma 7 Wasm inside `@prisma/client`), while `web` relies on Next.js `DOCKER_STANDALONE=true` (`output: 'standalone'`) tracing with no `pnpm prune` step."
+  - "Separates `docker-compose.yml` (zero-friction local reviewer demo with `WORKFOLIO_DEMO_MODE=true` on `api` and `web` + loopback `127.0.0.1:${*_HOST_PORT}` bindings) from `docker-compose.prod.yml` (`read_only`, `tmpfs`, `cap_drop: [ALL]`, `no-new-privileges:true`, `pids_limit: 256`, `TRUST_PROXY_HOPS`, and healthchecks on all 4 services)."
 ---
 
 ## 1. Multi-Stage Build Pipeline (`pruner -> builder -> runner`)
@@ -19,8 +19,8 @@ tldr:
 To keep source files, compilers, and unrelated workspace packages out of production images, every Dockerfile in `docker/` separates container construction into three deterministic stages:
 
 1. **`pruner`:** runs `turbo prune @repo/<app> --docker` to emit the minimal subgraph (`out/json/`, `out/full/`, `out/pnpm-lock.yaml`) needed by the target service.
-2. **`builder`:** activates `pnpm@12.21.0`, runs `pnpm install --frozen-lockfile --ignore-scripts` with a shared BuildKit cache mount, runs `pnpm turbo run build --filter=@repo/<app>...`, and prunes `devDependencies`.
-3. **`runner`:** copies only compiled artifacts (`dist/` or `.next/standalone`) and executes under a non-root user (`USER node` / `USER nextjs`).
+2. **`builder`:** activates `pnpm@12.21.0`, runs `pnpm install --frozen-lockfile --ignore-scripts` with a shared BuildKit cache mount, and runs `pnpm turbo run build --filter=@repo/<app>...`. Backend containers (`api`, `telemetry-ms`) then run `pnpm prune --prod --ignore-scripts`; the frontend container (`web`) sets `DOCKER_STANDALONE=true` so Next.js `output: 'standalone'` traces only the runtime files needed by `server.js` (no `pnpm prune` step required).
+3. **`runner`:** copies only compiled runtime artifacts and executes under a non-root user (`USER node` for `api`/`telemetry-ms`, `USER nextjs` UID `1001` for `web`).
 
 ---
 
@@ -53,9 +53,11 @@ RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
 
 ---
 
-## 3. Pruning `devDependencies` with Rust-Free Prisma 7
+## 3. Two Slimming Strategies: `pnpm prune` (Backend) vs `output: 'standalone'` (Web)
 
-In the `builder` stage, `pnpm turbo run build --filter=@repo/api...` generates the Prisma 7 ESM client (`prisma-client`) directly into `apps/api/src/generated/prisma/` and compiles it with `tsc` into `apps/api/dist/generated/prisma/`. Because Prisma 7 replaces the legacy `.prisma/client` Rust binary engine with a Wasm query compiler bundled inside production `@prisma/client` (paired with `@prisma/adapter-pg` and `pg`), `pnpm prune --prod --ignore-scripts` requires no `/tmp` staging workaround and the `runner` stage no longer needs `openssl`:
+### Backend (`api` & `telemetry-ms`): `pnpm prune --prod` with Rust-Free Prisma 7
+
+In `docker/api.Dockerfile` (and identically without `openssl` in `docker/telemetry-ms.Dockerfile`), `pnpm turbo run build --filter=@repo/api...` generates the Prisma 7 ESM client (`prisma-client`) into `apps/api/src/generated/prisma/` and compiles it via `tsc` into `apps/api/dist/generated/prisma/`. Because Prisma 7 replaces the legacy `.prisma/client` Rust binary engine with a Wasm query compiler bundled inside production `@prisma/client` (paired with `@prisma/adapter-pg` and `pg`), `pnpm prune --prod --ignore-scripts` needs no `/tmp` staging hack and the `runner` stage does not even install `openssl`:
 
 ```dockerfile title="docker/api.Dockerfile"
 RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
@@ -69,27 +71,79 @@ ENV NODE_ENV=production
 ENV PORT=4000
 ```
 
+### Frontend (`web`): `turbo prune @repo/web --docker` + Next.js `output: 'standalone'`
+
+`docker/web.Dockerfile` does **not** run `pnpm prune`. Instead, `builder` passes `ENV DOCKER_STANDALONE=true` and `ENV API_INTERNAL_URL=http://api:4000` into `pnpm turbo run build --filter=@repo/web...`. Next.js emits a self-contained `.next/standalone` bundle, and `runner` copies only the standalone server, static chunks, `public/`, and `apps/web/content/` (for runtime MDX reading):
+
+```dockerfile title="docker/web.Dockerfile"
+COPY --from=pruner /app/out/full/ .
+COPY tsconfig.base.json ./tsconfig.base.json
+ENV DOCKER_STANDALONE=true
+ENV API_INTERNAL_URL=http://api:4000
+RUN pnpm turbo run build --filter=@repo/web...
+
+# Stage 3: Production non-root runner
+FROM node:22-alpine AS runner
+...
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/static ./apps/web/.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/public ./apps/web/public
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/content ./apps/web/content
+
+USER nextjs
+EXPOSE 3000
+CMD ["node", "apps/web/server.js"]
+```
+
 ### Production Image Profiles
 
-| Container | Base Image | Port Scope | Runtime User |
-| :--- | :---: | :---: | :---: |
-| `workfolio-telemetry-ms` | `node:22-alpine` | `4001` (internal network only) | `node` (non-root) |
-| `workfolio-api` | `node:22-alpine` | `4000` | `node` (non-root) |
-| `workfolio-web` (`standalone`) | `node:22-alpine` | `3000` | `nextjs` (`UID 1001`) |
+| Container | Base Image | Runtime Slimming | Port Scope | Runtime User |
+| :--- | :---: | :--- | :---: | :---: |
+| `workfolio-telemetry-ms` | `node:22-alpine` | `turbo prune` + `pnpm prune --prod --ignore-scripts` | `4001` (internal only) | `node` (non-root) |
+| `workfolio-api` | `node:22-alpine` | `turbo prune` + `pnpm prune --prod --ignore-scripts` | `4000` | `node` (non-root) |
+| `workfolio-web` | `node:22-alpine` | `turbo prune` + Next.js `output: 'standalone'` | `3000` | `nextjs` (`UID 1001`) |
 
 > [!TIP]
 > Because the production `api` image excludes `Prisma CLI`, database schema migrations (`prisma migrate deploy`) run as a dedicated CI/CD step before rolling out new containers.
 
 ---
 
-## 4. Separating `docker-compose.yml` (Zero-Friction Reviewer Demo) from `docker-compose.prod.yml` (Strict Production)
+## 4. `docker-compose.yml` (Zero-Friction Demo) vs `docker-compose.prod.yml` (Hardened Production)
 
-To let a reviewing Team Lead or CTO spin up the entire topology in a single command (`docker compose up --build`) without manually creating an `.env` file while keeping real cloud/VPS deployments strictly locked down, orchestration is split into two Compose definitions:
+Orchestration is deliberately split so a reviewing Team Lead or CTO can launch the entire stack in one command (`docker compose up --build -d`) with zero `.env` setup, while cloud/VPS deployments enforce strict container hardening and fail-fast secrets:
 
-| Parameter | `docker-compose.yml` (Local Reviewer Demo) | `docker-compose.prod.yml` (Strict Production) |
+| Parameter | `docker-compose.yml` (Local Reviewer Demo) | `docker-compose.prod.yml` (Hardened Production) |
 | :--- | :--- | :--- |
 | **Launch Command** | `docker compose up --build -d` | `docker compose -f docker-compose.prod.yml --env-file .env.prod up --build -d` |
-| **`WORKFOLIO_DEMO_MODE`** | `"true"` (permits fallback to the shared `DEFAULT_DEV_JWT_SECRET` in `@repo/shared-schemas` and logs an explicit warning) | Omitted (`"false"` — enforces strict fail-fast validation in `loadAppConfig`) |
-| **Compose-Level Secret Enforcement** | `${JWT_SECRET:-}` (auto-resolved via `resolveJwtSecret()` without `.env`) | Hard fail-fast interpolation `${JWT_SECRET:?}`, `${ADMIN_SECRET_PASSCODE:?}`, `${POSTGRES_PASSWORD:?}` |
-| **`Secure` Flag on `HttpOnly` `kb_access_token` Cookie** | `false` (`appConfig.isProduction && !appConfig.isDemoMode` — works over `http://localhost:3000`) | `true` (enforced strictly over HTTPS / TLS) |
-| **PostgreSQL Port (`5432`)** | `127.0.0.1:5432:5432` (bound to host loopback for DBeaver / DataGrip inspection) | **Unpublished from host** (100% isolated inside the private `backend-network`) |
+| **`WORKFOLIO_DEMO_MODE`** | `${WORKFOLIO_DEMO_MODE:-true}` on **both `api` and `web`** (shared fallback to `DEFAULT_DEV_JWT_SECRET` + warning) | Omitted (`"false"` — fail-fast validation in `loadAppConfig`) |
+| **Host Port Bindings** | Loopback-only & overridable: `127.0.0.1:${POSTGRES_HOST_PORT:-5432}:5432`, `127.0.0.1:${API_HOST_PORT:-4000}:4000`, `127.0.0.1:${WEB_HOST_PORT:-3000}:3000` | `postgres` & `telemetry-ms` **unpublished** (`backend-network` only); `api` (`127.0.0.1:4000:4000`) & `web` (`127.0.0.1:3000:3000`) loopback-only behind reverse proxy |
+| **Secret & Origin Enforcement** | `${JWT_SECRET:-}` (auto-resolved via `resolveJwtSecret()` without `.env`) | Hard fail-fast `${POSTGRES_PASSWORD:?}`, `${JWT_SECRET:?}` (on `api` & `web`), `${ADMIN_SECRET_PASSCODE:?}`, `${WEB_ORIGIN:?}`, `${NEXT_PUBLIC_SITE_URL:?}` |
+| **Reverse Proxy Trust** | Direct localhost (`TRUST_PROXY_HOPS` unset) | `TRUST_PROXY_HOPS: ${TRUST_PROXY_HOPS:-1}` on `api` for accurate client IP rate limiting behind Nginx/Caddy/ALB |
+| **`Secure` Flag on `kb_access_token`** | `false` (`isProduction && !isDemoMode` — works on `http://localhost:3000`) | `true` (enforced strictly over HTTPS / TLS) |
+
+### Production Container Hardening & Healthcheck Matrix (`docker-compose.prod.yml`)
+
+Every production service applies least-privilege Linux kernel constraints and explicit readiness probes (`depends_on` uses `condition: service_healthy` across `postgres -> api`, `telemetry-ms -> api`, and `api -> web`):
+
+```yaml title="docker-compose.prod.yml (excerpt)"
+  web:
+    restart: always
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /app/apps/web/.next/cache
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    pids_limit: 256
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/robots.txt').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+```
+
+| Service | Kernel Hardening Directives | Read-Only Root FS + `tmpfs` | Healthcheck Probe |
+| :--- | :--- | :--- | :--- |
+| **`postgres`** | `no-new-privileges:true`, `pids_limit: 256` | Data persisted in `postgres_prod_data` volume | `pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-workfolio_db}` |
+| **`telemetry-ms`** | `no-new-privileges:true`, `cap_drop: [ALL]`, `pids_limit: 256` | `read_only: true`, `tmpfs: [/tmp]` | Node `node:net` TCP socket connect to `127.0.0.1:4001` |
+| **`api`** | `no-new-privileges:true`, `cap_drop: [ALL]`, `pids_limit: 256` | `read_only: true`, `tmpfs: [/tmp]` | `wget -qO- http://127.0.0.1:4000/api/health \|\| exit 1` |
+| **`web`** | `no-new-privileges:true`, `cap_drop: [ALL]`, `pids_limit: 256` | `read_only: true`, `tmpfs: [/tmp, /app/apps/web/.next/cache]` | Node `fetch('http://127.0.0.1:3000/robots.txt')` |

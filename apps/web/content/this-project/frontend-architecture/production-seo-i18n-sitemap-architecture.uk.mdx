@@ -1,124 +1,122 @@
 ---
-title: "Архітектура Production SEO в Next.js 16: SSG Sitemap, Hreflang-матриця локалей та OpenGraph"
+title: "Архітектура Production SEO в Next.js 16: Гібридний KB Sitemap, Hreflang-матриця та OpenGraph"
 sidebarLabel: "Production SEO та Sitemap"
-summary: "Інженерний довідник із реалізації SEO в мультимовному портфоліо на Next.js 16: мапінг локалей (en / uk ➔ /ua / ru), статична генерація robots.ts і sitemap.ts, canonical + hreflang та кодогенерація OpenGraph-карток."
+summary: "Інженерний довідник із мультимовного SEO в Next.js 16: єдиний контракт LOCALE_METADATA, гібридна індексація Бази Знань (0 редиректів 307 для краулерів), спільний білдер OpenGraph і JSON-LD, а також локалізовані OpenGraph-картки з Inter TTF."
 category: "this-project"
 format: "deep-dive"
 tags: ["seo", "nextjs", "i18n", "ssg", "sitemap", "architecture"]
-readingTime: "6 хв"
+readingTime: "7 хв"
 publishedAt: "2026-11-21"
 order: 4
 tldr:
-  - "Модуль `apps/web/src/shared/lib/seo.ts` централізує генерацію канонічних URL, безпечний парсинг `NEXT_PUBLIC_SITE_URL` (`parsed.origin`), мапінг форм локалі (`uk` ➔ `/ua` ➔ `uk_UA`) та XSS-безпечну серіалізацію `JSON-LD` (`ProfilePage`, `Person`, `TechArticle`)."
-  - "`robots.ts`, `sitemap.ts`, `llms.txt/route.ts`, `icon.tsx`, `apple-icon.tsx` та `[locale]/opengraph-image.tsx` працюють на базі нативного File-Based Metadata API (`0 КБ` клієнтського JS) і виключені з перевірок JWT у `src/proxy.ts` через `matcher`."
-  - "Адаптивний `viewport` (`themeColor`: `#FAF8F5` / `#121211`), директива `max-image-preview: 'large'`, прев’ю-картки `1200×630` (`Obsidian Editorial Dark`) та стандарт `/llms.txt` забезпечують максимальну видимість як у Google Search, так і в AI-пошуковиках (ChatGPT, Claude, Perplexity, Cursor)."
+  - "Метадані локалей централізовані в `LOCALE_METADATA` (`packages/shared-schemas/src/locale.schema.ts`), валідація origin — у `resolvePublicSiteUrl()` (`env.ts`), а `buildOpenGraphMetadata` та XSS-безпечний `JSON-LD` (`ProfilePage`, `TechArticle`, `BreadcrumbList`) — в `apps/web/src/shared/lib/seo.ts`."
+  - "Гібридна SEO-гігієна Бази Знань: `sitemap.ts` включає `/`, `/cv`, `/system-status`, `/knowledge-base` та `/knowledge-base/this-project/**`, а `robots.ts` закриває всі захищені категорії для всіх 3 префіксів локалей — нуль `307`-редиректів для роботів."
+  - "Локалізований `[locale]/opengraph-image.tsx` (`EN / UA / RU`) підвантажує TTF-шрифти `Inter` з офлайн-фолбеком на англійську копію, а `generateMetadata()` для неіснуючих слагів Бази Знань віддає `robots: { index: false, follow: false }`."
 ---
 
-## 1. Трирівнева матриця локалей (`Internal Code` vs `URL Prefix` vs `Hreflang / OpenGraph`)
+## 1. Трирівнева матриця локалей (`LOCALE_METADATA` як Single Source of Truth)
 
-Головна особливість мультимовного SEO в нашому проєкті полягає в тому, що внутрішній код мови, публічний префікс в адресній стрічці браузера та стандартні коди для пошукових роботів Google / месенджерів (Telegram, LinkedIn, Slack) підпорядковуються різним специфікаціям.
+Головна особливість мультимовного SEO в монорепозиторії полягає в тому, що внутрішній код мови, публічний URL-префікс, тег BCP 47 та стандарти пошукових роботів / месенджерів підпорядковуються різним специфікаціям.
 
-У `apps/web/src/shared/i18n/routing.ts` увімкнено режим `localePrefix: { mode: 'as-needed', prefixes: { uk: '/ua' } }`. Щоб на жодній сторінці не виникало розбіжностей, модуль `apps/web/src/shared/lib/seo.ts` чітко розділяє ці представлення:
+Замість дублювання словників по фронтенду єдине джерело правди `LOCALE_METADATA` експортується з `packages/shared-schemas/src/locale.schema.ts` і використовується в `apps/web/src/shared/lib/seo.ts`, `robots.ts` та `apps/web/src/shared/i18n/routing.ts` (`localePrefix: { mode: 'as-needed', prefixes: { uk: '/ua' } }`):
 
-| Мова | Внутрішній тип (`SupportedLocale` та суфікс `.mdx`) | Публічний URL-префікс (`as-needed`) | Пошуковий стандарт ISO 639-1 (`<html lang>` і `hreflang`) | Стандарт месенджерів (`og:locale`) |
+| Мова | Внутрішній тип (`SupportedLocale` та суфікс `.mdx`) | Публічний URL-префікс (`urlPrefix`) | Пошуковий стандарт ISO 639-1 (`<html lang>` і `hreflang`) | Стандарт месенджерів (`ogLocale`) |
 | :--- | :--- | :--- | :--- | :--- |
-| **English (Default)** | `'en'` (`*.en.mdx`) | Без префікса (`/`, `/cv`, `/knowledge-base`) | `en` (+ `x-default`) | `en_US` |
-| **Українська** | `'uk'` (`*.uk.mdx`) | `/ua` (`/ua`, `/ua/cv`, `/ua/knowledge-base`) | `uk` | `uk_UA` |
-| **Русский** | `'ru'` (`*.ru.mdx`) | `/ru` (`/ru`, `/ru/cv`, `/ru/knowledge-base`) | `ru` | `ru_RU` |
+| **English (Default)** | `'en'` (`*.en.mdx`) | `''` (`/`, `/cv`, `/system-status`, `/knowledge-base`) | `en` (+ `x-default`) | `en_US` |
+| **Українська** | `'uk'` (`*.uk.mdx`) | `'/ua'` (`/ua`, `/ua/cv`, `/ua/system-status`, `/ua/knowledge-base`) | `uk` | `uk_UA` |
+| **Русский** | `'ru'` (`*.ru.mdx`) | `'/ru'` (`/ru`, `/ru/cv`, `/ru/system-status`, `/ru/knowledge-base`) | `ru` | `ru_RU` |
 
 > [!IMPORTANT]
-> За специфікацією Google Search Central атрибут `hreflang` зобов’язаний використовувати код мови за стандартом **ISO 639-1** (`uk` для української мови, а не код країни `ua`), але сам `href` усередині цього тегу має вказувати на реальний публічний маршрут сайту (`https://domain.com/ua/...`). Саме тому в `buildLanguageAlternatesMap()` ключ словника — `uk`, а згенерований URL веде на префікс `/ua`.
+> За специфікацією Google Search Central атрибут `hreflang` зобов’язаний використовувати код мови за стандартом **ISO 639-1** (`uk` для української мови, а не код країни `ua`), але сам `href` має вказувати на реальний публічний URL (`https://domain.com/ua/...`). Тому `buildLanguageAlternatesMap()` пов’язує ключ `uk` напряму з `LOCALE_METADATA.uk.urlPrefix` (`'/ua'`).
 
 ---
 
-## 2. Єдине SEO-ядро та захист від невалідного Origin (`apps/web/src/shared/lib/seo.ts`)
+## 2. Єдине SEO-ядро, валідація Origin і спільний білдер `OpenGraph`
 
-Усі SEO-обчислення винесені в чисті серверні функції без зовнішніх залежностей:
+Валідація `NEXT_PUBLIC_SITE_URL` винесена в `resolvePublicSiteUrl()` усередині `apps/web/src/shared/config/env.ts` (через Zod-схему `HttpOriginSchema` і `parseSafeHttpOrigin()`, з одноразовим попередженням у продакшені поза `WORKFOLIO_DEMO_MODE=true`). Усі хелпери в `apps/web/src/shared/lib/seo.ts` спираються на `LOCALE_METADATA` та `resolvePublicSiteUrl()`:
 
 ```typescript title="apps/web/src/shared/lib/seo.ts"
-const DEFAULT_SITE_URL = 'http://localhost:3000'
+export function buildLocalizedPath(pathname: string, locale: SupportedLocale = DEFAULT_LOCALE): string {
+  const normalizedPath = normalizeSeoPathname(pathname)
+  const prefix = LOCALE_METADATA[locale].urlPrefix
 
-const LOCALE_URL_PREFIX_MAP: Record<SupportedLocale, string> = {
-  en: '',
-  uk: '/ua',
-  ru: '/ru',
+  if (normalizedPath === '/') {
+    return prefix || '/'
+  }
+  return `${prefix}${normalizedPath}`
 }
 
-const OG_LOCALE_MAP: Record<SupportedLocale, string> = {
-  en: 'en_US',
-  uk: 'uk_UA',
-  ru: 'ru_RU',
-}
+export function buildOpenGraphMetadata(input: OpenGraphMetadataInput): NonNullable<Metadata['openGraph']> {
+  const base = {
+    title: input.title,
+    description: input.description,
+    url: buildLocalizedUrl(input.pathname, input.locale),
+    siteName: SITE_NAME,
+    locale: resolveOgLocale(input.locale),
+    alternateLocale: resolveAlternateOgLocales(input.locale),
+  }
 
-export function resolveSiteUrl(): string {
-  const raw = process.env.NEXT_PUBLIC_SITE_URL?.trim()
-  if (!raw) return DEFAULT_SITE_URL
-
-  try {
-    const parsed = new URL(raw)
-    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-      return DEFAULT_SITE_URL
+  if (input.type === 'article') {
+    return {
+      ...base,
+      type: 'article',
+      ...(input.publishedTime ? { publishedTime: input.publishedTime } : {}),
+      ...(input.tags && input.tags.length > 0 ? { tags: [...input.tags] } : {}),
     }
-    return parsed.origin
-  } catch {
-    return DEFAULT_SITE_URL
   }
+
+  return { ...base, type: input.type ?? 'website' }
 }
 ```
 
-### Чому `resolveSiteUrl()` повертає `parsed.origin` через `new URL(raw)`?
-У `apps/web/src/app/[locale]/layout.tsx` викликається `metadataBase: new URL(resolveSiteUrl())`. Якщо у змінній оточення `NEXT_PUBLIC_SITE_URL` на хостингу випадково опиниться рядок без протоколу, із зайвим слешем або шляхом (наприклад, `example.com/`), пряме створення `new URL()` без `try/catch` зламає збірку `next build`, а некоректний протокол може порушити цілісність `<link rel="canonical">`. Валідація через `parsed.origin` гарантує чистий `https://domain.com` або безпечний відкат на `http://localhost:3000`.
+### Навіщо потрібен єдиний `buildOpenGraphMetadata()`
+Next.js виконує **поверхневе злиття (shallow merge)** об’єкта `openGraph` між `layout.tsx` і дочірніми `page.tsx`. Без спільного білдера перевизначення `openGraph` на `/cv`, `/system-status` або `/knowledge-base/[...slug]` мовчки втрачало б `siteName` і `alternateLocale`. `buildOpenGraphMetadata()` гарантує консистентні `siteName`, `locale` та `alternateLocale` на кожному маршруті (`[locale]/layout.tsx`, `[locale]/cv/page.tsx`, `[locale]/system-status/page.tsx`, `[locale]/knowledge-base/page.tsx`, `[locale]/knowledge-base/[...slug]/page.tsx`).
 
 ---
 
-## 3. Генерація `canonical`, `alternates.languages` (`hreflang`) та `openGraph`
+## 3. Гібридне SEO Бази Знань (`sitemap.ts`, `robots.ts`) та гігієна Edge Proxy
 
-Функція `buildPageAlternates(pathname, locale)` викликається всередині `generateMetadata()` на всіх рівнях маршрутизації (`[locale]/layout.tsx`, `[locale]/cv/page.tsx`, `[locale]/knowledge-base/page.tsx` та `[locale]/knowledge-base/[...slug]/page.tsx`):
+Оскільки База Знань розділена на публічний архітектурний blueprint (`/knowledge-base` + `/knowledge-base/this-project/**`) і захищені Edge JWT конспекти, правила для пошукових роботів суворо дзеркалять `PUBLIC_KB_ROOT_SEGMENTS = ['this-project']`, забезпечуючи **нуль `307`-редиректів для краулерів**:
+
+1. **Гібридна фільтрація Sitemap (`apps/web/src/app/sitemap.ts`):**
+   - Включає кореневі хаби: `/` (`priority: 1.0`), `/cv` (`0.9`), `/knowledge-base` (`0.9`) та `/system-status` (`0.85`).
+   - Під час обходу `getAllStaticKnowledgeSlugArrays()` пропускає захищені гілки через `if (!isPublicKnowledgeBasePath(pathname)) continue`, додаючи до `sitemap.xml` лише розділи й статті `this-project/**` із реальними датами `publishedAt` для `EN / UA / RU` (`alternates.languages`).
+2. **Динамічна заборона захищених категорій (`apps/web/src/app/robots.ts`):**
+   - `buildProtectedKbDisallowRules()` бере `KnowledgeCategoryEnum.options` за винятком `PUBLIC_KB_ROOT_SEGMENTS` і генерує правила заборони для всіх 3 префіксів локалей (`''`, `'/ua'`, `'/ru'`), віддаючи `disallow: ['/api/', '/search-index/', ...buildProtectedKbDisallowRules()]`.
+3. **Явний matcher розширень статики (`apps/web/src/proxy.ts`):**
+   - Мета-маршрути (`robots.ts`, `sitemap.ts`, `llms.txt/route.ts`, `icon.tsx`, `apple-icon.tsx`, `[locale]/opengraph-image.tsx`) оминають Edge Auth завдяки явному переліку розширень (`ico|png|jpg|jpeg|gif|svg|webp|avif|pdf|css|js|mjs|map|woff|woff2|ttf|otf|txt|xml|json|webmanifest`) замість широкого `.*\..*`.
+4. **Захист від Soft-404 та `noindex`:**
+   - Неіснуючі маршрути всередині локалі потрапляють у `app/[locale]/[...rest]/page.tsx` -> `notFound()` (чесний HTTP `404` через `app/[locale]/not-found.tsx`).
+   - У `apps/web/src/app/[locale]/knowledge-base/[...slug]/page.tsx` директива `export const dynamicParams = false` відсікає невідомі слаги, а fallback-гілка `generateMetadata()` явно повертає `robots: { index: false, follow: false }`.
+
+---
+
+## 4. XSS-безпечний `JSON-LD` (`ProfilePage`, `TechArticle`, `BreadcrumbList`), локалізовані `OG`-картки та `/llms.txt`
+
+### Загартована серіалізація JSON-LD
+Хелпер `serializeSafeJsonLd()` екранує всі 5 небезпечних символів для безпечного вбудовування в `<script type="application/ld+json">` (`<`, `>`, `&`, `\u2028`, `\u2029`):
 
 ```typescript title="apps/web/src/shared/lib/seo.ts"
-export function buildLanguageAlternatesMap(pathname: string): Record<string, string> {
-  return {
-    en: buildLocalizedUrl(pathname, 'en'),
-    uk: buildLocalizedUrl(pathname, 'uk'),
-    ru: buildLocalizedUrl(pathname, 'ru'),
-    'x-default': buildLocalizedUrl(pathname, DEFAULT_LOCALE),
-  }
-}
-
-export function buildPageAlternates(pathname: string, locale: SupportedLocale = DEFAULT_LOCALE) {
-  return {
-    canonical: buildLocalizedUrl(pathname, locale),
-    languages: buildLanguageAlternatesMap(pathname),
-  }
+export function serializeSafeJsonLd(payload: Record<string, unknown>): string {
+  return JSON.stringify(payload)
+    .replace(/</g, '\\u003c')
+    .replace(/>/g, '\\u003e')
+    .replace(/&/g, '\\u0026')
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029')
 }
 ```
 
-На основі цього об’єкта Next.js 16 автоматично рендерить у `<head>`:
-- **`<link rel="canonical">`** — авторитетний URL поточної локалі (захищає від дублів в індексі за наявності query-параметрів на кшталт `?unlock=knowledge-base`).
-- **Зв’язку `<link rel="alternate" hreflang="en | uk | ru | x-default">`** — перехресні посилання на всі мовні версії сторінки згідно з матрицею з Розділу 1 (`x-default` вказує на дефолтну англійську версію без префікса).
-- **Мета-теги `openGraph` (`og:title`, `og:description`, `og:url`, `og:locale`, `og:type`, `og:image`)** — локалізовані картки Rich Link Preview для **Telegram, LinkedIn, Slack та Discord** (для статей Бази Знань також додаються `og:type="article"`, `article:published_time` та `article:tag`).
+- **Головна (`/`) і Резюме (`/cv`):** рендерять `ProfilePage` + `Person` (`buildProfilePageJsonLd()`).
+- **Статті Бази Знань (`/knowledge-base/[...slug]`):** рендерять одночасно розширений `TechArticle` (`mainEntityOfPage`, `publisher`, локалізований `image` на `/opengraph-image`, `datePublished`, `dateModified`, `keywords`) через `buildTechArticleJsonLd()` **та** навігаційний ланцюжок `BreadcrumbList` через `buildBreadcrumbListJsonLd()`.
 
----
+### Локалізовані OpenGraph-картки (`EN / UA / RU`) з `Inter` TTF і офлайн-фолбеком
+`apps/web/src/app/[locale]/opengraph-image.tsx` (`1200×630`, `generateStaticParams` по `SUPPORTED_LOCALES`) генерує локалізовані банери `Obsidian Editorial Dark` (`OG_LOCALE_COPY` для `en`, `uk`, `ru`):
+- Завантажує кириличні TTF-накреслення `Inter` (`400`, `700`) з Google Fonts через `fetchGoogleFontTtf()` (`AbortSignal.timeout(4000)`) із кешуванням промісу на рівні модуля (`cachedInterFontsPromise`).
+- **Офлайн-фолбек:** якщо в ізольованій збірці без мережі не вдалося отримати TTF (`fonts.length === 0`), генератор автоматично перемикається на `OG_LOCALE_COPY.en` та `sans-serif`, щоб Satori ніколи не малював «тофу»-квадрати (`□□□`).
 
-## 4. File-Based Metadata (`robots.ts`, `sitemap.ts`, `opengraph-image.tsx`, `icon.tsx`) та Edge Proxy
-
-Усі мета-маршрути в `apps/web/src/app/` компілюються на етапі збірки (`SSG`, `0 КБ` клієнтського JS) та оминають перевірки JWT у `apps/web/src/proxy.ts` завдяки регулярному виразу `matcher`:
-
-```typescript title="apps/web/src/proxy.ts"
-export const config = {
-  matcher: ['/((?!api|search-index|icon|apple-icon|_next|_vercel|.*opengraph-image.*|.*\\..*).*)'],
-}
-```
-
-1. **Ізоляція службових ендпоінтів у `robots.ts`:** правило `disallow: ['/api/', '/search-index/']` закриває від пошукових краулерів REST/SSE-потоки бекенду (`/api/telemetry/stream`) та сирі JSON-індекси модалки `Cmd+K`.
-2. **Автоматичний обхід дерева `.mdx` у `sitemap.ts`:** об’єднує кореневі хаби (`/`, `/cv`, `/knowledge-base`) з усіма шляхами з `getAllStaticKnowledgeSlugArrays()` та реальними датами `publishedAt` із `getAllKnowledgeFrontmatters(DEFAULT_LOCALE)`.
-3. **Кодогенерація графіки через `next/og` (`ImageResponse` / Satori):**
-   - `apps/web/src/app/icon.tsx` (`32×32`) та `apple-icon.tsx` (`180×180`) генерують обсидіанову іконку термінала `>_`.
-   - `apps/web/src/app/[locale]/opengraph-image.tsx` (`1200×630`) рендерить фірмовий банер `Obsidian Editorial Dark` для кожної локалі (`generateStaticParams`) без зовнішніх мережевих запитів за шрифтами, а в `layout.tsx` увімкнено директиву `googleBot: { 'max-image-preview': 'large' }` та адаптивний `viewport.themeColor` (`#FAF8F5` / `#121211`) для мобільних шторок Safari та Chrome.
-   - **Запобігання Soft-404 в індексі:** для будь-яких неіснуючих URL усередині локалі catch-all маршрут `app/[locale]/[...rest]/page.tsx` синхронно викликає `notFound()`, віддаючи пошуковому роботу суворий HTTP-статус `404` усередині локалізованого серверного компонента `app/[locale]/not-found.tsx`.
-4. **Структуровані дані `JSON-LD` (`Schema.org`) та AI-маніфест `/llms.txt`:**
-   - Хелпери `buildProfilePageJsonLd()` та `buildTechArticleJsonLd()` у `seo.ts` генерують серверний `<script type="application/ld+json">` (із екрануванням `<` ➔ `\u003c` проти XSS) на головній сторінці (`/`), резюме (`/cv`) та в усіх конспектах Бази Знань (`/knowledge-base/[...slug]`).
-   - Статичний маршрут `apps/web/src/app/llms.txt/route.ts` (`force-static`) формує машиночитаний Markdown-паспорт портфоліо (профіль, комерційний трек-рекорд із метриками, 16 ADR та повний зміст Бази Знань) спеціально для LLM-агентів (**ChatGPT Search, Claude, Perplexity, Cursor**).
+### AI-маніфест `/llms.txt`
+`apps/web/src/app/llms.txt/route.ts` (`force-static`) формує машиночитаний Markdown-паспорт портфоліо з посиланнями на `/`, `/cv`, `/system-status`, `/knowledge-base/this-project`, комерційним досвідом, 16 ADR і структурою гібридної Бази Знань (явно позначаючи захищені категорії як закриті Guest Pass та виключені з індексації).
 
 ---
 
@@ -126,12 +124,12 @@ export const config = {
 
 | Компонент SEO | Файл / Розташування | Призначення в продакшені |
 | :--- | :--- | :--- |
-| **SEO Core & JSON-LD Builders** | `apps/web/src/shared/lib/seo.ts` | Валідація `NEXT_PUBLIC_SITE_URL` (`parsed.origin`), генерація `canonical`, `hreflang`, `og:locale` та `JSON-LD` (`ProfilePage` / `TechArticle`) |
-| **Adaptive Viewport & GoogleBot Rules** | `apps/web/src/app/[locale]/layout.tsx` | Системний `theme-color` (`#FAF8F5` / `#121211`), `authors`/`creator` та `max-image-preview: 'large'` |
-| **Turborepo Env Invalidation** | `turbo.json` (`globalEnv`) | Автоматична перезбірка SSG-метаданих при зміні `NEXT_PUBLIC_SITE_URL` |
-| **Robots.txt Generator** | `apps/web/src/app/robots.ts` | Статичні правила індексації (`allow: '/'`, `disallow: ['/api/', '/search-index/']`) |
-| **Multilingual Sitemap.xml** | `apps/web/src/app/sitemap.ts` | Повна карта локалізованих маршрутів (`EN / UA / RU`) із `lastModified` з `.mdx` |
-| **AI Discovery Manifest (`/llms.txt`)** | `apps/web/src/app/llms.txt/route.ts` | Структурований Markdown-маніфест досвіду, 16 ADR та каталогу статей для AI-пошуковиків |
-| **OpenGraph Social Banner (`1200×630`)** | `apps/web/src/app/[locale]/opengraph-image.tsx` | Статична кодогенерація карток `Obsidian Editorial Dark` через `next/og` |
-| **Browser & Apple Icons (`32×32`, `180×180`)** | `apps/web/src/app/icon.tsx`, `apple-icon.tsx` | Векторна генерація фавіконок `>_` через `ImageResponse` |
-| **Strict HTTP 404 Catch-All** | `apps/web/src/app/[locale]/[...rest]/page.tsx` + `not-found.tsx` | Захист від Soft-404: повернення чесного HTTP `404` зі збереженням навігації `LocaleRootLayout` |
+| **Матриця метаданих локалей** | `packages/shared-schemas/src/locale.schema.ts` | Єдиний контракт `LOCALE_METADATA` (`code`, `urlPrefix`, `intlLocale`, `ogLocale`) |
+| **Валідація Origin із Env** | `apps/web/src/shared/config/env.ts` | `resolvePublicSiteUrl()` через Zod `HttpOriginSchema` + попередження в продакшені |
+| **SEO-ядро та JSON-LD** | `apps/web/src/shared/lib/seo.ts` | `buildPageAlternates`, `buildOpenGraphMetadata` (`siteName` + `alternateLocale`), `serializeSafeJsonLd`, `ProfilePage`, розширений `TechArticle`, `BreadcrumbList` |
+| **Adaptive Viewport і GoogleBot** | `apps/web/src/app/[locale]/layout.tsx` | Системний `themeColor` (`#FAF8F5` / `#121211`), `authors`/`creator`, `max-image-preview: 'large'` |
+| **Robots.txt Generator** | `apps/web/src/app/robots.ts` | Закриває `/api/`, `/search-index/` і всі захищені категорії БЗ у всіх префіксах (`''`, `/ua`, `/ru`) |
+| **Гібридний Sitemap.xml** | `apps/web/src/app/sitemap.ts` | Статичні хаби (`/`, `/cv`, `/knowledge-base`, `/system-status`) + лише публічна `this-project/**` (нуль `307`) |
+| **AI-маніфест (`/llms.txt`)** | `apps/web/src/app/llms.txt/route.ts` | Структурований Markdown-паспорт досвіду, 16 ADR та каталогу БЗ для AI-пошуковиків |
+| **Локалізований OpenGraph (`1200×630`)** | `apps/web/src/app/[locale]/opengraph-image.tsx` | Локалізовані картки `EN / UA / RU` через `next/og`, `Inter` TTF (`400`/`700`) та офлайн-фолбек на EN |
+| **Суворий HTTP 404 і Noindex** | `app/[locale]/[...rest]/page.tsx`, `not-found.tsx`, `knowledge-base/[...slug]/page.tsx` | Чесний HTTP `404`, `dynamicParams = false` та `robots: { index: false, follow: false }` для 404-метаданих |

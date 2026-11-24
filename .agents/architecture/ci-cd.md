@@ -6,9 +6,12 @@
 
 ## 1. Структура файлов CI/CD
 
-- **Workflow:** `.github/workflows/ci.yml` — главный CI-конвейер (триггеры: `push` в `main`, `pull_request` в `main`, `workflow_dispatch`, права строго `permissions: contents: read`).
+- **Workflows:**
+  - `.github/workflows/ci.yml` — главный CI-конвейер (триггеры: `push` в `main`, `pull_request` в `main`, `workflow_dispatch`, права строго `permissions: contents: read`).
+  - `.github/workflows/security-audit.yml` — еженедельный (`schedule: cron '0 6 * * 1'`) аудит прод-зависимостей `pnpm audit --prod --audit-level=high` и `docker compose config --quiet` (без установки `node_modules` и без перезапуска Playwright/build).
+- **Dependabot:** `.github/dependabot.yml` — еженедельные обновления для экосистем `npm` (с группировкой `minor`/`patch`) и `github-actions`.
 - **Composite Action:** `.github/actions/setup-workspace/action.yml` — единый переиспользуемый шаг подготовки окружения (`pnpm` из `packageManager`, `Node.js 22`, кэш `pnpm store`, `pnpm install --frozen-lockfile`, опциональная кодогенерация `prepare-codegen`).
-- **Граф задач и глобальные зависимости:** `turbo.json` (`globalDependencies: ["tsconfig.base.json", "pnpm-workspace.yaml"]`, `globalEnv: ["API_INTERNAL_URL"]`, задачи `build`, `build-storybook`, `typecheck`, `lint`).
+- **Граф задач и глобальные зависимости:** `turbo.json` (`globalDependencies: ["tsconfig.base.json", "pnpm-workspace.yaml"]`, `globalEnv: ["API_INTERNAL_URL", "NEXT_PUBLIC_SITE_URL"]`, задачи `build`, `build-storybook`, `typecheck`, `lint`, `test`, `test:coverage`, `test:e2e`).
 
 > Папка `.github/` **не** входит в `.gitignore` и коммитится в Git — оттуда GitHub Actions автоматически считывает конфигурацию.
 
@@ -25,15 +28,15 @@
   [security] (Compose + pnpm audit) ──────▶ независимый supply-chain шлюз (без node_modules)
 ```
 
-| Job          | Назначение                                         | Зависимости (`needs`)        | `fetch-depth`            | Установка deps         | Ключевая логика (PR vs `main`)                                                                |
-| :----------- | :------------------------------------------------- | :--------------------------- | :----------------------- | :--------------------- | :-------------------------------------------------------------------------------------------- |
-| `lint`       | Форматирование и статанализ `Biome 2.6`            | —                            | `'1'`                    | Да                     | `pnpm run lint` (весь репозиторий за ~150 мс)                                                 |
-| `security`   | `docker compose config -q` + `pnpm audit`          | —                            | `'1'`                    | **Нет**                | Валидация Compose и `pnpm audit --prod --audit-level=high` по `pnpm-lock.yaml`                |
-| `typecheck`  | Строгий `tsc --noEmit` (с кодогенерацией)          | —                            | PR: `'0'`, `main`: `'1'` | Да + `prepare-codegen` | PR: `TURBO_SCM_BASE=...base.sha` + `--affected`; `main`: `pnpm run typecheck`                 |
-| `unit-tests` | Unit/Integration (`Vitest`) + API HTTP E2E         | —                            | PR: `'0'`, `main`: `'1'` | Да + `prepare-codegen` | PR: `turbo run test --affected` + `@repo/api test:e2e`; `main`: полный `pnpm run test`        |
-| `build`      | Продакшен-сборка через `Turborepo`                 | `lint`, `typecheck`          | PR: `'0'`, `main`: `'1'` | Да                     | PR: `TURBO_SCM_BASE=...base.sha` + `--affected`; `main`: полный билд + `.turbo`/`.next/cache` |
-| `storybook`  | Сборка витрины UI-кита `@repo/ui` (`Storybook 10`) | `lint`, `typecheck`          | PR: `'0'`, `main`: `'1'` | Да                     | PR: `TURBO_SCM_BASE=...base.sha` + `--affected`; `main`: `turbo run build-storybook`          |
-| `e2e`        | Браузерный E2E (`Playwright` Chromium + WebServer) | `lint`, `typecheck`, `build` | `'1'`                    | Да + Playwright Cache  | Поднимает собранный контур `api` + `web` и прогоняет `pnpm --filter @repo/web test:e2e`       |
+| Job          | Назначение                                                    | Зависимости (`needs`)        | `fetch-depth`            | Установка deps         | Ключевая логика (PR vs `main`)                                                                |
+| :----------- | :------------------------------------------------------------ | :--------------------------- | :----------------------- | :--------------------- | :-------------------------------------------------------------------------------------------- |
+| `lint`       | Форматирование, `noImportCycles` (`Biome 2.6`) + `actionlint` | —                            | `'1'`                    | Да                     | `pnpm run lint` + валидация `.github/workflows/*.yml` через `actionlint`                      |
+| `security`   | `docker compose config -q` + `pnpm audit`                     | —                            | `'1'`                    | **Нет**                | Валидация Compose и `pnpm audit --prod --audit-level=high` по `pnpm-lock.yaml`                |
+| `typecheck`  | Строгий `tsc --noEmit` (с кодогенерацией)                     | —                            | PR: `'0'`, `main`: `'1'` | Да + `prepare-codegen` | PR: `TURBO_SCM_BASE=...base.sha` + `--affected`; `main`: `pnpm run typecheck`                 |
+| `unit-tests` | Unit/Integration (`Vitest`) + API HTTP E2E                    | —                            | PR: `'0'`, `main`: `'1'` | Да + `prepare-codegen` | PR: `turbo run test --affected` + `@repo/api test:e2e`; `main`: полный `pnpm run test`        |
+| `build`      | Продакшен-сборка через `Turborepo`                            | `lint`, `typecheck`          | PR: `'0'`, `main`: `'1'` | Да                     | PR: `TURBO_SCM_BASE=...base.sha` + `--affected`; `main`: полный билд + `.turbo`/`.next/cache` |
+| `storybook`  | Сборка витрины UI-кита `@repo/ui` (`Storybook 10`)            | `lint`, `typecheck`          | PR: `'0'`, `main`: `'1'` | Да                     | PR: `TURBO_SCM_BASE=...base.sha` + `--affected`; `main`: `turbo run build-storybook`          |
+| `e2e`        | Браузерный E2E (`Playwright` Chromium + WebServer)            | `lint`, `typecheck`, `build` | `'1'`                    | Да + Playwright Cache  | Поднимает собранный контур `api` + `web` и прогоняет `pnpm --filter @repo/web test:e2e`       |
 
 ### Почему выбран Multi-Job DAG, а не один объединённый «быстрый» job
 
@@ -96,8 +99,8 @@ concurrency:
 - **`unit-tests` (`Vitest` + `Supertest`):** работает в Stage 1 (параллельно с `lint`, `security` и `typecheck`) с `uses: ./.github/actions/setup-workspace`, `prepare-codegen: "true"` (для `@repo/shared-schemas` и Prisma-клиента), `fetch-depth: ${{ github.event_name == 'pull_request' && '0' || '1' }}` (строкой `'0'`, так как число `0` в выражениях GitHub Actions считается falsy!), `turbo run test --affected` на PR (полный `pnpm run test` на `main`) и прогоном `pnpm --filter @repo/api test:e2e`.
 - **`e2e` (`Playwright`):** работает в Stage 2 (`needs: [ lint, typecheck, build ]`), восстанавливает `.turbo` кэш сборки (`pnpm turbo build`), кэширует бинарник Chromium по точной версии `@playwright/test` из `pnpm-lock.yaml` (`~/.cache/ms-playwright`), устанавливает системные зависимости `--with-deps chromium`, прогоняет `pnpm --filter @repo/web test:e2e` (с `webServer` для `@repo/api` + `@repo/web` и `NODE_OPTIONS` без IPv6 Happy Eyeballs) и загружает HTML-отчёт/трейсы через `actions/upload-artifact@v7` только при `if: failure()`.
 - **Реализованный и планируемый hardening CI:**
-  1. **`persist-credentials: false` на всех `actions/checkout@v6`:** уже внедрено для дополнительной Defense-in-Depth изоляции токена `.git/config` поверх `permissions: contents: read`.
-  2. **Регулярный скан CVE (`schedule` + Dependabot):** добавить еженедельный `schedule: - cron: ...` для триггера `security` и `.github/dependabot.yml` (для экосистем `npm` и `github-actions`), чтобы новые уязвимости ловились даже в недели без коммитов.
-  3. **`actionlint` в `lint`:** лёгкая проверка синтаксиса `.github/workflows/*.yml`, которую `Biome` не инспектирует.
+  1. **`persist-credentials: false` на всех `actions/checkout@v6`:** внедрено для дополнительной Defense-in-Depth изоляции токена `.git/config` поверх `permissions: contents: read`.
+  2. **Регулярный скан CVE (`security-audit.yml` + `dependabot.yml`):** еженедельный крон `pnpm audit --prod --audit-level=high` и Dependabot (`npm` + `github-actions`) отслеживают новые уязвимости даже в недели без коммитов.
+  3. **`actionlint` + `Biome noImportCycles` в `lint`:** проверка синтаксиса `.github/workflows/*.yml` и отсутствие циклических runtime-импортов по всему монорепозиторию.
   4. **Pinning экшенов по commit SHA (опционально):** жёсткая фиксация SHA-хэшей сторонних экшенов в паре с Dependabot для максимальной supply-chain неизменяемости.
 - **CD (деплой сервисов):** выносить отдельными workflow per-service (`web` на Vercel с Remote Cache, `api` и `telemetry-ms` через `docker/*.Dockerfile` с `turbo prune`), чтобы правка фронтенда или статей `.mdx` не перезапускала сборку Docker-образов бэкенда.

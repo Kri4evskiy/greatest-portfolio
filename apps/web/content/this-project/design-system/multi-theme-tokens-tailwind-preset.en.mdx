@@ -1,17 +1,17 @@
 ---
 title: "Multi-Theme CSS Token Matrix, Tailwind v4 @theme & @repo/ui Package Architecture"
 sidebarLabel: "Design Tokens & Tailwind v4"
-summary: "How to architect a scalable design system in a monorepo: 2D semantic token matrix (Mode × Palette) with Zero-FOUC switching, Tailwind CSS v4 Cascade Layers & @repo/ui/theme.css, Zero-CLS fonts, @container queries, and 100% Storybook 10 coverage."
+summary: "How to architect a scalable design system in a monorepo: 2D semantic token matrix (Mode × Palette) with Zero-FOUC switching, Tailwind CSS v4 Cascade Layers & @repo/ui/theme.css, RSC-safe @repo/ui packaging, Zero-CLS fonts, @container queries, and 100% Storybook 10 coverage."
 category: "this-project"
 format: "deep-dive"
 tags: ["design-tokens", "tailwind", "ui-system", "storybook", "architecture"]
 readingTime: "8 min"
-publishedAt: "2026-11-10"
+publishedAt: "2026-11-24"
 order: 1
 tldr:
   - "Defines a full 2D semantic HSL token matrix (`Light / Dark / System` × `Warm Paper / Graphite / Sepia`) in `packages/ui/src/styles/theme.css` exposed via `@theme inline` and controlled live in `ThemeToggle` with a Zero-FOUC `<head>` init script (`PALETTE_INIT_SCRIPT`)."
-  - "Uses Tailwind CSS v4 Cascade Layers cleanly: Baseline UX (`scrollbar-gutter: stable`, `text-wrap: balance/pretty`) in `@layer base`, `.shiki` + `@starting-style` dialog entry and Radix-Popper-synchronized CSS `@keyframes` (`Popover`, `Tooltip`) in `@layer components`, and unlayered `prefers-reduced-motion: reduce` above utilities."
-  - "Enforces Dependency Inversion (`@repo/ui/theme.css` ➔ `apps/web/src/app/globals.css` with `@source`), pins modern `browserslist` targets, bundles self-hosted `Inter` + `JetBrains Mono` via `next/font/google`, and adopts targeted `@container` queries with 100% Storybook 10 coverage."
+  - "Uses Tailwind CSS v4 Cascade Layers cleanly: Baseline UX (`scrollbar-gutter: stable` + `html:has(body[data-scroll-locked])`, `text-wrap: balance/pretty`) in `@layer base`, `.shiki` + `@starting-style` dialog entry and Radix-Popper-synchronized CSS `@keyframes` (`Popover`, `Tooltip`) in `@layer components`, and unlayered `prefers-reduced-motion: reduce` above utilities."
+  - "Enforces Dependency Inversion (`@repo/ui/theme.css` ➔ `apps/web/src/app/globals.css` with `@source`), declares `\"sideEffects\": [\"*.css\"]` in `packages/ui/package.json` with explicit `'use client'` boundaries on Radix primitives (`dialog.tsx`, `tabs.tsx`), pins modern `browserslist` targets, and achieves 100% Storybook 10 coverage."
 ---
 
 ## 1. Two-Dimensional Semantic Token Matrix (`Mode` × `Palette`)
@@ -57,7 +57,7 @@ Instead of coupling components to raw Tailwind palette classes (`slate-*`, `emer
 
 ### Live 2D Appearance Switcher & Zero-FOUC Hydration
 
-In the header, [`ThemeToggle`](apps/web/src/widgets/header/theme-toggle.tsx) is composed from `@repo/ui` primitives (`Button`, `Tooltip` + `Popover`) and acts as a pure UI control over both orthogonal axes:
+In the header, `ThemeToggle` (`apps/web/src/widgets/header/theme-toggle.tsx`) is composed from `@repo/ui` primitives (`Button`, `Tooltip` + `Popover`) and acts as a pure UI control over both orthogonal axes:
 - **Theme (`Light / Dark / System`):** managed by `next-themes` via `.dark`.
 - **Palette Preset:** `Warm Paper` (`default`), `Graphite`, or `Sepia` (stored in `localStorage['workfolio-palette']` and synced to `html[data-palette]` via `@/shared/store/use-ui-store`).
 
@@ -68,11 +68,11 @@ To prevent Flash of Unstyled Content (FOUC) when reloading with `Graphite` or `S
 
 ---
 
-## 2. CSS-First Architecture, Cascade Layers & Baseline UX
+## 2. CSS-First Architecture, Cascade Layers, RSC Boundaries & Tree-Shaking
 
 To keep `@repo/ui` self-contained and agnostic of `apps/web`, the UI package exports a pure token-and-layer stylesheet `@repo/ui/theme.css` (without `@import "tailwindcss";`), while Storybook compiles `packages/ui/src/styles/globals.css` with `@tailwindcss/vite`.
 
-In `apps/web`, [`globals.css`](apps/web/src/app/globals.css) acts as the **Composition Root** compiled by `@tailwindcss/postcss`:
+In `apps/web`, `globals.css` (`apps/web/src/app/globals.css`) acts as the **Composition Root** compiled by `@tailwindcss/postcss`:
 
 ```css title="apps/web/src/app/globals.css"
 @import "tailwindcss";
@@ -83,9 +83,13 @@ In `apps/web`, [`globals.css`](apps/web/src/app/globals.css) acts as the **Compo
 @source "../../../../packages/ui/src";
 ```
 
-Inside `theme.css`, rules are organized intentionally across **CSS Cascade Layers**:
-1. **`@layer base`:** Sets default `border-color: hsl(var(--border))`, active button `cursor: pointer`, `scrollbar-gutter: stable` (eliminates 15px layout shift when modals lock scrolling on Windows), `scrollbar-width: thin`, `scroll-padding-top: 5rem`, smooth scroll when motion is allowed (paired with `data-scroll-behavior="smooth"` on `<html>` in `LocaleRootLayout`), and `text-wrap: balance` / `text-wrap: pretty`.
-2. **`@layer components`:** Isolates `.shiki` dual-theme syntax rules, GPU-composited `@starting-style` entry animations (`opacity` + `scale`) for `[data-dialog-overlay]` / `[data-dialog-content]`, and pure CSS `@keyframes` (`ui-popper-in` / `ui-popper-out` using `data-state`, `data-side`, and `--radix-popper-transform-origin`) for `[data-popover-content]` and `[data-tooltip-content]` — synchronized with Radix Popper `isPositioned` (`animation: none` while measuring off-screen) and `<Presence>` exit timing.
+### Package-Level Packaging Guarantees (`packages/ui`)
+- **Tree-Shaking & CSS Side Effects (`packages/ui/package.json`):** Declares `"sideEffects": ["*.css"]` so bundlers aggressively tree-shake unused JS components while never stripping `@repo/ui/theme.css` or `@repo/ui/globals.css` stylesheet imports.
+- **Explicit `'use client'` Boundaries for Radix Primitives:** Interactive primitives that depend on Radix UI client context and portals—such as `packages/ui/src/components/dialog.tsx` and `packages/ui/src/components/tabs.tsx`—carry explicit `'use client'` directives at the top of the module so Server Components in `apps/web` can safely import pure UI primitives from `@repo/ui` without pulling client hooks into the RSC graph.
+
+Inside `packages/ui/src/styles/theme.css`, rules are organized intentionally across **CSS Cascade Layers**:
+1. **`@layer base`:** Sets default `border-color: hsl(var(--border))`, active button `cursor: pointer`, `scrollbar-gutter: stable` (paired with `html:has(body[data-scroll-locked]) { scrollbar-gutter: auto; }` so fixed Radix Dialog overlays span 100% width without leaving a right-edge gutter strip while body scroll is locked), `scrollbar-width: thin`, `scroll-padding-top: 5rem`, smooth scroll when motion is allowed (paired with `data-scroll-behavior="smooth"` on `<html>` in `LocaleRootLayout`), and `text-wrap: balance` / `text-wrap: pretty`.
+2. **`@layer components`:** Isolates `.shiki` dual-theme syntax rules, GPU-composited `@starting-style` entry animations (`opacity` + `scale`) for `[data-dialog-overlay]` / `[data-dialog-content]`, and pure CSS `@keyframes` (`ui-popper-in` / `ui-popper-out` using `data-state`, `data-side`, and `--radix-popper-transform-origin`) for `[data-popover-content]` and `[data-tooltip-content]` — synchronized with Radix Popper positioning and `<Presence>` exit timing.
 3. **Unlayered override:** `@media (prefers-reduced-motion: reduce)` sits intentionally *outside* `@layer` so it supersedes Tailwind's `@layer utilities` (`transition-*`, `animate-*`) without needing `!important`.
 
 Both `apps/web/package.json` and `packages/ui/package.json` pin `"browserslist": ["Chrome >= 111", "Edge >= 111", "Firefox >= 128", "Safari >= 16.4"]` so `Lightning CSS` and `Next.js SWC` emit zero legacy polyfills for `@property` and `color-mix()`.

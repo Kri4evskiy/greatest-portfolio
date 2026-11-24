@@ -38,6 +38,17 @@ jobs:
       - name: Run Biome check
         run: pnpm run lint
 
+      - name: Lint GitHub Actions workflows (actionlint)
+        run: |
+          ACTIONLINT_VERSION="1.7.12"
+          BASE_URL="https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}"
+          ARCHIVE="actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          CHECKSUMS="actionlint_${ACTIONLINT_VERSION}_checksums.txt"
+          curl -fsSL -o "/tmp/${ARCHIVE}" "${BASE_URL}/${ARCHIVE}"
+          curl -fsSL -o "/tmp/${CHECKSUMS}" "${BASE_URL}/${CHECKSUMS}"
+          (cd /tmp && sha256sum --ignore-missing --check "${CHECKSUMS}" && tar -xzf "${ARCHIVE}" actionlint)
+          /tmp/actionlint -color
+
   security:
     name: Security & Infra Config
     runs-on: ubuntu-latest

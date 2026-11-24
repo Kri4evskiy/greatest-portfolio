@@ -1,22 +1,22 @@
 ---
 title: "Эталонная конфигурация монорепозитория: pnpm 12, Turborepo, строгий tsconfig и Biome"
 sidebarLabel: "pnpm 12, tsconfig и Biome"
-summary: "Архитектурный шаблон настройки современного Full-Stack монорепозитория: структура воркспейса pnpm 12 с allowBuilds, граф задач Turborepo, каскад строгих правил TypeScript и единый Rust-линтер Biome.js."
+summary: "Архитектурный шаблон настройки современного Full-Stack монорепозитория: структура воркспейса pnpm 12.21.0 с allowBuilds в pnpm-workspace.yaml, tree-shaking через sideEffects, полный граф задач Turborepo, каскад строгих правил TypeScript и Biome 2.6.4 с noImportCycles."
 category: "this-project"
 format: "deep-dive"
 tags: ["monorepo", "pnpm-12", "turborepo", "typescript", "biome"]
-readingTime: "6 мин"
+readingTime: "7 мин"
 publishedAt: "2026-11-10"
 order: 1
 tldr:
-  - "Воркспейс разделён на приложения (`apps/web`, `apps/api`, `apps/telemetry-ms`) и переиспользуемые пакеты (`packages/ui`, `packages/shared-schemas`) под управлением `pnpm 12.21.0` с белым списком `allowBuilds`."
-  - "Граф `turbo.json` гарантирует топологическую сборку зависимостей (`^build`) перед запуском `build`, `build-storybook` и `dev`, а `^typecheck` позволяет проверять типы параллельно."
-  - "Единый `tsconfig.base.json` включает `strict`, `noUncheckedIndexedAccess` и `exactOptionalPropertyTypes`, а `biome.json` заменяет связку `ESLint + Prettier` одним быстрым Rust-бинарником."
+  - "Управляет `apps/*` и `packages/*` через `pnpm@12.21.0`, храня `allowBuilds` строго в `pnpm-workspace.yaml` (никогда в `package.json`) и задавая явный `sideEffects` для tree-shaking в `@repo/shared-schemas` (`false`) и `@repo/ui` (`[\"*.css\"]`)."
+  - "Настраивает `turbo.json` с `globalEnv: [\"API_INTERNAL_URL\", \"NEXT_PUBLIC_SITE_URL\"]` и 8 детерминированными задачами (`build`, `build-storybook`, `typecheck`, `lint`, `test`, `test:coverage`, `test:e2e`, `dev`)."
+  - "Включает `strict`, `noUncheckedIndexedAccess` и `exactOptionalPropertyTypes` через `tsconfig.base.json` и заменяет `ESLint + Prettier` на `Biome 2.6.4` с правилом `suspicious.noImportCycles: \"error\"`."
 ---
 
-## 1. Структура воркспейса `pnpm 12` и защита `allowBuilds`
+## 1. Структура воркспейса `pnpm 12.21.0`, защита `allowBuilds` и `sideEffects`
 
-В корневом файле `pnpm-workspace.yaml` объявляются границы пакетов и строгий белый список `allowBuilds`. В **pnpm 12** любые `postinstall`-скрипты сторонних зависимостей заблокированы по умолчанию для защиты от supply-chain атак — право на компиляцию нативных бинарников получают только явно перечисленные пакеты:
+Корневой `package.json` фиксирует `"packageManager": "pnpm@12.21.0"` и `"engines": { "node": ">=22.0.0" }`, а все настройки воркспейса и безопасности цепочки поставок живут **строго в `pnpm-workspace.yaml`** — никогда в устаревшей секции `"pnpm"` (вроде `onlyBuiltDependencies`) внутри `package.json`. В **pnpm 12** любые сторонние `postinstall`-скрипты заблокированы по умолчанию; компилировать нативные бинарники разрешено только пакетам из `allowBuilds`:
 
 ```yaml title="pnpm-workspace.yaml"
 packages:
@@ -34,28 +34,34 @@ allowBuilds:
   sharp: true
 ```
 
-| Слой монорепозитория | Пакет | Назначение |
-| :--- | :--- | :--- |
-| **Приложения (`apps/*`)** | `@repo/web`, `@repo/api`, `@repo/telemetry-ms` | Next.js 16 фронтенд, NestJS 12 REST API и микросервис живой SSE-телеметрии |
-| **Контракты (`packages/shared-schemas`)** | `@repo/shared-schemas` | Единый источник Zod-схем, DTO, констант кук/локалей и RBAC-прав для фронта и бэка |
-| **Дизайн-система (`packages/ui`)** | `@repo/ui` | Стили `theme.css`, матрица токенов, Tailwind v4 `@theme inline`, примитивы `Radix UI` и `Storybook` |
+| Слой монорепозитория | Пакет | Tree-shaking (`sideEffects`) | Назначение |
+| :--- | :--- | :---: | :--- |
+| **Приложения (`apps/*`)** | `@repo/web`, `@repo/api`, `@repo/telemetry-ms` | — | Next.js 16 фронтенд, NestJS 12 REST API и микросервис живой SSE-телеметрии |
+| **Контракты (`packages/shared-schemas`)** | `@repo/shared-schemas` | `false` | Чистые ESM Zod-схемы, DTO, константы кук/локалей и RBAC-хелперы, скомпилированные в `./dist/index.js` |
+| **Дизайн-система (`packages/ui`)** | `@repo/ui` | `["*.css"]` | Матрица токенов `theme.css` / `globals.css`, Tailwind v4 `@theme inline`, примитивы `Radix UI` и `Storybook` |
+
+> [!TIP]
+> **Почему `sideEffects` различается у внутренних пакетов:** `packages/shared-schemas/package.json` указывает `"sideEffects": false`, позволяя бандлерам агрессивно вырезать неиспользуемые Zod-схемы и хелперы. `packages/ui/package.json` указывает `"sideEffects": ["*.css"]`, чтобы импорты `@repo/ui/globals.css` и `@repo/ui/theme.css` сохранялись при сборке, а неиспользуемые React-компоненты и примитивы Radix продолжали вырезаться tree-shaking'ом.
 
 ---
 
 ## 2. Граф задач и кэширование в `Turborepo`
 
-Конфигурация `turbo.json` выстраивает детерминированный пайплайн: директива `"dependsOn": ["^build"]` для `build`, `build-storybook` и `dev` заставляет Turborepo сначала скомпилировать `@repo/shared-schemas` в `dist/`, а `"dependsOn": ["^typecheck"]` позволяет проверять типы пакетов параллельно:
+Конфигурация `turbo.json` оркестрирует все 8 задач воркспейса со стриминговым выводом (`"ui": "stream"`), явной инвалидацией кэша по `globalDependencies` и `globalEnv`, топологической сборкой `"dependsOn": ["^build"]` и параллельной проверкой типов `"dependsOn": ["^typecheck"]`:
 
 ```json title="turbo.json"
 {
   "$schema": "https://turbo.build/schema.json",
+  "ui": "stream",
   "globalDependencies": ["tsconfig.base.json", "pnpm-workspace.yaml"],
-  "globalEnv": ["API_INTERNAL_URL"],
+  "globalEnv": ["API_INTERNAL_URL", "NEXT_PUBLIC_SITE_URL"],
+  "globalPassThroughEnv": ["FORCE_PNPM"],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
-      "outputs": [".next/**", "!.next/cache/**", "dist/**", "src/generated/**", "storybook-static/**"]
+      "outputs": [".next/**", "!.next/cache/**", "dist/**", "src/generated/**", "storybook-static/**"],
+      "passThroughEnv": ["SWC_NATIVE_BINDING_CACHE"]
     },
     "build-storybook": {
       "dependsOn": ["^build"],
@@ -67,6 +73,22 @@ allowBuilds:
     "lint": {
       "dependsOn": ["^lint"]
     },
+    "test": {
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", ".env*"],
+      "passThroughEnv": ["SWC_NATIVE_BINDING_CACHE"]
+    },
+    "test:coverage": {
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", ".env*"],
+      "outputs": ["coverage/**"],
+      "passThroughEnv": ["SWC_NATIVE_BINDING_CACHE"]
+    },
+    "test:e2e": {
+      "dependsOn": ["build"],
+      "cache": false,
+      "passThroughEnv": ["SWC_NATIVE_BINDING_CACHE", "CI", "WORKFOLIO_DEMO_MODE"]
+    },
     "dev": {
       "dependsOn": ["^build"],
       "cache": false,
@@ -75,6 +97,9 @@ allowBuilds:
   }
 }
 ```
+
+- **`globalEnv: ["API_INTERNAL_URL", "NEXT_PUBLIC_SITE_URL"]`** гарантирует инвалидацию кэша Next.js при смене внутреннего адреса API или канонического домена (SEO canonicals, Open Graph, proxy rewrites).
+- **`test` и `test:coverage`** зависят от `^build`, чтобы `@repo/shared-schemas` был собран до запуска Vitest, а **`test:e2e`** зависит от `build` текущего пакета, отключает кэширование (`cache: false`) и пробрасывает `CI` и `WORKFOLIO_DEMO_MODE`.
 
 ---
 
@@ -89,6 +114,12 @@ allowBuilds:
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "moduleResolution": "Bundler",
+    "resolveJsonModule": true,
+    "allowJs": false,
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    "skipLibCheck": true,
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,
@@ -96,10 +127,7 @@ allowBuilds:
     "noFallthroughCasesInSwitch": true,
     "noImplicitReturns": true,
     "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "isolatedModules": true,
-    "noEmit": true,
-    "skipLibCheck": true
+    "noUnusedParameters": true
   }
 }
 ```
@@ -109,13 +137,18 @@ allowBuilds:
 
 ---
 
-## 4. Единый линтер и форматтер `Biome.js`
+## 4. Единый линтер, защита от циклов импортов и форматтер `Biome 2.6.4`
 
-Вместо десятка конфликтующих плагинов `ESLint + Prettier` весь код и CSS (включая директивы Tailwind) проверяются за `~100 мс` одним конфигом `biome.json`:
+Вместо десятка конфликтующих плагинов `ESLint + Prettier` весь код и стили Tailwind v4 проверяются за `~100 мс` одним Rust-бинарником (`@biomejs/biome` `2.6.4`) с конфигом `biome.json`:
 
 ```json title="biome.json"
 {
   "$schema": "https://biomejs.dev/schemas/2.6.4/schema.json",
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
+  },
   "assist": {
     "actions": {
       "source": { "organizeImports": "on" }
@@ -126,19 +159,33 @@ allowBuilds:
     "rules": {
       "preset": "recommended",
       "correctness": {
+        "noUnusedVariables": "error",
         "noUnusedImports": "error",
-        "noUnusedVariables": "error"
+        "useExhaustiveDependencies": "warn"
       },
       "suspicious": {
-        "noExplicitAny": "error"
+        "noExplicitAny": "error",
+        "noImportCycles": "error",
+        "noArrayIndexKey": "warn",
+        "noUnknownAtRules": "off"
       },
       "style": {
-        "noNonNullAssertion": "error"
+        "noNonNullAssertion": "error",
+        "useConst": "error",
+        "useImportType": "off"
       }
     }
+  },
+  "javascript": {
+    "parser": { "unsafeParameterDecoratorsEnabled": true }
   },
   "css": {
     "parser": { "tailwindDirectives": true }
   }
 }
 ```
+
+Ключевые архитектурные предохранители в `biome.json`:
+- **`suspicious.noImportCycles: "error"`:** принудительно поддерживает ацикличный граф модулей на этапе линтинга как в FSD-Modular слоях фронтенда, так и в модулях NestJS — отлавливая циклические импорты до появления `undefined` DI-токенов или ошибок инициализации бандлера.
+- **`javascript.parser.unsafeParameterDecoratorsEnabled: true` и `style.useImportType: "off"`:** сохраняют совместимость с декораторами параметров конструктора NestJS (`@Inject()`, `@Body()`) и рантайм-метаданными `emitDecoratorMetadata`.
+- **`css.parser.tailwindDirectives: true` и `noUnknownAtRules: "off"`:** нативно разбирают директивы Tailwind v4 (`@theme inline`, `@custom-variant`) без отключения форматирования CSS.

@@ -1,22 +1,22 @@
 ---
 title: "Еталонна конфігурація монорепозиторію: pnpm 12, Turborepo, суворий tsconfig та Biome"
 sidebarLabel: "pnpm 12, tsconfig та Biome"
-summary: "Архітектурний шаблон налаштування сучасного Full-Stack монорепозиторію: структура воркспейсу pnpm 12 з allowBuilds, граф задач Turborepo, каскад суворих правил TypeScript та єдиний Rust-лінтер Biome.js."
+summary: "Архітектурний шаблон налаштування сучасного Full-Stack монорепозиторію: структура воркспейсу pnpm 12.21.0 з allowBuilds у pnpm-workspace.yaml, tree-shaking через sideEffects, повний граф задач Turborepo, каскад суворих правил TypeScript та Biome 2.6.4 із noImportCycles."
 category: "this-project"
 format: "deep-dive"
 tags: ["monorepo", "pnpm-12", "turborepo", "typescript", "biome"]
-readingTime: "6 хв"
+readingTime: "7 хв"
 publishedAt: "2026-11-10"
 order: 1
 tldr:
-  - "Воркспейс розділений на застосунки (`apps/web`, `apps/api`, `apps/telemetry-ms`) та спільні пакети (`packages/ui`, `packages/shared-schemas`) під керуванням `pnpm 12.21.0` із білим списком `allowBuilds`."
-  - "Граф `turbo.json` гарантує топологічну збірку залежностей (`^build`) перед запуском `build`, `build-storybook` і `dev`, а `^typecheck` дає змогу перевіряти типи паралельно."
-  - "Єдиний `tsconfig.base.json` вмикає `strict`, `noUncheckedIndexedAccess` і `exactOptionalPropertyTypes`, а `biome.json` замінює зв'язку `ESLint + Prettier` одним швидким Rust-бінарником."
+  - "Керує `apps/*` і `packages/*` через `pnpm@12.21.0`, зберігаючи `allowBuilds` суворо в `pnpm-workspace.yaml` (ніколи в `package.json`) і задаючи явний `sideEffects` для tree-shaking у `@repo/shared-schemas` (`false`) та `@repo/ui` (`[\"*.css\"]`)."
+  - "Налаштовує `turbo.json` із `globalEnv: [\"API_INTERNAL_URL\", \"NEXT_PUBLIC_SITE_URL\"]` та 8 детермінованими задачами (`build`, `build-storybook`, `typecheck`, `lint`, `test`, `test:coverage`, `test:e2e`, `dev`)."
+  - "Вмикає `strict`, `noUncheckedIndexedAccess` і `exactOptionalPropertyTypes` через `tsconfig.base.json` та замінює `ESLint + Prettier` на `Biome 2.6.4` із правилом `suspicious.noImportCycles: \"error\"`."
 ---
 
-## 1. Структура воркспейсу `pnpm 12` та захист `allowBuilds`
+## 1. Структура воркспейсу `pnpm 12.21.0`, захист `allowBuilds` та `sideEffects`
 
-У кореневому файлі `pnpm-workspace.yaml` оголошуються межі пакетів та суворий білий список `allowBuilds`. У **pnpm 12** будь-які `postinstall`-скрипти сторонніх залежностей заблоковані за замовчуванням для захисту від supply-chain атак — право на компіляцію нативних бінарників отримують лише явно перелічені пакети:
+Кореневий `package.json` фіксує `"packageManager": "pnpm@12.21.0"` і `"engines": { "node": ">=22.0.0" }`, а всі налаштування воркспейсу й безпеки ланцюга постачання живуть **суворо в `pnpm-workspace.yaml`** — ніколи в застарілій секції `"pnpm"` (на кшталт `onlyBuiltDependencies`) всередині `package.json`. У **pnpm 12** будь-які сторонні `postinstall`-скрипти заблоковані за замовчуванням; компілювати нативні бінарники дозволено лише пакетам із `allowBuilds`:
 
 ```yaml title="pnpm-workspace.yaml"
 packages:
@@ -34,28 +34,34 @@ allowBuilds:
   sharp: true
 ```
 
-| Шар монорепозиторію | Пакет | Призначення |
-| :--- | :--- | :--- |
-| **Застосунки (`apps/*`)** | `@repo/web`, `@repo/api`, `@repo/telemetry-ms` | Next.js 16 фронтенд, NestJS 12 REST API та мікросервіс живої SSE-телеметрії |
-| **Контракти (`packages/shared-schemas`)** | `@repo/shared-schemas` | Єдине джерело Zod-схем, DTO, констант кук/локалей і RBAC-прав для фронту та беку |
-| **Дизайн-система (`packages/ui`)** | `@repo/ui` | Стилі `theme.css`, матриця токенів, Tailwind v4 `@theme inline`, примітиви `Radix UI` та `Storybook` |
+| Шар монорепозиторію | Пакет | Tree-shaking (`sideEffects`) | Призначення |
+| :--- | :--- | :---: | :--- |
+| **Застосунки (`apps/*`)** | `@repo/web`, `@repo/api`, `@repo/telemetry-ms` | — | Next.js 16 фронтенд, NestJS 12 REST API та мікросервіс живої SSE-телеметрії |
+| **Контракти (`packages/shared-schemas`)** | `@repo/shared-schemas` | `false` | Чисті ESM Zod-схеми, DTO, константи кук/локалей і RBAC-хелпери, скомпільовані в `./dist/index.js` |
+| **Дизайн-система (`packages/ui`)** | `@repo/ui` | `["*.css"]` | Матриця токенів `theme.css` / `globals.css`, Tailwind v4 `@theme inline`, примітиви `Radix UI` та `Storybook` |
+
+> [!TIP]
+> **Чому `sideEffects` різниться у внутрішніх пакетів:** `packages/shared-schemas/package.json` декларує `"sideEffects": false`, дозволяючи бандлерам агресивно вирізати невикористані Zod-схеми й хелпери. `packages/ui/package.json` декларує `"sideEffects": ["*.css"]`, щоб імпорти `@repo/ui/globals.css` і `@repo/ui/theme.css` зберігалися під час збірки, тоді як невикористані React-компоненти й примітиви Radix залишалися повністю tree-shakeable.
 
 ---
 
 ## 2. Граф задач і кешування в `Turborepo`
 
-Конфігурація `turbo.json` вибудовує детермінований пайплайн: директива `"dependsOn": ["^build"]` для `build`, `build-storybook` і `dev` змушує Turborepo спершу скомпілювати `@repo/shared-schemas` у `dist/`, а `"dependsOn": ["^typecheck"]` дає змогу перевіряти типи пакетів паралельно:
+Конфігурація `turbo.json` оркеструє всі 8 задач воркспейсу зі стрімінговим виводом (`"ui": "stream"`), явною інвалідацією кешу за `globalDependencies` і `globalEnv`, топологічною збіркою `"dependsOn": ["^build"]` та паралельною перевіркою типів `"dependsOn": ["^typecheck"]`:
 
 ```json title="turbo.json"
 {
   "$schema": "https://turbo.build/schema.json",
+  "ui": "stream",
   "globalDependencies": ["tsconfig.base.json", "pnpm-workspace.yaml"],
-  "globalEnv": ["API_INTERNAL_URL"],
+  "globalEnv": ["API_INTERNAL_URL", "NEXT_PUBLIC_SITE_URL"],
+  "globalPassThroughEnv": ["FORCE_PNPM"],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
-      "outputs": [".next/**", "!.next/cache/**", "dist/**", "src/generated/**", "storybook-static/**"]
+      "outputs": [".next/**", "!.next/cache/**", "dist/**", "src/generated/**", "storybook-static/**"],
+      "passThroughEnv": ["SWC_NATIVE_BINDING_CACHE"]
     },
     "build-storybook": {
       "dependsOn": ["^build"],
@@ -67,6 +73,22 @@ allowBuilds:
     "lint": {
       "dependsOn": ["^lint"]
     },
+    "test": {
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", ".env*"],
+      "passThroughEnv": ["SWC_NATIVE_BINDING_CACHE"]
+    },
+    "test:coverage": {
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", ".env*"],
+      "outputs": ["coverage/**"],
+      "passThroughEnv": ["SWC_NATIVE_BINDING_CACHE"]
+    },
+    "test:e2e": {
+      "dependsOn": ["build"],
+      "cache": false,
+      "passThroughEnv": ["SWC_NATIVE_BINDING_CACHE", "CI", "WORKFOLIO_DEMO_MODE"]
+    },
     "dev": {
       "dependsOn": ["^build"],
       "cache": false,
@@ -75,6 +97,9 @@ allowBuilds:
   }
 }
 ```
+
+- **`globalEnv: ["API_INTERNAL_URL", "NEXT_PUBLIC_SITE_URL"]`** гарантує інвалідацію кешу Next.js при зміні внутрішньої адреси API або канонічного домену (SEO canonicals, Open Graph, proxy rewrites).
+- **`test` і `test:coverage`** залежать від `^build`, щоб `@repo/shared-schemas` був зібраний до запуску Vitest, а **`test:e2e`** залежить від `build` поточного пакета, вимикає кешування (`cache: false`) і прокидає `CI` та `WORKFOLIO_DEMO_MODE`.
 
 ---
 
@@ -89,6 +114,12 @@ allowBuilds:
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "moduleResolution": "Bundler",
+    "resolveJsonModule": true,
+    "allowJs": false,
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    "skipLibCheck": true,
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,
@@ -96,10 +127,7 @@ allowBuilds:
     "noFallthroughCasesInSwitch": true,
     "noImplicitReturns": true,
     "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "isolatedModules": true,
-    "noEmit": true,
-    "skipLibCheck": true
+    "noUnusedParameters": true
   }
 }
 ```
@@ -109,13 +137,18 @@ allowBuilds:
 
 ---
 
-## 4. Єдиний лінтер і форматер `Biome.js`
+## 4. Єдиний лінтер, захист від циклів імпортів і форматер `Biome 2.6.4`
 
-Замість десятка конфліктуючих плагінів `ESLint + Prettier` увесь код та CSS (включно з директивами Tailwind) перевіряються за `~100 мс` одним конфігом `biome.json`:
+Замість десятка конфліктуючих плагінів `ESLint + Prettier` увесь код і стилі Tailwind v4 перевіряються за `~100 мс` одним Rust-бінарником (`@biomejs/biome` `2.6.4`) із конфігом `biome.json`:
 
 ```json title="biome.json"
 {
   "$schema": "https://biomejs.dev/schemas/2.6.4/schema.json",
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
+  },
   "assist": {
     "actions": {
       "source": { "organizeImports": "on" }
@@ -126,19 +159,33 @@ allowBuilds:
     "rules": {
       "preset": "recommended",
       "correctness": {
+        "noUnusedVariables": "error",
         "noUnusedImports": "error",
-        "noUnusedVariables": "error"
+        "useExhaustiveDependencies": "warn"
       },
       "suspicious": {
-        "noExplicitAny": "error"
+        "noExplicitAny": "error",
+        "noImportCycles": "error",
+        "noArrayIndexKey": "warn",
+        "noUnknownAtRules": "off"
       },
       "style": {
-        "noNonNullAssertion": "error"
+        "noNonNullAssertion": "error",
+        "useConst": "error",
+        "useImportType": "off"
       }
     }
+  },
+  "javascript": {
+    "parser": { "unsafeParameterDecoratorsEnabled": true }
   },
   "css": {
     "parser": { "tailwindDirectives": true }
   }
 }
 ```
+
+Ключові архітектурні запобіжники в `biome.json`:
+- **`suspicious.noImportCycles: "error"`:** примусово підтримує ациклічний граф модулів на етапі лінтингу як у FSD-Modular шарах фронтенду, так і в модулях NestJS — виявляючи циклічні імпорти ще до появи `undefined` DI-токенів чи помилок ініціалізації бандлера.
+- **`javascript.parser.unsafeParameterDecoratorsEnabled: true` і `style.useImportType: "off"`:** зберігають сумісність із декораторами параметрів конструктора NestJS (`@Inject()`, `@Body()`) та рантайм-метаданими `emitDecoratorMetadata`.
+- **`css.parser.tailwindDirectives: true` і `noUnknownAtRules: "off"`:** нативно розбирають директиви Tailwind v4 (`@theme inline`, `@custom-variant`) без вимкнення форматування CSS.

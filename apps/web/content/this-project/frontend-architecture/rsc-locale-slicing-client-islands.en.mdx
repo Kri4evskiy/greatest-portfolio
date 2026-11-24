@@ -1,96 +1,102 @@
 ---
-title: "Next.js RSC Architecture: Server Locale Slicing, Client Micro-Islands & React 19 Compiler"
-sidebarLabel: "RSC Islands & React Compiler"
-summary: "How to minimize client JS bundles in a multilingual Next.js 16 and React 19 app: slicing active locales in Server Components, isolating interactivity into micro-islands, bfcache-safe SSE, and React Compiler."
+title: "Next.js RSC Architecture: Server Locale Slicing, Client Micro-Islands & Singleton SSE"
+sidebarLabel: "RSC Islands & Locale Slicing"
+summary: "How we minimize client JS and serialized HTML payloads in a multilingual Next.js 16 and React 19 app: pickIntlMessages() namespace slicing, CvDocumentShowcase Server Island, next/dynamic modal loaders, ref-counted bfcache-safe singleton SSE, and IndexedDB allowlist persistence."
 category: "this-project"
 format: "deep-dive"
-tags: ["rsc", "nextjs", "react-compiler", "i18n", "performance", "zustand"]
-readingTime: "6 min"
+tags: ["rsc", "nextjs", "react-compiler", "i18n", "performance", "zustand", "sse"]
+readingTime: "8 min"
 publishedAt: "2026-11-10"
 order: 1
 tldr:
-  - "Renders primary home page sections (`WorkfolioHeroSection`, `WorkfolioProjectsSection`, `WorkfolioExperienceSection`, `WorkfolioFooter`) as pure Server Components that slice only the active locale on the server."
-  - "Isolates browser interactivity into tiny client micro-islands (`workfolio-client-islands.tsx`, `footer-sse-status.tsx`) receiving pre-resolved strings or `ReactNode` children."
-  - "Enables `reactCompiler` (`compilationMode: 'infer'`) in `next.config.ts` and separates high-frequency local `D3.js` state from cross-page `Zustand` UI state."
+  - "Slices both typed data (`pickLocalized`) and `next-intl` dictionaries (`pickIntlMessages`) on the server across root `layout.tsx` and route pages, while `CvDocumentShowcase` passes Server-rendered ATS HTML into `CvViewTabs` (`forceMount` + `data-[state=inactive]:hidden`)."
+  - "Lazy-loads heavy modal trees (`GuestPassModalLoader`, `CommandPaletteLoader`) via `next/dynamic` (`ssr: false`) and consolidates SSE into a ref-counted `useSyncExternalStore` singleton (`use-telemetry-stream.ts`) with `pagehide`/`pageshow` `bfcache` hygiene."
+  - "Enforces atomic Zustand hooks (`useUIActions()` + `use*`), a single root `AuthCrossTabSyncBridge` (`BroadcastChannel`), and a strict `['knowledge']`-only IndexedDB persistence allowlist in `QueryProvider`."
 ---
 
-## 1. Server Locale Slicing in Multilingual Next.js Apps
+## 1. Server Locale Slicing & `pickIntlMessages()` Namespace Splitting
 
-In multilingual applications (`EN / UK / RU`), importing typed content dictionaries (experience history, case studies, Tech Radar) inside a `'use client'` component forces the bundler to ship all three translations inside the browser JS chunk.
+In multilingual applications (`EN / UK / RU`), two silent payload leaks often bloat initial page loads:
+1. Importing trilingual TypeScript data modules (`author-profile.ts`, `tech-radar`, `engineering-roadmap`) into `'use client'` files bundles all 3 languages into browser JS chunks.
+2. Passing the entire `getMessages()` object to a single root `<NextIntlClientProvider>` serializes every page's translation keys into the SSR HTML stream of every route.
 
-To ensure the browser receives only the active locale, major page sections run as **Server Components**, slice localized fields via `pickLocalized(field, locale)` on the server, and pass plain strings or pre-rendered `ReactNode` trees to small client islands:
+We eliminate both leaks on the server:
+- **Typed Data Slicing:** primary home sections (`WorkfolioHeroSection`, `WorkfolioProjectsSection`, `WorkfolioExperienceSection`, `WorkfolioFooter`) and `CvDocumentShowcase` run as **Server Components**, project only the active locale via `pickLocalized(field, locale)`, and pass plain strings or pre-rendered `ReactNode` slots to thin client islands.
+- **Namespace Slicing via `pickIntlMessages()` (`apps/web/src/shared/i18n/pick-messages.ts`):**
+  - Root `apps/web/src/app/[locale]/layout.tsx` slices **only** `['Header', 'GuestPassModal', 'KnowledgeBase', 'ErrorPage']`.
+  - Individual route pages wrap only their client subtrees with scoped `<NextIntlClientProvider>` instances: Home (`['TechRadar', 'Roadmap']`), `/cv` (`['CvPage']`), and `/system-status` (`['SystemStatusPage']`).
 
-```tsx title="apps/web/src/entities/workfolio-profile/workfolio-sections.tsx"
-export async function WorkfolioExperienceSection({ locale }: { locale: SupportedLocale }) {
-  const t = await getTranslations({ locale, namespace: 'Experience' })
-  const featuredRoles = COMMERCIAL_EXPERIENCE.filter((role) => role.featured)
-  const earlierRoles = COMMERCIAL_EXPERIENCE.filter((role) => !role.featured)
+### `CvDocumentShowcase` Server Island + `CvViewTabs` (`forceMount`)
+On `/[locale]/cv`, `CvDocumentShowcase` (`apps/web/src/entities/workfolio-profile/cv-document-showcase.tsx`) renders the complete structured ATS resume on the server and injects it via `structuredSlot={structuredResumeNode}` into the thin Client Island `CvViewTabs` (`cv-view-tabs.tsx`). Inside `CvViewTabs`, the structured tab uses Radix `forceMount` paired with CSS visibility toggling:
 
-  return (
-    <section id="experience" className="scroll-mt-20 space-y-4">
-      {/* Featured roles render as pure static HTML on the server (0 KB JS) */}
-      {featuredRoles.map((role) => (
-        <ExperienceCard key={role.id} item={role} locale={locale} projectsLabel={t('projectsLabel')} />
-      ))}
+```tsx title="apps/web/src/entities/workfolio-profile/cv-view-tabs.tsx"
+<TabsContent value="structured" forceMount className="mt-0 data-[state=inactive]:hidden">
+  {structuredSlot}
+</TabsContent>
+```
 
-      {/* The client island receives pre-rendered server ReactNodes as children */}
-      <EarlierRolesDisclosure
-        showLabel={t('showEarlierRoles', { count: earlierRoles.length })}
-        hideLabel={t('hideEarlierRoles')}
-      >
-        {earlierRoles.map((role) => (
-          <ExperienceCard key={role.id} item={role} locale={locale} projectsLabel={t('projectsLabel')} />
-        ))}
-      </EarlierRolesDisclosure>
-    </section>
-  )
+Search crawlers always receive the full semantic HTML resume at SSR time even though `'pdf'` is the default active tab, while the trilingual `author-profile.ts` dictionary stays `0 KB` in client JS.
+
+---
+
+## 2. Client Micro-Islands, Lazy Modal Loaders & Singleton `bfcache`-Safe SSE
+
+Every interactive control is isolated into a dedicated micro-island:
+
+| Micro-Island / Loader | Location | Responsibility & Actual Props |
+| :--- | :--- | :--- |
+| **`HeroActionRow`** | `workfolio-client-islands.tsx` | Navigates to `/knowledge-base`, `/cv`, and smooth-scrolls to `#tech-radar` / `#roadmap` (`ctaUnlocked`, `ctaLocked`, `ctaCvPdf`, `ctaTechRadar`, `ctaRoadmap`) |
+| **`CaseStudyReadButton`** | `workfolio-client-islands.tsx` | Computes `/knowledge-base/${category}/${slug}`, checks `isUnlocked \|\| isPublicKnowledgeBasePath(targetUrl)`, and navigates or calls `openGuestPassModal(targetUrl)` (`category`, `slug`, `readUnlockedLabel`, `readLockedLabel`) |
+| **`EarlierRolesDisclosure`** | `workfolio-client-islands.tsx` | Expand/collapse earlier career roles (`showLabel`, `hideLabel`, server-rendered `children: ReactNode`) |
+| **`FooterSseStatus`** | `footer-sse-status.tsx` | Live telemetry pill linking to `/system-status` (`waitingLabel`, `inspectLabel = 'Inspect Live API'`) powered by `useTelemetryStream()` |
+| **`GuestPassModalLoader`** | `guest-pass-modal-loader.tsx` | Listens for `?unlock=knowledge-base` redirects and lazily loads `GuestPassModal` (RHF + Zod + Radix Dialog) via `next/dynamic(..., { ssr: false })` |
+| **`CommandPaletteLoader`** | `command-palette-loader.tsx` | Listens for global `Cmd+K` / `Ctrl+K` and lazily loads `CommandPaletteModal` via `next/dynamic(..., { ssr: false })` |
+
+### Ref-Counted Singleton `EventSource` & `bfcache` Hygiene (`use-telemetry-stream.ts`)
+Rather than opening separate `EventSource` sockets inside `FooterSseStatus` and `SystemStatusDashboard`, `apps/web/src/features/telemetry-stream/use-telemetry-stream.ts` encapsulates a single `SharedTelemetryStreamManager` exposed through `useSyncExternalStore`:
+
+- **Single Connection per Tab:** ref-counts mounted React listeners (`this.listeners.size === 1` connects; `0` tears down), respecting the backend's `MAX_SSE_STREAMS_PER_IP = 2` cap and HTTP/1.1 6-connection-per-origin browser limits.
+- **Bounded Exponential Backoff:** recovers cleanly from `EventSource.CLOSED` (e.g. `429`/`500` proxy errors or the backend's 15-minute stream TTL) from `2s` up to `30s` (max `6` attempts, reset on `online` / `pageshow`).
+- **`bfcache` Hygiene:** closes the socket on `pagehide` and restores it when `event.persisted` is true on `pageshow`:
+
+```typescript title="apps/web/src/features/telemetry-stream/use-telemetry-stream.ts"
+private readonly handlePageHide = (): void => {
+  this.clearReconnectTimer()
+  this.closeSource()
+  if (this.snapshot.sseConnected) {
+    this.emitSnapshot({ ...this.snapshot, sseConnected: false })
+  }
+}
+
+private readonly handlePageShow = (event: PageTransitionEvent): void => {
+  if (event.persisted && this.listeners.size > 0) {
+    this.reconnectAttempts = 0
+    this.connect()
+  }
 }
 ```
 
 ---
 
-## 2. Client Micro-Islands & Mobile `bfcache`-Safe SSE
+## 3. `React 19 Compiler` & Atomic State Boundaries (`useState` vs `Zustand`)
 
-Every interactive control is isolated into a dedicated micro-island:
-
-| Micro-Island | Responsibility | Serialized Props |
-| :--- | :--- | :--- |
-| **`HeroActionRow`** | Smooth scroll to `#roadmap` or open the `Guest Pass` modal | Plain localized button labels |
-| **`CaseStudyReadButton`** | Navigate to the case study note or trigger `openAuthModal(targetHref)` | `targetHref`, `readUnlockedLabel`, `readLockedLabel` |
-| **`EarlierRolesDisclosure`** | Expand/collapse earlier career roles | Server-rendered `children: ReactNode` + toggle labels |
-| **`FooterSseStatus`** | Live `EventSource` telemetry pulse indicator | Localized status labels (`Online`, `Standby`) |
-
-To prevent an open `EventSource` connection in `FooterSseStatus` from disqualifying pages from the browser's **Back/Forward Cache (`bfcache`)** on mobile Safari/Chrome, the island closes the stream on `pagehide` and reconnects when restored from `bfcache` on `pageshow`:
-
-```typescript title="apps/web/src/features/telemetry-stream/footer-sse-status.tsx"
-window.addEventListener('pagehide', closeStream)
-window.addEventListener('pageshow', (event) => {
-  if (event.persisted) connectStream()
-})
-```
+`apps/web/next.config.ts` enables `reactCompiler` (`compilationMode: 'infer'`, `panicThreshold: 'none'`). Client state follows strict boundaries:
+- **Component-Local `useState`:** used inside interactive `D3.js` simulations (`d3-architecture-flow.tsx`, `d3-react-render-graph.tsx`) and `CvViewTabs` so local toggles never re-render unrelated subtrees.
+- **Atomic `Zustand` (`apps/web/src/shared/store/use-ui-store.ts`):** keeps `useUIStoreBase` private and exports explicit atomic selector hooks (`useIsGuestPassModalOpen`, `useIsCommandPaletteOpen`, `useTechRadarCategoryFilter`, `useExpandedKbFolders`, `usePalette`, etc.) plus a stable `useUIActions()` object — zero `createSelectors` proxies, zero server/auth data in Zustand, and hydration-safe `sessionStorage` / `localStorage` sync.
 
 ---
 
-## 3. `React 19 Compiler` & State Boundaries (`useState` vs `Zustand`)
+## 4. Enterprise Client Fetching: `apiClient`, IndexedDB Allowlist & `AuthCrossTabSyncBridge`
 
-`apps/web/next.config.ts` enables `reactCompiler` (`babel-plugin-react-compiler` with `compilationMode: 'infer'`), which automatically memoizes derived values and JSX subtrees at build time without manual `useMemo` or `useCallback` wrappers.
-
-To keep rendering predictable, client state follows strict boundaries:
-- **Component-Local `useState`:** used inside interactive `D3.js` simulations (`d3-architecture-flow.tsx`, `d3-react-render-graph.tsx`) so toggling simulation modes never triggers re-renders outside the graph card.
-- **Global `Zustand` (`use-ui-store.ts`):** reserved strictly for cross-component UI state (`Cmd+K` / `Guest Pass` modals and expanded Knowledge Base folders persisted to `sessionStorage` after hydration).
-
----
-
-## 4. Enterprise Client Fetching: `apiClient` (`Axios`), `AbortSignal`, `QueryCache` & Typed Routes
-
-While Next.js Server Components rely on native `fetch`, client-side API communication (`'use client'` + `TanStack Query v5`) uses a battle-tested **Axios** client paired with strict Zod validation and typed route registries:
+Client-side API communication (`'use client'` + `TanStack Query v5`) is architected for offline safety, tab synchronization, and strict error hygiene:
 
 1. **Centralized `API_ENDPOINTS` & `APP_ROUTES`:**
-   - API contracts live in `@repo/shared-schemas` (`API_ENDPOINTS` + template-literal `resolveEndpoint` for parameterized paths like `/api/knowledge/:slug/view`).
-   - Next.js page navigation and header/sidebar matching use `APP_ROUTES` + `resolveHeaderRouteBadge` in `apps/web/src/shared/i18n/app-routes.ts`.
+   - API contracts live in `@repo/shared-schemas` (`API_ENDPOINTS` + `resolveEndpoint`), while page routes and Hybrid KB access predicates (`isPublicKnowledgeBasePath`, `isProtectedKnowledgeBasePath`) live in `apps/web/src/shared/i18n/app-routes.ts`.
 2. **Typed Axios `apiClient` (`apps/web/src/shared/lib/api-client.ts`):**
-   - Wraps an isolated `axios.create({ withCredentials: true, allowAbsoluteUrls: false, timeout: 16_000 })` instance (exceeding the backend's 15s `TimeoutInterceptor`, with `allowBuilds` supply-chain protection in `pnpm-workspace.yaml` and `pnpm-lock.yaml`).
-   - Exposes `get`, `post`, `put`, `patch`, and `delete` with runtime `Zod` validation, `204 No Content` & `onUploadProgress` support, `X-Request-Id` Correlation ID extraction into `ApiClientError`, query param compaction (`cursor=null` guard), native `AbortSignal` support, and `axios` response interceptors.
-3. **3-Layer `queries/*.ts` + `StrictMode`-Safe `QueryCache`:**
-   - Every domain splits standalone fetchers (`fetchSystemCapabilities(signal?)`) from `queryOptions` / `infiniteQueryOptions` (`({ signal }) => ...`) and thin `use*` hooks.
-   - `QueryProvider` configures a global `QueryCache({ onError })` shield that filters out `AbortError` / `CancelledError` (including expected React 19 `StrictMode` cancellations in `dev`) and expected `4xx` RBAC responses, forwarding only unexpected failures to the production-only `captureClientException` Sentry hook (`process.env.NODE_ENV === 'production'`).
+   - Isolated `axios.create({ withCredentials: true, allowAbsoluteUrls: false, timeout: 16_000 })` with runtime `Zod` validation, `X-Request-Id` extraction into `ApiClientError`, query param compaction, and native `AbortSignal` support.
+3. **Strict IndexedDB Persistence Allowlist (`apps/web/src/shared/providers/query-provider.tsx`):**
+   - `QueryProvider` wires `persistQueryClientSubscribe` with `dehydrateOptions: { shouldDehydrateQuery: shouldPersistQueryToIndexedDb }`, where `PERSISTABLE_QUERY_ROOT_KEYS = new Set(['knowledge'])`.
+   - **Security & Freshness Guard:** only offline-safe `['knowledge', ...]` queries persist to IndexedDB; `['auth', 'me']` (preventing 24-hour resurrection of expired/revoked sessions) and volatile observability queries (`['telemetry', ...]`, `['system', ...]`) are never persisted.
+   - `QueryCache({ onError })` ignores `AbortError` / React 19 `StrictMode` cancellations and expected `4xx` responses, forwarding only real network/5xx errors to `captureClientException`.
+4. **Single-Socket `AuthCrossTabSyncBridge` (`apps/web/src/features/auth/auth-cross-tab-sync-bridge.tsx`):**
+   - Mounted once in root `[locale]/layout.tsx` inside `QueryProvider`, opening exactly **one** `BroadcastChannel('workfolio_auth_sync')` listener per browser tab (instead of one per `useVisitorProfile()` consumer) to invalidate `VISITOR_PROFILE_QUERY_KEY` and `['knowledge']` across tabs upon Guest Pass unlock or logout.

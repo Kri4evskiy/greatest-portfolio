@@ -1,96 +1,102 @@
 ---
-title: "Архітектура RSC у Next.js: серверна нарізка локалей, мікро-острови та React 19 Compiler"
-sidebarLabel: "RSC-острови та React Compiler"
-summary: "Як мінімізувати клієнтський JS-бандл у багатомовному застосунку на Next.js 16 та React 19: нарізка активної локалі в Server Components, тонкі клієнтські мікро-острови, bfcache-безпечний SSE та React Compiler."
+title: "Архітектура RSC у Next.js: серверна нарізка локалей, мікро-острови та синглтон SSE"
+sidebarLabel: "RSC-острови та нарізка локалей"
+summary: "Як ми мінімізуємо клієнтський JS та HTML-пейлоад у багатомовному застосунку на Next.js 16 і React 19: нарізка словників через pickIntlMessages(), серверний острів CvDocumentShowcase, ліниві завантажувачі модалок на next/dynamic, ref-counted bfcache-безпечний SSE та allowlist для IndexedDB."
 category: "this-project"
 format: "deep-dive"
-tags: ["rsc", "nextjs", "react-compiler", "i18n", "performance", "zustand"]
-readingTime: "6 хв"
+tags: ["rsc", "nextjs", "react-compiler", "i18n", "performance", "zustand", "sse"]
+readingTime: "8 хв"
 publishedAt: "2026-11-10"
 order: 1
 tldr:
-  - "Секції головної сторінки (`WorkfolioHeroSection`, `WorkfolioProjectsSection`, `WorkfolioExperienceSection`, `WorkfolioFooter`) є чистими Server Components і вирізають лише активну локаль на сервері."
-  - "Уся інтерактивність винесена в мінімальні клієнтські мікро-острови (`workfolio-client-islands.tsx`, `footer-sse-status.tsx`), які отримують уже готові рядки через пропси."
-  - "У `next.config.ts` активовано `reactCompiler` (`compilationMode: 'infer'`), а стейт розділений між локальним `useState` усередині D3-графів та глобальним `Zustand` із синхронізацією `sessionStorage`."
+  - "На сервері нарізаються і типізовані дані (`pickLocalized`), і словники `next-intl` (`pickIntlMessages`) на рівні кореневого `layout.tsx` та сторінок, а `CvDocumentShowcase` прокидає серверний ATS-HTML усередину `CvViewTabs` (`forceMount` + `data-[state=inactive]:hidden`)."
+  - "Важкі модалки (`GuestPassModalLoader`, `CommandPaletteLoader`) підвантажуються ліниво через `next/dynamic` (`ssr: false`), а SSE об’єднано в ref-counted синглтон `useSyncExternalStore` (`use-telemetry-stream.ts`) із `pagehide`/`pageshow` гігієною `bfcache`."
+  - "Застосовуються атомарні хуки Zustand (`useUIActions()` + `use*`), єдиний кореневий `AuthCrossTabSyncBridge` (`BroadcastChannel`) і суворий allowlist `['knowledge']` для персистенції в IndexedDB у `QueryProvider`."
 ---
 
-## 1. Серверна нарізка локалей (`Server Locale Slicing`)
+## 1. Серверна нарізка локалей і розділення неймспейсів через `pickIntlMessages()`
 
-У багатомовних проєктах (`EN / UK / RU`) імпорт типізованих словників (досвід роботи, кейси, Tech Radar) усередині `'use client'` компонента змушує бандлер пакувати тексти одразу трьома мовами в браузерний JS-чанк.
+У багатомовних застосунках (`EN / UK / RU`) до роздування початкового завантаження найчастіше призводять два приховані витоки:
+1. Імпорт тримовних TypeScript-словників (`author-profile.ts`, `tech-radar`, `engineering-roadmap`) усередині `'use client'` пакує всі 3 мови в браузерний JS-чанк.
+2. Передача повного об'єкта `getMessages()` в один кореневий `<NextIntlClientProvider>` серіалізує переклади всіх сторінок застосунку в SSR HTML кожного маршруту.
 
-Щоб клієнт отримував лише одну активну локаль, великі секції рендеряться як **Server Components**, обирають потрібну мову через `pickLocalized(field, locale)` на сервері та передають готові рядки в точкові клієнтські острови:
+Обидві проблеми вирішено на сервері:
+- **Нарізка типізованих даних:** основні секції головної (`WorkfolioHeroSection`, `WorkfolioProjectsSection`, `WorkfolioExperienceSection`, `WorkfolioFooter`) та `CvDocumentShowcase` є **Server Components**, обирають лише активну локаль через `pickLocalized(field, locale)` і передають у тонкі клієнтські острови готові рядки або `ReactNode`.
+- **Нарізка словників через `pickIntlMessages()` (`apps/web/src/shared/i18n/pick-messages.ts`):**
+  - Кореневий `apps/web/src/app/[locale]/layout.tsx` передає **лише** `['Header', 'GuestPassModal', 'KnowledgeBase', 'ErrorPage']`.
+  - Окремі сторінки обгортають свої клієнтські піддерева точковими `<NextIntlClientProvider>`: головна (`['TechRadar', 'Roadmap']`), `/cv` (`['CvPage']`) та `/system-status` (`['SystemStatusPage']`).
 
-```tsx title="apps/web/src/entities/workfolio-profile/workfolio-sections.tsx"
-export async function WorkfolioExperienceSection({ locale }: { locale: SupportedLocale }) {
-  const t = await getTranslations({ locale, namespace: 'Experience' })
-  const featuredRoles = COMMERCIAL_EXPERIENCE.filter((role) => role.featured)
-  const earlierRoles = COMMERCIAL_EXPERIENCE.filter((role) => !role.featured)
+### Серверний острів `CvDocumentShowcase` + `CvViewTabs` (`forceMount`)
+На маршруті `/[locale]/cv` серверний компонент `CvDocumentShowcase` (`apps/web/src/entities/workfolio-profile/cv-document-showcase.tsx`) рендерить повне структуроване ATS-резюме на сервері й передає його через слот `structuredSlot={structuredResumeNode}` у клієнтський острів `CvViewTabs` (`cv-view-tabs.tsx`). Вкладка структурованого резюме використовує Radix `forceMount` та приховування через CSS:
 
-  return (
-    <section id="experience" className="scroll-mt-20 space-y-4">
-      {/* Основний список рендериться в статичний HTML на сервері (0 КБ JS) */}
-      {featuredRoles.map((role) => (
-        <ExperienceCard key={role.id} item={role} locale={locale} projectsLabel={t('projectsLabel')} />
-      ))}
+```tsx title="apps/web/src/entities/workfolio-profile/cv-view-tabs.tsx"
+<TabsContent value="structured" forceMount className="mt-0 data-[state=inactive]:hidden">
+  {structuredSlot}
+</TabsContent>
+```
 
-      {/* У клієнтський острів передаються лише готові HTML-вузли (ReactNode) */}
-      <EarlierRolesDisclosure
-        showLabel={t('showEarlierRoles', { count: earlierRoles.length })}
-        hideLabel={t('hideEarlierRoles')}
-      >
-        {earlierRoles.map((role) => (
-          <ExperienceCard key={role.id} item={role} locale={locale} projectsLabel={t('projectsLabel')} />
-        ))}
-      </EarlierRolesDisclosure>
-    </section>
-  )
+Пошукові краулери завжди отримують повний семантичний HTML резюме під час SSR навіть за активної вкладки `'pdf'`, а тримовний словник `author-profile.ts` займає рівно `0 КБ` у клієнтському JS.
+
+---
+
+## 2. Клієнтські мікро-острови, ліниві завантажувачі модалок і синглтон SSE із `bfcache`
+
+Кожна інтерактивна точка ізольована у власний легковаговий компонент:
+
+| Мікро-острів / Завантажувач | Файл | Призначення й актуальні пропси |
+| :--- | :--- | :--- |
+| **`HeroActionRow`** | `workfolio-client-islands.tsx` | Перехід на `/knowledge-base`, `/cv` та плавний скрол до `#tech-radar` / `#roadmap` (`ctaUnlocked`, `ctaLocked`, `ctaCvPdf`, `ctaTechRadar`, `ctaRoadmap`) |
+| **`CaseStudyReadButton`** | `workfolio-client-islands.tsx` | Збирає `/knowledge-base/${category}/${slug}`, перевіряє `isUnlocked \|\| isPublicKnowledgeBasePath(targetUrl)` і або переходить, або викликає `openGuestPassModal(targetUrl)` (`category`, `slug`, `readUnlockedLabel`, `readLockedLabel`) |
+| **`EarlierRolesDisclosure`** | `workfolio-client-islands.tsx` | Акордеон раннього досвіду роботи (`showLabel`, `hideLabel`, серверний `children: ReactNode`) |
+| **`FooterSseStatus`** | `footer-sse-status.tsx` | Живий індикатор телеметрії з посиланням на `/system-status` (`waitingLabel`, `inspectLabel = 'Inspect Live API'`) поверх `useTelemetryStream()` |
+| **`GuestPassModalLoader`** | `guest-pass-modal-loader.tsx` | Відстежує редиректи `?unlock=knowledge-base` і ліниво завантажує `GuestPassModal` (RHF + Zod + Radix Dialog) через `next/dynamic(..., { ssr: false })` |
+| **`CommandPaletteLoader`** | `command-palette-loader.tsx` | Слухає глобальне поєднання `Cmd+K` / `Ctrl+K` і ліниво завантажує `CommandPaletteModal` через `next/dynamic(..., { ssr: false })` |
+
+### Ref-Counted синглтон `EventSource` і гігієна `bfcache` (`use-telemetry-stream.ts`)
+Замість відкриття окремих сокетів `EventSource` у `FooterSseStatus` та `SystemStatusDashboard` модуль `apps/web/src/features/telemetry-stream/use-telemetry-stream.ts` інкапсулює єдиний `SharedTelemetryStreamManager`, підключений до React через `useSyncExternalStore`:
+
+- **Одне з'єднання на вкладку:** ведеться підрахунок посилань активних підписників (`this.listeners.size === 1` відкриває з'єднання, `0` — закриває), що дотримується бекенд-ліміту `MAX_SSE_STREAMS_PER_IP = 2` та обмеження браузера в 6 HTTP/1.1 з'єднань на origin.
+- **Обмежений експоненційний backoff:** після `EventSource.CLOSED` (наприклад, через `429`/`500` або 15-хвилинний серверний TTL потоку) виконує перепідключення від `2с` до `30с` (максимум `6` спроб, лічильник скидається за подіями `online` / `pageshow`).
+- **Гігієна `bfcache`:** закриває потік на `pagehide` і відновлює його за `event.persisted === true` на `pageshow`:
+
+```typescript title="apps/web/src/features/telemetry-stream/use-telemetry-stream.ts"
+private readonly handlePageHide = (): void => {
+  this.clearReconnectTimer()
+  this.closeSource()
+  if (this.snapshot.sseConnected) {
+    this.emitSnapshot({ ...this.snapshot, sseConnected: false })
+  }
+}
+
+private readonly handlePageShow = (event: PageTransitionEvent): void => {
+  if (event.persisted && this.listeners.size > 0) {
+    this.reconnectAttempts = 0
+    this.connect()
+  }
 }
 ```
 
 ---
 
-## 2. Клієнтські мікро-острови та сумісність SSE з мобільним `bfcache`
+## 3. `React 19 Compiler` та атомарні межі стану (`useState` проти `Zustand`)
 
-Кожна інтерактивна точка ізольована у власний легковаговий клієнтський компонент:
-
-| Мікро-острів | Призначення | Передавані пропси |
-| :--- | :--- | :--- |
-| **`HeroActionRow`** | Програмний скрол до `#roadmap` або відкриття модалки `Guest Pass` | Лише локалізовані підписи кнопок |
-| **`CaseStudyReadButton`** | Перехід до статті кейса або виклик `openAuthModal(targetHref)` | `targetHref`, `readUnlockedLabel`, `readLockedLabel` |
-| **`EarlierRolesDisclosure`** | Акордеон раннього досвіду роботи | Серверний `children: ReactNode` + текстові мітки |
-| **`FooterSseStatus`** | Живий індикатор пульсу телеметрії `EventSource` | Рядки статусів (`Online`, `Standby`) |
-
-Щоб відкрите з'єднання `EventSource` у `FooterSseStatus` не блокувало миттєве повернення кнопкою «Назад» (**Back/Forward Cache — `bfcache`**) у мобільних браузерах, компонент закриває потік на події `pagehide` і перепідключає його на `pageshow`:
-
-```typescript title="apps/web/src/features/telemetry-stream/footer-sse-status.tsx"
-window.addEventListener('pagehide', closeStream)
-window.addEventListener('pageshow', (event) => {
-  if (event.persisted) connectStream()
-})
-```
+В `apps/web/next.config.ts` активовано `reactCompiler` (`compilationMode: 'infer'`, `panicThreshold: 'none'`). Клієнтський стан розділено суворо за областю життя:
+- **Локальний `useState`:** використовується всередині інтерактивних симуляцій `D3.js` (`d3-architecture-flow.tsx`, `d3-react-render-graph.tsx`) та вкладок `CvViewTabs`, щоб локальні перемикання не викликали ререндер сусідніх гілок.
+- **Атомарний `Zustand` (`apps/web/src/shared/store/use-ui-store.ts`):** базовий хук `useUIStoreBase` прихований, а назовні експортуються лише явні атомарні хуки (`useIsGuestPassModalOpen`, `useIsCommandPaletteOpen`, `useTechRadarCategoryFilter`, `useExpandedKbFolders`, `usePalette` тощо) і стабільний `useUIActions()` — без проксі `createSelectors`, без зберігання серверних/auth-даних у Zustand і з SSR-безпечною синхронізацією `sessionStorage` / `localStorage`.
 
 ---
 
-## 3. `React 19 Compiler` та гігієна стану (`useState` проти `Zustand`)
+## 4. Enterprise-шар запитів: `apiClient`, allowlist IndexedDB та `AuthCrossTabSyncBridge`
 
-В `apps/web/next.config.ts` увімкнено `reactCompiler` (`babel-plugin-react-compiler` у режимі `compilationMode: 'infer'`), який автоматично мемоїзує обчислення та JSX-вузли на етапі збірки без ручних обгорток `useMemo` та `useCallback`.
-
-Для передбачуваної роботи компілятора клієнтський стан розділений за областю життя:
-- **Локальний `useState`:** використовується всередині інтерактивних симуляцій `D3.js` (`d3-architecture-flow.tsx`, `d3-react-render-graph.tsx`), щоб перемикання режимів графа не викликало ререндер сусідніх компонентів сторінки.
-- **Глобальний `Zustand` (`use-ui-store.ts`):** зберігає лише крос-компонентний стан UI (модалки `Cmd+K` / `Guest Pass` та розгорнуті папки дерева Бази Знань із SSR-безпечною синхронізацією в `sessionStorage`).
-
----
-
-## 4. Enterprise-шар запитів: `apiClient` (`Axios`), `AbortSignal`, `QueryCache` та типізовані роути
-
-Поки серверний шар Next.js спирається на нативний `fetch`, клієнтська взаємодія з API (`'use client'` + `TanStack Query v5`) побудована поверх перевіреного **Axios** із жорсткою `Zod`-валідацією та реєстрами маршрутів:
+Клієнтська робота з API (`'use client'` + `TanStack Query v5`) спроєктована з акцентом на офлайн-безпеку, крос-вкладкову синхронізацію та чистоту обробки помилок:
 
 1. **Єдині реєстри `API_ENDPOINTS` та `APP_ROUTES`:**
-   - Контракти API описані в `@repo/shared-schemas` (`API_ENDPOINTS` + шаблонізатор `resolveEndpoint` для параметризованих маршрутів на кшталт `/api/knowledge/:slug/view`).
-   - Маршрути сторінок Next.js, бейджі шапки та `Cmd+K` переходи централізовані в `apps/web/src/shared/i18n/app-routes.ts` (`APP_ROUTES`, `resolveHeaderRouteBadge`, `buildKnowledgeBasePath`).
+   - Контракти API описані в `@repo/shared-schemas` (`API_ENDPOINTS` + `resolveEndpoint`), а маршрути та предикати гібридного доступу до БЗ (`isPublicKnowledgeBasePath`, `isProtectedKnowledgeBasePath`) — в `apps/web/src/shared/i18n/app-routes.ts`.
 2. **Типізований Axios `apiClient` (`apps/web/src/shared/lib/api-client.ts`):**
-   - Інкапсулює налаштований інстанс `axios.create({ withCredentials: true, allowAbsoluteUrls: false, timeout: 16_000 })` (із запасом понад 15s `TimeoutInterceptor` бекенду; захист ланцюга постачання забезпечено через `allowBuilds` у `pnpm-workspace.yaml` та `pnpm-lock.yaml`).
-   - Підтримує `get`, `post`, `put`, `patch`, `delete`, рантайм-валідацію відповідей через `Zod`, обробку `204 No Content` та `onUploadProgress`, витягування `X-Request-Id` у `ApiClientError`, фільтрацію порожніх query-параметрів (захист від `cursor=null`), нативний `AbortSignal` та інтерсептори Axios.
-3. **3-шарові `queries/*.ts` та захист `QueryCache` у `StrictMode`:**
-   - Кожен домен розділений на standalone-фетчери (`fetchSystemCapabilities(signal?)`), фабрики `queryOptions` / `infiniteQueryOptions` (`({ signal }) => ...`) та тонкі хуки `use*`.
-   - Глобальний `QueryCache({ onError })` у `QueryProvider` відсікає штатні `AbortError` / `CancelledError` (включно з подвійним маунтом React 19 `StrictMode` у `dev`) та очікувані `4xx` відповіді RBAC, передаючи лише реальні мережеві/5xx збої у `captureClientException` (строго за `NODE_ENV === 'production'`, без витоків dev-помилок у Sentry).
+   - Ізольований інстанс `axios.create({ withCredentials: true, allowAbsoluteUrls: false, timeout: 16_000 })` із рантайм-валідацією `Zod`, витягуванням `X-Request-Id` у `ApiClientError`, фільтрацією порожніх query-параметрів та підтримкою `AbortSignal`.
+3. **Суворий allowlist персистенції IndexedDB (`apps/web/src/shared/providers/query-provider.tsx`):**
+   - `QueryProvider` передає в `persistQueryClientSubscribe` опцію `dehydrateOptions: { shouldDehydrateQuery: shouldPersistQueryToIndexedDb }`, де `PERSISTABLE_QUERY_ROOT_KEYS = new Set(['knowledge'])`.
+   - **Захист свіжості й безпеки:** в IndexedDB зберігаються лише офлайн-безпечні запити `['knowledge', ...]`; сесія `['auth', 'me']` (щоб не воскрешати прострочені/відкликані токени на 24 години) та волатильні запити спостережуваності (`['telemetry', ...]`, `['system', ...]`) ніколи не записуються на диск.
+   - Глобальний `QueryCache({ onError })` фільтрує `AbortError` / скасування React 19 `StrictMode` і очікувані `4xx` відповіді, передаючи в `captureClientException` лише реальні мережеві/5xx збої.
+4. **Єдиний крос-вкладковий міст `AuthCrossTabSyncBridge` (`apps/web/src/features/auth/auth-cross-tab-sync-bridge.tsx`):**
+   - Монтується рівно один раз у кореневому `[locale]/layout.tsx` усередині `QueryProvider`, відкриваючи **один** канал `BroadcastChannel('workfolio_auth_sync')` на всю вкладку браузера (замість окремої підписки в кожному `useVisitorProfile()`) для миттєвої інвалідації `VISITOR_PROFILE_QUERY_KEY` та `['knowledge']` під час входу за Guest Pass або виходу.

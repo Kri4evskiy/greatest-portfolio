@@ -1,124 +1,122 @@
 ---
-title: "Production SEO Architecture in Next.js 16: SSG Sitemap, Locale Hreflang Matrix & OpenGraph"
+title: "Production SEO Architecture in Next.js 16: Hybrid KB Sitemap, Locale Hreflang Matrix & OpenGraph"
 sidebarLabel: "Production SEO & Sitemap"
-summary: "Engineering reference for our multilingual SEO pipeline in Next.js 16: locale mapping (en / uk ➔ /ua / ru), static robots.ts and sitemap.ts generation, canonical + hreflang tags, and code-generated OpenGraph cards."
+summary: "Engineering reference for our multilingual SEO pipeline in Next.js 16: LOCALE_METADATA single source of truth, Hybrid Knowledge Base indexing (zero 307 redirects for crawlers), shared OpenGraph & JSON-LD builders, and localized Inter TTF OpenGraph cards."
 category: "this-project"
 format: "deep-dive"
 tags: ["seo", "nextjs", "i18n", "ssg", "sitemap", "architecture"]
-readingTime: "6 min"
+readingTime: "7 min"
 publishedAt: "2026-11-21"
 order: 4
 tldr:
-  - "Module `apps/web/src/shared/lib/seo.ts` centralizes canonical URL builders, strict `NEXT_PUBLIC_SITE_URL` origin parsing (`parsed.origin`), locale mapping (`uk` ➔ `/ua` ➔ `uk_UA`), and XSS-safe `JSON-LD` serialization (`ProfilePage`, `Person`, `TechArticle`)."
-  - "`robots.ts`, `sitemap.ts`, `llms.txt/route.ts`, `icon.tsx`, `apple-icon.tsx`, and `[locale]/opengraph-image.tsx` leverage the native File-Based Metadata API (`0 KB` client JS) and bypass JWT checks in `src/proxy.ts` via `matcher`."
-  - "Adaptive `viewport` (`themeColor`: `#FAF8F5` / `#121211`), `max-image-preview: 'large'`, `1200×630` `Obsidian Editorial Dark` cards, and the `/llms.txt` standard maximize discoverability across both Google Search and AI search engines (ChatGPT, Claude, Perplexity, Cursor)."
+  - "Centralizes locale metadata in `LOCALE_METADATA` (`packages/shared-schemas/src/locale.schema.ts`), origin validation in `resolvePublicSiteUrl()` (`env.ts`), and `buildOpenGraphMetadata` / XSS-safe `JSON-LD` (`ProfilePage`, `TechArticle`, `BreadcrumbList`) in `apps/web/src/shared/lib/seo.ts`."
+  - "Enforces Hybrid KB SEO hygiene: `sitemap.ts` includes `/`, `/cv`, `/system-status`, `/knowledge-base`, and `/knowledge-base/this-project/**`, while `robots.ts` disallows all protected categories across all 3 locale prefixes — zero `307` redirects for crawlers."
+  - "Localized `[locale]/opengraph-image.tsx` (`EN / UA / RU`) loads `Inter` TTF fonts with an offline English fallback, while `generateMetadata()` on unmatched KB slugs sets `robots: { index: false, follow: false }`."
 ---
 
-## 1. The 3-Tier Locale Matrix (`Internal Code` vs `URL Prefix` vs `Hreflang / OpenGraph`)
+## 1. The 3-Tier Locale Matrix (`LOCALE_METADATA` Single Source of Truth)
 
-A core nuance of multilingual SEO in this monorepo is that internal locale codes, public browser URL prefixes, and search engine / social messenger specifications follow different standards.
+A core nuance of multilingual SEO in this monorepo is that internal locale codes, public browser URL prefixes, BCP 47 tags, and search engine / social messenger specifications follow different standards.
 
-In `apps/web/src/shared/i18n/routing.ts`, routing uses `localePrefix: { mode: 'as-needed', prefixes: { uk: '/ua' } }`. To prevent inconsistencies across pages, `apps/web/src/shared/lib/seo.ts` explicitly maps each representation:
+Rather than duplicating lookup maps across frontend modules, `packages/shared-schemas/src/locale.schema.ts` exports `LOCALE_METADATA` as the single source of truth consumed by `apps/web/src/shared/lib/seo.ts`, `robots.ts`, and `apps/web/src/shared/i18n/routing.ts` (`localePrefix: { mode: 'as-needed', prefixes: { uk: '/ua' } }`):
 
-| Language | Internal Type (`SupportedLocale` & `.mdx` suffix) | Public URL Prefix (`as-needed`) | Search Engine ISO 639-1 (`<html lang>` & `hreflang`) | Messenger Standard (`og:locale`) |
+| Language | Internal Type (`SupportedLocale` & `.mdx` suffix) | Public URL Prefix (`urlPrefix`) | Search Engine ISO 639-1 (`<html lang>` & `hreflang`) | Messenger Standard (`ogLocale`) |
 | :--- | :--- | :--- | :--- | :--- |
-| **English (Default)** | `'en'` (`*.en.mdx`) | No prefix (`/`, `/cv`, `/knowledge-base`) | `en` (+ `x-default`) | `en_US` |
-| **Ukrainian** | `'uk'` (`*.uk.mdx`) | `/ua` (`/ua`, `/ua/cv`, `/ua/knowledge-base`) | `uk` | `uk_UA` |
-| **Russian** | `'ru'` (`*.ru.mdx`) | `/ru` (`/ru`, `/ru/cv`, `/ru/knowledge-base`) | `ru` | `ru_RU` |
+| **English (Default)** | `'en'` (`*.en.mdx`) | `''` (`/`, `/cv`, `/system-status`, `/knowledge-base`) | `en` (+ `x-default`) | `en_US` |
+| **Ukrainian** | `'uk'` (`*.uk.mdx`) | `'/ua'` (`/ua`, `/ua/cv`, `/ua/system-status`, `/ua/knowledge-base`) | `uk` | `uk_UA` |
+| **Russian** | `'ru'` (`*.ru.mdx`) | `'/ru'` (`/ru`, `/ru/cv`, `/ru/system-status`, `/ru/knowledge-base`) | `ru` | `ru_RU` |
 
 > [!IMPORTANT]
-> According to Google Search Central guidelines, the `hreflang` attribute must use the **ISO 639-1** language code (`uk` for Ukrainian, not the country code `ua`), while its `href` attribute must resolve to the actual public URL (`https://domain.com/ua/...`). Therefore, `buildLanguageAlternatesMap()` maps the `uk` key directly to the `/ua` URL prefix.
+> According to Google Search Central guidelines, the `hreflang` attribute must use the **ISO 639-1** language code (`uk` for Ukrainian, not the country code `ua`), while its `href` attribute must resolve to the actual public URL (`https://domain.com/ua/...`). Therefore, `buildLanguageAlternatesMap()` maps the `uk` key directly to `LOCALE_METADATA.uk.urlPrefix` (`'/ua'`).
 
 ---
 
-## 2. Unified SEO Core & Origin Hardening (`apps/web/src/shared/lib/seo.ts`)
+## 2. Unified SEO Core, Origin Hardening & Shared `OpenGraph` Builder
 
-All SEO URL builders live in pure server functions with zero external dependencies:
+Origin validation lives in `resolvePublicSiteUrl()` inside `apps/web/src/shared/config/env.ts` (backed by Zod `HttpOriginSchema` and `parseSafeHttpOrigin()`, with a one-time production warning outside `WORKFOLIO_DEMO_MODE=true` if `NEXT_PUBLIC_SITE_URL` is missing or invalid). All URL, OpenGraph, and JSON-LD builders in `apps/web/src/shared/lib/seo.ts` consume `LOCALE_METADATA` and `resolvePublicSiteUrl()`:
 
 ```typescript title="apps/web/src/shared/lib/seo.ts"
-const DEFAULT_SITE_URL = 'http://localhost:3000'
+export function buildLocalizedPath(pathname: string, locale: SupportedLocale = DEFAULT_LOCALE): string {
+  const normalizedPath = normalizeSeoPathname(pathname)
+  const prefix = LOCALE_METADATA[locale].urlPrefix
 
-const LOCALE_URL_PREFIX_MAP: Record<SupportedLocale, string> = {
-  en: '',
-  uk: '/ua',
-  ru: '/ru',
+  if (normalizedPath === '/') {
+    return prefix || '/'
+  }
+  return `${prefix}${normalizedPath}`
 }
 
-const OG_LOCALE_MAP: Record<SupportedLocale, string> = {
-  en: 'en_US',
-  uk: 'uk_UA',
-  ru: 'ru_RU',
-}
+export function buildOpenGraphMetadata(input: OpenGraphMetadataInput): NonNullable<Metadata['openGraph']> {
+  const base = {
+    title: input.title,
+    description: input.description,
+    url: buildLocalizedUrl(input.pathname, input.locale),
+    siteName: SITE_NAME,
+    locale: resolveOgLocale(input.locale),
+    alternateLocale: resolveAlternateOgLocales(input.locale),
+  }
 
-export function resolveSiteUrl(): string {
-  const raw = process.env.NEXT_PUBLIC_SITE_URL?.trim()
-  if (!raw) return DEFAULT_SITE_URL
-
-  try {
-    const parsed = new URL(raw)
-    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-      return DEFAULT_SITE_URL
+  if (input.type === 'article') {
+    return {
+      ...base,
+      type: 'article',
+      ...(input.publishedTime ? { publishedTime: input.publishedTime } : {}),
+      ...(input.tags && input.tags.length > 0 ? { tags: [...input.tags] } : {}),
     }
-    return parsed.origin
-  } catch {
-    return DEFAULT_SITE_URL
   }
+
+  return { ...base, type: input.type ?? 'website' }
 }
 ```
 
-### Why `resolveSiteUrl()` validates `parsed.origin` via `new URL(raw)`
-In `apps/web/src/app/[locale]/layout.tsx`, Next.js expects a valid URL instance in `metadataBase: new URL(resolveSiteUrl())`. If a deployment environment accidentally provides a malformed `NEXT_PUBLIC_SITE_URL` (missing protocol or containing trailing path segments), unguarded `new URL()` calls would crash `next build`. Extracting `parsed.origin` with protocol verification (`http:` / `https:`) guarantees a clean origin or a safe fallback to `http://localhost:3000`.
+### Why `buildOpenGraphMetadata()` Exists
+Next.js performs a **shallow merge** on the `openGraph` object between `layout.tsx` and child route `page.tsx` files. Without a shared builder, overriding `openGraph` on `/cv`, `/system-status`, or `/knowledge-base/[...slug]` silently drops `siteName` and `alternateLocale`. `buildOpenGraphMetadata()` guarantees consistent `siteName`, `locale`, and `alternateLocale` across every route (`[locale]/layout.tsx`, `[locale]/cv/page.tsx`, `[locale]/system-status/page.tsx`, `[locale]/knowledge-base/page.tsx`, and `[locale]/knowledge-base/[...slug]/page.tsx`).
 
 ---
 
-## 3. Generating `canonical`, `alternates.languages` (`hreflang`), and `openGraph`
+## 3. Hybrid Knowledge Base SEO (`sitemap.ts`, `robots.ts`) & Edge Proxy Hygiene
 
-The `buildPageAlternates(pathname, locale)` helper is invoked inside `generateMetadata()` across all route levels (`[locale]/layout.tsx`, `[locale]/cv/page.tsx`, `[locale]/knowledge-base/page.tsx`, and `[locale]/knowledge-base/[...slug]/page.tsx`):
+Because the Knowledge Base splits into public architectural blueprints (`/knowledge-base` + `/knowledge-base/this-project/**`) and Edge-JWT-protected study notes, crawler configuration strictly mirrors `PUBLIC_KB_ROOT_SEGMENTS = ['this-project']` so search engines encounter **zero `307` auth redirects**:
+
+1. **Hybrid Sitemap Filtering (`apps/web/src/app/sitemap.ts`):**
+   - Registers static hubs: `/` (`priority: 1.0`), `/cv` (`0.9`), `/knowledge-base` (`0.9`), and `/system-status` (`0.85`).
+   - Walks `getAllStaticKnowledgeSlugArrays()` and skips every non-public route via `if (!isPublicKnowledgeBasePath(pathname)) continue`, emitting only `this-project/**` folders and articles with real `publishedAt` dates across `EN / UA / RU` (`alternates.languages`).
+2. **Dynamic Protected Category Disallow (`apps/web/src/app/robots.ts`):**
+   - `buildProtectedKbDisallowRules()` iterates `KnowledgeCategoryEnum.options` minus `PUBLIC_KB_ROOT_SEGMENTS` across all 3 locale prefixes (`''`, `'/ua'`, `'/ru'`), outputting `disallow: ['/api/', '/search-index/', ...buildProtectedKbDisallowRules()]`.
+3. **Explicit Asset Extension Matcher (`apps/web/src/proxy.ts`):**
+   - Metadata routes (`robots.ts`, `sitemap.ts`, `llms.txt/route.ts`, `icon.tsx`, `apple-icon.tsx`, `[locale]/opengraph-image.tsx`) bypass Edge Auth via an explicit static extension list (`ico|png|jpg|jpeg|gif|svg|webp|avif|pdf|css|js|mjs|map|woff|woff2|ttf|otf|txt|xml|json|webmanifest`) rather than a blanket `.*\..*` pattern.
+4. **Soft-404 & Noindex Protection:**
+   - Unmatched locale routes hit `app/[locale]/[...rest]/page.tsx` -> `notFound()` (strict HTTP `404` rendered by `app/[locale]/not-found.tsx`).
+   - Inside `apps/web/src/app/[locale]/knowledge-base/[...slug]/page.tsx`, `export const dynamicParams = false` blocks arbitrary slugs at the router level, and the `generateMetadata()` fallback explicitly returns `robots: { index: false, follow: false }`.
+
+---
+
+## 4. XSS-Safe `JSON-LD` (`ProfilePage`, `TechArticle`, `BreadcrumbList`), Localized `OG` Cards & `/llms.txt`
+
+### Hardened JSON-LD Serialization
+`serializeSafeJsonLd()` escapes all five dangerous characters for inline `<script type="application/ld+json">` injection safety (`<`, `>`, `&`, `\u2028`, `\u2029`):
 
 ```typescript title="apps/web/src/shared/lib/seo.ts"
-export function buildLanguageAlternatesMap(pathname: string): Record<string, string> {
-  return {
-    en: buildLocalizedUrl(pathname, 'en'),
-    uk: buildLocalizedUrl(pathname, 'uk'),
-    ru: buildLocalizedUrl(pathname, 'ru'),
-    'x-default': buildLocalizedUrl(pathname, DEFAULT_LOCALE),
-  }
-}
-
-export function buildPageAlternates(pathname: string, locale: SupportedLocale = DEFAULT_LOCALE) {
-  return {
-    canonical: buildLocalizedUrl(pathname, locale),
-    languages: buildLanguageAlternatesMap(pathname),
-  }
+export function serializeSafeJsonLd(payload: Record<string, unknown>): string {
+  return JSON.stringify(payload)
+    .replace(/</g, '\\u003c')
+    .replace(/>/g, '\\u003e')
+    .replace(/&/g, '\\u0026')
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029')
 }
 ```
 
-From this object, Next.js 16 automatically renders in `<head>`:
-- **`<link rel="canonical">`** — the authoritative URL for the active locale (preventing duplicate indexing from query parameters like `?unlock=knowledge-base`).
-- **`<link rel="alternate" hreflang="en | uk | ru | x-default">`** — cross-language links following the Section 1 matrix (`x-default` points to the unprefixed English route).
-- **`openGraph` tags (`og:title`, `og:description`, `og:url`, `og:locale`, `og:type`, `og:image`)** — localized Rich Link Previews for **Telegram, LinkedIn, Slack, and Discord** (with `og:type="article"`, `article:published_time`, and `article:tag` added on Knowledge Base notes).
+- **Home (`/`) & Resume (`/cv`):** emit `ProfilePage` + `Person` (`buildProfilePageJsonLd()`).
+- **Knowledge Base Articles (`/knowledge-base/[...slug]`):** emit both enhanced `TechArticle` (`mainEntityOfPage`, `publisher`, localized `image` pointing to `/opengraph-image`, `datePublished`, `dateModified`, `keywords`) via `buildTechArticleJsonLd()` **and** `BreadcrumbList` via `buildBreadcrumbListJsonLd()`.
 
----
+### Localized OpenGraph Cards (`EN / UA / RU`) with `Inter` TTF & Offline Fallback
+`apps/web/src/app/[locale]/opengraph-image.tsx` (`1200×630`, `generateStaticParams` over `SUPPORTED_LOCALES`) renders localized `Obsidian Editorial Dark` cards (`OG_LOCALE_COPY` for `en`, `uk`, `ru`):
+- Fetches Cyrillic-capable `Inter` `.ttf` weights (`400`, `700`) from Google Fonts via `fetchGoogleFontTtf()` (`AbortSignal.timeout(4000)`) with module-level promise caching (`cachedInterFontsPromise`).
+- **Resilient Offline Fallback:** if an offline or air-gapped build cannot download `Inter` TTF (`fonts.length === 0`), it automatically falls back to `OG_LOCALE_COPY.en` and `sans-serif` so Satori never renders tofu boxes (`□□□`).
 
-## 4. File-Based Metadata (`robots.ts`, `sitemap.ts`, `opengraph-image.tsx`, `icon.tsx`) & Edge Proxy
-
-All metadata routes in `apps/web/src/app/` compile statically at build time (`SSG`, `0 KB` client JS) and bypass Edge JWT verification in `apps/web/src/proxy.ts` via the `matcher` exclusion list:
-
-```typescript title="apps/web/src/proxy.ts"
-export const config = {
-  matcher: ['/((?!api|search-index|icon|apple-icon|_next|_vercel|.*opengraph-image.*|.*\\..*).*)'],
-}
-```
-
-1. **Internal Endpoint Isolation in `robots.ts`:** `disallow: ['/api/', '/search-index/']` prevents search crawlers from indexing backend REST/SSE streams (`/api/telemetry/stream`) and raw `Cmd+K` JSON search dumps.
-2. **Recursive `.mdx` Discovery in `sitemap.ts`:** combines top-level hubs (`/`, `/cv`, `/knowledge-base`) with all paths from `getAllStaticKnowledgeSlugArrays()` and real `publishedAt` dates from `getAllKnowledgeFrontmatters(DEFAULT_LOCALE)`.
-3. **Code-Generated Branded Graphics via `next/og` (`ImageResponse` / Satori):**
-   - `apps/web/src/app/icon.tsx` (`32×32`) and `apple-icon.tsx` (`180×180`) render the obsidian terminal prompt `>_` icon.
-   - `apps/web/src/app/[locale]/opengraph-image.tsx` (`1200×630`) generates the `Obsidian Editorial Dark` preview card for each locale (`generateStaticParams`) offline, paired with `googleBot: { 'max-image-preview': 'large' }` and adaptive `viewport.themeColor` (`#FAF8F5` / `#121211`) in `layout.tsx`.
-   - **Soft-404 Prevention:** for any unmatched URL inside a locale, the catch-all route `app/[locale]/[...rest]/page.tsx` invokes `notFound()`, returning a strict HTTP `404` status to crawlers via the pure RSC `app/[locale]/not-found.tsx`.
-4. **Structured `JSON-LD` (`Schema.org`) & AI Discovery Manifest (`/llms.txt`):**
-   - `buildProfilePageJsonLd()` and `buildTechArticleJsonLd()` in `seo.ts` emit server-rendered `<script type="application/ld+json">` blocks (escaping `<` ➔ `\u003c` against XSS) on `/`, `/cv`, and all `/knowledge-base/[...slug]` engineering notes.
-   - The static route `apps/web/src/app/llms.txt/route.ts` (`force-static`) compiles a machine-readable Markdown portfolio dossier (executive profile, quantified commercial highlights, 16 ADRs, and full Knowledge Base catalog) tailored for LLM agents (**ChatGPT Search, Claude, Perplexity, Cursor**).
+### AI Discovery Manifest (`/llms.txt`)
+`apps/web/src/app/llms.txt/route.ts` (`force-static`) serves a machine-readable Markdown dossier covering executive positioning, `/`, `/cv`, `/system-status`, `/knowledge-base/this-project`, commercial highlights, the 16 ADRs, and the Hybrid Knowledge Base catalog (explicitly marking protected study-note trees as Guest-Pass-gated and excluded from crawler indexation).
 
 ---
 
@@ -126,12 +124,12 @@ export const config = {
 
 | SEO Component | File / Location | Production Responsibility |
 | :--- | :--- | :--- |
-| **SEO Core & JSON-LD Builders** | `apps/web/src/shared/lib/seo.ts` | Validates `NEXT_PUBLIC_SITE_URL` (`parsed.origin`) and builds `canonical`, `hreflang`, `og:locale`, and `JSON-LD` (`ProfilePage` / `TechArticle`) |
-| **Adaptive Viewport & GoogleBot Rules** | `apps/web/src/app/[locale]/layout.tsx` | System `theme-color` (`#FAF8F5` / `#121211`), `authors`/`creator`, and `max-image-preview: 'large'` |
-| **Turborepo Env Invalidation** | `turbo.json` (`globalEnv`) | Automatically invalidates SSG metadata cache when `NEXT_PUBLIC_SITE_URL` changes |
-| **Robots.txt Generator** | `apps/web/src/app/robots.ts` | Static crawler indexing rules (`allow: '/'`, `disallow: ['/api/', '/search-index/']`) |
-| **Multilingual Sitemap.xml** | `apps/web/src/app/sitemap.ts` | Full localized route map (`EN / UA / RU`) with `lastModified` timestamps from `.mdx` |
-| **AI Discovery Manifest (`/llms.txt`)** | `apps/web/src/app/llms.txt/route.ts` | Structured Markdown dossier of commercial track record, 16 ADRs, and KB catalog for AI search engines |
-| **OpenGraph Social Banner (`1200×630`)** | `apps/web/src/app/[locale]/opengraph-image.tsx` | Build-time `Obsidian Editorial Dark` preview card generation via `next/og` |
-| **Browser & Apple Icons (`32×32`, `180×180`)** | `apps/web/src/app/icon.tsx`, `apple-icon.tsx` | Vector-sharp terminal prompt `>_` icons via `ImageResponse` |
-| **Strict HTTP 404 Catch-All** | `apps/web/src/app/[locale]/[...rest]/page.tsx` + `not-found.tsx` | Prevents Soft-404 indexing by returning an HTTP `404` inside `LocaleRootLayout` |
+| **Locale Metadata Matrix** | `packages/shared-schemas/src/locale.schema.ts` | Single `LOCALE_METADATA` contract (`code`, `urlPrefix`, `intlLocale`, `ogLocale`) |
+| **Origin Env Validation** | `apps/web/src/shared/config/env.ts` | `resolvePublicSiteUrl()` via Zod `HttpOriginSchema` + production warning guard |
+| **SEO Core & JSON-LD** | `apps/web/src/shared/lib/seo.ts` | `buildPageAlternates`, `buildOpenGraphMetadata` (`siteName` + `alternateLocale`), `serializeSafeJsonLd`, `ProfilePage`, enhanced `TechArticle`, `BreadcrumbList` |
+| **Adaptive Viewport & GoogleBot** | `apps/web/src/app/[locale]/layout.tsx` | System `themeColor` (`#FAF8F5` / `#121211`), `authors`/`creator`, `max-image-preview: 'large'` |
+| **Robots.txt Generator** | `apps/web/src/app/robots.ts` | Disallows `/api/`, `/search-index/`, and all protected KB categories across `''`, `/ua`, `/ru` |
+| **Hybrid Sitemap.xml** | `apps/web/src/app/sitemap.ts` | Static hubs (`/`, `/cv`, `/knowledge-base`, `/system-status`) + public `this-project/**` only (zero `307` redirects) |
+| **AI Manifest (`/llms.txt`)** | `apps/web/src/app/llms.txt/route.ts` | Structured Markdown portfolio dossier & Hybrid KB catalog for AI search engines |
+| **Localized OpenGraph (`1200×630`)** | `apps/web/src/app/[locale]/opengraph-image.tsx` | Localized `EN / UA / RU` cards via `next/og`, `Inter` TTF (`400`/`700`), and offline English fallback |
+| **Strict HTTP 404 & Noindex** | `app/[locale]/[...rest]/page.tsx`, `not-found.tsx`, `knowledge-base/[...slug]/page.tsx` | Strict HTTP `404`, `dynamicParams = false`, and `robots: { index: false, follow: false }` on 404 metadata |

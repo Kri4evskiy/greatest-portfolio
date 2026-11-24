@@ -1,35 +1,78 @@
 ---
 title: "Глобальный поиск Cmd+K: статический SSG-индекс маршрута и ленивая подгрузка по требованию"
 sidebarLabel: "Поиск Cmd+K и SSG-индекс"
-summary: "Как спроектировать мгновенный глобальный поиск по 100+ конспектам без внешней БД и без раздувания начального HTML страниц: статический Route Handler и кэширующий клиентский загрузчик."
+summary: "Как спроектировать мгновенный глобальный поиск по 100+ конспектам без внешней БД и без раздувания начального HTML/JS: статический Route Handler, ленивая загрузка модалки через next/dynamic, Zod-валидация индекса, защита от stale-locale и замки Hybrid KB."
 category: "this-project"
 format: "deep-dive"
 tags: ["cmdk", "search", "nextjs", "ssg", "performance"]
-readingTime: "5 мин"
+readingTime: "6 мин"
 publishedAt: "2026-11-10"
 order: 2
 tldr:
   - "Поисковый индекс вынесен из корневого `layout.tsx` в статический SSG-маршрут `/search-index/[locale]`, что экономит `100%` веса индекса в начальном HTML и RSC-пейлоаде страниц."
-  - "Route Handler с `dynamic = 'force-static'` собирает заголовки статей, `#теги` и якоря подзаголовков `h2/h3` один раз на этапе `next build` (`0 мс` CPU в рантайме)."
-  - "Клиентский модуль `search-index-client.ts` предзагружает JSON при наведении курсора на кнопку поиска или нажатии `Cmd+K`, кэшируя промис в памяти."
+  - "`CommandPaletteLoader` (`next/dynamic`, `ssr: false`) удерживает UI `CommandPaletteModal` и примитивы Radix `Dialog` вне начального JS-бандла до первого открытия."
+  - "Клиентский модуль `search-index-client.ts` валидирует JSON через Zod (`KnowledgeSearchPayloadSchema`) и дедуплицирует запросы, а `CommandPaletteModal` защищён от stale-locale (`{ locale, payload }`) и учитывает публичные пути через `isPublicKnowledgeBasePath`."
 ---
 
-## 1. Вынос поискового индекса из корневого `layout.tsx`
+## 1. Нулевой оверхед HTML и JS в корневом `layout.tsx`
 
-Глобальное модальное окно `CommandPaletteModal` (`Cmd+K`) монтируется в корневом `app/[locale]/layout.tsx`, чтобы быть доступным с любой страницы. Если передавать массив `searchIndex` напрямую через пропсы из `layout.tsx`, Next.js сериализует заголовки, теги и оглавления всех статей в первичный HTML и RSC-пейлоад **каждой** страницы, даже если пользователь не открывает поиск.
+Если в корневом `apps/web/src/app/[locale]/layout.tsx` передавать массив `searchIndex` напрямую через пропсы — или жадно импортировать `CommandPaletteModal` вместе с примитивами Radix `Dialog` — каждый посетитель будет скачивать и заголовки всех статей в первичном HTML/RSC-пейлоаде, и JS-код самой модалки на **каждой** странице, даже если ни разу не откроет поиск.
 
-Чтобы сохранить минимальный размер документа при росте базы знаний за `100+` статей, индекс выделен в отдельный статический JSON-эндпоинт.
+Обе проблемы решаются разделением на два слоя:
+
+1. **Ленивая оболочка (`CommandPaletteLoader`):** в `app/[locale]/layout.tsx` монтируется только легковесный слушатель горячей клавиши `Cmd+K` / `Ctrl+K`, который подгружает `CommandPaletteModal` через `next/dynamic` с `ssr: false` только при первом открытии:
+
+```tsx title="apps/web/src/features/search/command-palette-loader.tsx"
+'use client'
+
+import type { SupportedLocale } from '@repo/shared-schemas'
+import dynamic from 'next/dynamic'
+import { useEffect, useState } from 'react'
+import { useIsCommandPaletteOpen, useUIActions } from '@/shared/store/use-ui-store'
+
+const LazyCommandPaletteModal = dynamic(
+  () => import('./command-palette-modal').then((m) => m.CommandPaletteModal),
+  { ssr: false },
+)
+
+export function CommandPaletteLoader({ locale }: { locale: SupportedLocale }) {
+  const isOpen = useIsCommandPaletteOpen()
+  const { openCommandPalette: openPalette, closeCommandPalette: closePalette } = useUIActions()
+  const [hasLoaded, setHasLoaded] = useState(false)
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault()
+        if (isOpen) closePalette()
+        else openPalette('')
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [isOpen, openPalette, closePalette])
+
+  useEffect(() => {
+    if (isOpen && !hasLoaded) setHasLoaded(true)
+  }, [hasLoaded, isOpen])
+
+  if (!isOpen && !hasLoaded) return null
+  return <LazyCommandPaletteModal locale={locale} />
+}
+```
+
+2. **Отдельный статический индекс:** метаданные статей отдаются отдельным статическим JSON-маршрутом `/search-index/[locale]`, не попадая в пропсы `layout.tsx`.
 
 ---
 
 ## 2. Статический SSG Route Handler (`/search-index/[locale]`)
 
-Маршрут `apps/web/src/app/search-index/[locale]/route.ts` помечен директивой `export const dynamic = 'force-static'` и использует `generateStaticParams()`. Во время сборки он извлекает облегчённую проекцию статей (без HAST-деревьев контента) и список популярных тегов:
+Маршрут `apps/web/src/app/search-index/[locale]/route.ts` помечен директивой `export const dynamic = 'force-static'` и использует `generateStaticParams()`. Во время `next build` он вызывает мемоизированные через React `cache()` функции `getKnowledgeSearchIndex(resolvedLocale)` и `getAllKnowledgeTags(resolvedLocale)` из `apps/web/src/entities/knowledge-content/lib/mdx-search-index.ts` (без сериализации HAST-деревьев контента) и выставляет заголовки `Cache-Control`:
 
 ```typescript title="apps/web/src/app/search-index/[locale]/route.ts"
 import { DEFAULT_LOCALE, SUPPORTED_LOCALES, SupportedLocaleEnum } from '@repo/shared-schemas'
 import { NextResponse } from 'next/server'
-import { getKnowledgeSearchIndex, getPopularTags } from '@/entities/knowledge-content'
+import { getAllKnowledgeTags, getKnowledgeSearchIndex } from '@/entities/knowledge-content'
 
 export const dynamic = 'force-static'
 
@@ -40,45 +83,99 @@ export function generateStaticParams() {
 export async function GET(_request: Request, context: { params: Promise<{ locale: string }> }) {
   const { locale } = await context.params
   const parsed = SupportedLocaleEnum.safeParse(locale)
-  const safeLocale = parsed.success ? parsed.data : DEFAULT_LOCALE
+  const resolvedLocale = parsed.success ? parsed.data : DEFAULT_LOCALE
 
-  return NextResponse.json({
-    items: getKnowledgeSearchIndex(safeLocale),
-    popularTags: getPopularTags(safeLocale, 14),
-  })
+  return NextResponse.json(
+    {
+      items: getKnowledgeSearchIndex(resolvedLocale),
+      topTags: getAllKnowledgeTags(resolvedLocale),
+    },
+    {
+      headers: {
+        'Cache-Control': 'public, max-age=3600, stale-while-revalidate=86400',
+      },
+    },
+  )
 }
 ```
 
-Каждая запись `KnowledgeSearchItem` содержит маршрут статьи, локализованные названия темы и подтемы, массив `#тегов` и массив заголовков `h2/h3` с их `id` для прямого прыжка к нужному абзацу (`/ru/knowledge-base/...#section-id`).
+Каждая запись `KnowledgeSearchItem` содержит `routePath`, локализованные `topicLabel` и `subtopicLabel`, `sidebarLabel`, `summary`, `format`, `readingTime`, массив `#тегов` и массив заголовков `h2/h3` (`id` + `text`) для прямого прыжка к нужному разделу (`/ru/knowledge-base/...#section-id`).
 
 ---
 
-## 3. Клиентский загрузчик с дедупликацией промиса и предзагрузкой
+## 3. Клиентский загрузчик с Zod-валидацией, кэшем и предзагрузкой
 
-В `apps/web/src/features/search/search-index-client.ts` две `Map`-таблицы хранят уже полученный ответ и активный in-flight промис, предотвращая повторные сетевые запросы при быстрых переключениях:
+В `apps/web/src/features/search/search-index-client.ts` две `Map`-таблицы (`resolvedCache` и `inflightCache`) кэшируют полученные индексы и дедуплицируют параллельные сетевые запросы. Вместо небезопасного каста `res.json() as ...` ответ проходит рантайм-валидацию через Zod `KnowledgeSearchPayloadSchema` (переиспользуя `KnowledgeCategoryEnum` и `KnowledgeNoteFormatEnum` из `@repo/shared-schemas`) и безопасно откатывается к `EMPTY_PAYLOAD` при HTTP-ошибке, сбое сети или рассинхроне контракта:
 
 ```typescript title="apps/web/src/features/search/search-index-client.ts"
-const resolvedCache = new Map<SupportedLocale, SearchIndexPayload>()
-const inflightRequests = new Map<SupportedLocale, Promise<SearchIndexPayload>>()
+const resolvedCache = new Map<SupportedLocale, KnowledgeSearchPayload>()
+const inflightCache = new Map<SupportedLocale, Promise<KnowledgeSearchPayload>>()
 
-export function fetchSearchIndexForLocale(locale: SupportedLocale): Promise<SearchIndexPayload> {
-  const cached = resolvedCache.get(locale)
-  if (cached) return Promise.resolve(cached)
+export function getCachedKnowledgeSearchIndex(locale: SupportedLocale): KnowledgeSearchPayload | null {
+  return resolvedCache.get(locale) ?? null
+}
 
-  const existing = inflightRequests.get(locale)
-  if (existing) return existing
+export function loadKnowledgeSearchIndex(locale: SupportedLocale): Promise<KnowledgeSearchPayload> {
+  const existingResolved = resolvedCache.get(locale)
+  if (existingResolved) return Promise.resolve(existingResolved)
 
-  const request = fetch(`/search-index/${locale}`)
-    .then((res) => res.json() as Promise<SearchIndexPayload>)
-    .then((payload) => {
+  const existingInflight = inflightCache.get(locale)
+  if (existingInflight) return existingInflight
+
+  const requestPromise = fetch(`/search-index/${locale}`, {
+    method: 'GET',
+    credentials: 'same-origin',
+  })
+    .then(async (res): Promise<KnowledgeSearchPayload> => {
+      if (!res.ok) return EMPTY_PAYLOAD
+      const rawJson: unknown = await res.json()
+      const parsed = KnowledgeSearchPayloadSchema.safeParse(rawJson)
+      if (!parsed.success) return EMPTY_PAYLOAD
+      const payload: KnowledgeSearchPayload = parsed.data
       resolvedCache.set(locale, payload)
-      inflightRequests.delete(locale)
       return payload
     })
+    .catch((): KnowledgeSearchPayload => EMPTY_PAYLOAD)
+    .finally(() => {
+      inflightCache.delete(locale)
+    })
 
-  inflightRequests.set(locale, request)
-  return request
+  inflightCache.set(locale, requestPromise)
+  return requestPromise
+}
+
+export function prefetchKnowledgeSearchIndex(locale: SupportedLocale): void {
+  if (typeof window === 'undefined') return
+  void loadKnowledgeSearchIndex(locale)
 }
 ```
 
-Кнопка поиска в `WorkfolioHeader` вызывает `preloadSearchIndex(locale)` на событиях `onMouseEnter` и `onFocus`, поэтому к моменту клика или нажатия `Cmd+K` индекс уже находится в памяти браузера.
+Кнопка поиска в `WorkfolioHeader` вызывает `prefetchKnowledgeSearchIndex(locale)` на событиях `onMouseEnter` и `onFocus`, поэтому к моменту клика или нажатия `Cmd+K` индекс уже прогрет в памяти браузера.
+
+---
+
+## 4. Защита от stale-locale и бейджи замка Hybrid KB в `CommandPaletteModal`
+
+Когда глобальный поиск работает поверх трёх локалей (`en`, `ru`, `uk`) и гибридной (публичной + защищённой) Базы Знаний, в `CommandPaletteModal` решаются две тонкие задачи:
+
+1. **Защита от мигания старой локали (`{ locale, payload }`):** стейт индекса хранит пару `{ locale, payload }`, а не «голый» payload:
+
+```typescript title="apps/web/src/features/search/command-palette-modal.tsx"
+const [indexState, setIndexState] = useState<{
+  locale: SupportedLocale
+  payload: KnowledgeSearchPayload
+} | null>(() => {
+  const cached = getCachedKnowledgeSearchIndex(locale)
+  return cached ? { locale, payload: cached } : null
+})
+
+// Match payload strictly against active locale to prevent stale-locale flashes & missing spinner
+const indexPayload = indexState?.locale === locale ? indexState.payload : null
+const isLoadingIndex = isOpen && indexPayload === null
+```
+
+Если пользователь переключил язык (например, `en` -> `ru`) и снова открыл `Cmd+K`, устаревший индекс другой локали мгновенно отбрасывается, отображается спиннер `Loader2` до ответа `loadKnowledgeSearchIndex(locale)`, а флаг отмены `active` в cleanup-функции эффекта не даёт позднему ответу перезаписать актуальный язык.
+
+2. **Проверка публичных путей Hybrid KB (`isPublicKnowledgeBasePath`):** архитектурные статьи в `/knowledge-base/this-project/**` открыты без авторизации. Перед рендером бейджа замка и переходом по статье `CommandPaletteModal` проверяет `isPublicKnowledgeBasePath(buildKnowledgeBasePath(entry.item.routePath))`:
+   - **Отображение замка:** условие `!isUnlocked && !isPublicKnowledgeBasePath(buildKnowledgeBasePath(entry.item.routePath))` показывает бейдж замка только на защищённых доменных конспектах.
+   - **Навигация по клику / Enter:** если `isUnlocked || isPublicKnowledgeBasePath(baseArticlePath)`, палитра сразу переходит по `${baseArticlePath}${hashSuffix}` (с якорем найденного заголовка); иначе вызывается `openGuestPassModal(baseArticlePath)`, позволяя пройти авторизацию без неожиданного `307`-редиректа.

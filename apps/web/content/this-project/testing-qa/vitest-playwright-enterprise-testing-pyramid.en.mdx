@@ -1,23 +1,23 @@
 ---
 title: "Enterprise Testing Pyramid in a TypeScript 7 & NestJS ESM Monorepo: Vitest, SWC, MSW v3, Supertest & Playwright"
 sidebarLabel: "Testing Pyramid (Vitest & Playwright)"
-summary: "How we engineered a 3-tier automated testing architecture across Zod schemas, React 19 + MSW v3, NestJS 12 ESM with unplugin-swc + Supertest, and Playwright POM E2E—plus every real-world trap solved on Windows, Node 24, and CI."
+summary: "How we engineered a 3-tier automated testing architecture—65 Vitest unit/integration tests across 4 packages, Supertest HTTP E2E for NestJS 12 ESM, and Playwright POM E2E—plus every real-world trap solved on Windows, Node 24, and CI."
 category: "this-project"
 format: "deep-dive"
 tags: ["vitest", "playwright", "testing-pyramid", "swc", "msw", "supertest", "ci-cd"]
 readingTime: "11 min"
-publishedAt: "2026-11-23"
+publishedAt: "2026-11-24"
 order: 1
 tldr:
-  - "**3-Tier Pyramid on Native ESM:** `Vitest` covers `@repo/shared-schemas`, `@repo/web` (RTL + `MSW v3`), and `@repo/api` (`unplugin-swc`), `Supertest` tests the full NestJS `AppModule` over HTTP, and `Playwright` POM verifies real Edge JWT + Next.js + NestJS browser flows."
+  - "**3-Tier Pyramid on Native ESM:** `65` `Vitest` unit/integration tests span 4 packages (`@repo/shared-schemas`, `@repo/web` with RTL + `MSW v3`, `@repo/api` with `unplugin-swc`, and `@repo/telemetry-ms`), paired with `Supertest` HTTP E2E and `Playwright` POM browser E2E."
   - "**Why `Vitest` + `SWC` replaced `Jest` / `ts-jest`:** `ts-jest` does not support `TypeScript 7` and struggles with native ESM `.js`-extension imports, whereas `Vitest` + `unplugin-swc` compiles `emitDecoratorMetadata` fast and cleanly."
-  - "**Zero-Cruft `data-testid` & `test.step`:** Playwright locators strictly avoid localized copy and brittle CSS tags, attaching `data-testid` only where tests interact and structuring every scenario into `test.step` blocks."
-  - "**Solved Infrastructure Traps:** `SWC_NATIVE_BINDING_CACHE` + Turborepo `passThroughEnv`, Node 24 IPv6 Happy Eyeballs (`--dns-result-order=ipv4first`), `window.indexedDB` test guard, Radix UI Portals, and root `vitest.config.ts` `projects` for IDE Test Explorer."
+  - "**Zero-Cruft `data-testid` & 5-Step `test.step` E2E:** Playwright verifies public `/knowledge-base/this-project` access, protected KB Edge redirect, `HttpOnly` Guest Pass issuance, compiled MDX hydration, and `/system-status` pagination without relying on localized copy."
+  - "**Solved Infrastructure Traps & CI Caching:** `SWC_NATIVE_BINDING_CACHE` + Turborepo `passThroughEnv`, Node 24 IPv6 Happy Eyeballs (`--dns-result-order=ipv4first`), `window.indexedDB` guard, root `vitest.config.ts`, and exact `@playwright/test` version cache keys in GitHub Actions."
 ---
 
 ## 1. Architecture of Our 3-Tier Testing Pyramid
 
-Rather than relying on slow UI tests for logic checks or mocking away entire frameworks, every workspace layer uses the lightest tool that preserves real runtime semantics:
+Rather than relying on slow UI tests for logic checks or mocking away entire frameworks, every workspace layer uses the lightest tool that preserves real runtime semantics—totaling **65 Vitest unit & integration tests across 4 packages**, a full **Supertest HTTP E2E** suite against NestJS `AppModule`, and a **Playwright Chromium POM E2E** suite:
 
 ```text
                         ▲
@@ -25,22 +25,22 @@ Rather than relying on slow UI tests for logic checks or mocking away entire fra
                       /   \    Tier 3: Playwright POM E2E (apps/web/e2e/)
                      / E2E \   Real Chromium + built Next.js 16 + NestJS 12 webServer
                     /-------\
-                   /  HTTP   \ Tier 2: NestJS AppModule + Supertest + RTL/MSW v3
-                  /  & UI Int \ Real DI/Guards/Filters/Pipes & React Query + MSW v3
+                   /  HTTP   \ Tier 2: NestJS AppModule + Supertest & RTL + MSW v3
+                  /  & UI Int \ Real DI/CSRF/Guards/Pipes/Filters & React Query + MSW v3
                  /-------------\
-                /   Unit & Zod  \ Tier 1: Pure Vitest (shared-schemas, web, api)
-               /_________________\ Schema contracts, Zustand store, Axios, Prisma fallback
+                /   Unit & Zod  \ Tier 1: Pure Vitest (65 unit/int tests across 4 packages)
+               /_________________\ shared-schemas, web, api, telemetry-ms
 ```
 
 | Layer | Runner & Libraries | Scope & Location | Key Guarantees |
 | :--- | :--- | :--- | :--- |
-| **Contracts (`Tier 1`)** | `Vitest` (Node) | `packages/shared-schemas/src/__tests__/` | `resolveEndpoint`, Zod defaults/bounds, integrity of 16 localized ADRs |
-| **Web Unit (`Tier 1`)** | `Vitest` (`node` + `jsdom`) | `apps/web/src/shared/**/__tests__/` | Axios normalization, `verifyEdgeJwtHs256`, `QueryClient` error filter, `APP_ROUTES`, `useUIStore` |
+| **Contracts (`Tier 1`)** | `Vitest` (Node) | `packages/shared-schemas/src/__tests__/` | `resolveEndpoint`, Zod defaults/bounds (`offset <= 500`, `nextOffset`), integrity of 16 localized ADRs |
+| **Web Unit (`Tier 1`)** | `Vitest` (`node` + `jsdom`) | `apps/web/src/shared/**/__tests__/` | Axios normalization, fail-closed `verifyEdgeJwtHs256`, `QueryClient` error filter, Hybrid `APP_ROUTES`, `useUIStore` |
 | **Web Integration (`Tier 2`)** | `Vitest` + `RTL` + `MSW v3` | `apps/web/src/features/**/__tests__/` | Interactive pagination, category filter & sort transitions wired through real `TanStack Query` |
-| **API Unit (`Tier 1`)** | `Vitest` + `unplugin-swc` | `apps/api/src/**/__tests__/*.spec.ts` | `app.config` prod guards, `request-id` CRLF sanitization, `PrismaService` fallback, `AuthService` / `JwtRolesGuard` |
-| **Telemetry Unit (`Tier 1`)** | `Vitest` (Node + `@vitest/coverage-v8`) | `apps/telemetry-ms/src/__tests__/` | `TelemetryMicroserviceController` schema validation, bounded 50-event ring, and `getStats()` |
-| **API HTTP E2E (`Tier 2`)** | `Vitest` + `Supertest` | `apps/api/test/*.e2e-spec.ts` | Full `AppModule` bootstrap (`CORS`, `CookieParser`, `ThrottlerGuard`, `ValidationPipe`, `HttpOnly` JWT) |
-| **Browser E2E (`Tier 3`)** | `Playwright` Chromium | `apps/web/e2e/{fixtures,pages,specs}/` | Edge `src/proxy.ts` JWT verification, `GuestPassModal` unlock flow, `/system-status` inspection |
+| **API Unit (`Tier 1`)** | `Vitest` + `unplugin-swc` | `apps/api/src/**/__tests__/*.spec.ts` | `app.config` prod & `TRUST_PROXY_HOPS` guards, `request-id` CRLF sanitization, bounded `PrismaService` fallback, `AuthService` / `JwtRolesGuard` / `TelemetryService` SSE caps |
+| **Telemetry Unit (`Tier 1`)** | `Vitest` (Node + `@vitest/coverage-v8`) | `apps/telemetry-ms/src/__tests__/` | `TelemetryMicroserviceController` schema validation, bounded 50-event ring, `telemetry-ms.config` loopback default `127.0.0.1:4001`, and `getStats()` |
+| **API HTTP E2E (`Tier 2`)** | `Vitest` + `Supertest` | `apps/api/test/auth-and-observability.e2e-spec.ts` | Full `AppModule`: `/api/capabilities`, public metrics, RBAC `403`, CSRF `415`/`403`, bad `adminPasscode` `403`, `HttpOnly` cookie & `X-Request-Id`, unknown slug `404`, helpful dedup, `ADMIN` `/api/telemetry/admin-diagnostics`, offset (`offset=501` ➔ `400`) & cursor (`cursor=null` ➔ `400`) |
+| **Browser E2E (`Tier 3`)** | `Playwright` Chromium | `apps/web/e2e/{fixtures,pages,specs}/` | Hybrid KB public `this-project` check, Edge `src/proxy.ts` redirect, `GuestPassModal` unlock flow, `/system-status` pagination |
 
 ### Tool Roles: How `Vitest`, `SWC`, `MSW v3`, `Supertest`, and `Playwright` Divide Responsibilities
 
@@ -53,16 +53,9 @@ Think of the stack as an assembly line where each library owns one isolated job 
 3. **`MSW v3` (Mock Service Worker — Network-Boundary Mock for Frontend):**
    Used inside `apps/web` integration tests (`React 19` + `TanStack Query` + `Axios`). Components dispatch real HTTP requests (`/api/knowledge/metrics/paginated`), while `MSW` intercepts them at the network boundary in memory and returns deterministic JSON—testing real pagination, filters, retries, and cache invalidation without starting the backend server.
 4. **`Supertest` (In-Memory HTTP Client for Backend E2E):**
-   Used inside `apps/api` HTTP E2E suites. It boots the real NestJS `AppModule` in memory and fires real HTTP requests (`GET /api/capabilities`, `POST /api/auth/guest-pass`) to validate HTTP status codes, `Set-Cookie` attributes, `ZodValidationPipe`, `JwtRolesGuard`, and `SentryExceptionFilter`—without needing a browser or frontend.
+   Used inside `apps/api/test/auth-and-observability.e2e-spec.ts`. It boots the real NestJS `AppModule` in memory (with `DATABASE_URL=""` and `WORKFOLIO_DEMO_MODE="true"`) and fires real HTTP requests (`GET /api/capabilities`, `POST /api/auth/guest-pass`, `GET /api/telemetry/admin-diagnostics`, etc.) to validate status codes, `Set-Cookie` attributes, `CsrfOriginMiddleware`, `ZodValidationPipe`, `JwtRolesGuard`, and `SentryExceptionFilter`—without needing a browser or frontend.
 5. **`Playwright` (Real Chromium Browser Automation):**
-   Drives compiled Next.js and NestJS production servers end-to-end as a real user, verifying Edge Proxy redirects, `HttpOnly` cookies across page reloads, RSC/MDX hydration, and live dashboard interactions.
-
-**In short:**
-- **`Vitest`** — runs tests and evaluates `expect(...)`.
-- **`SWC`** — compiles NestJS TypeScript code for `Vitest` while preserving DI decorator metadata.
-- **`MSW v3`** — intercepts and stubs HTTP responses for frontend integration tests.
-- **`Supertest`** — sends real HTTP requests into an in-memory NestJS `AppModule` without a frontend.
-- **`Playwright`** — launches a real browser to verify the entire stack together.
+   Drives compiled Next.js and NestJS production servers end-to-end as a real user, verifying Hybrid KB routing, Edge Proxy redirects, `HttpOnly` cookies across page reloads, RSC/MDX hydration, and live dashboard interactions.
 
 > [!NOTE]
 > **Storybook 10 (`@repo/ui`) vs Vitest / Playwright:** UI primitives live in `packages/ui/` and are visually inspected in Storybook without coupling business API state into design-system stories. Logic, caching, RBAC redirects, and full-stack hydration stay inside `Vitest` + `Playwright`.
@@ -74,30 +67,50 @@ Think of the stack as an assembly line where each library owns one isolated job 
 Our monorepo targets **`TypeScript 7` + `NodeNative ESM` (`"type": "module"`)**, which surfaces two blockers for legacy `Jest` stacks:
 
 1. **`ts-jest` TypeScript Compiler Coupling:** `ts-jest` relies on older TypeScript JS compiler internals (`typescript <7`) and often requires experimental `--experimental-vm-modules` flags with brittle CJS/ESM transforms.
-2. **NestJS `emitDecoratorMetadata` in ESM:** Vite's default `esbuild` / `oxc` strips TypeScript decorator parameter metadata (`design:paramtypes`) required by NestJS Dependency Injection (`ConfigService`, `JwtService`, `PrismaService`). Replacing it via **`unplugin-swc`** inside `apps/api/vitest.base.ts` preserves `decoratorMetadata: true` at Rust speed.
+2. **NestJS `emitDecoratorMetadata` in ESM:** Vite's default `esbuild` / `oxc` strips TypeScript decorator parameter metadata (`design:paramtypes`) required by NestJS Dependency Injection (`JwtService`, `PrismaService`, `TelemetryService`). Replacing it via **`unplugin-swc`** inside `apps/api/vitest.base.ts` preserves `decoratorMetadata: true` at Rust speed.
 
 ```ts title="apps/api/vitest.base.ts"
 function resolveTsExtensionPlugin(): Plugin {
   return {
-    name: 'resolve-ts-extensions',
+    name: 'resolve-ts-extension',
     enforce: 'pre',
-    resolveId(source, importer) {
-      if (!importer || !source.startsWith('.') || !source.endsWith('.js')) return null
-      const base = path.resolve(path.dirname(importer), source.slice(0, -3))
-      for (const ext of ['.ts', '.tsx']) {
-        if (fs.existsSync(base + ext)) return base + ext
+    async resolveId(source, importer, options) {
+      if (!importer || !source.startsWith('.')) {
+        return null
       }
+
+      const resolved = await this.resolve(source, importer, {
+        ...options,
+        skipSelf: true,
+      })
+
+      if (resolved && !resolved.external && resolved.id.endsWith('.js')) {
+        const tsPath = resolved.id.replace(/\.js$/, '.ts')
+        if (existsSync(tsPath)) {
+          return tsPath
+        }
+      }
+
       return null
     },
   }
+}
+
+function ensureSwcNativeCacheDir(): void {
+  if (process.env.SWC_NATIVE_BINDING_CACHE) {
+    return
+  }
+  const cacheDir = resolve(import.meta.dirname, '../../.turbo/swc')
+  mkdirSync(cacheDir, { recursive: true })
+  process.env.SWC_NATIVE_BINDING_CACHE = cacheDir
 }
 ```
 
 ### Three NestJS-Specific Vitest Requirements
 
-1. **Explicit `.js` ➔ `.ts` Vite Resolver:** TypeScript `NodeNext` requires importing `./auth.service.js` in `.ts` sources. While `tsc` handles this automatically, Vite resolves raw source files during tests—so `resolveTsExtensionPlugin()` maps relative `.js` imports back to `.ts` before bundling.
+1. **Explicit `.js` ➔ `.ts` Vite Resolver:** TypeScript `NodeNext` requires importing `./auth.service.js` in `.ts` sources. `resolveTsExtensionPlugin()` delegates to Vite's `this.resolve(..., { skipSelf: true })` and maps resolved local `.js` specifiers back to existing `.ts` source files cleanly.
 2. **`reflect-metadata` + `pool: 'forks'`:** `apps/api/vitest.setup.ts` imports `'reflect-metadata'` once before any NestJS controller loads, and **`pool: 'forks'`** avoids worker-thread native `@swc/core` registration crashes on Windows/Linux.
-3. **`SWC_NATIVE_BINDING_CACHE` + `passThroughEnv`:** On Windows or constrained sandboxes where `%LOCALAPPDATA%\swc` is blocked or nested paths approach `MAX_PATH`, `@swc/core@1.16` fails unless pointed to a short writable cache folder. Setting a fallback to `.turbo/swc` in `vitest.base.ts` **and** declaring `"passThroughEnv": ["SWC_NATIVE_BINDING_CACHE"]` in `turbo.json` guarantees Turborepo forwards the override instead of stripping it under Strict Env Mode.
+3. **`SWC_NATIVE_BINDING_CACHE` + `passThroughEnv`:** `createApiVitestConfig(include)` calls `ensureSwcNativeCacheDir()` **before** dynamically importing `unplugin-swc`, pointing `@swc/core` to the short `../../.turbo/swc` path (< Windows `MAX_PATH`). Declaring `"passThroughEnv": ["SWC_NATIVE_BINDING_CACHE"]` in `turbo.json` guarantees Turborepo forwards the override under Strict Env Mode.
 
 ---
 
@@ -105,36 +118,39 @@ function resolveTsExtensionPlugin(): Plugin {
 
 Modern React 19 + Next.js App Router testing requires deliberate isolation of async timers, browser APIs, and DOM cleanup:
 
-### Essential Patterns Implemented in `apps/web`
-
 - **Explicit `'vitest'` Imports + `afterEach(cleanup)`:** Biome and strict TS work cleanly without injecting ambient `describe`/`it`/`expect` globals (`globals: false`). Because `@testing-library/react` only registers automatic cleanup when global `afterEach` exists, `apps/web/vitest.setup.ts` calls `afterEach(() => cleanup())` explicitly—preventing duplicate DOM elements across multiple `render()` calls in one file.
-- **No Unhandled Requests in `MSW v3`:** Integration suites call `server.listen({ onUnhandledFrame: 'error' })` inside `beforeAll`, `server.resetHandlers()` in `afterEach`, and `server.close()` in `afterAll`. Any accidental unmocked `/api/*` URL immediately fails the test loudly instead of hanging or hitting localhost.
-- **Deterministic Async Cancellation vs Fake Timers:** Testing `makeQueryClient()`'s `AbortError` suppression with real network teardown calls `unmount()` on an in-flight `useQuery` hook wrapped with a deferred `Promise` that stays clean—zero flaky timeouts or unhandled rejections.
-- **`window.indexedDB` Availability Guard:** `QueryProvider` persists cache via `idb-keyval` + `IndexedDB`. Because `jsdom` does not bundle a browser `IndexedDB` backend by default, checking `typeof window.indexedDB !== 'undefined'` keeps client components crash-free in both SSR and unit tests without polluting prod logic with mock hacks.
-- **Radix UI Portals in Component Tests:** Clicking a Radix `<Select>` or `<Dialog>` trigger portals options directly to `document.body` outside the test wrapper; queries always run through `@testing-library/react` `screen` (which reads `document.body`) paired with `@testing-library/user-event` (`pointer-events` and keyboard events).
+- **Strict Network Interception in `MSW v3`:** Integration suites fail loudly on any unmocked `/api/*` request, call `server.resetHandlers()` in `afterEach`, and `server.close()` in `afterAll`.
+- **Deterministic Async Cancellation vs Fake Timers:** Testing `makeQueryClient()`'s `AbortError` suppression calls `unmount()` on an in-flight `useQuery` hook wrapped with a deferred `Promise`—zero flaky timeouts or unhandled rejections.
+- **`window.indexedDB` Availability Guard:** `QueryProvider` persists cache via `idb-keyval` + `IndexedDB`. Checking `typeof window.indexedDB !== 'undefined'` keeps client components crash-free in both SSR and `jsdom` tests.
+- **Radix UI Portals in Component Tests:** Clicking a Radix `<Select>` or `<Dialog>` trigger portals content directly to `document.body`; queries always run through `@testing-library/react` `screen` paired with `@testing-library/user-event`.
 
 ---
 
-## 4. Playwright E2E: `POM`, `test.step`, `Zero-Cruft data-testid`, and Scalable `WebServer`
+## 4. Playwright E2E: `POM`, 5-Step `test.step`, `Zero-Cruft data-testid` & Scalable `WebServer`
 
 End-to-end specs live in `apps/web/e2e/` and follow the **Page Object Model (POM)**:
 
 ```text
 apps/web/e2e/
-├── fixtures/app.fixture.ts         # Injects GuestPassPage & SystemStatusPage fixtures
+├── fixtures/app.fixture.ts            # Injects GuestPassPage & SystemStatusPage fixtures
 ├── pages/
-│   ├── guest-pass.page.ts          # Encapsulates modal open, displayName, visitorType, submit
-│   └── system-status.page.ts       # Encapsulates capabilities matrix, leaderboard page 2, live events
+│   ├── guest-pass.page.ts             # Encapsulates modal open, displayName, visitorType, submit
+│   └── system-status.page.ts          # Encapsulates capabilities matrix, leaderboard page 2, live events
 └── specs/
-    └── rbac-and-observability.spec.ts # Full RBAC + /system-status verification structured via test.step()
+    └── rbac-and-observability.spec.ts # Full Hybrid KB + RBAC + /system-status verification via test.step()
 ```
 
 ### Engineering Rules for Maintainable E2E Suites
 
-1. **`Zero-Cruft data-testid` Policy:** Playwright locators **never** depend on localized UI copy (`"Get Pass"`, `"Next"`, `"Отримати"`) or semantic HTML tags (`table`, `h2`) that break during copy edits or design refactors. At the same time, `data-testid` attributes (`guest-pass-dialog`, `guest-pass-submit-btn`, `leaderboard-table`, etc.) are added **strictly** to elements actually queried by tests—never sprayed speculatively across production JSX.
-2. **Structured Monitoring with `test.step(...)`:** Every scenario splits actions into crisp telemetry steps (`Navigate to protected Knowledge Base route triggers GuestPassModal`, `Submit GuestPass form unlocks HttpOnly JWT session and article content`, `Inspect /system-status capabilities matrix, leaderboard pagination, and live telemetry events`), turning CI HTML reports and IDE traces into readable step-by-step timelines.
-3. **Scalable Workers + Serial Stateful Suites:** `playwright.config.ts` enables `fullyParallel: true` (`...(process.env.CI ? { workers: 2 } : {})`), allowing independent read-only specs to scale automatically across CPU cores as the suite grows, while `test.describe.configure({ mode: 'serial' })` keeps stateful auth -> event-log verification strictly ordered without sharing global state across files.
-4. **Windows Node 24 Happy Eyeballs & Next.js Proxy (`NODE_OPTIONS`):** When `playwright.config.ts` spawns `next start` (`localhost:3000`) + NestJS `apps/api` (`0.0.0.0:4000`), **Node 24's IPv6-first DNS (`::1`) + Happy Eyeballs** can trigger concurrent proxy `AggregateError` (`ECONNREFUSED ::1:4000`) when Next.js rewrites forward `/api/*` requests to an IPv4-bound API. Passing `NODE_OPTIONS: '--dns-result-order=ipv4first --no-network-family-autoselection'` inside Next.js's `webServer.env` resolves `localhost` deterministically to `127.0.0.1` across both Windows and Linux.
+1. **`Zero-Cruft data-testid` Policy:** Playwright locators **never** depend on localized UI copy (`"Get Pass"`, `"Next"`, `"Отримати"`) or brittle CSS tags. `data-testid` attributes (`guest-pass-dialog`, `guest-pass-submit-btn`, `leaderboard-table`, etc.) are added **strictly** to elements queried by tests.
+2. **5-Step Structured Telemetry (`rbac-and-observability.spec.ts`):** Every phase is captured in an explicit `test.step(...)` block for readable CI HTML reports and Playwright Trace Viewer timelines:
+   1. `1. Verify public /knowledge-base/this-project article loads directly without redirect`
+   2. `2. Redirect unauthenticated guest on protected KB article to GuestPassModal via Edge Proxy`
+   3. `3. Issue Guest Pass and verify HttpOnly JWT cookie`
+   4. `4. Land on protected MDX article and verify server-compiled content`
+   5. `5. Verify /system-status Capability Matrix, Cursor Event Log, and Leaderboard Page 1 -> Page 2`
+3. **Scalable Workers + Serial Stateful Suites:** `playwright.config.ts` enables `fullyParallel: true` (`...(process.env.CI ? { workers: 2 } : {})`) while `test.describe.configure({ mode: 'serial' })` keeps stateful Hybrid KB ➔ auth ➔ event-log verification strictly ordered.
+4. **Windows Node 24 Happy Eyeballs & Next.js Proxy (`NODE_OPTIONS`):** Passing `NODE_OPTIONS: '--dns-result-order=ipv4first --no-network-family-autoselection'` inside Next.js's `webServer.env` prevents Node 24's IPv6-first DNS (`::1:4000`) `AggregateError` when Next.js rewrites forward `/api/*` requests to an IPv4-bound API.
 
 ---
 
@@ -142,21 +158,9 @@ apps/web/e2e/
 
 ### Root Workspace Discovery for IDE Test Explorer
 
-Running `Vitest` in each workspace package keeps `Turborepo --affected` fast, **but** VS Code / Cursor Testing extensions scan only the workspace root by default. Adding a lightweight root `vitest.config.ts`:
+Running `Vitest` in each workspace package keeps `Turborepo --affected` fast, while root `vitest.config.ts` unifies discovery (`projects: ['packages/*', 'apps/*']`) and V8 coverage for IDE Test Explorer (`vitest.explorer` + `ms-playwright.playwright`). Generate coverage via `pnpm run test:coverage` or launch the Vitest UI dashboard via `pnpm run test:ui`.
 
-```ts title="vitest.config.ts"
-import { defineConfig } from 'vitest/config'
+### GitHub Actions CI Integration (`.github/workflows/ci.yml`)
 
-export default defineConfig({
-  test: {
-    projects: ['packages/*', 'apps/*'],
-  },
-})
-```
-
-Paired with `"vitest.explorer"` + `"ms-playwright.playwright"` in `.vscode/extensions.json` and `.vscode/settings.json` (`"playwright.config": "apps/web/playwright.config.ts"`), both the **Vitest suite tree** and **Playwright specs** appear side-by-side in the IDE Testing sidebar—while Turborepo caches package runs independently. You can also generate V8 HTML/LCOV coverage via `pnpm run test:coverage` (or `pnpm exec vitest run --coverage`) or launch the interactive Vitest UI dashboard on `http://localhost:5124/__vitest__/` via `pnpm run test:ui`.
-
-### GitHub Actions CI Integration
-
-- **Stage 1 (`unit-tests`):** runs in parallel alongside `lint`, `security`, and `typecheck` with `prepare-codegen: "true"` and `fetch-depth: '0'` + `TURBO_SCM_BASE` on PRs (`turbo run test --affected` + `pnpm --filter @repo/api test:e2e`).
-- **Stage 2 (`e2e`):** waits for `needs: [ lint, typecheck, build ]`, restores `.turbo` build outputs and `~/.cache/ms-playwright` keyed to the locked Playwright version in `pnpm-lock.yaml`, runs `pnpm --filter @repo/web test:e2e`, and uploads HTML reports/traces via `actions/upload-artifact@v7` exclusively on `failure()`.
+- **Stage 1 (`unit-tests`):** Runs in parallel alongside `lint`, `security`, and `typecheck` with `prepare-codegen: "true"`, `fetch-depth: '0'` + `TURBO_SCM_BASE` on PRs (`turbo run test --affected` covering the 65 Vitest unit/integration tests across 4 packages), followed by `pnpm --filter @repo/api test:e2e` (Supertest HTTP E2E).
+- **Stage 2 (`e2e`):** Waits for `needs: [ lint, typecheck, build ]`, restores `.turbo` build cache, reads the exact installed `@playwright/test` version (`id: playwright-version` from `./apps/web/node_modules/@playwright/test/package.json`), and caches `~/.cache/ms-playwright` under `${{ runner.os }}-playwright-${{ steps.playwright-version.outputs.version }}`. On cache miss it runs `playwright install --with-deps chromium`; on cache hit it installs only OS deps via `playwright install-deps chromium`, runs `pnpm --filter @repo/web test:e2e`, and uploads HTML reports/traces via `actions/upload-artifact@v7` exclusively on `failure()`.

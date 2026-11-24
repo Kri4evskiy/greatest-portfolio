@@ -101,7 +101,7 @@ docker compose up --build -d
 
 #### 2B. Strict Production (`docker-compose.prod.yml` — Fail-Fast Secrets & Isolated DB)
 
-Enforces non-default secrets (`JWT_SECRET >= 32` chars, `ADMIN_SECRET_PASSCODE`, `POSTGRES_PASSWORD`, `WEB_ORIGIN`, `NEXT_PUBLIC_SITE_URL`) at both Docker Compose parse time (`${VAR:?error}`) and NestJS startup (`WORKFOLIO_DEMO_MODE` disabled), while completely unpublishing PostgreSQL port `5432` from the host machine:
+Enforces non-default secrets (`JWT_SECRET >= 32` chars, `ADMIN_SECRET_PASSCODE >= 16` chars, `POSTGRES_PASSWORD`, `WEB_ORIGIN`, `NEXT_PUBLIC_SITE_URL`, configurable `TRUST_PROXY_HOPS`) at both Docker Compose parse time (`${VAR:?error}`) and NestJS startup (`WORKFOLIO_DEMO_MODE` disabled), applies container hardening (`no-new-privileges`, `cap_drop: ALL`, `read_only` + `tmpfs`, `pids_limit`, healthchecks), and completely unpublishes PostgreSQL port `5432` from the host machine:
 
 ```bash
 docker compose -f docker-compose.prod.yml --env-file .env.prod up --build -d
@@ -109,13 +109,13 @@ docker compose -f docker-compose.prod.yml --env-file .env.prod up --build -d
 
 ---
 
-## 🔑 How to Test the Protected Knowledge Base & RBAC (for Team Leads / Recruiters)
+## 🔑 How to Test the Hybrid Knowledge Base & RBAC (for Team Leads / Recruiters)
 
-1. On the home page [http://localhost:3000](http://localhost:3000), click the **`🔒 Base of Knowledge (Protected • 1-Click)`** button in the header.
-2. The **1-Click Guest Pass** modal appears (`React Hook Form` + `Zod` from `@repo/shared-schemas`):
+1. On the home page [http://localhost:3000](http://localhost:3000), click **`Base of Knowledge`** in the header — the directory hub (`/knowledge-base`) and all **`This Project`** architecture case studies (`/knowledge-base/this-project/**`) open immediately with zero auth friction.
+2. Open any protected domain section (e.g., `React`, `NestJS`, `TypeScript`, or `AI`): the Edge Proxy (`src/proxy.ts`) redirects to `/?unlock=knowledge-base&redirect=...` and opens the lazy-loaded **1-Click Guest Pass** modal (`React Hook Form` + `Zod` from `@repo/shared-schemas`):
    - Click any fast preset (**`⚡ Alex (Team Lead)`**, **`🎯 Maria (Tech Recruiter)`**, or **`🚀 David (CTO)`**) for instant 1-click access with the `USER` role.
-   - Alternatively, expand the _"I am the owner (Admin Passcode)"_ section and enter the demo key: `workfolio-admin-2026` to unlock the `ADMIN` role.
-3. The `NestJS` backend signs an HS256 JWT, sets an `HttpOnly, Secure, SameSite=Lax` cookie (`kb_access_token`), publishes a telemetry event to the TCP microservice (`:4001`), updates the footer status over `SSE`, and grants seamless access to `/knowledge-base` (enforced at the Edge via Next.js 16 `src/proxy.ts` and NestJS 12 `JwtRolesGuard`).
+   - Alternatively, expand the _"I am the owner (Admin Passcode)"_ section and enter the demo key: `workfolio-admin-2026` (hint visible in demo/dev mode only) to unlock the `ADMIN` role.
+3. The `NestJS` backend signs an HS256 JWT (`1d` TTL), sets an `HttpOnly, Secure, SameSite=Lax` cookie (`kb_access_token`), publishes a telemetry event to the TCP microservice (`:4001`), updates the footer status over a single shared `SSE` connection, and grants seamless access to all protected `/knowledge-base/**` sections (enforced fail-closed at the Edge via Next.js 16 `src/proxy.ts` and NestJS 12 `JwtRolesGuard`).
 
 ---
 

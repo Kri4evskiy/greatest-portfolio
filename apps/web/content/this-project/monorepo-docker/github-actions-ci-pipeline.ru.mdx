@@ -1,29 +1,29 @@
 ---
 title: "GitHub Actions CI/CD в монорепозитории pnpm + Turborepo: Устройство, DAG, Inputs/Outputs и Security"
 sidebarLabel: "GitHub Actions CI/CD пайплайн"
-summary: "Полное практическое руководство по нашему CI/CD: разбор всех полей YAML, inputs/outputs между шагами и джобами, сравнение с Turborepo и без него, изоляция concurrency, fetch-depth с --affected, кэширование и supply-chain шлюз security."
+summary: "Полное практическое руководство по нашему CI/CD: разбор всех полей YAML, inputs/outputs между шагами и джобами, сравнение с Turborepo и без него, изоляция concurrency, fetch-depth с --affected, кэширование и CI-hardening (actionlint, noImportCycles, еженедельный security-audit и Dependabot)."
 category: "this-project"
 format: "deep-dive"
 tags: ["github-actions", "ci-cd", "turborepo", "storybook", "biome", "security"]
-readingTime: "12 мин"
+readingTime: "13 мин"
 publishedAt: "2026-11-11"
 order: 3
 tldr:
-  - "**Модульный DAG из 7 джоб вместо монолита:** `lint`, `security`, `typecheck` и `unit-tests` (`Vitest` + `Supertest`) идут параллельно перед `build`, `storybook` и браузерным `e2e` (`Playwright`) — чёткий fail-fast и изоляция прав."
+  - "**Модульный DAG из 7 джоб вместо монолита:** `lint` (`Biome` + `noImportCycles` + `actionlint`), `security`, `typecheck` и `unit-tests` (`Vitest` + `Supertest`) идут параллельно перед `build`, `storybook` и браузерным `e2e` (`Playwright`) — чёткий fail-fast и изоляция прав."
   - "**Справочник GitHub Actions:** детальный разбор `on`, `permissions`, `concurrency`, `needs`, `Composite Actions` (`inputs` / `outputs`) и передачи данных между изолированными VM-раннерами."
   - "**С Turborepo vs без него:** графовый `--affected` с `fetch-depth: '0'` и `TURBO_SCM_BASE` пропускает незатронутые сервисы без зависания Branch Protection и автоматически проверяет зависимых от `packages/shared-schemas`."
-  - "**Независимый шлюз `security` без `node_modules`:** валидирует `docker compose config --quiet` и аудирует прод-граф `pnpm-lock.yaml` через `pnpm audit --prod --audit-level=high`."
+  - "**Непрерывный supply-chain hardening:** шлюз `security` без `node_modules` на каждом PR/push, еженедельный `.github/workflows/security-audit.yml` (`cron: '0 6 * * 1'`), `persist-credentials: false` на каждом checkout и `.github/dependabot.yml` для `npm` + `github-actions`."
 ---
 
 ## 1. Анатомия GitHub Actions: из чего состоит наш CI/CD
 
-Весь пайплайн описан в `.github/workflows/ci.yml` и опирается на переиспользуемый **Composite Action** (`.github/actions/setup-workspace/action.yml`) и граф задач `turbo.json`. Главная идея для понимания GitHub Actions: **каждый `job` запускается на отдельной чистой виртуальной машине (`ubuntu-latest`)** со своей файловой системой и оперативной памятью.
+Весь пайплайн описан в `.github/workflows/ci.yml` в связке с еженедельным аудитом (`.github/workflows/security-audit.yml`), конфигурацией Dependabot (`.github/dependabot.yml`), переиспользуемым **Composite Action** (`.github/actions/setup-workspace/action.yml`) и графом задач `turbo.json`. Главная идея для понимания GitHub Actions: **каждый `job` запускается на отдельной чистой виртуальной машине (`ubuntu-latest`)** со своей файловой системой и оперативной памятью.
 
 ### Ключевые секции и поля `.github/workflows/ci.yml`
 
 | Поле YAML | Назначение и что делает в нашем проекте |
 | :--- | :--- |
-| **`on:`** | Триггеры запуска: `push` в `main`, `pull_request` (в целевую ветку `main`) и ручной `workflow_dispatch` (кнопка *Run workflow* в UI GitHub). |
+| **`on:`** | Тригеры запуска: `push` в `main`, `pull_request` (в целевую ветку `main`) и ручной `workflow_dispatch` (кнопка *Run workflow* в UI GitHub). |
 | **`permissions:`** | Выдаёт временному токену `GITHUB_TOKEN` минимальные права (принцип Least Privilege): только `contents: read` (чтение кода без права пуша или изменения релизов). |
 | **`concurrency:`** | Управляет параллельными запусками одного workflow: отменяет устаревшие проверки внутри одного PR и защищает каждый коммит в `main`. |
 | **`env:`** | Переменные окружения на весь workflow (`CI: true`, `LEFTHOOK: 0`, отключение телеметрии `DO_NOT_TRACK`, `TURBO_TELEMETRY_DISABLED`, `NEXT_TELEMETRY_DISABLED`). |
@@ -39,7 +39,7 @@ tldr:
 Поскольку в GitHub Actions нельзя просто объявить общую JS-переменную для всего файла, для обмена параметрами используются **инпуты (`inputs`)** и **аутпуты (`outputs`)**:
 
 1. **Внутри Composite Action (`action.yml`) — параметризация переиспользуемого блока:**
-   - **`inputs:`** — аргументы, которые вызывающий job передаёт внутрь через `with:`. У нас в `setup-workspace` это `prepare-codegen` (`required: false`, `default: "false"`): job `typecheck` передаёт `"true"`, а остальные оставляют `"false"`.
+   - **`inputs:`** — аргументы, которые вызывающий job передаёт внутрь через `with:`. У нас в `setup-workspace` это `prepare-codegen` (`required: false`, `default: "false"`): джобы `typecheck` и `unit-tests` передают `"true"`, а остальные оставляют `"false"`.
    - **`outputs:`** — значения, которые шаг внутри экшена может вернуть наружу (через запись в `$GITHUB_OUTPUT`), чтобы использовать их в следующих шагах того же job.
 2. **Между разными `jobs` (на уровне разных VM):**
    - Так как у каждой джобы своя виртуальная машина, передать строку (например, собранный тег Docker-образа, URL превью-деплоя или флаг `has-changes`) из `job_a` в `job_b` можно через `jobs.job_a.outputs`:
@@ -58,21 +58,21 @@ tldr:
 Вместо одного длинного скрипта проверки выстроены в **двухступенчатый направленный ациклический граф (DAG)** с быстрыми параллельными шлюзами в Stage 1 и тяжёлыми сборками / браузерным E2E в Stage 2:
 
 ```text
-Stage 1 (Параллельный Fail-Fast и граф типов)     Stage 2 (Тяжёлые сборки и Browser E2E)
-──────────────────────────────────────────────     ─────────────────────────────────────
-[lint] (Biome 2.6, shallow) ──────────────────┐
-                                              ├──▶ [build] (Turborepo + .turbo + .next/cache) ──▶ [e2e] (Playwright Chromium)
-[typecheck] (tsc + prepare-codegen) ──────────┤
-                                              └──▶ [storybook] (@repo/ui build-storybook)
-[unit-tests] (Vitest + Supertest E2E) ───────────▶ Параллельно Stage 1 (графовый --affected на PR)
-[security] (Compose + pnpm audit, без install) ──▶ Независимый supply-chain шлюз
+Stage 1 (Параллельный Fail-Fast и граф типов)                  Stage 2 (Тяжёлые сборки и Browser E2E)
+──────────────────────────────────────────────                 ─────────────────────────────────────
+[lint] (Biome 2.6 noImportCycles + actionlint, depth 1) ───┐
+                                                           ├──▶ [build] (Turborepo + .turbo + .next/cache) ──▶ [e2e] (Playwright Chromium)
+[typecheck] (tsc + prepare-codegen) ───────────────────────┤
+                                                           └──▶ [storybook] (@repo/ui build-storybook)
+[unit-tests] (Vitest + Supertest E2E) ────────────────────────▶ Параллельно Stage 1 (графовый --affected на PR)
+[security] (Compose + pnpm audit, без install) ───────────────▶ Независимый supply-chain шлюз (+ еженедельный cron)
 ```
 
 ### Профили всех 7 Jobs
 
 | Job | Зависимости (`needs`) | Git `fetch-depth` | Ставит `node_modules`? | Команда (`pull_request` vs `main`) |
 | :--- | :--- | :--- | :--- | :--- |
-| **`lint`** | — | `'1'` (shallow) | Да (без кодогенерации) | `pnpm run lint` (`biome check .` по всему репозиторию за ~150 мс) |
+| **`lint`** | — | `'1'` (shallow) | Да (без кодогенерации) | `pnpm run lint` (`biome check .` с `noImportCycles: "error"`) + `actionlint` (`v1.7.12`) |
 | **`security`** | — | `'1'` (shallow) | **Нет** | `docker compose config --quiet` → `pnpm audit --prod --audit-level=high` |
 | **`typecheck`** | — | PR: `'0'`, `main`: `'1'` | Да + `prepare-codegen` | PR: `TURBO_SCM_BASE=...base.sha` + `--affected`; `main`: `pnpm run typecheck` |
 | **`unit-tests`** | — | PR: `'0'`, `main`: `'1'` | Да + `prepare-codegen` | PR: `turbo run test --affected` + `@repo/api test:e2e`; `main`: `pnpm run test` + `@repo/api test:e2e` |
@@ -85,8 +85,8 @@ Stage 1 (Параллельный Fail-Fast и граф типов)     Stage 2 
 Объединение всех команд в один общий job экономит ~15–30 секунд на старте виртуальных машин (`checkout` + `setup-workspace`), но мы **осознанно выбрали** модульный граф:
 
 1. **Изолированные контуры `Vitest` и `Playwright` E2E:** быстрые unit-тесты идут в Stage 1 параллельно `typecheck`, а тяжёлый браузерный `Playwright` подключается после `build` (`needs: [ lint, typecheck, build ]`) со своим кэшем `.turbo`, Chromium и `webServer`-контуром, не тормозя `lint`, `security` и `storybook`.
-2. **Мгновенный Fail-Fast и экономия сборок:** в PR Checks сразу видно, какой контур упал (`Lint`, `Security`, `Typecheck`, `Unit Tests`, `Build`, `Storybook` или `E2E`), а `needs: [ lint, typecheck ]` физически не даёт запускать сборки Next.js/Playwright, если сломан синтаксис или типы TypeScript.
-3. **Разделение прав и изоляция `node_modules`:** `security` вообще не ставит `node_modules` и не исполняет скрипты пакетов, а `lint` и `security` скачивают только последний коммит (`fetch-depth: 1`).
+2. **Мгновенный Fail-Fast и экономия сборок:** в PR Checks сразу видно, какой контур упал (`Lint`, `Security`, `Typecheck`, `Unit Tests`, `Build`, `Storybook` или `E2E`), а `needs: [ lint, typecheck ]` физически не даёт запускать сборки Next.js/Playwright, если сломаны форматирование, циклы импортов, workflow YAML или типы TypeScript.
+3. **Разделение прав и изоляция `node_modules`:** `security` вообще не ставит `node_modules` и не исполняет скрипты пакетов, на каждом `actions/checkout@v6` задан `persist-credentials: false`, а `lint` и `security` скачивают только последний коммит (`fetch-depth: 1`).
 4. **Атомарные обязательные проверки (Branch Protection):** каждый job выступает отдельным Required Status Check перед мерджем в `main`.
 5. **Независимый сигнал по безопасности:** `security` не блокирует `build` и `storybook` — при выходе нового CVE в сторонней библиотеке разработчик всё равно видит, собирается ли код.
 
@@ -94,7 +94,7 @@ Stage 1 (Параллельный Fail-Fast и граф типов)     Stage 2 
 
 ## 3. DRY-инициализация воркспейса (`.github/actions/setup-workspace/action.yml`)
 
-Чтобы не дублировать настройку `pnpm`, `Node.js 22` и кэша стора в 4+ джобах, вся подготовка вынесена в локальный Composite Action:
+Чтобы не дублировать настройку `pnpm`, `Node.js 22` и кэша стора в 6 джобах, вся подготовка вынесена в локальный Composite Action:
 
 ```yaml title=".github/actions/setup-workspace/action.yml"
 inputs:
@@ -131,8 +131,8 @@ runs:
 Ключевые детали реализации:
 
 - **Порядок `pnpm/action-setup@v5` до `actions/setup-node@v6`:** настройка `cache: pnpm` требует уже доступного бинарника `pnpm`, чтобы определить путь к стору. Версия не дублируется в YAML — экшен читает `"packageManager": "pnpm@12.21.0"` из корневого `package.json`.
-- **Единый runtime без устаревших версий:** мажорные версии `actions/checkout@v6`, `actions/setup-node@v6`, `actions/cache@v5` и `pnpm/action-setup@v5` работают на современном Node 24 runtime для Actions.
-- **`pnpm install --frozen-lockfile` с белым списком `allowBuilds`:** в отличие от продакшен-Dockerfiles (`--ignore-scripts`), в CI разрешённым пакетам (`@prisma/client`, `@swc/core`, `@biomejs/biome`) нужно скомпилировать бинарники. Безопасность гарантируется `allowBuilds` в `pnpm-workspace.yaml` — любые неизвестные `postinstall`-скрипты по умолчанию заблокированы.
+- **Единый runtime без устаревших версий:** мажорные версии `actions/checkout@v6`, `actions/setup-node@v6`, `actions/cache@v5`, `actions/upload-artifact@v7` и `pnpm/action-setup@v5` работают на современном Node 24 runtime для Actions.
+- **`pnpm install --frozen-lockfile` с белым списком `allowBuilds`:** в отличие от продакшен-Dockerfiles (`--ignore-scripts`), в CI разрешённым нативным пакетам (`@biomejs/biome`, `@parcel/watcher`, `@prisma/engines`, `@swc/core`, `esbuild`, `lefthook`, `prisma`, `sharp`) разрешено собираться строго по белому списку `allowBuilds` в `pnpm-workspace.yaml` (никогда в `package.json`), а любые неизвестные транзитивные `postinstall`-скрипты заблокированы по умолчанию.
 - **`LEFTHOOK: 0` и отключение телеметрии:** глобальная `LEFTHOOK: 0` отключает установку локальных git-хуков скриптом `prepare` внутри эфемерного раннера.
 
 ---
@@ -177,22 +177,22 @@ concurrency:
 
 ---
 
-## 6. Подготовка кодогенерации в `typecheck` и 3 слоя кэширования
+## 6. Подготовка кодогенерации (`prepare-codegen`) и 3 слоя кэширования
 
-### Зачем `typecheck` передаёт `prepare-codegen: "true"`
+### Зачем `typecheck` и `unit-tests` передают `prepare-codegen: "true"`
 
-В `turbo.json` у задачи `typecheck` указано `"dependsOn": ["^typecheck"]` (а не `^build`), чтобы пакеты проверяли типы параллельно, не дожидаясь тяжёлых бандлов. На чистом раннере сразу после `checkout` ещё нет трёх сгенерированных артефактов, на которые ссылается TypeScript:
+В `turbo.json` у задачи `typecheck` указано `"dependsOn": ["^typecheck"]` (а не `^build`), чтобы пакеты проверяли типы параллельно, не дожидаясь тяжёлых бандлов. На чистом раннере сразу после `checkout` ещё нет трёх сгенерированных артефактов, на которые ссылаются TypeScript и тестовые контуры:
 
 1. Деклараций `packages/shared-schemas/dist/index.d.ts` (их импортируют `api`, `telemetry-ms` и `web`).
 2. Типов моделей БД в `@prisma/client` для `apps/api`.
 3. Типов маршрутов Next.js в `.next/types/*`, которые подключает `apps/web/next-env.d.ts`.
 
-Флаг `prepare-codegen: "true"` компилирует эти три слоя до старта `turbo run typecheck`. В джобе `build` он не требуется: там уже работает цепочка `"dependsOn": ["^build"]` (сначала собирается `@repo/shared-schemas`), а скрипт сборки `@repo/api` сам вызывает `prisma generate && tsc -p tsconfig.build.json`.
+Флаг `prepare-codegen: "true"` в `typecheck` и `unit-tests` компилирует `@repo/shared-schemas`, генерирует Prisma Client и запускает `next typegen` до старта Turborepo. В джобе `build` он не требуется: там уже работает цепочка `"dependsOn": ["^build"]` (сначала собирается `@repo/shared-schemas`), а скрипт сборки `@repo/api` сам вызывает `prisma generate && tsc -p tsconfig.build.json`.
 
 ### Три слоя кэша и защита от Cache Poisoning
 
 1. **Store `pnpm`:** кэшируется в `actions/setup-node@v6` (`cache: pnpm`) во всех джобах установки зависимостей.
-2. **Артефакты Turborepo (`.turbo`):** сохраняются и восстанавливаются в `build` по ключу `${{ runner.os }}-turbo-build-${{ github.sha }}` с префиксным фолбеком `${{ runner.os }}-turbo-build-`.
+2. **Артефакты Turborepo (`.turbo`):** сохраняются и восстанавливаются в `build` и `e2e` по ключу `${{ runner.os }}-turbo-build-${{ github.sha }}` с префиксным фолбеком `${{ runner.os }}-turbo-build-`.
 3. **Кэш компилятора Next.js (`apps/web/.next/cache`):** привязан к хэшам `pnpm-lock.yaml` и `apps/web/**`, сохраняя промежуточный кэш webpack/SWC между прогонами.
 
 > [!TIP]
@@ -200,7 +200,7 @@ concurrency:
 
 ---
 
-## 7. Supply-Chain шлюз `security` и план развития CI/CD
+## 7. Supply-Chain шлюз `security` и слои CI-hardening
 
 ### Зачем вынесен отдельный job `security` (и почему без `node_modules`)
 
@@ -213,6 +213,7 @@ concurrency:
         uses: actions/checkout@v6
         with:
           fetch-depth: 1
+          persist-credentials: false
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v5
@@ -231,12 +232,22 @@ concurrency:
 
 - **Защита цепочки поставок (Supply-Chain Security):** многие атаки на npm-пакеты происходят через вредоносные `postinstall`-скрипты во время установки или уязвимости в транзитивных библиотеках. Изолированный job `security` **не устанавливает `node_modules`**, а проверяет уже зафиксированный граф зависимостей напрямую по `pnpm-lock.yaml`.
 - **Порядок шагов:** сначала быстрая офлайн-валидация синтаксиса `docker-compose.yml` (`docker compose config --quiet`), затем сетевой аудит `pnpm audit --prod --audit-level=high` — проблема реестра npm не скроет сломанную конфигурацию контейнеров.
-- **Почему именно `--prod --audit-level=high`:** инструменты разработки (`Storybook`, `Vite`, `Biome`, `Turbo`) не попадают в финальные runtime-контейнеры `docker/*.Dockerfile` (`pnpm prune --prod`). Проверка только `--prod` держит высокий уровень сигнал/шум без ложных блокировок из-за dev-утилит.
+- **Почему именно `--prod --audit-level=high`:** инструменты разработки (`Storybook`, `Vite`, `Biome`, `Turbo`) не попадают в финальные продакшен-образы (`pnpm prune --prod --ignore-scripts` для `api`/`telemetry-ms` и Next.js `output: 'standalone'` для `web`). Проверка только `--prod` держит высокий уровень сигнал/шум без ложных блокировок из-за dev-утилит.
 - **Управляемые исключения в `pnpm 12`:** если когда-либо потребуется временно задокументировать недостижимую или ложноположительную уязвимость, используется блок `audit.ignore` в `pnpm-workspace.yaml` (через `pnpm audit --ignore <GHSA>`).
 
-### Внедрённые тестовые шлюзы и дальнейший roadmap CI/CD
+### Внедрённые контуры CI-hardening и автоматизации
 
-1. **`unit-tests` (`Vitest` + `Supertest`) — Внедрено:** параллельный job в Stage 1 (`needs: []`) с `prepare-codegen: "true"`, `fetch-depth: '0'` / `TURBO_SCM_BASE` на PR, `turbo run test --affected` и `pnpm --filter @repo/api test:e2e` для проверки Zod-контрактов, `Zustand`-сторов, RTL + `MSW v3` интеграций и `AppModule` NestJS.
-2. **`e2e` (`Playwright` Chromium) — Внедрено:** job в Stage 2 (`needs: [ lint, typecheck, build ]`) с восстановлением `.turbo` кэша и кэшированием `~/.cache/ms-playwright` по точной версии Playwright, проверкой RBAC-флоу (`GuestPassModal` → `HttpOnly` кука → открытие `.mdx` и `/system-status`) и загрузкой отчётов/трейсов (`actions/upload-artifact@v7`) по `if: failure()`.
-3. **Дополнительный hardening:** на всех шагах `actions/checkout@v6` уже выставлен `persist-credentials: false`; следующие шаги — еженедельный `schedule:` крон для `security` + `.github/dependabot.yml` (чтобы новые CVE ловились даже в недели без коммитов) и `actionlint` внутри `lint`.
-4. **Раздельный CD (Continuous Delivery):** отдельные per-service деплои (`apps/web` на Vercel с Remote Cache; `apps/api` и `apps/telemetry-ms` через `docker/*.Dockerfile` с `turbo prune --docker`), чтобы добавление новых `.mdx`-конспектов не пересобирало Docker-образы бэкенда.
+1. **Усиление `lint` (`noImportCycles` + `actionlint`) — Внедрено:**
+   - **Правило `suspicious.noImportCycles: "error"` в `biome.json`** блокирует циклические импорты между слоями FSD и модулями NestJS на самом первом этапе.
+   - **`actionlint` (`v1.7.12`)** запускается внутри джобы `lint` (`/tmp/actionlint -color`) и статически валидирует все `.github/workflows/*.yml` (выражения `${{ ... }}`, ссылки `needs`/`outputs`, встроенные bash-скрипты через shellcheck).
+2. **Еженедельный аудит безопасности (`.github/workflows/security-audit.yml`) — Внедрено:**
+   - Запускается каждый понедельник в 06:00 UTC (`cron: '0 6 * * 1'`) и вручную через `workflow_dispatch`, с `permissions: contents: read`, `cancel-in-progress: false` и `persist-credentials: false`.
+   - Повторяет `docker compose config --quiet` и `pnpm audit --prod --audit-level=high` без установки `node_modules`, чтобы новые CVE обнаруживались даже в недели без коммитов.
+3. **Автообновление зависимостей и экшенов (`.github/dependabot.yml`) — Внедрено:**
+   - Еженедельные проверки по понедельникам в 06:00 UTC для двух экосистем:
+     - **`npm`** (`directory: "/"`, `open-pull-requests-limit: 10`, префикс `chore(deps)`, группировка `minor` и `patch` в группу `minor-and-patch` для снижения шума PR).
+     - **`github-actions`** (`directory: "/"`, `open-pull-requests-limit: 5`, префикс `chore(ci)`).
+4. **Тестовые шлюзы (`unit-tests` и `e2e`) — Внедрено:**
+   - `unit-tests` выполняется параллельно в Stage 1 (`prepare-codegen: "true"`, `turbo run test --affected` + `pnpm --filter @repo/api test:e2e`).
+   - `e2e` запускается в Stage 2 (`needs: [ lint, typecheck, build ]`), восстанавливает `.turbo` и `~/.cache/ms-playwright`, проверяет RBAC-флоу (`GuestPassModal` -> `HttpOnly` кука -> открытие `.mdx` и `/system-status`) и выгружает отчёты/трейсы через `actions/upload-artifact@v7` при падении.
+5. **Следующий шаг — раздельный CD (Continuous Delivery):** отдельные per-service деплои (`apps/web` на Vercel с Remote Cache; `apps/api` и `apps/telemetry-ms` через `docker/*.Dockerfile` с `turbo prune --docker`), чтобы добавление новых `.mdx`-конспектов не пересобирало Docker-образы бэкенда.
