@@ -137,7 +137,7 @@ jobs:
         uses: ./.github/actions/setup-workspace
 
       - name: Restore Turborepo cache
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: .turbo
           key: ${{ runner.os }}-turbo-build-${{ github.sha }}
@@ -145,7 +145,7 @@ jobs:
             ${{ runner.os }}-turbo-build-
 
       - name: Restore Next.js build cache
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: apps/web/.next/cache
           key: ${{ runner.os }}-nextjs-${{ hashFiles('**/pnpm-lock.yaml') }}-${{ hashFiles('apps/web/**') }}
@@ -198,7 +198,7 @@ jobs:
         uses: ./.github/actions/setup-workspace
 
       - name: Restore Turborepo cache
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: .turbo
           key: ${{ runner.os }}-turbo-build-${{ github.sha }}
@@ -213,7 +213,7 @@ jobs:
 
       - name: Cache Playwright Chromium binaries
         id: playwright-cache
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-${{ steps.playwright-version.outputs.version }}
