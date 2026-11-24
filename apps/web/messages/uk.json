@@ -198,7 +198,10 @@
     "cmdHintNavigate": "↑↓ вибір",
     "cmdHintOpen": "↵ відкрити",
     "cmdHintClose": "esc закрити",
-    "cmdLockedBadge": "1-Клік доступ"
+    "cmdLockedBadge": "1-Клік доступ",
+    "lockedSectionDivider": "Закриті розділи • 1-Клік доступ",
+    "lockedSectionTooltip": "Увійдіть у 1 клік (Guest Pass), щоб відкрити цей розділ",
+    "unlockInPlaceCta": "Відкрити (1 клік)"
   },
   "Roadmap": {
     "title": "Інженерний беклог, Tech Debt та архітектурні компроміси",

@@ -198,7 +198,10 @@
     "cmdHintNavigate": "↑↓ выбор",
     "cmdHintOpen": "↵ открыть",
     "cmdHintClose": "esc закрыть",
-    "cmdLockedBadge": "Доступ в 1 клик"
+    "cmdLockedBadge": "Доступ в 1 клик",
+    "lockedSectionDivider": "Закрытые разделы • Вход в 1 клик",
+    "lockedSectionTooltip": "Войдите в 1 клик (Guest Pass), чтобы открыть этот раздел",
+    "unlockInPlaceCta": "Открыть (1 клик)"
   },
   "Roadmap": {
     "title": "Инженерный бэклог, Tech Debt и архитектурные компромиссы",

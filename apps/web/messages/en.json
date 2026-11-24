@@ -198,7 +198,10 @@
     "cmdHintNavigate": "↑↓ navigate",
     "cmdHintOpen": "↵ open",
     "cmdHintClose": "esc close",
-    "cmdLockedBadge": "1-Click Unlock"
+    "cmdLockedBadge": "1-Click Unlock",
+    "lockedSectionDivider": "Protected Notes • 1-Click Pass",
+    "lockedSectionTooltip": "Sign in with a 1-Click Guest Pass to unlock this section",
+    "unlockInPlaceCta": "Unlock (1-Click)"
   },
   "Roadmap": {
     "title": "Engineering Backlog, Tech Debt & Trade-offs",

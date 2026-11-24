@@ -1,7 +1,8 @@
 'use client'
 
-import { DEFAULT_LOCALE, SupportedLocaleEnum } from '@repo/shared-schemas'
+import { DEFAULT_LOCALE, type SessionProfile, SupportedLocaleEnum } from '@repo/shared-schemas'
 import { Badge, Button, Tooltip, TooltipContent, TooltipTrigger } from '@repo/ui'
+import { useQuery } from '@tanstack/react-query'
 import {
   BookOpen,
   ChevronDown,
@@ -11,6 +12,7 @@ import {
   Folder,
   FolderOpen,
   Layers,
+  Lock,
   PanelLeft,
   Search,
   Sparkles,
@@ -19,7 +21,7 @@ import { useLocale, useTranslations } from 'next-intl'
 import { useEffect, useMemo, useState } from 'react'
 import type { KnowledgeTreeFolderNode, KnowledgeTreeNode } from '@/entities/knowledge-content'
 import { prefetchKnowledgeSearchIndex } from '@/features/search/search-index-client'
-import { APP_ROUTES, isRouteActive } from '@/shared/i18n/app-routes'
+import { APP_ROUTES, buildKnowledgeBasePath, isPublicKnowledgeBasePath, isRouteActive } from '@/shared/i18n/app-routes'
 import { Link, usePathname } from '@/shared/i18n/navigation'
 import { useExpandedKbFolders, useUIActions } from '@/shared/store/use-ui-store'
 
@@ -42,17 +44,55 @@ interface KnowledgeTreeItemProps {
   depth: number
   pathname: string
   closeOnSelect: boolean
+  isUnlocked: boolean
+  lockedTooltip: string
   onSelectLeaf: () => void
+  onRequestUnlock: (targetHref: string) => void
 }
 
-function KnowledgeTreeItem({ node, depth, pathname, closeOnSelect, onSelectLeaf }: KnowledgeTreeItemProps) {
+function KnowledgeTreeItem({
+  node,
+  depth,
+  pathname,
+  closeOnSelect,
+  isUnlocked,
+  lockedTooltip,
+  onSelectLeaf,
+  onRequestUnlock,
+}: KnowledgeTreeItemProps) {
   const expandedFolders = useExpandedKbFolders()
   const { toggleKbFolder: toggleFolder } = useUIActions()
 
   // Level 3 (or deepest leaf): Article inside a Subtopic
   if (node.type === 'article') {
-    const href = `/knowledge-base/${node.article.routePath}`
+    const href = buildKnowledgeBasePath(node.article.routePath)
     const isActive = pathname === href
+    const isLocked = !isUnlocked && !isPublicKnowledgeBasePath(href)
+
+    if (isLocked) {
+      const lockedButton = (
+        <button
+          type="button"
+          onClick={() => onRequestUnlock(href)}
+          className="group flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-muted-foreground/75 transition-colors hover:bg-warning/10 hover:text-foreground"
+        >
+          <Lock className="h-3 w-3 shrink-0 text-warning" />
+          <span className="truncate">{node.article.sidebarLabel}</span>
+        </button>
+      )
+
+      if (closeOnSelect) return lockedButton
+
+      return (
+        <Tooltip>
+          <TooltipTrigger asChild>{lockedButton}</TooltipTrigger>
+          <TooltipContent side="right" align="center" sideOffset={8}>
+            {lockedTooltip}
+          </TooltipContent>
+        </Tooltip>
+      )
+    }
+
     const linkElement = (
       <Link
         href={href}
@@ -90,11 +130,49 @@ function KnowledgeTreeItem({ node, depth, pathname, closeOnSelect, onSelectLeaf 
   }
 
   // Level 1 (Root Topic, e.g. React) or Level 2+ (Subtopic, e.g. React Compiler)
-  const folderHref = `/knowledge-base/${node.pathKey}`
+  const folderHref = buildKnowledgeBasePath(node.pathKey)
   const isExactFolderActive = pathname === folderHref
   const isInsideBranch = isExactFolderActive || pathname.startsWith(`${folderHref}/`)
   const isExpanded = expandedFolders[node.pathKey] ?? false
   const isThisProjectRoot = depth === 0 && node.segment === 'this-project'
+  const isLockedBranch = !isUnlocked && !isPublicKnowledgeBasePath(folderHref)
+
+  if (isLockedBranch) {
+    const lockedRow = (
+      <button
+        type="button"
+        onClick={() => onRequestUnlock(folderHref)}
+        className="group flex w-full items-start justify-between gap-1.5 rounded-md px-1.5 py-1.5 text-left text-muted-foreground/75 transition-colors hover:bg-warning/10 hover:text-foreground"
+      >
+        <span className="flex min-w-0 flex-1 items-start gap-2">
+          <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warning/80 transition-transform group-hover:scale-105 group-hover:text-warning" />
+          <span
+            className={`min-w-0 flex-1 wrap-break-word leading-snug ${
+              depth === 0 ? 'text-[13px] font-medium tracking-tight' : 'text-xs font-medium'
+            }`}
+          >
+            {node.label}
+          </span>
+        </span>
+        <span className="mt-0.5 shrink-0 rounded-sm bg-muted/60 px-1.5 py-0.5 font-mono text-[10px] leading-none text-muted-foreground/80">
+          {node.articleCount}
+        </span>
+      </button>
+    )
+
+    if (closeOnSelect) {
+      return lockedRow
+    }
+
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>{lockedRow}</TooltipTrigger>
+        <TooltipContent side="right" align="center" sideOffset={8}>
+          {lockedTooltip}
+        </TooltipContent>
+      </Tooltip>
+    )
+  }
 
   const renderLevelIcon = () => {
     if (isThisProjectRoot) {
@@ -172,7 +250,10 @@ function KnowledgeTreeItem({ node, depth, pathname, closeOnSelect, onSelectLeaf 
               depth={depth + 1}
               pathname={pathname}
               closeOnSelect={closeOnSelect}
+              isUnlocked={isUnlocked}
+              lockedTooltip={lockedTooltip}
               onSelectLeaf={onSelectLeaf}
+              onRequestUnlock={onRequestUnlock}
             />
           ))}
         </div>
@@ -200,13 +281,38 @@ export function KnowledgeSidebar({
     collapseAllKbFolders,
     expandAllKbFolders,
     openCommandPalette,
+    openGuestPassModal,
   } = useUIActions()
   const [isMobileOpen, setIsMobileOpen] = useState(false)
 
+  // Read auth cache reactively without violating FSD (`entities` never imports `features/auth`)
+  const { data: profile } = useQuery<SessionProfile>({
+    queryKey: ['auth', 'me'],
+    enabled: false,
+  })
+  const isUnlocked = profile?.role === 'USER' || profile?.role === 'ADMIN'
+
+  const { publicRoots, protectedRoots } = useMemo(() => {
+    const pub: KnowledgeTreeFolderNode[] = []
+    const prot: KnowledgeTreeFolderNode[] = []
+    for (const rootNode of tree) {
+      if (isPublicKnowledgeBasePath(buildKnowledgeBasePath(rootNode.pathKey))) {
+        pub.push(rootNode)
+      } else {
+        prot.push(rootNode)
+      }
+    }
+    return { publicRoots: pub, protectedRoots: prot }
+  }, [tree])
+
+  const expandableFolderKeys = useMemo(
+    () => collectAllFolderKeys(isUnlocked ? tree : publicRoots),
+    [isUnlocked, publicRoots, tree],
+  )
   const allFolderKeys = useMemo(() => collectAllFolderKeys(tree), [tree])
   const hasAnyExpanded = useMemo(
-    () => allFolderKeys.some((key) => Boolean(expandedFolders[key])),
-    [allFolderKeys, expandedFolders],
+    () => expandableFolderKeys.some((key) => Boolean(expandedFolders[key])),
+    [expandableFolderKeys, expandedFolders],
   )
 
   useEffect(() => {
@@ -235,6 +341,12 @@ export function KnowledgeSidebar({
   }, [pathname, allFolderKeys, expandKbAncestors])
 
   const toggleAllLabel = hasAnyExpanded ? t('collapseAllTree') : t('expandAllTree')
+  const lockedTooltip = t('lockedSectionTooltip')
+
+  const handleRequestUnlock = (targetHref: string, closeOnSelect: boolean) => {
+    if (closeOnSelect) setIsMobileOpen(false)
+    openGuestPassModal(targetHref)
+  }
 
   const renderTreeContent = (closeOnSelect: boolean) => {
     const toggleAllButton = (
@@ -247,7 +359,7 @@ export function KnowledgeSidebar({
           if (hasAnyExpanded) {
             collapseAllKbFolders()
           } else {
-            expandAllKbFolders(allFolderKeys)
+            expandAllKbFolders(expandableFolderKeys)
           }
         }}
         className="h-7 w-7 shrink-0 border-border/60 bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -317,16 +429,52 @@ export function KnowledgeSidebar({
         </div>
 
         <nav aria-label={t('sidebarNavTitle')} className="space-y-1">
-          {tree.map((rootNode) => (
+          {publicRoots.map((rootNode) => (
             <KnowledgeTreeItem
               key={rootNode.pathKey}
               node={rootNode}
               depth={0}
               pathname={pathname}
               closeOnSelect={closeOnSelect}
+              isUnlocked={isUnlocked}
+              lockedTooltip={lockedTooltip}
               onSelectLeaf={() => setIsMobileOpen(false)}
+              onRequestUnlock={(href) => handleRequestUnlock(href, closeOnSelect)}
             />
           ))}
+
+          {protectedRoots.length > 0 ? (
+            <div className="mt-2.5 border-t border-border/70 pt-2.5">
+              {!isUnlocked ? (
+                <button
+                  type="button"
+                  onClick={() => handleRequestUnlock(APP_ROUTES.knowledgeBase, closeOnSelect)}
+                  className="mb-1.5 flex w-full items-center justify-between gap-1.5 rounded-md border border-dashed border-warning/40 bg-warning/5 px-2 py-1 text-left font-mono text-[10px] font-medium text-warning transition-colors hover:border-warning/70 hover:bg-warning/10"
+                >
+                  <span className="flex min-w-0 items-center gap-1.5 truncate">
+                    <Lock className="h-3 w-3 shrink-0" />
+                    <span className="truncate">{t('lockedSectionDivider')}</span>
+                  </span>
+                </button>
+              ) : null}
+
+              <div className="space-y-1">
+                {protectedRoots.map((rootNode) => (
+                  <KnowledgeTreeItem
+                    key={rootNode.pathKey}
+                    node={rootNode}
+                    depth={0}
+                    pathname={pathname}
+                    closeOnSelect={closeOnSelect}
+                    isUnlocked={isUnlocked}
+                    lockedTooltip={lockedTooltip}
+                    onSelectLeaf={() => setIsMobileOpen(false)}
+                    onRequestUnlock={(href) => handleRequestUnlock(href, closeOnSelect)}
+                  />
+                ))}
+              </div>
+            </div>
+          ) : null}
         </nav>
       </div>
     )

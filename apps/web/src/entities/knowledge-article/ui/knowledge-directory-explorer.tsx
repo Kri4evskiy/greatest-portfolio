@@ -5,6 +5,7 @@ import {
   getKnowledgeCategoryLabel,
   getKnowledgeFormatLabel,
   type KnowledgeNoteFormat,
+  type SessionProfile,
   type SupportedLocale,
 } from '@repo/shared-schemas'
 import {
@@ -18,7 +19,11 @@ import {
   Input,
   ToggleGroup,
   ToggleGroupItem,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
 } from '@repo/ui'
+import { useQuery } from '@tanstack/react-query'
 import {
   ArrowRight,
   ChevronDown,
@@ -27,6 +32,7 @@ import {
   FolderOpen,
   Hash,
   Layers,
+  Lock,
   RotateCcw,
   Search,
   Sparkles,
@@ -40,6 +46,7 @@ import type {
   KnowledgeTreeFolderNode,
   MdxArticleFrontmatter,
 } from '@/entities/knowledge-content'
+import { APP_ROUTES, buildKnowledgeBasePath, isPublicKnowledgeBasePath } from '@/shared/i18n/app-routes'
 import { Link } from '@/shared/i18n/navigation'
 import { useUIActions } from '@/shared/store/use-ui-store'
 
@@ -88,7 +95,14 @@ interface KnowledgeDirectoryExplorerProps {
 export function KnowledgeDirectoryExplorer({ tree, articles, tags, locale }: KnowledgeDirectoryExplorerProps) {
   const t = useTranslations('KnowledgeBase')
   const searchParams = useSearchParams()
-  const { openCommandPalette } = useUIActions()
+  const { openCommandPalette, openGuestPassModal } = useUIActions()
+
+  // Read auth cache reactively without importing `features/auth` into `entities`
+  const { data: profile } = useQuery<SessionProfile>({
+    queryKey: ['auth', 'me'],
+    enabled: false,
+  })
+  const isUnlocked = profile?.role === 'USER' || profile?.role === 'ADMIN'
 
   const urlTag = searchParams.get('tag')?.trim().toLowerCase() ?? null
   const [selectedFormat, setSelectedFormat] = useState<KnowledgeNoteFormat | 'ALL'>('ALL')
@@ -334,10 +348,28 @@ export function KnowledgeDirectoryExplorer({ tree, articles, tags, locale }: Kno
                   .slice(1, -1)
                   .map((seg) => formatKnowledgeSegmentLabel(seg, locale))
                   .join(' / ')
+                const articleHref = buildKnowledgeBasePath(article.routePath)
+                const isLockedArticle = !isUnlocked && !isPublicKnowledgeBasePath(articleHref)
 
                 return (
-                  <Link key={article.routePath} href={`/knowledge-base/${article.routePath}`} className="group block">
-                    <Card className="flex h-full flex-col justify-between transition-all group-hover:border-primary/50 group-hover:shadow-md">
+                  <Link
+                    key={article.routePath}
+                    href={articleHref}
+                    onClick={(event) => {
+                      if (isLockedArticle) {
+                        event.preventDefault()
+                        openGuestPassModal(articleHref)
+                      }
+                    }}
+                    className="group block"
+                  >
+                    <Card
+                      className={`flex h-full flex-col justify-between transition-all ${
+                        isLockedArticle
+                          ? 'border-dashed border-border/80 bg-muted/20 opacity-85 hover:border-warning/60 hover:opacity-100'
+                          : 'group-hover:border-primary/50 group-hover:shadow-md'
+                      }`}
+                    >
                       <CardHeader className="p-4 pb-3 @sm:p-5 @sm:pb-3">
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <div className="flex flex-wrap items-center gap-1.5">
@@ -352,6 +384,12 @@ export function KnowledgeDirectoryExplorer({ tree, articles, tags, locale }: Kno
                             <Badge variant="outline" className="font-mono text-[10px] text-primary">
                               {getKnowledgeFormatLabel(article.format, locale)}
                             </Badge>
+                            {isLockedArticle ? (
+                              <Badge variant="warning" className="gap-1 font-mono text-[10px]">
+                                <Lock className="h-2.5 w-2.5" />
+                                <span>{t('cmdLockedBadge')}</span>
+                              </Badge>
+                            ) : null}
                           </div>
                           <span className="flex items-center gap-1 font-mono text-[11px] text-muted-foreground">
                             <Clock className="h-3 w-3" />
@@ -378,10 +416,14 @@ export function KnowledgeDirectoryExplorer({ tree, articles, tags, locale }: Kno
                           </div>
                         ) : null}
 
-                        <div className="flex items-center justify-between border-t border-border/60 pt-3 font-mono text-xs text-primary">
+                        <div
+                          className={`flex items-center justify-between border-t border-border/60 pt-3 font-mono text-xs ${
+                            isLockedArticle ? 'text-warning' : 'text-primary'
+                          }`}
+                        >
                           <span className="flex items-center gap-1">
-                            <Sparkles className="h-3.5 w-3.5" />
-                            {t('openArticleCta')}
+                            {isLockedArticle ? <Lock className="h-3.5 w-3.5" /> : <Sparkles className="h-3.5 w-3.5" />}
+                            {isLockedArticle ? t('unlockInPlaceCta') : t('openArticleCta')}
                           </span>
                           <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-1" />
                         </div>
@@ -395,115 +437,224 @@ export function KnowledgeDirectoryExplorer({ tree, articles, tags, locale }: Kno
         </section>
       ) : (
         <div className="space-y-4">
-          {visibleTopics.map((topic) => {
+          {visibleTopics.map((topic, index) => {
             const subtopics = topic.children.filter(
               (child): child is KnowledgeTreeFolderNode => child.type === 'folder',
             )
+            const topicHref = buildKnowledgeBasePath(topic.pathKey)
+            const isPublicTopic = isPublicKnowledgeBasePath(topicHref)
+            const isLockedTopic = !isUnlocked && !isPublicTopic
             const isThisProject = topic.segment === 'this-project'
             const isTopicExpanded = expandedTopics[topic.pathKey] ?? false
             const hiddenSubtopicsCount = Math.max(0, subtopics.length - MAX_VISIBLE_SUBTOPICS)
             const visibleSubtopics = isTopicExpanded ? subtopics : subtopics.slice(0, MAX_VISIBLE_SUBTOPICS)
 
-            return (
-              <section
-                key={topic.pathKey}
-                className={`rounded-xl border p-5 shadow-xs transition-colors ${
-                  isThisProject ? 'border-primary/40 bg-primary/5' : 'border-border bg-card'
+            const prevTopic = index > 0 ? visibleTopics[index - 1] : undefined
+            const prevWasPublic = prevTopic
+              ? isPublicKnowledgeBasePath(buildKnowledgeBasePath(prevTopic.pathKey))
+              : false
+            const showProtectedDivider = prevWasPublic && !isPublicTopic
+
+            const topicHeadingLink = (
+              <Link
+                href={topicHref}
+                onClick={(event) => {
+                  if (isLockedTopic) {
+                    event.preventDefault()
+                    openGuestPassModal(topicHref)
+                  }
+                }}
+                className={`group inline-flex items-center gap-2.5 text-lg font-bold tracking-tight transition-colors ${
+                  isLockedTopic ? 'text-muted-foreground hover:text-foreground' : 'text-foreground hover:text-primary'
                 }`}
               >
-                {/* Level 1: Topic Header */}
-                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 pb-3.5">
-                  <Link
-                    href={`/knowledge-base/${topic.pathKey}`}
-                    className="group inline-flex items-center gap-2.5 text-lg font-bold tracking-tight text-foreground transition-colors hover:text-primary"
-                  >
-                    {isThisProject ? (
-                      <Sparkles className="h-5 w-5 text-primary" />
+                {isLockedTopic ? (
+                  <Lock className="h-4.5 w-4.5 text-warning" />
+                ) : isThisProject ? (
+                  <Sparkles className="h-5 w-5 text-primary" />
+                ) : (
+                  <Layers className="h-5 w-5 text-primary" />
+                )}
+                <span>{topic.label}</span>
+                <ArrowRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-1 group-hover:text-primary" />
+              </Link>
+            )
+
+            return (
+              <div key={topic.pathKey} className="space-y-4">
+                {showProtectedDivider ? (
+                  <div className="flex items-center gap-3 pt-2">
+                    <div className="h-px flex-1 bg-border/80" />
+                    {!isUnlocked ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => openGuestPassModal(APP_ROUTES.knowledgeBase)}
+                        className="h-auto gap-1.5 rounded-full border-dashed border-warning/50 bg-warning/10 px-3 py-1 font-mono text-[11px] font-medium text-warning hover:border-warning hover:bg-warning/15 hover:text-warning"
+                      >
+                        <Lock className="h-3 w-3" />
+                        <span>{t('lockedSectionDivider')}</span>
+                      </Button>
                     ) : (
-                      <Layers className="h-5 w-5 text-primary" />
+                      <span className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
+                        {t('sidebarNavTitle')}
+                      </span>
                     )}
-                    <span>{topic.label}</span>
-                    <ArrowRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-1 group-hover:text-primary" />
-                  </Link>
+                    <div className="h-px flex-1 bg-border/80" />
+                  </div>
+                ) : null}
 
-                  <Badge variant="secondary" className="font-mono text-[11px]">
-                    {t('subtopicsCountBadge', { subtopics: subtopics.length, articles: topic.articleCount })}
-                  </Badge>
-                </div>
+                <section
+                  className={`rounded-xl border p-5 shadow-xs transition-colors ${
+                    isThisProject
+                      ? 'border-primary/40 bg-primary/5'
+                      : isLockedTopic
+                        ? 'border-dashed border-border/80 bg-muted/20'
+                        : 'border-border bg-card'
+                  }`}
+                >
+                  {/* Level 1: Topic Header */}
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 pb-3.5">
+                    {isLockedTopic ? (
+                      <Tooltip>
+                        <TooltipTrigger asChild>{topicHeadingLink}</TooltipTrigger>
+                        <TooltipContent side="top">{t('lockedSectionTooltip')}</TooltipContent>
+                      </Tooltip>
+                    ) : (
+                      topicHeadingLink
+                    )}
 
-                {/* Level 2: Clickable Subtopic Tabs/Cards inside the Topic */}
-                {subtopics.length > 0 ? (
-                  <>
-                    <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                      {visibleSubtopics.map((sub) => {
-                        const directNotes = sub.children.filter(
-                          (child): child is KnowledgeTreeArticleNode => child.type === 'article',
-                        )
-                        const previewNotes = directNotes.slice(0, MAX_PREVIEW_NOTES_PER_SUBTOPIC)
-                        const remainingNotesCount = Math.max(0, sub.articleCount - previewNotes.length)
-
-                        return (
-                          <Link key={sub.pathKey} href={`/knowledge-base/${sub.pathKey}`} className="group block">
-                            <div className="flex h-full flex-col justify-between rounded-lg border border-border/80 bg-background/80 p-3.5 transition-all group-hover:border-primary/50 group-hover:bg-accent/40 group-hover:shadow-xs">
-                              <div className="flex items-center justify-between gap-2">
-                                <span className="flex min-w-0 items-center gap-2 text-sm font-semibold text-foreground group-hover:text-primary">
-                                  <FolderOpen className="h-4 w-4 shrink-0 text-primary/80" />
-                                  <span className="truncate">{sub.label}</span>
-                                </span>
-                                <Badge variant="outline" className="shrink-0 font-mono text-[10px]">
-                                  {sub.articleCount}
-                                </Badge>
-                              </div>
-
-                              {/* Level 3 Preview: Titles of articles inside this subtopic */}
-                              {previewNotes.length > 0 || remainingNotesCount > 0 ? (
-                                <ul className="mt-2.5 space-y-1 border-t border-border/50 pt-2 text-xs text-muted-foreground">
-                                  {previewNotes.map((leaf) => (
-                                    <li key={leaf.pathKey} className="flex items-center gap-1.5 truncate">
-                                      <span className="h-1 w-1 shrink-0 rounded-full bg-primary/60" />
-                                      <span className="truncate">{leaf.article.sidebarLabel}</span>
-                                    </li>
-                                  ))}
-                                  {remainingNotesCount > 0 ? (
-                                    <li className="pl-2.5 font-mono text-[11px] text-primary/80">
-                                      {t('moreNotesInSubtopic', { count: remainingNotesCount })}
-                                    </li>
-                                  ) : null}
-                                </ul>
-                              ) : null}
-                            </div>
-                          </Link>
-                        )
-                      })}
-                    </div>
-
-                    {hiddenSubtopicsCount > 0 ? (
-                      <div className="mt-3 flex justify-center border-t border-border/50 pt-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      {isLockedTopic ? (
                         <Button
                           type="button"
                           variant="outline"
                           size="sm"
-                          aria-expanded={isTopicExpanded}
-                          onClick={() => toggleTopicExpanded(topic.pathKey)}
-                          className="h-auto gap-1.5 rounded-lg bg-background/80 px-3 py-1.5 font-mono text-xs font-medium text-muted-foreground hover:border-primary/40 hover:bg-muted/50 hover:text-foreground"
+                          onClick={() => openGuestPassModal(topicHref)}
+                          className="h-7 gap-1.5 border-warning/40 bg-warning/10 px-2.5 font-mono text-[11px] text-warning hover:border-warning hover:bg-warning/15 hover:text-warning"
                         >
-                          {isTopicExpanded ? (
-                            <>
-                              <ChevronUp className="h-3.5 w-3.5 text-primary" />
-                              <span>{t('showLessSubtopics')}</span>
-                            </>
-                          ) : (
-                            <>
-                              <ChevronDown className="h-3.5 w-3.5 text-primary" />
-                              <span>{t('showMoreSubtopics', { count: hiddenSubtopicsCount })}</span>
-                            </>
-                          )}
+                          <Lock className="h-3 w-3" />
+                          <span>{t('unlockInPlaceCta')}</span>
                         </Button>
+                      ) : null}
+                      <Badge variant="secondary" className="font-mono text-[11px]">
+                        {t('subtopicsCountBadge', { subtopics: subtopics.length, articles: topic.articleCount })}
+                      </Badge>
+                    </div>
+                  </div>
+
+                  {/* Level 2: Clickable Subtopic Tabs/Cards inside the Topic */}
+                  {subtopics.length > 0 ? (
+                    <>
+                      <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                        {visibleSubtopics.map((sub) => {
+                          const directNotes = sub.children.filter(
+                            (child): child is KnowledgeTreeArticleNode => child.type === 'article',
+                          )
+                          const previewNotes = directNotes.slice(0, MAX_PREVIEW_NOTES_PER_SUBTOPIC)
+                          const remainingNotesCount = Math.max(0, sub.articleCount - previewNotes.length)
+                          const subHref = buildKnowledgeBasePath(sub.pathKey)
+
+                          const subCard = (
+                            <Link
+                              href={subHref}
+                              onClick={(event) => {
+                                if (isLockedTopic) {
+                                  event.preventDefault()
+                                  openGuestPassModal(subHref)
+                                }
+                              }}
+                              className="group block"
+                            >
+                              <div
+                                className={`flex h-full flex-col justify-between rounded-lg border p-3.5 transition-all ${
+                                  isLockedTopic
+                                    ? 'border-border/60 bg-background/60 opacity-80 group-hover:border-warning/50 group-hover:bg-warning/5 group-hover:opacity-100'
+                                    : 'border-border/80 bg-background/80 group-hover:border-primary/50 group-hover:bg-accent/40 group-hover:shadow-xs'
+                                }`}
+                              >
+                                <div className="flex items-center justify-between gap-2">
+                                  <span
+                                    className={`flex min-w-0 items-center gap-2 text-sm font-semibold ${
+                                      isLockedTopic
+                                        ? 'text-muted-foreground group-hover:text-foreground'
+                                        : 'text-foreground group-hover:text-primary'
+                                    }`}
+                                  >
+                                    {isLockedTopic ? (
+                                      <Lock className="h-3.5 w-3.5 shrink-0 text-warning/80" />
+                                    ) : (
+                                      <FolderOpen className="h-4 w-4 shrink-0 text-primary/80" />
+                                    )}
+                                    <span className="truncate">{sub.label}</span>
+                                  </span>
+                                  <Badge variant="outline" className="shrink-0 font-mono text-[10px]">
+                                    {sub.articleCount}
+                                  </Badge>
+                                </div>
+
+                                {/* Level 3 Preview: Titles of articles inside this subtopic */}
+                                {previewNotes.length > 0 || remainingNotesCount > 0 ? (
+                                  <ul className="mt-2.5 space-y-1 border-t border-border/50 pt-2 text-xs text-muted-foreground">
+                                    {previewNotes.map((leaf) => (
+                                      <li key={leaf.pathKey} className="flex items-center gap-1.5 truncate">
+                                        <span className="h-1 w-1 shrink-0 rounded-full bg-primary/60" />
+                                        <span className="truncate">{leaf.article.sidebarLabel}</span>
+                                      </li>
+                                    ))}
+                                    {remainingNotesCount > 0 ? (
+                                      <li className="pl-2.5 font-mono text-[11px] text-primary/80">
+                                        {t('moreNotesInSubtopic', { count: remainingNotesCount })}
+                                      </li>
+                                    ) : null}
+                                  </ul>
+                                ) : null}
+                              </div>
+                            </Link>
+                          )
+
+                          if (isLockedTopic) {
+                            return (
+                              <Tooltip key={sub.pathKey}>
+                                <TooltipTrigger asChild>{subCard}</TooltipTrigger>
+                                <TooltipContent side="top">{t('lockedSectionTooltip')}</TooltipContent>
+                              </Tooltip>
+                            )
+                          }
+
+                          return <div key={sub.pathKey}>{subCard}</div>
+                        })}
                       </div>
-                    ) : null}
-                  </>
-                ) : null}
-              </section>
+
+                      {hiddenSubtopicsCount > 0 ? (
+                        <div className="mt-3 flex justify-center border-t border-border/50 pt-3">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            aria-expanded={isTopicExpanded}
+                            onClick={() => toggleTopicExpanded(topic.pathKey)}
+                            className="h-auto gap-1.5 rounded-lg bg-background/80 px-3 py-1.5 font-mono text-xs font-medium text-muted-foreground hover:border-primary/40 hover:bg-muted/50 hover:text-foreground"
+                          >
+                            {isTopicExpanded ? (
+                              <>
+                                <ChevronUp className="h-3.5 w-3.5 text-primary" />
+                                <span>{t('showLessSubtopics')}</span>
+                              </>
+                            ) : (
+                              <>
+                                <ChevronDown className="h-3.5 w-3.5 text-primary" />
+                                <span>{t('showMoreSubtopics', { count: hiddenSubtopicsCount })}</span>
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      ) : null}
+                    </>
+                  ) : null}
+                </section>
+              </div>
             )
           })}
 
