@@ -45,6 +45,7 @@ pnpm run dev
 ### 1. Branching Strategy
 
 Create a feature branch from `main`:
+
 ```bash
 git checkout -b feat/your-feature-name
 # or fix/your-bugfix-name
@@ -54,6 +55,7 @@ git checkout -b feat/your-feature-name
 ### 2. Code Quality & Tooling Rules
 
 Our project enforces strict, zero-overhead tooling:
+
 - **Linter & Formatter:** Exclusively **Biome.js** (never install or run ESLint or Prettier).
 - **TypeScript:** Strict mode enabled (`strict: true`, `noUncheckedIndexedAccess: true`). Never use `any` or `@ts-ignore`.
 - **Pre-commit Hooks:** Configured via **Lefthook** (`lefthook.yml`) to automatically check staged files before committing.
@@ -61,6 +63,7 @@ Our project enforces strict, zero-overhead tooling:
 ### 3. Local Verification Commands
 
 Before submitting a PR, verify all Quality Gates pass locally:
+
 ```bash
 # Check formatting and lint rules across all files
 pnpm run lint

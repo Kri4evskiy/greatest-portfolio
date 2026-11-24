@@ -62,6 +62,7 @@
 ## 4. Стандарты Next.js AI Agents & Vercel React Best Practices
 
 Обязательно соблюдать правила из `.agents/skills/react-next-best-practices/SKILL.md`:
+
 1. **Next.js Local Version-Matched Docs (`nextjs.org/docs/app/guides/ai-agents`):** При работе с API Next.js сверяться с локальной документацией пакета в `apps/web/node_modules/next/dist/docs/` и соблюдать асинхронные контракты (`await params`, `await searchParams`, `await cookies()`).
 2. **Eliminate Waterfalls (`async-*`):** Запускать независимые запросы параллельно через `Promise.all`, использовать `React.cache()` для чтения MDX на сервере.
 3. **Bundle Optimization (`bundle-*`):** Грузить тяжелые клиентские модули (`D3.js` графы, модалки ADR) через `next/dynamic`, настраивать `optimizePackageImports` в `next.config.ts` и минимизировать сериализацию пропсов на границе `RSC -> Client Component`.

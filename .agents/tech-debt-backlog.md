@@ -3,6 +3,7 @@
 ## 📌 Текущая база (Production Baseline)
 
 Архитектурное ядро находится в продакшен-состоянии (`v0.9.0`; подробности и 16 ADR лежат в `.agents/frontend/*`, `.agents/backend/*`, `.agents/architecture/*` и статьях базы знаний):
+
 - **Monorepo & DX:** `pnpm 12.21.0` + `Turborepo` + `TypeScript 7.0.2` (native Go compiler) + `Biome 2.6.4` + `Lefthook` · `@repo/shared-schemas` (`Zod v4`: `SystemCapabilitiesSchema`, `API_ENDPOINTS` + `resolveEndpoint`, `LOCALE_METADATA`, Offset/Cursor контракты) + `@repo/ui` (`Tailwind CSS v4.3.5` + `Storybook 10` (100% coverage, 11/11 компонентов)) · 3-уровневое QA (`Vitest` 15 файлов / 56 тестов + `V8 coverage` + `Vitest UI :5124`, `Supertest` HTTP E2E, `Playwright` POM + `test.step`, `INITIAL_ARTICLE_SEEDS` из 10 слагов) · Multi-stage `Docker` + 7-джобный `GitHub Actions CI/CD`.
 - **Frontend (`apps/web`):** `Next.js 16.4.6` (`React 19 Compiler`) · архитектура `FSD-Modular` (`app` ➔ `widgets` ➔ `features` ➔ `entities` ➔ `shared`, централизованный реестр маршрутов `APP_ROUTES`) · `next-intl` (`EN/UK/RU` SSG) · `/[locale]/system-status` (`System Observability & Live API Inspector`: матрица `Capability Gated`, Cursor-лог событий с `SSE` и Offset-рейтинг на `TanStack Table`) · кликабельный `SSE LIVE` в футере · `robots.ts` + мультиязычный `sitemap.ts` + `/llms.txt` + `JSON-LD` (`ProfilePage`, `Person`, `TechArticle`) + `icon.tsx` / `apple-icon.tsx` / `opengraph-image.tsx` + локализованные `[locale]/not-found.tsx` и `[locale]/error.tsx` (с prod-only `captureClientException`) · 2D Appearance + cross-tab auth sync (`BroadcastChannel`) · `Zero-Eval HAST MDX Engine` (`mtimeMs` кэш + `Dual-Theme Shiki`) · `Cmd+K` SSG-индекс · `TanStack Query v5` (`IndexedDB` + 3-слойные `queryOptions` + `QueryCache.onError` `AbortError`-shield + `Axios` `apiClient` с `allowAbsoluteUrls: false`, `16s` таймаутом и `X-Request-Id`) · `D3.js` острова · `Edge Web Crypto JWT` + строгий `CSP`.
 - **Backend (`apps/api` & `apps/telemetry-ms`):** `NestJS 12 ESM` (`common`/`config`/`migrations`/`modules`, Zod env validation & timing-safe auth, `enableShutdownHooks()` + `takeUntil(shutdown$)`, `X-Request-Id` Correlation ID, `TimeoutInterceptor` 15s, `WORKFOLIO_DEMO_MODE` vs `docker-compose.prod.yml`) + `Prisma 7` (`7.10.1`, Rust-free Wasm + `@prisma/adapter-pg` + In-Memory fallback + `prisma:seed`) + `GET /api/capabilities` (типизированные runtime-флаги), публичный Read-Only `GET /api/knowledge/metrics/paginated` (с `category`/`sortBy`), `GET /api/telemetry/events` (Cursor + `eventType`) + `HttpOnly JWT` + `Helmet` + `@nestjs/throttler` + TCP-микросервис телеметрии (`:4001`) с `SSE`.
@@ -23,6 +24,7 @@
 #### Сессия 1 — Backend Security, Stability & Free-Tier Hardening _(Recommended Effort: **High** — ✅ Завершена)_
 
 _Область:_ `packages/shared-schemas/**`, `apps/api/**`, `apps/telemetry-ms/**`, `docker-compose*.yml`.
+
 - [x] **Unbounded Memory & DB Bloat (`apps/api/src/prisma/prisma.service.ts`, `apps/api/src/modules/knowledge/*`):**
   - Ввести лимиты `MAX_MEMORY_SESSIONS = 200` и `MAX_MEMORY_METRICS = 200` + очистку просроченных сессий в in-memory fallback.
   - Валидировать `:slug` на `POST /api/knowledge/:slug/view` и `/:slug/helpful` по allowlist реальных слагов статей (`404 NotFoundException` для неизвестных слагов) + дедупликация `helpful` по `(sessionId, slug)` против накрутки и засорения `ArticleMetrics`.
@@ -60,6 +62,7 @@ _Область:_ `packages/shared-schemas/**`, `apps/api/**`, `apps/telemetry-m
 #### Сессия 2 — Frontend Security, Auth Modal UX, Cache/SSE/Race Fixes & SEO _(Recommended Effort: **High** — ✅ Завершена)_
 
 _Область:_ `apps/web/config/security-headers.config.ts`, `apps/web/src/{proxy.ts,shared/*,features/auth/*,features/search/*,features/telemetry-stream/*,entities/knowledge-article/queries/*,app/{sitemap.ts,robots.ts,llms.txt}}`.
+
 - [x] **Frontend Zod Env Validation & Fail-Closed Edge JWT (`apps/web/src/shared/config/env.ts`, `edge-jwt.ts`, `proxy.ts`):**
   - Создать Zod-валидатор серверных и клиентских env-переменных фронтенда (`JWT_SECRET`, `WORKFOLIO_DEMO_MODE`, `API_INTERNAL_URL` со стриппингом trailing `/`, `NEXT_PUBLIC_SITE_URL`, `NEXT_PUBLIC_POSTHOG_HOST`).
   - Сделать `verifyEdgeJwtHs256()` **строго fail-closed** при `NODE_ENV === 'production' && WORKFOLIO_DEMO_MODE !== 'true'` (отклонять пустой, `< 32` символов или `DEFAULT_DEV_JWT_SECRET`); добавить проверку claims `sub`, `role` (`'USER' | 'ADMIN'`), `nbf`; сбрасывать `cachedHmacKeyPromise` в `.catch()`.
@@ -87,6 +90,7 @@ _Область:_ `apps/web/config/security-headers.config.ts`, `apps/web/src/{p
 #### Сессия 3A — Frontend RSC/Streaming, Bundle & CWV Optimization _(Recommended Effort: **High** — ✅ Завершена)_
 
 _Область:_ `packages/shared-schemas/package.json`, `packages/ui/*`, `apps/web/next.config.ts`, `apps/web/src/app/**`, `CvDocumentShowcase`, `D3`, `scrollspy`.
+
 - [x] **Устранение утечек клиентского бандла (`H5`, `I4`):**
   - Добавить `"sideEffects": false` в `packages/shared-schemas/package.json` и `"sideEffects": ["*.css"]` в `packages/ui/package.json` + `'@repo/shared-schemas'` в `optimizePackageImports`, чтобы 43.6 КБ `tech-radar.schema.ts` не утекали в клиентский бандл.
   - Заменить `import * as d3 from 'd3'` на точечные импорты (`select`, `hierarchy`, `tree`, `linkHorizontal`), добавить cleanup в `useEffect`, keyboard a11y (`role="button"`, `tabIndex={0}`), убрать мёртвый `pulseCounterRef` и хардкод русских строк в D3-виджетах.
@@ -106,6 +110,7 @@ _Область:_ `packages/shared-schemas/package.json`, `packages/ui/*`, `apps
 #### Сессия 3B — Синхронизация `this-project` MDX (42 файла), Docs & CI Quick-Wins _(Recommended Effort: **Medium** — ✅ Завершена)_
 
 _Область:_ `apps/web/content/this-project/**`, `.github/**`, `README.md`, `.agents/**`, `SECURITY.md`, `biome.json`.
+
 - [x] **Фактчекинг и полная синхронизация всех 14 статей (42 файла) `apps/web/content/this-project/**`** под итоговый код после Сессий 1–3A и CI Hardening:
   - Синхронизированы все 14 статей во всех 3 локалях (`en`, `ru`, `uk`): `nestjs-12-esm-prisma-7-sse-graceful-architecture`, `multi-theme-tokens-tailwind-preset`, `programmatic-scrollspy-section-nav`, `edge-web-crypto-jwt-proxy`, `production-seo-i18n-sitemap-architecture`, `react-compiler-config-boundaries`, `rsc-locale-slicing-client-islands`, `server-mdx-ast-dual-theme-shiki`, `static-search-index-cmdk-palette`, `github-actions-ci-pipeline`, `multi-stage-buildkit-docker`, `pnpm-turborepo-tsconfig-biome`, `production-security-hardening-csp-helmet-throttler` (включая `CsrfOriginMiddleware` и паттерны расширения под медиа-загрузки), `vitest-playwright-enterprise-testing-pyramid`.
 - [x] **Синхронизация системной документации** по чеклисту `AGENTS.md` (`README.md`, `apps/web/README.md`, `apps/api/README.md`, `.agents/frontend/*`, `.agents/backend/*`, `.agents/architecture/ci-cd.md`, `SECURITY.md`).
