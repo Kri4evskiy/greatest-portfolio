@@ -1,8 +1,7 @@
 'use client'
 
-import type { KnowledgeCategory, SessionProfile } from '@repo/shared-schemas'
+import type { KnowledgeCategory } from '@repo/shared-schemas'
 import { Badge, Button, Skeleton } from '@repo/ui'
-import { useQuery } from '@tanstack/react-query'
 import { Database, Eye, Loader2, ThumbsUp } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useEffect, useRef } from 'react'
@@ -11,6 +10,7 @@ import {
   useIncrementViewMutation,
   useKnowledgeMetrics,
 } from '@/entities/knowledge-article/queries/use-knowledge-metrics'
+import { useCachedAuth } from '@/shared/hooks/use-cached-auth'
 import { usePathname } from '@/shared/i18n/navigation'
 import { trackEvent } from '@/shared/lib/analytics'
 import { useUIActions } from '@/shared/store/use-ui-store'
@@ -18,13 +18,8 @@ import { useUIActions } from '@/shared/store/use-ui-store'
 export function ArticleMetricsBar({ slug, category }: { slug: string; category: KnowledgeCategory }) {
   const t = useTranslations('KnowledgeBase')
   const pathname = usePathname()
-  // Subscribe reactively to the root `['auth', 'me']` cache without violating FSD (`entities` -> `features`)
-  const { data: profile } = useQuery<SessionProfile>({
-    queryKey: ['auth', 'me'],
-    enabled: false,
-  })
+  const { isUnlocked } = useCachedAuth()
   const { openGuestPassModal } = useUIActions()
-  const isUnlocked = profile?.role === 'USER' || profile?.role === 'ADMIN'
 
   const { data: metricsList, isPending: isMetricsPending } = useKnowledgeMetrics(true)
   const { mutate: recordArticleView } = useIncrementViewMutation()

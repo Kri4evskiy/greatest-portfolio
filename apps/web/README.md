@@ -66,11 +66,11 @@ apps/web/
     │   ├── workfolio-profile/            # author-profile.ts, cv-file.ts (React.cache), workfolio-sections.tsx, CvDocumentShowcase (RSC) + CvViewTabs (Client Island)
     │   ├── engineering-roadmap/          # engineering-roadmap.ts, EngineeringRoadmapBoard, TechRadarTable + table/{tech-radar-data-table,tech-radar-columns}.tsx
     │   ├── knowledge-content/            # Серверный MDX/HAST-движок (mdx-fs-loader с примитивным React.cache, mdx-ast-parser, shiki FIFO, sanitizer)
-    │   └── knowledge-article/            # Рендеринг статей (MdxArticleRenderer, Sidebar, TOC на IntersectionObserver, knowledge-skeletons) + queries/use-knowledge-metrics.ts
+    │   └── knowledge-article/            # Рендеринг статей (MdxArticleRenderer, Sidebar, AccessCallout, DirectoryExplorer, TOC на IntersectionObserver, knowledge-skeletons) + queries/use-knowledge-metrics.ts
     │
     └── shared/                           # [Слой 5: Infrastructure & Common Tools]
         ├── config/                       # env.ts (Zod env validation + fail-closed resolveEdgeJwtSecretStrict)
-        ├── hooks/                        # Чистые браузерные DOM/ScrollSpy-хуки на IntersectionObserver (use-section-navigation.ts)
+        ├── hooks/                        # DOM/ScrollSpy-хуки (use-section-navigation.ts) и read-only auth cache subscriber (use-cached-auth.ts на skipToken)
         ├── i18n/                         # app-routes.ts (Hybrid KB access + __tests__/app-routes.test.ts), pick-messages.ts, routing.ts, request.ts, navigation.ts
         ├── lib/                          # api-client.ts (+ __tests__/api-client.test.ts), edge-jwt.ts (+ __tests__/edge-jwt.test.ts), seo.ts, palette.ts, analytics.ts
         ├── providers/                    # ThemeProvider (next-themes), QueryProvider (IDB allowlist ['knowledge'] + __tests__/query-provider.test.tsx)

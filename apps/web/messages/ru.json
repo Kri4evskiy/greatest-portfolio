@@ -139,6 +139,8 @@
     "description": "Все статьи ниже скомпилированы статически на этапе сборки (SSG из apps/web/content/*.mdx), содержат интерактивные симуляции на D3.js и кэшируют пользовательские метрики в браузерной БД IndexedDB через TanStack Query v5.",
     "calloutTitle": "Доступ подтвержден (Next.js Edge Proxy + NestJS JWT HttpOnly Cookie)",
     "calloutBody": "Вы успешно прошли проверку куки kb_access_token. Откройте вкладку Application → IndexedDB в Chrome DevTools, чтобы увидеть клиентский кэш greatest-portfolio-query-cache.",
+    "guestCalloutTitle": "Гибридный доступ: раздел This Project открыт, остальные — в 1 клик",
+    "guestCalloutBody": "Архитектурные разборы этого проекта (This Project) доступны без входа. Получите 1-Click Guest Pass, чтобы открыть конспекты по React, NestJS, TypeScript и AI.",
     "openArticleCta": "Читать конспект",
     "howToAddTitle": "Как добавлять вложенные разделы, подпункты и статьи:",
     "howToAddBody": "Создавайте подпапки любой глубины внутри apps/web/content/[category]/[subtopic]/... и добавляйте файлы .en.mdx, .uk.mdx или .ru.mdx. Рекурсивный SSG-сканер автоматически построит дерево в сайдбаре, хлебные крошки и статические маршруты.",
@@ -201,7 +203,10 @@
     "cmdLockedBadge": "Доступ в 1 клик",
     "lockedSectionDivider": "Закрытые разделы • Вход в 1 клик",
     "lockedSectionTooltip": "Войдите в 1 клик (Guest Pass), чтобы открыть этот раздел",
-    "unlockInPlaceCta": "Открыть (1 клик)"
+    "unlockInPlaceCta": "Открыть (1 клик)",
+    "cmdPublicArticlesHeading": "Публичные статьи (This Project)",
+    "cmdHintUnlock": "↵ войти и открыть",
+    "cmdGuestUnlockBanner": "This Project открыт. Остальные разделы — в 1 клик:"
   },
   "Roadmap": {
     "title": "Инженерный бэклог, Tech Debt и архитектурные компромиссы",

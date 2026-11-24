@@ -34,7 +34,7 @@ export function WorkfolioHeader() {
   const isRestoring = useIsRestoring()
   const isSessionChecking = isRestoring || (isProfilePending && profile === undefined)
   const { mutateAsync: logoutSession, isPending: isLoggingOut } = useLogoutMutation()
-  const { openCommandPalette } = useUIActions()
+  const { openCommandPalette, openGuestPassModal } = useUIActions()
 
   const currentRole = profile?.role ?? 'GUEST'
   const isUnlocked = currentRole === 'USER' || currentRole === 'ADMIN'
@@ -44,7 +44,12 @@ export function WorkfolioHeader() {
   const headerRouteBadge = resolveHeaderRouteBadge(pathname)
 
   const handleKnowledgeBaseClick = () => {
-    // Knowledge Base hub & /this-project/** are public; navigate directly without auth friction.
+    // If a guest is already inside `/knowledge-base` and clicks the locked header button,
+    // open GuestPassModal in place instead of a no-op navigation to the same route.
+    if (!isUnlocked && isInsideKnowledgeBase) {
+      openGuestPassModal(pathname)
+      return
+    }
     router.push(APP_ROUTES.knowledgeBase)
   }
 

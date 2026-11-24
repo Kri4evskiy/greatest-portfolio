@@ -37,15 +37,19 @@ interface CommandPaletteModalProps {
   locale: SupportedLocale
 }
 
+type PaletteSection = 'quick-actions' | 'articles' | 'public-articles' | 'protected-articles'
+
 type PaletteEntry =
   | {
       kind: 'quick-action'
+      section: 'quick-actions'
       id: string
       label: string
       actionType: 'cv-home' | 'cv-pdf' | 'system-status' | 'tech-radar' | 'roadmap' | 'kb-overview'
     }
   | {
       kind: 'article'
+      section: Exclude<PaletteSection, 'quick-actions'>
       id: string
       item: KnowledgeSearchItem
       matchedHeading?: { id: string; text: string } | undefined
@@ -111,12 +115,48 @@ export function CommandPaletteModal({ locale }: CommandPaletteModalProps) {
 
   const quickActions = useMemo<PaletteEntry[]>(
     () => [
-      { kind: 'quick-action', id: 'qa-cv-pdf', label: t('cmdActionCvPdf'), actionType: 'cv-pdf' },
-      { kind: 'quick-action', id: 'qa-system-status', label: t('cmdActionSystemStatus'), actionType: 'system-status' },
-      { kind: 'quick-action', id: 'qa-kb', label: t('cmdActionKbOverview'), actionType: 'kb-overview' },
-      { kind: 'quick-action', id: 'qa-radar', label: t('cmdActionTechRadar'), actionType: 'tech-radar' },
-      { kind: 'quick-action', id: 'qa-roadmap', label: t('cmdActionRoadmap'), actionType: 'roadmap' },
-      { kind: 'quick-action', id: 'qa-cv', label: t('cmdActionCvHome'), actionType: 'cv-home' },
+      {
+        kind: 'quick-action',
+        section: 'quick-actions',
+        id: 'qa-cv-pdf',
+        label: t('cmdActionCvPdf'),
+        actionType: 'cv-pdf',
+      },
+      {
+        kind: 'quick-action',
+        section: 'quick-actions',
+        id: 'qa-system-status',
+        label: t('cmdActionSystemStatus'),
+        actionType: 'system-status',
+      },
+      {
+        kind: 'quick-action',
+        section: 'quick-actions',
+        id: 'qa-kb',
+        label: t('cmdActionKbOverview'),
+        actionType: 'kb-overview',
+      },
+      {
+        kind: 'quick-action',
+        section: 'quick-actions',
+        id: 'qa-radar',
+        label: t('cmdActionTechRadar'),
+        actionType: 'tech-radar',
+      },
+      {
+        kind: 'quick-action',
+        section: 'quick-actions',
+        id: 'qa-roadmap',
+        label: t('cmdActionRoadmap'),
+        actionType: 'roadmap',
+      },
+      {
+        kind: 'quick-action',
+        section: 'quick-actions',
+        id: 'qa-cv',
+        label: t('cmdActionCvHome'),
+        actionType: 'cv-home',
+      },
     ],
     [t],
   )
@@ -124,7 +164,24 @@ export function CommandPaletteModal({ locale }: CommandPaletteModalProps) {
   const filteredEntries = useMemo<PaletteEntry[]>(() => {
     const trimmed = query.trim().toLowerCase()
     if (!trimmed) {
-      return [...quickActions, ...items.map((item): PaletteEntry => ({ kind: 'article', id: item.routePath, item }))]
+      if (isUnlocked) {
+        return [
+          ...quickActions,
+          ...items.map((item): PaletteEntry => ({ kind: 'article', section: 'articles', id: item.routePath, item })),
+        ]
+      }
+
+      const publicEntries: PaletteEntry[] = []
+      const protectedEntries: PaletteEntry[] = []
+      for (const item of items) {
+        const isPublic = isPublicKnowledgeBasePath(buildKnowledgeBasePath(item.routePath))
+        if (isPublic) {
+          publicEntries.push({ kind: 'article', section: 'public-articles', id: item.routePath, item })
+        } else {
+          protectedEntries.push({ kind: 'article', section: 'protected-articles', id: item.routePath, item })
+        }
+      }
+      return [...quickActions, ...publicEntries, ...protectedEntries]
     }
 
     const isTagSearch = trimmed.startsWith('#')
@@ -165,6 +222,7 @@ export function CommandPaletteModal({ locale }: CommandPaletteModalProps) {
           score,
           entry: {
             kind: 'article',
+            section: 'articles',
             id: item.routePath,
             item,
             matchedHeading,
@@ -180,9 +238,14 @@ export function CommandPaletteModal({ locale }: CommandPaletteModalProps) {
       : quickActions.filter((qa) => qa.kind === 'quick-action' && qa.label.toLowerCase().includes(needle))
 
     return [...matchedActions, ...matchedArticles.map((m) => m.entry)]
-  }, [items, query, quickActions])
+  }, [isUnlocked, items, query, quickActions])
 
   const safeActiveIndex = filteredEntries.length === 0 ? 0 : Math.min(activeIndex, filteredEntries.length - 1)
+  const activeEntry = filteredEntries[safeActiveIndex]
+  const isActiveEntryLocked =
+    activeEntry?.kind === 'article' &&
+    !isUnlocked &&
+    !isPublicKnowledgeBasePath(buildKnowledgeBasePath(activeEntry.item.routePath))
 
   // Keep keyboard navigation focus-in-view without disturbing mouse hover
   useEffect(() => {
@@ -352,6 +415,29 @@ export function CommandPaletteModal({ locale }: CommandPaletteModalProps) {
           </div>
         ) : null}
 
+        {/* Guest 1-Click Unlock Banner */}
+        {!isUnlocked ? (
+          <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-warning/25 bg-warning/5 px-3.5 py-2 sm:px-4">
+            <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+              <Lock className="h-3.5 w-3.5 shrink-0 text-warning" />
+              <span className="truncate">{t('cmdGuestUnlockBanner')}</span>
+            </span>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                closePalette()
+                openGuestPassModal(APP_ROUTES.knowledgeBase)
+              }}
+              className="h-6 shrink-0 gap-1 border-warning/40 bg-background px-2 font-mono text-[10px] text-warning hover:bg-warning/10 hover:text-warning"
+            >
+              <Lock className="h-2.5 w-2.5" />
+              <span>{t('unlockInPlaceCta')}</span>
+            </Button>
+          </div>
+        ) : null}
+
         {/* Results List */}
         <div ref={listContainerRef} className="min-h-0 flex-1 overflow-y-auto p-2 sm:p-2.5">
           {filteredEntries.length === 0 ? (
@@ -361,14 +447,31 @@ export function CommandPaletteModal({ locale }: CommandPaletteModalProps) {
               {filteredEntries.map((entry, idx) => {
                 const isSelected = idx === safeActiveIndex
                 const prevEntry = idx > 0 ? filteredEntries[idx - 1] : undefined
-                const showSectionHeader = !prevEntry || prevEntry.kind !== entry.kind
+                const showSectionHeader = !prevEntry || prevEntry.section !== entry.section
+                const isLockedArticle =
+                  entry.kind === 'article' &&
+                  !isUnlocked &&
+                  !isPublicKnowledgeBasePath(buildKnowledgeBasePath(entry.item.routePath))
 
                 return (
                   <div key={entry.id}>
                     {showSectionHeader ? (
-                      <div className="px-2.5 pt-2 pb-1 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                        {entry.kind === 'quick-action' ? t('cmdQuickActionsHeading') : t('cmdArticlesHeading')}
-                      </div>
+                      entry.section === 'protected-articles' ? (
+                        <div className="mt-2 border-t border-border/70 px-2.5 pt-2.5 pb-1">
+                          <div className="flex items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                            <Lock className="h-3 w-3 shrink-0 text-warning" />
+                            <span>{t('lockedSectionDivider')}</span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="px-2.5 pt-2 pb-1 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                          {entry.section === 'quick-actions'
+                            ? t('cmdQuickActionsHeading')
+                            : entry.section === 'public-articles'
+                              ? t('cmdPublicArticlesHeading')
+                              : t('cmdArticlesHeading')}
+                        </div>
+                      )
                     ) : null}
 
                     {entry.kind === 'quick-action' ? (
@@ -406,12 +509,20 @@ export function CommandPaletteModal({ locale }: CommandPaletteModalProps) {
                         onMouseEnter={() => setActiveIndex(idx)}
                         onClick={() => executeEntry(entry)}
                         className={`flex w-full flex-col gap-1 rounded-lg px-3 py-2.5 text-left transition-colors ${
-                          isSelected ? 'bg-primary/10' : 'hover:bg-muted/60'
+                          isSelected
+                            ? isLockedArticle
+                              ? 'bg-warning/10'
+                              : 'bg-primary/10'
+                            : isLockedArticle
+                              ? 'opacity-85 hover:bg-warning/5 hover:opacity-100'
+                              : 'hover:bg-muted/60'
                         }`}
                       >
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <div className="flex min-w-0 items-center gap-1.5 font-mono text-[10px] text-muted-foreground">
-                            {entry.item.category === 'this-project' ? (
+                            {isLockedArticle ? (
+                              <Lock className="h-3 w-3 shrink-0 text-warning" />
+                            ) : entry.item.category === 'this-project' ? (
                               <Sparkles className="h-3 w-3 shrink-0 text-primary" />
                             ) : (
                               <FileText className="h-3 w-3 shrink-0 text-primary" />
@@ -426,7 +537,7 @@ export function CommandPaletteModal({ locale }: CommandPaletteModalProps) {
                             <Badge variant="outline" className="px-1.5 py-0 font-mono text-[10px]">
                               {getKnowledgeFormatLabel(entry.item.format, locale)}
                             </Badge>
-                            {!isUnlocked && !isPublicKnowledgeBasePath(buildKnowledgeBasePath(entry.item.routePath)) ? (
+                            {isLockedArticle ? (
                               <span className="inline-flex items-center gap-1 rounded-sm bg-warning/15 px-1.5 py-0.5 font-mono text-[10px] text-warning">
                                 <Lock className="h-2.5 w-2.5" />
                                 {t('cmdLockedBadge')}
@@ -437,7 +548,13 @@ export function CommandPaletteModal({ locale }: CommandPaletteModalProps) {
 
                         <div
                           className={`text-xs font-semibold leading-snug sm:text-sm ${
-                            isSelected ? 'text-primary' : 'text-foreground'
+                            isSelected
+                              ? isLockedArticle
+                                ? 'text-warning'
+                                : 'text-primary'
+                              : isLockedArticle
+                                ? 'text-foreground/85'
+                                : 'text-foreground'
                           }`}
                         >
                           {entry.item.title}
@@ -477,7 +594,9 @@ export function CommandPaletteModal({ locale }: CommandPaletteModalProps) {
         <div className="flex shrink-0 items-center justify-between border-t border-border bg-muted/30 px-4 py-2 font-mono text-[10px] text-muted-foreground">
           <div className="flex items-center gap-3">
             <span>{t('cmdHintNavigate')}</span>
-            <span>{t('cmdHintOpen')}</span>
+            <span className={isActiveEntryLocked ? 'text-warning' : undefined}>
+              {isActiveEntryLocked ? t('cmdHintUnlock') : t('cmdHintOpen')}
+            </span>
             <span>{t('cmdHintClose')}</span>
           </div>
           <span>Ctrl+K / ⌘K</span>

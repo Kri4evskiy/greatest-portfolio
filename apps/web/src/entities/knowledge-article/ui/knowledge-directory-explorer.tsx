@@ -5,7 +5,6 @@ import {
   getKnowledgeCategoryLabel,
   getKnowledgeFormatLabel,
   type KnowledgeNoteFormat,
-  type SessionProfile,
   type SupportedLocale,
 } from '@repo/shared-schemas'
 import {
@@ -23,7 +22,6 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@repo/ui'
-import { useQuery } from '@tanstack/react-query'
 import {
   ArrowRight,
   ChevronDown,
@@ -46,6 +44,7 @@ import type {
   KnowledgeTreeFolderNode,
   MdxArticleFrontmatter,
 } from '@/entities/knowledge-content'
+import { useCachedAuth } from '@/shared/hooks/use-cached-auth'
 import { APP_ROUTES, buildKnowledgeBasePath, isPublicKnowledgeBasePath } from '@/shared/i18n/app-routes'
 import { Link } from '@/shared/i18n/navigation'
 import { useUIActions } from '@/shared/store/use-ui-store'
@@ -97,12 +96,7 @@ export function KnowledgeDirectoryExplorer({ tree, articles, tags, locale }: Kno
   const searchParams = useSearchParams()
   const { openCommandPalette, openGuestPassModal } = useUIActions()
 
-  // Read auth cache reactively without importing `features/auth` into `entities`
-  const { data: profile } = useQuery<SessionProfile>({
-    queryKey: ['auth', 'me'],
-    enabled: false,
-  })
-  const isUnlocked = profile?.role === 'USER' || profile?.role === 'ADMIN'
+  const { isUnlocked } = useCachedAuth()
 
   const urlTag = searchParams.get('tag')?.trim().toLowerCase() ?? null
   const [selectedFormat, setSelectedFormat] = useState<KnowledgeNoteFormat | 'ALL'>('ALL')

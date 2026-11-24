@@ -139,6 +139,8 @@
     "description": "All articles below are statically compiled at build time (SSG from apps/web/content/*.mdx), feature interactive D3.js simulations, and persist engagement metrics in IndexedDB via TanStack Query v5.",
     "calloutTitle": "Access Verified (Next.js Edge Proxy + NestJS JWT HttpOnly Cookie)",
     "calloutBody": "You passed the kb_access_token cookie check. Open Application → IndexedDB in Chrome DevTools to inspect the greatest-portfolio-query-cache.",
+    "guestCalloutTitle": "Hybrid Access: This Project is public, domain notes unlock in 1 click",
+    "guestCalloutBody": "Architecture deep-dives in This Project are open without login. Sign in with a 1-Click Guest Pass to unlock React, NestJS, TypeScript, and AI engineering notes.",
     "openArticleCta": "Open article",
     "howToAddTitle": "How to add nested sections, subtopics, and articles:",
     "howToAddBody": "Create any nested folder hierarchy inside apps/web/content/[category]/[subtopic]/... and drop .en.mdx, .uk.mdx, or .ru.mdx files at any depth. The recursive SSG scanner automatically builds the sidebar tree, breadcrumbs, and static routes.",
@@ -201,7 +203,10 @@
     "cmdLockedBadge": "1-Click Unlock",
     "lockedSectionDivider": "Protected Notes • 1-Click Pass",
     "lockedSectionTooltip": "Sign in with a 1-Click Guest Pass to unlock this section",
-    "unlockInPlaceCta": "Unlock (1-Click)"
+    "unlockInPlaceCta": "Unlock (1-Click)",
+    "cmdPublicArticlesHeading": "Public Notes (This Project)",
+    "cmdHintUnlock": "↵ unlock & open",
+    "cmdGuestUnlockBanner": "This Project is open. Unlock all domain notes in 1 click:"
   },
   "Roadmap": {
     "title": "Engineering Backlog, Tech Debt & Trade-offs",

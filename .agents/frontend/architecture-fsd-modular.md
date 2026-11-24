@@ -78,7 +78,7 @@ apps/web/
     ├── entities/               # [Слой 4: Business Data Representation]
     │   │                       # Отображение данных предметной области (без глобальных сайд-эффектов)
     │   ├── knowledge-article/  # HAST RSC-рендер (mdx-article-renderer, code-block, callout-config, knowledge-skeletons),
-    │   │                       # ArticleToc (IntersectionObserver), MetricsBar, DirectoryExplorer, KnowledgeSidebar,
+    │   │                       # ArticleToc (IntersectionObserver), MetricsBar, AccessCallout, DirectoryExplorer, KnowledgeSidebar,
     │   │                       # queries/use-knowledge-metrics (metrics, paginated metrics, mutations)
     │   ├── knowledge-content/  # mdx-fs-loader (primitive React.cache), mdx-ast-parser (remark/rehype HAST), mdx-search-index,
     │   │                       # link-sanitizer, shiki-highlighter (FIFO), mdx-types
@@ -88,7 +88,7 @@ apps/web/
     └── shared/                 # [Слой 5: Infrastructure & Common Tools]
         │                       # Фундамент, не знающий о специфике бизнес-фичей
         ├── config/             # env.ts (Zod env validation + fail-closed Edge JWT secret resolver)
-        ├── hooks/              # Браузерные DOM/ScrollSpy UI-хуки на IntersectionObserver (use-section-navigation.ts)
+        ├── hooks/              # Браузерные DOM/ScrollSpy UI-хуки (use-section-navigation.ts) + read-only auth cache subscriber (use-cached-auth.ts)
         ├── i18n/               # app-routes.ts (Hybrid KB policy + __tests__/app-routes.test.ts), pick-messages.ts, navigation.ts, routing.ts, request.ts
         ├── lib/                # api-client.ts (+ __tests__/api-client.test.ts), edge-jwt.ts (+ __tests__/edge-jwt.test.ts), seo.ts, analytics.ts, palette.ts
         ├── providers/          # ThemeProvider, QueryProvider (IDB allowlist + __tests__/query-provider.test.tsx)

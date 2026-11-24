@@ -1,8 +1,7 @@
 'use client'
 
-import { DEFAULT_LOCALE, type SessionProfile, SupportedLocaleEnum } from '@repo/shared-schemas'
+import { DEFAULT_LOCALE, SupportedLocaleEnum } from '@repo/shared-schemas'
 import { Badge, Button, Tooltip, TooltipContent, TooltipTrigger } from '@repo/ui'
-import { useQuery } from '@tanstack/react-query'
 import {
   BookOpen,
   ChevronDown,
@@ -21,6 +20,7 @@ import { useLocale, useTranslations } from 'next-intl'
 import { useEffect, useMemo, useState } from 'react'
 import type { KnowledgeTreeFolderNode, KnowledgeTreeNode } from '@/entities/knowledge-content'
 import { prefetchKnowledgeSearchIndex } from '@/features/search/search-index-client'
+import { useCachedAuth } from '@/shared/hooks/use-cached-auth'
 import { APP_ROUTES, buildKnowledgeBasePath, isPublicKnowledgeBasePath, isRouteActive } from '@/shared/i18n/app-routes'
 import { Link, usePathname } from '@/shared/i18n/navigation'
 import { useExpandedKbFolders, useUIActions } from '@/shared/store/use-ui-store'
@@ -285,12 +285,7 @@ export function KnowledgeSidebar({
   } = useUIActions()
   const [isMobileOpen, setIsMobileOpen] = useState(false)
 
-  // Read auth cache reactively without violating FSD (`entities` never imports `features/auth`)
-  const { data: profile } = useQuery<SessionProfile>({
-    queryKey: ['auth', 'me'],
-    enabled: false,
-  })
-  const isUnlocked = profile?.role === 'USER' || profile?.role === 'ADMIN'
+  const { isUnlocked } = useCachedAuth()
 
   const { publicRoots, protectedRoots } = useMemo(() => {
     const pub: KnowledgeTreeFolderNode[] = []

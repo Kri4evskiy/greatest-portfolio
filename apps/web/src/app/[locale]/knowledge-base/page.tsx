@@ -1,9 +1,10 @@
 import { DEFAULT_LOCALE, SupportedLocaleEnum } from '@repo/shared-schemas'
-import { Badge, Callout } from '@repo/ui'
-import { Database, ShieldCheck } from 'lucide-react'
+import { Badge } from '@repo/ui'
+import { Database } from 'lucide-react'
 import type { Metadata } from 'next'
 import { getTranslations } from 'next-intl/server'
 import { Suspense } from 'react'
+import { KnowledgeAccessCallout } from '@/entities/knowledge-article/ui/knowledge-access-callout'
 import { KnowledgeDirectoryExplorer } from '@/entities/knowledge-article/ui/knowledge-directory-explorer'
 import { KnowledgeDirectorySkeleton } from '@/entities/knowledge-article/ui/knowledge-skeletons'
 import {
@@ -62,9 +63,7 @@ export default async function KnowledgeBaseIndexPage({ params }: { params: Promi
         <p className="text-sm leading-relaxed text-muted-foreground">{t('description')}</p>
       </div>
 
-      <Callout variant="success" title={t('calloutTitle')} icon={<ShieldCheck className="h-4 w-4" />}>
-        {t('calloutBody')}
-      </Callout>
+      <KnowledgeAccessCallout />
 
       <Suspense fallback={<KnowledgeDirectorySkeleton />}>
         <KnowledgeDirectoryExplorer tree={tree} articles={lightweightArticles} tags={tags} locale={resolvedLocale} />
