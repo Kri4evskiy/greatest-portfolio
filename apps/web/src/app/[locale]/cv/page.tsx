@@ -1,10 +1,12 @@
 import { DEFAULT_LOCALE, SUPPORTED_LOCALES, SupportedLocaleEnum } from '@repo/shared-schemas'
 import type { Metadata } from 'next'
-import { getTranslations } from 'next-intl/server'
+import { NextIntlClientProvider } from 'next-intl'
+import { getMessages, getTranslations } from 'next-intl/server'
 import { AUTHOR_PROFILE, AUTHOR_SKILL_GROUPS, pickLocalized } from '@/entities/workfolio-profile/author-profile'
 import { CvDocumentShowcase } from '@/entities/workfolio-profile/cv-document-showcase'
 import { getLatestCvFileMetadata } from '@/entities/workfolio-profile/cv-file'
 import { APP_ROUTES } from '@/shared/i18n/app-routes'
+import { pickIntlMessages } from '@/shared/i18n/pick-messages'
 import { buildOpenGraphMetadata, buildPageAlternates, buildProfilePageJsonLd } from '@/shared/lib/seo'
 
 export function generateStaticParams() {
@@ -38,7 +40,11 @@ export default async function CvResumePage({ params }: { params: Promise<{ local
   const parsed = SupportedLocaleEnum.safeParse(locale)
   const resolvedLocale = parsed.success ? parsed.data : DEFAULT_LOCALE
   const cvMeta = getLatestCvFileMetadata()
-  const t = await getTranslations({ locale: resolvedLocale, namespace: 'CvPage' })
+  const [t, messages] = await Promise.all([
+    getTranslations({ locale: resolvedLocale, namespace: 'CvPage' }),
+    getMessages({ locale: resolvedLocale }),
+  ])
+  const cvClientMessages = pickIntlMessages(messages, ['CvPage'])
   const cvJsonLd = buildProfilePageJsonLd({
     locale: resolvedLocale,
     pathname: APP_ROUTES.cv,
@@ -57,7 +63,9 @@ export default async function CvResumePage({ params }: { params: Promise<{ local
     <>
       {/* biome-ignore lint/security/noDangerouslySetInnerHtml: Server-serialized JSON-LD escaped against < script injection */}
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: cvJsonLd }} />
-      <CvDocumentShowcase cvMeta={cvMeta} locale={resolvedLocale} />
+      <NextIntlClientProvider locale={resolvedLocale} messages={cvClientMessages}>
+        <CvDocumentShowcase cvMeta={cvMeta} locale={resolvedLocale} />
+      </NextIntlClientProvider>
     </>
   )
 }

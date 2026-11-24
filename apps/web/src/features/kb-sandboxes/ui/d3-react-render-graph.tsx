@@ -1,8 +1,10 @@
 'use client'
 
+import { DEFAULT_LOCALE, type SupportedLocale, SupportedLocaleEnum } from '@repo/shared-schemas'
 import { Badge, Button, Tooltip, TooltipContent, TooltipTrigger } from '@repo/ui'
-import * as d3 from 'd3'
+import { type HierarchyPointLink, type HierarchyPointNode, hierarchy, linkHorizontal, select, tree } from 'd3'
 import { Cpu, RefreshCw, Sparkles } from 'lucide-react'
+import { useLocale } from 'next-intl'
 import { useEffect, useRef, useState } from 'react'
 
 export type ReactRenderMode = 'react18' | 'react19'
@@ -72,9 +74,47 @@ const COMPONENT_TREE: RenderTreeNode = {
   ],
 }
 
+const UI_COPY: Record<
+  SupportedLocale,
+  {
+    title: string
+    subtitle: string
+    recalculateAria: string
+    react18Summary: string
+    react19Summary: string
+  }
+> = {
+  en: {
+    title: 'D3.js Interactive Simulation: React 18 Manual Memo vs React 19 Compiler',
+    subtitle: 'Tree-shaken d3 hierarchy/tree layout rendered inside a scoped SVG ref',
+    recalculateAria: 'Recalculate render cycle',
+    react18Summary: 'Red nodes re-render in a cascade on every filter change without manual useMemo / useCallback.',
+    react19Summary: 'React 19 Compiler auto-memoizes subtrees while use(promise) streams data into Suspense.',
+  },
+  uk: {
+    title: 'D3.js Інтерактивна симуляція: React 18 Manual Memo vs React 19 Compiler',
+    subtitle: 'Точковий імпорт d3 hierarchy/tree у локальному SVG ref',
+    recalculateAria: 'Перерахувати цикл рендеру',
+    react18Summary: 'Червоні вузли ререндеряться каскадно при кожній зміні фільтра без ручного useMemo / useCallback.',
+    react19Summary: 'React 19 Compiler автоматично мемоїзує піддерева, а use(promise) стрімить дані в Suspense.',
+  },
+  ru: {
+    title: 'D3.js Интерактивная симуляция: React 18 Manual Memo vs React 19 Compiler',
+    subtitle: 'Точечный импорт d3 hierarchy/tree в локальном SVG ref',
+    recalculateAria: 'Пересчитать цикл рендера',
+    react18Summary:
+      'Красные узлы ререндерятся каскадно при каждом изменении фильтра без ручного useMemo / useCallback.',
+    react19Summary: 'React 19 Compiler автоматически мемоизирует поддеревья, а use(promise) стримит данные в Suspense.',
+  },
+}
+
 export function ReactRenderGraphD3() {
+  const rawLocale = useLocale()
+  const parsedLocale = SupportedLocaleEnum.safeParse(rawLocale)
+  const locale: SupportedLocale = parsedLocale.success ? parsedLocale.data : DEFAULT_LOCALE
+  const copy = UI_COPY[locale]
+
   const svgRef = useRef<SVGSVGElement | null>(null)
-  const pulseCounterRef = useRef(0)
   const [mode, setMode] = useState<ReactRenderMode>('react19')
   const [triggerCount, setTriggerCount] = useState(1)
 
@@ -84,12 +124,12 @@ export function ReactRenderGraphD3() {
 
     const width = 680
     const height = 300
-    const svg = d3.select(svgEl)
+    const svg = select(svgEl)
     svg.selectAll('*').remove()
 
     const g = svg.append('g').attr('transform', 'translate(90, 30)')
-    const hierarchyRoot = d3.hierarchy<RenderTreeNode>(COMPONENT_TREE)
-    const treeLayout = d3.tree<RenderTreeNode>().size([height - 60, width - 220])
+    const hierarchyRoot = hierarchy<RenderTreeNode>(COMPONENT_TREE)
+    const treeLayout = tree<RenderTreeNode>().size([height - 60, width - 220])
     const treeData = treeLayout(hierarchyRoot)
 
     // Links
@@ -104,8 +144,7 @@ export function ReactRenderGraphD3() {
       .attr('stroke-dasharray', mode === 'react19' ? 'none' : '5,3')
       .attr(
         'd',
-        d3
-          .linkHorizontal<d3.HierarchyPointLink<RenderTreeNode>, d3.HierarchyPointNode<RenderTreeNode>>()
+        linkHorizontal<HierarchyPointLink<RenderTreeNode>, HierarchyPointNode<RenderTreeNode>>()
           .x((d) => d.y)
           .y((d) => d.x),
       )
@@ -152,21 +191,21 @@ export function ReactRenderGraphD3() {
           ? `${d.data.renderCostMs19}ms (${d.data.react19Status} #${triggerCount})`
           : `${d.data.renderCostMs18}ms (${d.data.react18Status} #${triggerCount})`,
       )
+
+    return () => {
+      svg.selectAll('*').remove()
+    }
   }, [mode, triggerCount])
 
   return (
-    <div className="my-6 rounded-xl border border-border bg-card p-4 shadow-xs">
+    <div className="my-6 min-h-[420px] rounded-xl border border-border bg-card p-4 shadow-xs">
       <div className="flex flex-col justify-between gap-3 border-b border-border/60 pb-3 sm:flex-row sm:items-center">
         <div>
           <div className="flex items-center gap-2">
             <Cpu className="h-4 w-4 text-primary" />
-            <h4 className="font-semibold text-sm">
-              D3.js Interactive Simulation: React 18 Manual Memo vs React 19 Compiler
-            </h4>
+            <h4 className="font-semibold text-sm">{copy.title}</h4>
           </div>
-          <p className="text-xs text-muted-foreground">
-            Управляется через атомарный селектор <code>Zustand</code> + <code>useRef</code> SVG
-          </p>
+          <p className="text-xs text-muted-foreground">{copy.subtitle}</p>
         </div>
 
         <div className="flex flex-wrap items-center gap-1.5">
@@ -195,17 +234,14 @@ export function ReactRenderGraphD3() {
                 type="button"
                 size="icon-sm"
                 variant="ghost"
-                aria-label="Пересчитать цикл рендера"
-                onClick={() => {
-                  pulseCounterRef.current += 1
-                  setTriggerCount((c) => c + 1)
-                }}
+                aria-label={copy.recalculateAria}
+                onClick={() => setTriggerCount((c) => c + 1)}
                 className="h-7 w-7"
               >
                 <RefreshCw className="h-3.5 w-3.5" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent side="top">Пересчитать цикл рендера</TooltipContent>
+            <TooltipContent side="top">{copy.recalculateAria}</TooltipContent>
           </Tooltip>
         </div>
       </div>
@@ -227,19 +263,14 @@ export function ReactRenderGraphD3() {
               <Badge variant="warning" className="font-mono text-[10px]">
                 Total Commit: ~30.3ms
               </Badge>
-              <span className="text-muted-foreground">
-                Красные узлы ререндерятся каскадно при каждом изменении фильтра без ручного <code>useCallback</code>.
-              </span>
+              <span className="text-muted-foreground">{copy.react18Summary}</span>
             </>
           ) : (
             <>
               <Badge variant="success" className="font-mono text-[10px]">
                 Total Commit: ~5.5ms (-81%)
               </Badge>
-              <span className="text-muted-foreground">
-                React 19 Compiler автоматически мемоизирует поддеревья, а <code>use(promise)</code> стримит данные в
-                Suspense.
-              </span>
+              <span className="text-muted-foreground">{copy.react19Summary}</span>
             </>
           )}
         </div>

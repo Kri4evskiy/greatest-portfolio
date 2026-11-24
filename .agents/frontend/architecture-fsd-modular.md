@@ -47,15 +47,15 @@ apps/web/
     ├── robots.ts               # Статический SSG /robots.txt (force-static)
     ├── sitemap.ts              # Статический SSG /sitemap.xml с матрицей hreflang (force-static)
     ├── [locale]/
-    │   ├── layout.tsx          # Провайдеры, Header, Footer, Modals, metadataBase
-    │   ├── opengraph-image.tsx # OpenGraph карточка 1200×630 (Obsidian Editorial Dark)
-    │   ├── page.tsx            # Главная: сборка Hero, Experience, Roadmap
+    │   ├── layout.tsx          # Провайдеры (нарезанный NextIntlClientProvider), Header, Footer, lazy Modals, metadataBase
+    │   ├── opengraph-image.tsx # Локализованная OpenGraph карточка 1200×630 (Obsidian Editorial Dark + Inter TTF)
+    │   ├── page.tsx            # Главная: сборка Hero, Experience, Roadmap (+ scoped NextIntlClientProvider)
     │   ├── error.tsx           # Локализованный Error Boundary внутри LocaleRootLayout
     │   ├── not-found.tsx       # Локализованный 404 RSC внутри LocaleRootLayout
     │   ├── [...rest]/page.tsx  # Catch-all неизвестных маршрутов ➔ notFound()
-    │   ├── cv/page.tsx         # Страница резюме
-    │   ├── system-status/page.tsx # System Observability & Live API Inspector (SSG + Client Dashboard)
-    │   └── knowledge-base/     # Роуты базы знаний
+    │   ├── cv/page.tsx         # Страница резюме (Server Island CvDocumentShowcase + CvViewTabs)
+    │   ├── system-status/      # System Observability & Live API Inspector (page.tsx + loading.tsx)
+    │   └── knowledge-base/     # Роуты базы знаний (layout + page + loading.tsx + [...slug] с dynamicParams=false)
     └── search-index/[locale]/  # API route статического индекса
     │
     ├── widgets/                # [Слой 2: Composite UI Blocks]
@@ -66,29 +66,30 @@ apps/web/
     │
     ├── features/               # [Слой 3: User Scenarios & Interactions]
     │   │                       # Интерактивные фичи с действиями пользователя
-    │   ├── auth/               # GuestPassModal + AuthCrossTabSyncBridge + lib/auth-cross-tab-sync.ts + queries/use-visitor-profile
-    │   ├── search/             # CommandPaletteModal, search-index-client.ts (Zod)
+    │   ├── auth/               # GuestPassModalLoader (next/dynamic) + GuestPassModal + AuthCrossTabSyncBridge + lib/auth-cross-tab-sync.ts + queries/use-visitor-profile
+    │   ├── search/             # CommandPaletteLoader (Cmd+K, next/dynamic) + CommandPaletteModal, search-index-client.ts (Zod)
     │   ├── telemetry-stream/   # FooterSseStatus, useTelemetryStream (ref-counted singleton SSE),
     │   │                       # queries/use-system-observability, lib/system-status-helpers,
-    │   │                       # ui/{system-status-dashboard,capabilities-matrix-card,live-event-log-card,knowledge-leaderboard-card,observability-data-table}
+    │   │                       # ui/{system-status-dashboard,capabilities-matrix-card,live-event-log-card,knowledge-leaderboard-card},
+    │   │                       # ui/table/{observability-data-table,knowledge-leaderboard-columns,live-event-log-columns}
     │   │                       # + __tests__/knowledge-leaderboard-card.integration.test.tsx (RTL + MSW v3)
-    │   └── kb-sandboxes/       # Интерактивные песочницы в статьях (Zod, JWT, SSE, Redis)
+    │   └── kb-sandboxes/       # Интерактивные песочницы в статьях (next/dynamic, точечный D3, MCP)
     │
     ├── entities/               # [Слой 4: Business Data Representation]
     │   │                       # Отображение данных предметной области (без глобальных сайд-эффектов)
-    │   ├── knowledge-article/  # HAST RSC-рендер (mdx-article-renderer, code-block, callout-config),
-    │   │                       # ArticleToc, MetricsBar, DirectoryExplorer, KnowledgeSidebar,
+    │   ├── knowledge-article/  # HAST RSC-рендер (mdx-article-renderer, code-block, callout-config, knowledge-skeletons),
+    │   │                       # ArticleToc (IntersectionObserver), MetricsBar, DirectoryExplorer, KnowledgeSidebar,
     │   │                       # queries/use-knowledge-metrics (metrics, paginated metrics, mutations)
-    │   ├── knowledge-content/  # mdx-fs-loader, mdx-ast-parser (remark/rehype HAST), mdx-search-index,
-    │   │                       # link-sanitizer, shiki-highlighter, mdx-types
-    │   ├── workfolio-profile/  # author-profile.ts, cv-file.ts, CvDocumentShowcase
-    │   └── engineering-roadmap/# engineering-roadmap.ts, EngineeringRoadmapBoard, TechRadarTable
+    │   ├── knowledge-content/  # mdx-fs-loader (primitive React.cache), mdx-ast-parser (remark/rehype HAST), mdx-search-index,
+    │   │                       # link-sanitizer, shiki-highlighter (FIFO), mdx-types
+    │   ├── workfolio-profile/  # author-profile.ts, cv-file.ts (React.cache), CvDocumentShowcase (RSC) + CvViewTabs (Client Island)
+    │   └── engineering-roadmap/# engineering-roadmap.ts, EngineeringRoadmapBoard, TechRadarTable + table/{tech-radar-data-table,tech-radar-columns}
     │
     └── shared/                 # [Слой 5: Infrastructure & Common Tools]
         │                       # Фундамент, не знающий о специфике бизнес-фичей
         ├── config/             # env.ts (Zod env validation + fail-closed Edge JWT secret resolver)
-        ├── hooks/              # Браузерные DOM/ScrollSpy UI-хуки (use-section-navigation.ts)
-        ├── i18n/               # app-routes.ts (Hybrid KB policy + __tests__/app-routes.test.ts), navigation.ts, routing.ts, request.ts
+        ├── hooks/              # Браузерные DOM/ScrollSpy UI-хуки на IntersectionObserver (use-section-navigation.ts)
+        ├── i18n/               # app-routes.ts (Hybrid KB policy + __tests__/app-routes.test.ts), pick-messages.ts, navigation.ts, routing.ts, request.ts
         ├── lib/                # api-client.ts (+ __tests__/api-client.test.ts), edge-jwt.ts (+ __tests__/edge-jwt.test.ts), seo.ts, analytics.ts, palette.ts
         ├── providers/          # ThemeProvider, QueryProvider (IDB allowlist + __tests__/query-provider.test.tsx)
         └── store/              # Zustand (use-ui-store: actions + атомарные use* хуки + uiStore + __tests__/use-ui-store.test.ts)

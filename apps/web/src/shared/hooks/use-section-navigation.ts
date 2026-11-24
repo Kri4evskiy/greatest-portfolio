@@ -46,62 +46,91 @@ export function useSectionNavigation() {
 }
 
 /**
- * Passive ScrollSpy hook tracking which CV section is currently in the viewport.
+ * Zero-layout-thrashing IntersectionObserver ScrollSpy tracking which CV section
+ * is currently active in the viewport without scroll-tick `getBoundingClientRect()` loops.
  */
 export function useActiveWorkfolioSection(): WorkfolioSectionId {
   const [activeSection, setActiveSection] = useState<WorkfolioSectionId>('about')
 
   useEffect(() => {
-    let rafId = 0
+    const elements = WORKFOLIO_SECTION_IDS.map((id) => ({
+      id,
+      el: document.getElementById(id),
+    })).filter((item): item is { id: WorkfolioSectionId; el: HTMLElement } => item.el !== null)
 
-    const computeActiveSection = () => {
-      const scrollY = window.scrollY
-      const viewportHeight = window.innerHeight
-      const docHeight = document.documentElement.scrollHeight
+    if (elements.length === 0) return
 
-      if (scrollY < 48) {
-        setActiveSection('about')
-        return
-      }
+    const visibleSet = new Set<WorkfolioSectionId>()
+    const lastTopMap = new Map<WorkfolioSectionId, number>()
+    let isLastSectionFullyVisible = false
 
-      if (scrollY + viewportHeight >= docHeight - 48) {
+    const resolveActive = () => {
+      if (isLastSectionFullyVisible) {
         setActiveSection('roadmap')
         return
       }
 
-      const triggerOffset = 160
-      let matched: WorkfolioSectionId = 'about'
-
       for (const id of WORKFOLIO_SECTION_IDS) {
-        const el = document.getElementById(id)
-        if (!el) continue
-        const top = el.getBoundingClientRect().top
-        if (top <= triggerOffset) {
-          matched = id
+        if (visibleSet.has(id)) {
+          setActiveSection(id)
+          return
         }
       }
 
-      setActiveSection(matched)
+      let fallback: WorkfolioSectionId = 'about'
+      for (const id of WORKFOLIO_SECTION_IDS) {
+        const top = lastTopMap.get(id)
+        if (top !== undefined && top <= 160) {
+          fallback = id
+        }
+      }
+      setActiveSection(fallback)
     }
 
-    const handleScroll = () => {
-      if (rafId !== 0) return
-      rafId = window.requestAnimationFrame(() => {
-        rafId = 0
-        computeActiveSection()
-      })
+    const sectionObserver = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          const id = entry.target.id as WorkfolioSectionId
+          lastTopMap.set(id, entry.boundingClientRect.top)
+          if (entry.isIntersecting) {
+            visibleSet.add(id)
+          } else {
+            visibleSet.delete(id)
+          }
+        }
+        resolveActive()
+      },
+      {
+        rootMargin: '-112px 0px -55% 0px',
+        threshold: 0,
+      },
+    )
+
+    for (const { el } of elements) {
+      sectionObserver.observe(el)
     }
 
-    computeActiveSection()
-    window.addEventListener('scroll', handleScroll, { passive: true })
-    window.addEventListener('resize', handleScroll, { passive: true })
+    // Ensure the short bottom section (`roadmap`) activates reliably when scrolled to the bottom
+    const roadmapEl = document.getElementById('roadmap')
+    const bottomObserver = roadmapEl
+      ? new IntersectionObserver(
+          (entries) => {
+            const entry = entries[0]
+            if (!entry) return
+            isLastSectionFullyVisible = entry.isIntersecting
+            resolveActive()
+          },
+          { threshold: 0.85 },
+        )
+      : null
+
+    if (roadmapEl && bottomObserver) {
+      bottomObserver.observe(roadmapEl)
+    }
 
     return () => {
-      if (rafId !== 0) {
-        window.cancelAnimationFrame(rafId)
-      }
-      window.removeEventListener('scroll', handleScroll)
-      window.removeEventListener('resize', handleScroll)
+      sectionObserver.disconnect()
+      bottomObserver?.disconnect()
     }
   }, [])
 

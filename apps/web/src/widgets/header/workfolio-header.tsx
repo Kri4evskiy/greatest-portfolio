@@ -167,7 +167,6 @@ export function WorkfolioHeader() {
               variant="outline"
               size="sm"
               onClick={handleKnowledgeBaseClick}
-              onMouseEnter={() => router.prefetch(APP_ROUTES.knowledgeBase)}
               className="group h-8 gap-1.5 border-primary/30 bg-background px-2.5 text-xs font-medium hover:border-primary hover:bg-accent sm:gap-2 sm:px-3"
             >
               <Lock className="h-3.5 w-3.5 shrink-0 text-warning transition-transform group-hover:scale-110" />

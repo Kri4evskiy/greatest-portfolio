@@ -31,17 +31,20 @@ const NODE_ICONS: Record<ArchitectureNodeId, typeof Server> = {
 
 export function CapabilitiesMatrixCard({ locale }: { locale: SupportedLocale }) {
   const t = useTranslations('SystemStatusPage')
-  const capabilitiesQuery = useSystemCapabilities()
-  const statsQuery = useTelemetryStats()
+  const {
+    data: capabilities,
+    isLoading,
+    isError: isCapabilitiesError,
+    isFetching: isFetchingCapabilities,
+    refetch: refetchCapabilities,
+  } = useSystemCapabilities()
+  const { data: stats, isFetching: isFetchingStats, refetch: refetchStats } = useTelemetryStats()
 
-  const isLoading = capabilitiesQuery.isLoading
-  const isFetching = capabilitiesQuery.isFetching || statsQuery.isFetching
-  const capabilities = capabilitiesQuery.data
-  const stats = statsQuery.data
+  const isFetching = isFetchingCapabilities || isFetchingStats
 
   const handleRefresh = () => {
-    void capabilitiesQuery.refetch()
-    void statsQuery.refetch()
+    void refetchCapabilities()
+    void refetchStats()
   }
 
   const nodes = capabilities ? buildArchitectureNodes(capabilities, stats?.totalEventsProcessed) : []
@@ -100,7 +103,7 @@ export function CapabilitiesMatrixCard({ locale }: { locale: SupportedLocale }) 
               </div>
             ))}
           </div>
-        ) : capabilitiesQuery.isError ? (
+        ) : isCapabilitiesError ? (
           <div className="rounded-lg border border-warning/40 bg-warning/10 p-4 text-sm text-foreground">
             <p className="font-medium">{t('apiOfflineTitle')}</p>
             <p className="mt-1 text-xs text-muted-foreground">{t('apiOfflineHint')}</p>

@@ -1,5 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import { cache } from 'react'
 
 export interface CvFileMetadata {
   exists: boolean
@@ -28,7 +29,7 @@ function resolveCvDirectory(): string {
  * Automatically detects the most recently updated .pdf file inside `apps/web/public/cv/`.
  * Appends `?v=<mtimeMs>` cache-buster so replacing the file immediately invalidates stale browser caches.
  */
-export function getLatestCvFileMetadata(): CvFileMetadata {
+export const getLatestCvFileMetadata = cache(function getLatestCvFileMetadata(): CvFileMetadata {
   const cvDir = resolveCvDirectory()
 
   if (!fs.existsSync(cvDir)) {
@@ -80,4 +81,4 @@ export function getLatestCvFileMetadata(): CvFileMetadata {
     sizeKb: Math.max(1, Math.round(latest.size / 1024)),
     updatedAt: latest.mtimeIso,
   }
-}
+})

@@ -5,6 +5,7 @@ import type { Metadata } from 'next'
 import { getTranslations } from 'next-intl/server'
 import { Suspense } from 'react'
 import { KnowledgeDirectoryExplorer } from '@/entities/knowledge-article/ui/knowledge-directory-explorer'
+import { KnowledgeDirectorySkeleton } from '@/entities/knowledge-article/ui/knowledge-skeletons'
 import {
   getAllKnowledgeFrontmatters,
   getAllKnowledgeTags,
@@ -65,7 +66,7 @@ export default async function KnowledgeBaseIndexPage({ params }: { params: Promi
         {t('calloutBody')}
       </Callout>
 
-      <Suspense fallback={null}>
+      <Suspense fallback={<KnowledgeDirectorySkeleton />}>
         <KnowledgeDirectoryExplorer tree={tree} articles={lightweightArticles} tags={tags} locale={resolvedLocale} />
       </Suspense>
 

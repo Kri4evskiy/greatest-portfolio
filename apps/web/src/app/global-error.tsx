@@ -1,5 +1,6 @@
 'use client'
 
+import './globals.css'
 import { DEFAULT_LOCALE, SupportedLocale } from '@repo/shared-schemas'
 import { Button } from '@repo/ui'
 import { AlertTriangle, RotateCcw } from 'lucide-react'

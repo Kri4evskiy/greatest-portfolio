@@ -36,6 +36,8 @@ const globalForShiki = globalThis as unknown as {
   __kbShikiCache?: Map<string, Promise<string>>
 }
 
+const MAX_SHIKI_CACHE_ENTRIES = 1000
+
 const shikiCache: Map<string, Promise<string>> = globalForShiki.__kbShikiCache ?? new Map<string, Promise<string>>()
 globalForShiki.__kbShikiCache = shikiCache
 
@@ -69,9 +71,17 @@ export function highlightCodeServer(code: string, rawLanguage: string): Promise<
     return existing
   }
 
-  const promise = renderHighlightedHtml(code, lang)
-  if (shikiCache.size > 1000) {
-    shikiCache.clear()
+  const promise = renderHighlightedHtml(code, lang).catch((error: unknown) => {
+    shikiCache.delete(cacheKey)
+    throw error
+  })
+
+  // FIFO eviction avoids cold-start cliff caused by wiping the entire cache at once
+  if (shikiCache.size >= MAX_SHIKI_CACHE_ENTRIES) {
+    const oldestKey = shikiCache.keys().next().value
+    if (oldestKey !== undefined) {
+      shikiCache.delete(oldestKey)
+    }
   }
   shikiCache.set(cacheKey, promise)
   return promise

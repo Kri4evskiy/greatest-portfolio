@@ -11,9 +11,11 @@ import { ArrowRight, Calendar, ChevronRight, Clock, FolderOpen, Globe, Sparkles,
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { getTranslations } from 'next-intl/server'
+import { Suspense } from 'react'
 import { ArticleFooterNav } from '@/entities/knowledge-article/ui/article-footer-nav'
 import { ArticleMetricsBar } from '@/entities/knowledge-article/ui/article-metrics-bar'
 import { DesktopArticleToc, MobileArticleToc } from '@/entities/knowledge-article/ui/article-toc'
+import { ArticleBodySkeleton } from '@/entities/knowledge-article/ui/knowledge-skeletons'
 import { MdxArticleRenderer, renderInlineMarkdown } from '@/entities/knowledge-article/ui/mdx-article-renderer'
 import { TopicSubtopicTabs } from '@/entities/knowledge-article/ui/topic-subtopic-tabs'
 import {
@@ -43,6 +45,8 @@ interface CatchAllKnowledgePageProps {
     slug: string[]
   }>
 }
+
+export const dynamicParams = false
 
 export function generateStaticParams() {
   const slugArrays = getAllStaticKnowledgeSlugArrays()
@@ -301,7 +305,9 @@ export default async function KnowledgeCatchAllPage({ params }: CatchAllKnowledg
 
           <ArticleMetricsBar slug={article.slug} category={article.category} />
 
-          <MdxArticleRenderer hast={article.hast} codeBlocks={article.codeBlocks} />
+          <Suspense fallback={<ArticleBodySkeleton />}>
+            <MdxArticleRenderer hast={article.hast} codeBlocks={article.codeBlocks} />
+          </Suspense>
 
           <ArticleFooterNav
             prev={prev}

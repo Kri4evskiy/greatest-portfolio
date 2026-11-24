@@ -3,7 +3,6 @@
 import {
   API_ENDPOINTS,
   type SupportedLocale,
-  type SystemEventLogItem,
   type TelemetryEvent,
   type TelemetryEventType,
   TelemetryEventTypeEnum,
@@ -24,18 +23,13 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@repo/ui'
-import type { ColumnDef } from '@tanstack/react-table'
-import { Activity, ArrowDownCircle, Radio, RefreshCw, Sparkles } from 'lucide-react'
+import { Activity, ArrowDownCircle, Radio, RefreshCw } from 'lucide-react'
 import { useTranslations } from 'next-intl'
-import { useState } from 'react'
-import {
-  formatSystemTimestamp,
-  getTelemetryEventBadgeVariant,
-  mergeLiveEventsWithPages,
-  truncateUuid,
-} from '../lib/system-status-helpers'
+import { useMemo, useState } from 'react'
+import { mergeLiveEventsWithPages, truncateUuid } from '../lib/system-status-helpers'
 import { usePaginatedTelemetryEvents } from '../queries/use-system-observability'
-import { ObservabilityDataTable } from './observability-data-table'
+import { createLiveEventLogColumns } from './table/live-event-log-columns'
+import { ObservabilityDataTable } from './table/observability-data-table'
 
 type EventFilterValue = 'ALL' | TelemetryEventType
 
@@ -52,15 +46,27 @@ export function LiveEventLogCard({ locale, sseConnected, recentLiveEvents }: Liv
   const [eventTypeFilter, setEventTypeFilter] = useState<EventFilterValue>('ALL')
 
   const activeFilter = eventTypeFilter === 'ALL' ? undefined : eventTypeFilter
-  const eventsQuery = usePaginatedTelemetryEvents({
+  const {
+    data: eventsData,
+    isLoading,
+    isError,
+    isFetching,
+    hasNextPage,
+    isFetchingNextPage,
+    fetchNextPage,
+    refetch,
+  } = usePaginatedTelemetryEvents({
     limit: 8,
     eventType: activeFilter,
   })
 
-  const fetchedItems = eventsQuery.data?.pages.flatMap((page) => page.items) ?? []
-  const lastPage = eventsQuery.data?.pages.at(-1)
+  const fetchedItems = useMemo(() => eventsData?.pages.flatMap((page) => page.items) ?? [], [eventsData])
+  const lastPage = eventsData?.pages.at(-1)
   const nextCursor = lastPage?.nextCursor ?? null
-  const { items: displayItems, liveIds } = mergeLiveEventsWithPages(recentLiveEvents, fetchedItems, activeFilter)
+  const { items: displayItems, liveIds } = useMemo(
+    () => mergeLiveEventsWithPages(recentLiveEvents, fetchedItems, activeFilter),
+    [activeFilter, fetchedItems, recentLiveEvents],
+  )
 
   const handleFilterChange = (value: string) => {
     if (!value) return
@@ -74,62 +80,20 @@ export function LiveEventLogCard({ locale, sseConnected, recentLiveEvents }: Liv
     }
   }
 
-  const columns: ColumnDef<SystemEventLogItem>[] = [
-    {
-      accessorKey: 'type',
-      header: () => t('colEventType'),
-      meta: {
-        cellClassName: 'whitespace-nowrap px-3 py-2.5 align-top',
-      },
-      cell: ({ row }) => {
-        const item = row.original
-        const isLiveHighlight = liveIds.has(item.id)
-        return (
-          <div className="flex items-center gap-1.5">
-            <Badge variant={getTelemetryEventBadgeVariant(item.type)} className="font-mono text-[10px]">
-              {item.type}
-            </Badge>
-            {isLiveHighlight ? (
-              <Badge variant="success" className="font-mono text-[10px]">
-                <Sparkles className="h-2.5 w-2.5" />
-                <span>SSE</span>
-              </Badge>
-            ) : null}
-          </div>
-        )
-      },
-    },
-    {
-      accessorKey: 'message',
-      header: () => t('colEventMessage'),
-      meta: {
-        cellClassName: 'max-w-md px-3 py-2.5 align-top font-mono text-[11px] text-foreground',
-      },
-      cell: ({ row }) => <span className="break-words">{row.original.message}</span>,
-    },
-    {
-      id: 'context',
-      header: () => t('colEventContext'),
-      meta: {
-        cellClassName: 'whitespace-nowrap px-3 py-2.5 align-top font-mono text-[11px] text-muted-foreground',
-      },
-      cell: ({ row }) => {
-        const item = row.original
-        if (item.slug) return <span>/{item.slug}</span>
-        if (item.actorRole) return <span>{item.actorRole}</span>
-        return <span>—</span>
-      },
-    },
-    {
-      accessorKey: 'createdAt',
-      header: () => t('colEventTime'),
-      meta: {
-        headerClassName: 'px-3 py-2.5 text-right font-medium',
-        cellClassName: 'whitespace-nowrap px-3 py-2.5 text-right align-top font-mono text-[11px] text-muted-foreground',
-      },
-      cell: ({ row }) => formatSystemTimestamp(row.original.createdAt, locale),
-    },
-  ]
+  const columns = useMemo(
+    () =>
+      createLiveEventLogColumns({
+        locale,
+        liveIds,
+        labels: {
+          eventType: t('colEventType'),
+          eventMessage: t('colEventMessage'),
+          eventContext: t('colEventContext'),
+          eventTime: t('colEventTime'),
+        },
+      }),
+    [liveIds, locale, t],
+  )
 
   return (
     <Card>
@@ -154,13 +118,11 @@ export function LiveEventLogCard({ locale, sseConnected, recentLiveEvents }: Liv
         <Button
           variant="outline"
           size="sm"
-          onClick={() => void eventsQuery.refetch()}
-          disabled={eventsQuery.isFetching}
+          onClick={() => void refetch()}
+          disabled={isFetching}
           className="shrink-0 gap-1.5 font-mono text-xs"
         >
-          <RefreshCw
-            className={`h-3.5 w-3.5 ${eventsQuery.isFetching && !eventsQuery.isFetchingNextPage ? 'animate-spin' : ''}`}
-          />
+          <RefreshCw className={`h-3.5 w-3.5 ${isFetching && !isFetchingNextPage ? 'animate-spin' : ''}`} />
           <span>{t('refreshBtn')}</span>
         </Button>
       </CardHeader>
@@ -187,13 +149,13 @@ export function LiveEventLogCard({ locale, sseConnected, recentLiveEvents }: Liv
           </span>
         </div>
 
-        {eventsQuery.isLoading ? (
+        {isLoading ? (
           <div className="space-y-2">
             {Array.from({ length: 4 }, (_, idx) => (
               <Skeleton key={`event-skeleton-${String(idx)}`} className="h-12 w-full rounded-lg" />
             ))}
           </div>
-        ) : eventsQuery.isError && displayItems.length === 0 ? (
+        ) : isError && displayItems.length === 0 ? (
           <div className="rounded-lg border border-warning/40 bg-warning/10 p-4 text-xs text-muted-foreground">
             {t('eventsFetchError')}
           </div>
@@ -236,15 +198,15 @@ export function LiveEventLogCard({ locale, sseConnected, recentLiveEvents }: Liv
         <Button
           variant="outline"
           size="sm"
-          disabled={!eventsQuery.hasNextPage || eventsQuery.isFetchingNextPage}
-          onClick={() => void eventsQuery.fetchNextPage()}
+          disabled={!hasNextPage || isFetchingNextPage}
+          onClick={() => void fetchNextPage()}
           className="gap-1.5 font-mono text-xs"
         >
           <ArrowDownCircle className="h-3.5 w-3.5" />
           <span>
-            {eventsQuery.isFetchingNextPage
+            {isFetchingNextPage
               ? t('loadingOlderEvents')
-              : eventsQuery.hasNextPage
+              : hasNextPage
                 ? t('loadOlderEventsBtn')
                 : t('noOlderEventsBtn')}
           </span>

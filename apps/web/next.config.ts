@@ -23,7 +23,7 @@ const nextConfig: NextConfig = {
   },
   transpilePackages: ['@repo/ui', '@repo/shared-schemas'],
   experimental: {
-    optimizePackageImports: ['lucide-react', 'd3', '@repo/ui'],
+    optimizePackageImports: ['lucide-react', 'd3', '@repo/ui', '@repo/shared-schemas'],
   },
   async headers() {
     const cvPdfAssetHeaders = getSecurityHeaders(undefined, undefined, {

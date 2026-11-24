@@ -59,7 +59,7 @@ export function CommandPaletteModal({ locale }: CommandPaletteModalProps) {
 
   const isOpen = useIsCommandPaletteOpen()
   const initialQuery = useCommandPaletteInitialQuery()
-  const { openCommandPalette: openPalette, closeCommandPalette: closePalette, openGuestPassModal } = useUIActions()
+  const { closeCommandPalette: closePalette, openGuestPassModal } = useUIActions()
 
   const [query, setQuery] = useState('')
   const [activeIndex, setActiveIndex] = useState(0)
@@ -108,23 +108,6 @@ export function CommandPaletteModal({ locale }: CommandPaletteModalProps) {
     setQuery(initialQuery)
     setActiveIndex(0)
   }, [isOpen, initialQuery])
-
-  // Global Cmd+K / Ctrl+K shortcut listener
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
-        event.preventDefault()
-        if (isOpen) {
-          closePalette()
-        } else {
-          openPalette('')
-        }
-      }
-    }
-
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [isOpen, openPalette, closePalette])
 
   const quickActions = useMemo<PaletteEntry[]>(
     () => [

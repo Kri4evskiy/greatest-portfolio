@@ -23,15 +23,16 @@ import {
   ToggleGroup,
   ToggleGroupItem,
 } from '@repo/ui'
-import type { ColumnDef } from '@tanstack/react-table'
-import { ArrowDown, BarChart3, ChevronLeft, ChevronRight, Eye, ThumbsUp } from 'lucide-react'
+import { BarChart3, ChevronLeft, ChevronRight, Eye, ThumbsUp } from 'lucide-react'
 import { useTranslations } from 'next-intl'
-import { useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { usePaginatedKnowledgeMetrics } from '@/entities/knowledge-article/queries/use-knowledge-metrics'
 import { computeOffsetPagination } from '../lib/system-status-helpers'
-import { ObservabilityDataTable } from './observability-data-table'
+import { createKnowledgeLeaderboardColumns } from './table/knowledge-leaderboard-columns'
+import { ObservabilityDataTable } from './table/observability-data-table'
 
 const PAGE_LIMIT = 5
+const EMPTY_ARTICLES: ArticleMeta[] = []
 type CategoryFilterValue = 'ALL' | KnowledgeCategory
 
 export function KnowledgeLeaderboardCard({ locale }: { locale: SupportedLocale }) {
@@ -40,14 +41,13 @@ export function KnowledgeLeaderboardCard({ locale }: { locale: SupportedLocale }
   const [sortBy, setSortBy] = useState<KnowledgeMetricsSortBy>('viewsCount')
   const [offset, setOffset] = useState(0)
 
-  const metricsQuery = usePaginatedKnowledgeMetrics({
+  const { data, isLoading, isError, isFetching, isPlaceholderData } = usePaginatedKnowledgeMetrics({
     limit: PAGE_LIMIT,
     offset,
     category: categoryFilter === 'ALL' ? undefined : categoryFilter,
     sortBy,
   })
 
-  const data = metricsQuery.data
   const total = data?.total ?? 0
   const { currentPage, totalPages, pageNumbers } = computeOffsetPagination(total, PAGE_LIMIT, offset)
 
@@ -64,91 +64,36 @@ export function KnowledgeLeaderboardCard({ locale }: { locale: SupportedLocale }
     }
   }
 
-  const handleSortChange = (value: string) => {
+  const handleSortChange = useCallback((value: string) => {
     if (!value) return
     const parsed = KnowledgeMetricsSortByEnum.safeParse(value)
     if (parsed.success) {
       setOffset(0)
       setSortBy(parsed.data)
     }
-  }
+  }, [])
 
   const goToPage = (pageNumber: number) => {
     const nextOffset = Math.max(0, (pageNumber - 1) * PAGE_LIMIT)
     setOffset(nextOffset)
   }
 
-  const columns: ColumnDef<ArticleMeta>[] = [
-    {
-      id: 'rank',
-      header: () => '#',
-      meta: {
-        headerClassName: 'w-12 px-3 py-2.5 font-medium',
-        cellClassName: 'px-3 py-2.5 font-mono text-[11px] text-muted-foreground',
-      },
-      cell: ({ row }) => offset + row.index + 1,
-    },
-    {
-      accessorKey: 'slug',
-      header: () => t('colArticleSlug'),
-      meta: {
-        cellClassName: 'px-3 py-2.5 font-mono text-xs font-medium text-foreground',
-      },
-      cell: ({ row }) => row.original.slug,
-    },
-    {
-      accessorKey: 'category',
-      header: () => t('colCategory'),
-      meta: {
-        cellClassName: 'px-3 py-2.5',
-      },
-      cell: ({ row }) => (
-        <Badge variant="secondary" className="font-mono text-[10px]">
-          {getKnowledgeCategoryLabel(row.original.category, locale)}
-        </Badge>
-      ),
-    },
-    {
-      accessorKey: 'viewsCount',
-      header: () => (
-        <button
-          type="button"
-          onClick={() => handleSortChange('viewsCount')}
-          className={`inline-flex items-center gap-1 transition-colors hover:text-foreground ${
-            sortBy === 'viewsCount' ? 'text-primary' : 'text-muted-foreground'
-          }`}
-        >
-          <span>{t('colViews')}</span>
-          {sortBy === 'viewsCount' ? <ArrowDown className="h-3 w-3" /> : null}
-        </button>
-      ),
-      meta: {
-        headerClassName: 'px-3 py-2.5 text-right font-medium',
-        cellClassName: 'px-3 py-2.5 text-right font-mono text-xs font-semibold text-foreground',
-      },
-      cell: ({ row }) => row.original.viewsCount,
-    },
-    {
-      accessorKey: 'helpfulCount',
-      header: () => (
-        <button
-          type="button"
-          onClick={() => handleSortChange('helpfulCount')}
-          className={`inline-flex items-center gap-1 transition-colors hover:text-foreground ${
-            sortBy === 'helpfulCount' ? 'text-primary' : 'text-muted-foreground'
-          }`}
-        >
-          <span>{t('colHelpful')}</span>
-          {sortBy === 'helpfulCount' ? <ArrowDown className="h-3 w-3" /> : null}
-        </button>
-      ),
-      meta: {
-        headerClassName: 'px-3 py-2.5 text-right font-medium',
-        cellClassName: 'px-3 py-2.5 text-right font-mono text-xs font-semibold text-success',
-      },
-      cell: ({ row }) => row.original.helpfulCount,
-    },
-  ]
+  const columns = useMemo(
+    () =>
+      createKnowledgeLeaderboardColumns({
+        locale,
+        offset,
+        sortBy,
+        onSortChange: handleSortChange,
+        labels: {
+          articleSlug: t('colArticleSlug'),
+          category: t('colCategory'),
+          views: t('colViews'),
+          helpful: t('colHelpful'),
+        },
+      }),
+    [handleSortChange, locale, offset, sortBy, t],
+  )
 
   return (
     <Card>
@@ -158,7 +103,7 @@ export function KnowledgeLeaderboardCard({ locale }: { locale: SupportedLocale }
             <Badge variant="info" className="font-mono text-[10px]">
               {`useQuery + keepPreviousData ➔ GET ${API_ENDPOINTS.knowledgeMetricsPaginated}`}
             </Badge>
-            {metricsQuery.isPlaceholderData ? (
+            {isPlaceholderData ? (
               <Badge variant="warning" className="font-mono text-[10px]">
                 {t('updatingPage')}
               </Badge>
@@ -210,24 +155,24 @@ export function KnowledgeLeaderboardCard({ locale }: { locale: SupportedLocale }
           ))}
         </ToggleGroup>
 
-        {metricsQuery.isLoading ? (
+        {isLoading ? (
           <div className="space-y-2">
             {Array.from({ length: 4 }, (_, idx) => (
               <Skeleton key={`leaderboard-skeleton-${String(idx)}`} className="h-12 w-full rounded-lg" />
             ))}
           </div>
-        ) : metricsQuery.isError && !data ? (
+        ) : isError && !data ? (
           <div className="rounded-lg border border-warning/40 bg-warning/10 p-4 text-xs text-muted-foreground">
             {t('leaderboardFetchError')}
           </div>
         ) : (
           <ObservabilityDataTable
-            data={data?.items ?? []}
+            data={data?.items ?? EMPTY_ARTICLES}
             columns={columns}
             emptyState={t('leaderboardEmptyState')}
             minTableWidthClass="min-w-[560px]"
             getRowId={(row) => row.slug}
-            isDimmed={metricsQuery.isPlaceholderData}
+            isDimmed={isPlaceholderData}
             tableTestId="leaderboard-table"
           />
         )}
@@ -244,7 +189,7 @@ export function KnowledgeLeaderboardCard({ locale }: { locale: SupportedLocale }
           <Button
             variant="outline"
             size="sm"
-            disabled={currentPage <= 1 || metricsQuery.isFetching}
+            disabled={currentPage <= 1 || isFetching}
             onClick={() => goToPage(currentPage - 1)}
             className="h-8 gap-1 px-2.5 font-mono text-xs"
           >
@@ -258,7 +203,7 @@ export function KnowledgeLeaderboardCard({ locale }: { locale: SupportedLocale }
               data-testid={`leaderboard-page-${String(pageNum)}-btn`}
               variant={pageNum === currentPage ? 'default' : 'outline'}
               size="sm"
-              disabled={metricsQuery.isFetching}
+              disabled={isFetching}
               onClick={() => goToPage(pageNum)}
               className="h-8 min-w-8 px-2.5 font-mono text-xs"
             >
@@ -269,7 +214,7 @@ export function KnowledgeLeaderboardCard({ locale }: { locale: SupportedLocale }
           <Button
             variant="outline"
             size="sm"
-            disabled={currentPage >= totalPages || !data?.hasMore || metricsQuery.isFetching}
+            disabled={currentPage >= totalPages || !data?.hasMore || isFetching}
             onClick={() => goToPage(currentPage + 1)}
             className="h-8 gap-1 px-2.5 font-mono text-xs"
           >

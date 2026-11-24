@@ -8,9 +8,10 @@ import { NextIntlClientProvider } from 'next-intl'
 import { getMessages, getTranslations } from 'next-intl/server'
 import { type ReactNode, Suspense } from 'react'
 import { AuthCrossTabSyncBridge } from '@/features/auth/auth-cross-tab-sync-bridge'
-import { GuestPassModal } from '@/features/auth/guest-pass-modal'
-import { CommandPaletteModal } from '@/features/search/command-palette-modal'
+import { GuestPassModalLoader } from '@/features/auth/guest-pass-modal-loader'
+import { CommandPaletteLoader } from '@/features/search/command-palette-loader'
 import { resolvePublicSiteUrl } from '@/shared/config/env'
+import { pickIntlMessages } from '@/shared/i18n/pick-messages'
 import { PALETTE_INIT_SCRIPT } from '@/shared/lib/palette'
 import { buildOpenGraphMetadata, buildPageAlternates } from '@/shared/lib/seo'
 import { QueryProvider } from '@/shared/providers/query-provider'
@@ -93,6 +94,7 @@ export default async function LocaleRootLayout({
   }
 
   const messages = await getMessages()
+  const rootClientMessages = pickIntlMessages(messages, ['Header', 'GuestPassModal', 'KnowledgeBase', 'ErrorPage'])
 
   return (
     <html
@@ -109,7 +111,7 @@ export default async function LocaleRootLayout({
         suppressHydrationWarning
         className="min-h-screen bg-background font-sans text-foreground antialiased selection:bg-primary selection:text-primary-foreground"
       >
-        <NextIntlClientProvider locale={parsed.data} messages={messages}>
+        <NextIntlClientProvider locale={parsed.data} messages={rootClientMessages}>
           <ThemeProvider>
             <QueryProvider>
               <AuthCrossTabSyncBridge />
@@ -117,9 +119,9 @@ export default async function LocaleRootLayout({
                 <div className="flex min-h-screen flex-col">
                   <WorkfolioHeader />
                   <Suspense fallback={null}>
-                    <GuestPassModal />
+                    <GuestPassModalLoader />
                   </Suspense>
-                  <CommandPaletteModal locale={parsed.data} />
+                  <CommandPaletteLoader locale={parsed.data} />
                   <main className="flex-1">{children}</main>
                   <WorkfolioFooter locale={parsed.data} />
                 </div>

@@ -200,8 +200,7 @@ function scanCategoryEntriesRecursively(
   }
 }
 
-const getAllCachedFrontmatterEntries = cache((localeInput?: string): CachedFrontmatterEntry[] => {
-  const requestedLocale = normalizeLocale(localeInput)
+const getAllCachedFrontmatterEntriesByLocale = cache((requestedLocale: SupportedLocale): CachedFrontmatterEntry[] => {
   const root = resolveContentRoot()
   const categories = Object.keys(KNOWLEDGE_CATEGORY_LABELS) as KnowledgeCategory[]
   const entries: CachedFrontmatterEntry[] = []
@@ -217,17 +216,25 @@ const getAllCachedFrontmatterEntries = cache((localeInput?: string): CachedFront
   )
 })
 
+const getAllKnowledgeFrontmattersByLocale = cache((locale: SupportedLocale): MdxArticleFrontmatter[] => {
+  return getAllCachedFrontmatterEntriesByLocale(locale).map((entry) => entry.frontmatter)
+})
+
 /**
  * Lightweight frontmatter-only list (0 Markdown/HAST body parsing).
  * Used by KnowledgeSidebar, KnowledgeDirectoryExplorer, and tag counters for sub-millisecond response in dev & prod.
  */
-export const getAllKnowledgeFrontmatters = cache((localeInput?: string): MdxArticleFrontmatter[] => {
-  return getAllCachedFrontmatterEntries(localeInput).map((entry) => entry.frontmatter)
+export function getAllKnowledgeFrontmatters(localeInput?: string): MdxArticleFrontmatter[] {
+  return getAllKnowledgeFrontmattersByLocale(normalizeLocale(localeInput))
+}
+
+const getAllKnowledgeArticlesByLocale = cache((locale: SupportedLocale): MdxArticleDocument[] => {
+  return getAllCachedFrontmatterEntriesByLocale(locale).map((entry) => loadCachedDocumentFromEntry(entry))
 })
 
-export const getAllKnowledgeArticles = cache((localeInput?: string): MdxArticleDocument[] => {
-  return getAllCachedFrontmatterEntries(localeInput).map((entry) => loadCachedDocumentFromEntry(entry))
-})
+export function getAllKnowledgeArticles(localeInput?: string): MdxArticleDocument[] {
+  return getAllKnowledgeArticlesByLocale(normalizeLocale(localeInput))
+}
 
 function insertArticleIntoFolder(
   folder: KnowledgeTreeFolderNode,
@@ -295,9 +302,8 @@ function sortTreeNodesRecursively(nodes: KnowledgeTreeNode[]): void {
   }
 }
 
-export const getKnowledgeTree = cache((localeInput?: string): KnowledgeTreeFolderNode[] => {
-  const locale = normalizeLocale(localeInput)
-  const frontmatters = getAllKnowledgeFrontmatters(locale)
+const getKnowledgeTreeByLocale = cache((locale: SupportedLocale): KnowledgeTreeFolderNode[] => {
+  const frontmatters = getAllKnowledgeFrontmattersByLocale(locale)
   const categories = Object.keys(KNOWLEDGE_CATEGORY_LABELS) as KnowledgeCategory[]
   const rootFolders: KnowledgeTreeFolderNode[] = []
 
@@ -327,39 +333,55 @@ export const getKnowledgeTree = cache((localeInput?: string): KnowledgeTreeFolde
   return rootFolders
 })
 
+export function getKnowledgeTree(localeInput?: string): KnowledgeTreeFolderNode[] {
+  return getKnowledgeTreeByLocale(normalizeLocale(localeInput))
+}
+
+/**
+ * Primitive-keyed `React.cache` loader so `generateMetadata()` and `Page()`
+ * share the exact same memoized entry even when Next.js passes distinct `slug[]` array instances.
+ */
+const getArticleByRouteKey = cache((targetRoute: string, locale: SupportedLocale): MdxArticleDocument | null => {
+  const entries = getAllCachedFrontmatterEntriesByLocale(locale)
+  const matchedEntry = entries.find((e) => e.frontmatter.routePath === targetRoute)
+  if (!matchedEntry) {
+    return null
+  }
+  return loadCachedDocumentFromEntry(matchedEntry)
+})
+
 /**
  * On-demand single-article HAST loader: parses full Markdown/HAST only for the requested routePath!
  */
-export const getArticleByPathSegments = cache(
-  (segments: readonly string[], localeInput?: string): MdxArticleDocument | null => {
-    const targetRoute = segments.join('/')
-    const entries = getAllCachedFrontmatterEntries(localeInput)
-    const matchedEntry = entries.find((e) => e.frontmatter.routePath === targetRoute)
-    if (!matchedEntry) {
-      return null
-    }
-    return loadCachedDocumentFromEntry(matchedEntry)
-  },
-)
+export function getArticleByPathSegments(segments: readonly string[], localeInput?: string): MdxArticleDocument | null {
+  return getArticleByRouteKey(segments.join('/'), normalizeLocale(localeInput))
+}
 
-export const getFolderByPathSegments = cache(
-  (segments: readonly string[], localeInput?: string): KnowledgeTreeFolderNode | null => {
-    if (segments.length === 0) return null
-    const tree = getKnowledgeTree(localeInput)
-    const rootSegment = segments[0]
-    let current: KnowledgeTreeFolderNode | undefined = tree.find((node) => node.segment === rootSegment)
+const getFolderByRouteKey = cache((routeKey: string, locale: SupportedLocale): KnowledgeTreeFolderNode | null => {
+  if (!routeKey) return null
+  const segments = routeKey.split('/')
+  const tree = getKnowledgeTreeByLocale(locale)
+  const rootSegment = segments[0]
+  let current: KnowledgeTreeFolderNode | undefined = tree.find((node) => node.segment === rootSegment)
 
-    for (let i = 1; i < segments.length; i += 1) {
-      if (!current) return null
-      const seg = segments[i]
-      current = current.children.find(
-        (child): child is KnowledgeTreeFolderNode => child.type === 'folder' && child.segment === seg,
-      )
-    }
+  for (let i = 1; i < segments.length; i += 1) {
+    if (!current) return null
+    const seg = segments[i]
+    current = current.children.find(
+      (child): child is KnowledgeTreeFolderNode => child.type === 'folder' && child.segment === seg,
+    )
+  }
 
-    return current ?? null
-  },
-)
+  return current ?? null
+})
+
+export function getFolderByPathSegments(
+  segments: readonly string[],
+  localeInput?: string,
+): KnowledgeTreeFolderNode | null {
+  if (segments.length === 0) return null
+  return getFolderByRouteKey(segments.join('/'), normalizeLocale(localeInput))
+}
 
 export function buildKnowledgeBreadcrumbs(
   segments: readonly string[],

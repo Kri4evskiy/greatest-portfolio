@@ -1,27 +1,34 @@
 'use client'
 
+import { DEFAULT_LOCALE, type SupportedLocale, SupportedLocaleEnum } from '@repo/shared-schemas'
 import { Badge } from '@repo/ui'
-import * as d3 from 'd3'
+import { select } from 'd3'
 import { Network } from 'lucide-react'
+import { useLocale } from 'next-intl'
 import { useEffect, useRef, useState } from 'react'
 
+type ArchNodeId = 'client-idb' | 'nextjs-edge' | 'nestjs-api' | 'prisma-neon' | 'telemetry-ms'
+
 interface ArchNode {
-  id: string
+  id: ArchNodeId
   label: string
   sub: string
   x: number
   y: number
-  description: string
+  description: Record<SupportedLocale, string>
 }
 
 const DEFAULT_ARCH_NODE: ArchNode = {
   id: 'nextjs-edge',
   label: 'Next.js 16 Edge',
-  sub: 'Middleware + SSG MDX',
+  sub: 'Proxy + SSG MDX',
   x: 235,
   y: 120,
-  description:
-    'Edge Middleware проверяет наличие HttpOnly куки kb_access_token за <5 мс до отдачи SSG-страницы Базы Знаний.',
+  description: {
+    en: 'Edge Proxy verifies the HS256 HttpOnly kb_access_token cookie via Web Crypto in <5ms before serving protected Knowledge Base routes.',
+    uk: 'Edge Proxy перевіряє HS256 HttpOnly куку kb_access_token через Web Crypto за <5 мс перед віддачею захищених маршрутів Бази Знань.',
+    ru: 'Edge Proxy проверяет HS256 HttpOnly куку kb_access_token через Web Crypto за <5 мс до отдачи защищённых маршрутов Базы Знаний.',
+  },
 }
 
 const ARCH_NODES: readonly ArchNode[] = [
@@ -31,8 +38,11 @@ const ARCH_NODES: readonly ArchNode[] = [
     sub: 'RHF + IndexedDB Cache',
     x: 80,
     y: 120,
-    description:
-      'Клиентское ядро: React Hook Form + Zod валидируют форму Guest Pass, а TanStack Query v5 синхронизирует кэш в IndexedDB (idb-keyval, TTL 24h).',
+    description: {
+      en: 'Client core: React Hook Form + Zod validate Guest Pass input, while TanStack Query v5 persists allowlisted KB metrics to IndexedDB (idb-keyval, 24h TTL).',
+      uk: 'Клієнтське ядро: React Hook Form + Zod валідують форму Guest Pass, а TanStack Query v5 зберігає allowlist метрик БЗ в IndexedDB (idb-keyval, TTL 24h).',
+      ru: 'Клиентское ядро: React Hook Form + Zod валидируют форму Guest Pass, а TanStack Query v5 сохраняет allowlist метрик БЗ в IndexedDB (idb-keyval, TTL 24h).',
+    },
   },
   DEFAULT_ARCH_NODE,
   {
@@ -41,8 +51,11 @@ const ARCH_NODES: readonly ArchNode[] = [
     sub: 'Native ESM + JwtGuard',
     x: 390,
     y: 120,
-    description:
-      'Модульный бэкенд на нативном ESM (порт 4000): выпускает HttpOnly JWT куки, проверяет роли GUEST/USER/ADMIN и валидирует DTO через единый пакет @repo/shared-schemas.',
+    description: {
+      en: 'Modular Native ESM backend (port 4000): issues HttpOnly JWT cookies, enforces GUEST/USER/ADMIN roles, and validates DTOs via shared @repo/shared-schemas.',
+      uk: 'Модульний бекенд на нативному ESM (порт 4000): випускає HttpOnly JWT куки, перевіряє ролі GUEST/USER/ADMIN і валідує DTO через єдиний пакет @repo/shared-schemas.',
+      ru: 'Модульный бэкенд на нативном ESM (порт 4000): выпускает HttpOnly JWT куки, проверяет роли GUEST/USER/ADMIN и валидирует DTO через единый пакет @repo/shared-schemas.',
+    },
   },
   {
     id: 'prisma-neon',
@@ -50,8 +63,11 @@ const ARCH_NODES: readonly ArchNode[] = [
     sub: 'PostgreSQL Serverless',
     x: 555,
     y: 65,
-    description:
-      'Персистентное хранилище PostgreSQL: таблицы VisitorSession, ArticleMetrics (атомарный upsert increment) и SystemEventLog.',
+    description: {
+      en: 'Persistent PostgreSQL storage: VisitorSession, ArticleMetrics (atomic upsert increment), and SystemEventLog with bounded in-memory fallback.',
+      uk: 'Персистентне сховище PostgreSQL: таблиці VisitorSession, ArticleMetrics (атомарний upsert increment) і SystemEventLog з обмеженим in-memory fallback.',
+      ru: 'Персистентное хранилище PostgreSQL: таблицы VisitorSession, ArticleMetrics (атомарный upsert increment) и SystemEventLog с ограниченным in-memory fallback.',
+    },
   },
   {
     id: 'telemetry-ms',
@@ -59,12 +75,15 @@ const ARCH_NODES: readonly ArchNode[] = [
     sub: 'TCP :4001 + @Sse Stream',
     x: 555,
     y: 175,
-    description:
-      'Изолированный микросервис @nestjs/microservices (Transport.TCP) обогащает события и стримит их обратно в браузер через RxJS @Sse("/api/telemetry/stream").',
+    description: {
+      en: 'Isolated @nestjs/microservices worker (Transport.TCP) enriches telemetry events and streams them back to clients over a single shared RxJS @Sse("/api/telemetry/stream") connection.',
+      uk: 'Ізольований мікросервіс @nestjs/microservices (Transport.TCP) збагачує події телеметрії та стрімить їх у браузер через RxJS @Sse("/api/telemetry/stream").',
+      ru: 'Изолированный микросервис @nestjs/microservices (Transport.TCP) обогащает события телеметрии и стримит их в браузер через RxJS @Sse("/api/telemetry/stream").',
+    },
   },
 ]
 
-const ARCH_LINKS: ReadonlyArray<{ source: string; target: string; label: string }> = [
+const ARCH_LINKS: ReadonlyArray<{ source: ArchNodeId; target: ArchNodeId; label: string }> = [
   { source: 'client-idb', target: 'nextjs-edge', label: 'Cookie / RSC' },
   { source: 'nextjs-edge', target: 'nestjs-api', label: '/api/*' },
   { source: 'nestjs-api', target: 'prisma-neon', label: 'Prisma Upsert' },
@@ -72,9 +91,43 @@ const ARCH_LINKS: ReadonlyArray<{ source: string; target: string; label: string 
   { source: 'telemetry-ms', target: 'client-idb', label: 'SSE Push' },
 ]
 
+const UI_COPY: Record<
+  SupportedLocale,
+  {
+    title: string
+    activeNodeLabel: string
+    graphAriaLabel: string
+    selectNodePrefix: string
+  }
+> = {
+  en: {
+    title: 'D3.js Interactive Monorepo Data-Flow (Select any architecture node)',
+    activeNodeLabel: 'Active Node',
+    graphAriaLabel: 'Monorepo Architecture Flow Graph',
+    selectNodePrefix: 'Inspect architecture node',
+  },
+  uk: {
+    title: 'D3.js Інтерактивний Data-Flow монорепозиторію (Оберіть будь-який вузол)',
+    activeNodeLabel: 'Активний вузол',
+    graphAriaLabel: 'Граф архітектури монорепозиторію',
+    selectNodePrefix: 'Переглянути вузол архітектури',
+  },
+  ru: {
+    title: 'D3.js Интерактивный Data-Flow монорепозитория (Выберите любой узел)',
+    activeNodeLabel: 'Активный узел',
+    graphAriaLabel: 'Граф архитектуры монорепозитория',
+    selectNodePrefix: 'Посмотреть узел архитектуры',
+  },
+}
+
 export function ArchitectureFlowD3() {
+  const rawLocale = useLocale()
+  const parsedLocale = SupportedLocaleEnum.safeParse(rawLocale)
+  const locale: SupportedLocale = parsedLocale.success ? parsedLocale.data : DEFAULT_LOCALE
+  const copy = UI_COPY[locale]
+
   const svgRef = useRef<SVGSVGElement | null>(null)
-  const [activeNodeId, setActiveNodeId] = useState<string>(DEFAULT_ARCH_NODE.id)
+  const [activeNodeId, setActiveNodeId] = useState<ArchNodeId>(DEFAULT_ARCH_NODE.id)
 
   const selectedNode = ARCH_NODES.find((n) => n.id === activeNodeId) ?? DEFAULT_ARCH_NODE
 
@@ -82,7 +135,7 @@ export function ArchitectureFlowD3() {
     const svgEl = svgRef.current
     if (!svgEl) return
 
-    const svg = d3.select(svgEl)
+    const svg = select(svgEl)
     svg.selectAll('*').remove()
 
     const nodeMap = new Map(ARCH_NODES.map((n) => [n.id, n]))
@@ -108,7 +161,7 @@ export function ArchitectureFlowD3() {
         .attr('stroke-dasharray', isLoopback ? '4,4' : 'none')
     }
 
-    // Draw nodes
+    // Draw keyboard-accessible nodes
     const nodeGroup = svg
       .append('g')
       .selectAll('g')
@@ -116,9 +169,19 @@ export function ArchitectureFlowD3() {
       .enter()
       .append('g')
       .attr('transform', (d) => `translate(${d.x}, ${d.y})`)
+      .attr('role', 'button')
+      .attr('tabindex', '0')
+      .attr('aria-label', (d) => `${copy.selectNodePrefix}: ${d.label}`)
+      .attr('aria-pressed', (d) => (d.id === selectedNode.id ? 'true' : 'false'))
       .style('cursor', 'pointer')
       .on('click', (_event, d) => {
         setActiveNodeId(d.id)
+      })
+      .on('keydown', (event: KeyboardEvent, d) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault()
+          setActiveNodeId(d.id)
+        }
       })
 
     nodeGroup
@@ -152,19 +215,21 @@ export function ArchitectureFlowD3() {
         d.id === selectedNode.id ? 'hsl(var(--primary-foreground))' : 'hsl(var(--muted-foreground))',
       )
       .text((d) => d.sub)
-  }, [selectedNode.id])
+
+    return () => {
+      svg.selectAll('*').remove()
+    }
+  }, [copy.selectNodePrefix, selectedNode.id])
 
   return (
-    <div className="my-6 rounded-xl border border-border bg-card p-4 shadow-xs">
+    <div className="my-6 min-h-[420px] rounded-xl border border-border bg-card p-4 shadow-xs">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 pb-3">
         <div className="flex items-center gap-2">
           <Network className="h-4 w-4 text-primary" />
-          <h4 className="font-semibold text-sm">
-            D3.js Interactive Monorepo Data-Flow (Кликните на любой узел архитектуры)
-          </h4>
+          <h4 className="font-semibold text-sm">{copy.title}</h4>
         </div>
         <Badge variant="outline" className="font-mono text-[10px]">
-          Active Node: {selectedNode.label}
+          {copy.activeNodeLabel}: {selectedNode.label}
         </Badge>
       </div>
 
@@ -174,7 +239,7 @@ export function ArchitectureFlowD3() {
           viewBox="0 0 650 250"
           className="h-auto w-full min-w-[540px]"
           role="img"
-          aria-label="Monorepo Architecture Flow Graph"
+          aria-label={copy.graphAriaLabel}
         />
       </div>
 
@@ -182,7 +247,7 @@ export function ArchitectureFlowD3() {
         <div className="font-mono font-semibold text-foreground">
           {selectedNode.label} ({selectedNode.sub})
         </div>
-        <p className="mt-1 text-muted-foreground leading-relaxed">{selectedNode.description}</p>
+        <p className="mt-1 text-muted-foreground leading-relaxed">{selectedNode.description[locale]}</p>
       </div>
     </div>
   )

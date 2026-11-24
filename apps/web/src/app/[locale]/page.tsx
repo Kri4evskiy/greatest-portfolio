@@ -1,5 +1,6 @@
 import { DEFAULT_LOCALE, getTechRadarItems, SupportedLocaleEnum } from '@repo/shared-schemas'
-import { getTranslations } from 'next-intl/server'
+import { NextIntlClientProvider } from 'next-intl'
+import { getMessages, getTranslations } from 'next-intl/server'
 import { getLocalizedRoadmapItems } from '@/entities/engineering-roadmap/engineering-roadmap'
 import { EngineeringRoadmapBoard } from '@/entities/engineering-roadmap/engineering-roadmap-board'
 import { TechRadarTable } from '@/entities/engineering-roadmap/tech-radar-table'
@@ -9,6 +10,7 @@ import {
   WorkfolioHeroSection,
   WorkfolioProjectsSection,
 } from '@/entities/workfolio-profile/workfolio-sections'
+import { pickIntlMessages } from '@/shared/i18n/pick-messages'
 import { buildProfilePageJsonLd } from '@/shared/lib/seo'
 import { PageSectionNavigator } from '@/widgets/section-nav/page-section-navigator'
 
@@ -16,7 +18,11 @@ export default async function WorkfolioHomePage({ params }: { params: Promise<{ 
   const { locale } = await params
   const parsed = SupportedLocaleEnum.safeParse(locale)
   const resolvedLocale = parsed.success ? parsed.data : DEFAULT_LOCALE
-  const tMeta = await getTranslations({ locale: resolvedLocale, namespace: 'Metadata' })
+  const [tMeta, messages] = await Promise.all([
+    getTranslations({ locale: resolvedLocale, namespace: 'Metadata' }),
+    getMessages({ locale: resolvedLocale }),
+  ])
+  const homeClientMessages = pickIntlMessages(messages, ['TechRadar', 'Roadmap'])
 
   // Project only the active locale on the server so inactive locale dictionaries never enter client JS
   const techRadarItems = getTechRadarItems(resolvedLocale)
@@ -43,8 +49,10 @@ export default async function WorkfolioHomePage({ params }: { params: Promise<{ 
         <WorkfolioHeroSection locale={resolvedLocale} />
         <WorkfolioProjectsSection locale={resolvedLocale} />
         <WorkfolioExperienceSection locale={resolvedLocale} />
-        <TechRadarTable items={techRadarItems} />
-        <EngineeringRoadmapBoard items={roadmapItems} />
+        <NextIntlClientProvider locale={resolvedLocale} messages={homeClientMessages}>
+          <TechRadarTable items={techRadarItems} />
+          <EngineeringRoadmapBoard items={roadmapItems} />
+        </NextIntlClientProvider>
       </div>
       <PageSectionNavigator />
     </>

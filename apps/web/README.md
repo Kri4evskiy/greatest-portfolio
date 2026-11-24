@@ -38,15 +38,15 @@ apps/web/
     │   ├── search-index/[locale]/
     │   │   └── route.ts                  # Статический SSG JSON-индекс для Cmd+K (force-static)
     │   └── [locale]/
-    │       ├── layout.tsx                # Корневой layout: next/font, Zero-FOUC palette <script>, metadataBase, провайдеры
-    │       ├── opengraph-image.tsx       # Статическая карточка-превью 1200×630 (Obsidian Editorial Dark, next/og)
-    │       ├── page.tsx                  # Главная страница Workfolio (RSC)
+    │       ├── layout.tsx                # Корневой layout: next/font, Zero-FOUC palette <script>, metadataBase, нарезанный NextIntlClientProvider
+    │       ├── opengraph-image.tsx       # Локализованная (EN/UA/RU + Inter TTF) карточка-превью 1200×630 (Obsidian Editorial Dark, next/og)
+    │       ├── page.tsx                  # Главная страница Workfolio (RSC + scoped NextIntlClientProvider)
     │       ├── error.tsx                 # Локализованный Error Boundary внутри LocaleRootLayout ('use client')
     │       ├── not-found.tsx             # Локализованная 404 страница внутри LocaleRootLayout (чистый RSC)
     │       ├── [...rest]/page.tsx        # Catch-all роут неизвестных путей внутри локали ➔ notFound()
-    │       ├── cv/page.tsx               # Страница резюме (PDF <object> + структурированный ATS-вид)
-    │       ├── system-status/page.tsx    # System Observability & API Inspector (SSG + Client Dashboard)
-    │       └── knowledge-base/           # Защищённая База Знаний (layout + index + [...slug] catch-all)
+    │       ├── cv/page.tsx               # Страница резюме (Server Island CvDocumentShowcase + CvViewTabs)
+    │       ├── system-status/            # System Observability & API Inspector (page.tsx + loading.tsx)
+    │       └── knowledge-base/           # Гибридная База Знаний (layout + page + loading.tsx + [...slug] с dynamicParams=false & <Suspense>)
     │
     ├── widgets/                          # [Слой 2: Composite UI Blocks]
     │   ├── header/                       # WorkfolioHeader, LanguageSwitcher, ThemeToggle (2D Mode × Palette)
@@ -54,23 +54,24 @@ apps/web/
     │   └── section-nav/                  # PageSectionNavigator (плавающий outline / мобильная pill-кнопка)
     │
     ├── features/                         # [Слой 3: User Scenarios & Interactions]
-    │   ├── auth/                         # GuestPassModal + AuthCrossTabSyncBridge + lib/auth-cross-tab-sync.ts (senderId) + queries/use-visitor-profile.ts
-    │   ├── search/                       # CommandPaletteModal (на базе @repo/ui Dialog) + search-index-client.ts (Zod)
+    │   ├── auth/                         # GuestPassModalLoader (next/dynamic) + GuestPassModal + AuthCrossTabSyncBridge + lib/auth-cross-tab-sync.ts + queries/use-visitor-profile.ts
+    │   ├── search/                       # CommandPaletteLoader (Cmd+K, next/dynamic) + CommandPaletteModal + search-index-client.ts (Zod)
     │   ├── telemetry-stream/             # FooterSseStatus + use-telemetry-stream.ts (single ref-counted EventSource + backoff) + queries/use-system-observability.ts
-    │   │                                 # + lib/system-status-helpers.ts + ui/{system-status-dashboard,capabilities-matrix-card,live-event-log-card,knowledge-leaderboard-card,observability-data-table}.tsx
+    │   │                                 # + lib/system-status-helpers.ts + ui/{system-status-dashboard,capabilities-matrix-card,live-event-log-card,knowledge-leaderboard-card}.tsx
+    │   │                                 # + ui/table/{observability-data-table,knowledge-leaderboard-columns,live-event-log-columns}.tsx
     │   │                                 # + __tests__/knowledge-leaderboard-card.integration.test.tsx (RTL + MSW v3)
-    │   └── kb-sandboxes/ui/              # Ленивые клиентские острова (mdx-client-widgets.tsx, D3, MCP)
+    │   └── kb-sandboxes/ui/              # Ленивые клиентские острова (mdx-client-widgets.tsx через next/dynamic, точечный D3, MCP)
     │
     ├── entities/                         # [Слой 4: Business Data Representation]
-    │   ├── workfolio-profile/            # author-profile.ts, cv-file.ts, workfolio-sections.tsx, CvDocumentShowcase
-    │   ├── engineering-roadmap/          # engineering-roadmap.ts, EngineeringRoadmapBoard, TechRadarTable
-    │   ├── knowledge-content/            # Серверный MDX/HAST-движок (mdx-fs-loader, mdx-ast-parser, shiki, sanitizer)
-    │   └── knowledge-article/            # Рендеринг статей (MdxArticleRenderer, Sidebar, TOC) + queries/use-knowledge-metrics.ts
+    │   ├── workfolio-profile/            # author-profile.ts, cv-file.ts (React.cache), workfolio-sections.tsx, CvDocumentShowcase (RSC) + CvViewTabs (Client Island)
+    │   ├── engineering-roadmap/          # engineering-roadmap.ts, EngineeringRoadmapBoard, TechRadarTable + table/{tech-radar-data-table,tech-radar-columns}.tsx
+    │   ├── knowledge-content/            # Серверный MDX/HAST-движок (mdx-fs-loader с примитивным React.cache, mdx-ast-parser, shiki FIFO, sanitizer)
+    │   └── knowledge-article/            # Рендеринг статей (MdxArticleRenderer, Sidebar, TOC на IntersectionObserver, knowledge-skeletons) + queries/use-knowledge-metrics.ts
     │
     └── shared/                           # [Слой 5: Infrastructure & Common Tools]
         ├── config/                       # env.ts (Zod env validation + fail-closed resolveEdgeJwtSecretStrict)
-        ├── hooks/                        # Чистые браузерные DOM/ScrollSpy-хуки (use-section-navigation.ts)
-        ├── i18n/                         # app-routes.ts (Hybrid KB access + __tests__/app-routes.test.ts), routing.ts, request.ts, navigation.ts
+        ├── hooks/                        # Чистые браузерные DOM/ScrollSpy-хуки на IntersectionObserver (use-section-navigation.ts)
+        ├── i18n/                         # app-routes.ts (Hybrid KB access + __tests__/app-routes.test.ts), pick-messages.ts, routing.ts, request.ts, navigation.ts
         ├── lib/                          # api-client.ts (+ __tests__/api-client.test.ts), edge-jwt.ts (+ __tests__/edge-jwt.test.ts), seo.ts, palette.ts, analytics.ts
         ├── providers/                    # ThemeProvider (next-themes), QueryProvider (IDB allowlist ['knowledge'] + __tests__/query-provider.test.tsx)
         └── store/                        # useUIStore (Zustand — модалки, фильтры, папки сайдбара, palette + __tests__/use-ui-store.test.ts)
@@ -81,7 +82,7 @@ apps/web/
 1. **Изоляция по доменам и направлениям зависимостей:** плоские папки `src/components/` и `src/lib/` скрывают связи между доменами и быстро превращаются в «свалку» с циклическими импортами. В `FSD-Modular` каждый модуль лежит в своём слое и публикует чёткую границу ответственности.
 2. **Серверные `queries/` vs браузерные `shared/hooks/`:**
    - **Серверные хуки (`TanStack Query`)** привязаны к конкретному бизнес-домену и API-контракту, поэтому живут строго внутри доменных подпапок `queries/`: `features/auth/queries/use-visitor-profile.ts` и `entities/knowledge-article/queries/use-knowledge-metrics.ts`.
-   - **Браузерные DOM-хуки** (не знающие о серверном кэше) вынесены в `shared/hooks/use-section-navigation.ts` (пассивный `requestAnimationFrame` ScrollSpy и программный `#hash`-скролл).
+   - **Браузерные DOM-хуки** (не знающие о серверном кэше) вынесены в `shared/hooks/use-section-navigation.ts` (`IntersectionObserver` ScrollSpy без scroll-tick layout thrashing и программный `#hash`-скролл).
 
 ---
 

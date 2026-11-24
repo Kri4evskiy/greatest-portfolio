@@ -24,7 +24,7 @@ import {
 import { KeyRound, Loader2, LockOpen, ShieldCheck, Sparkles, Terminal } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { useSystemCapabilities } from '@/features/telemetry-stream/queries/use-system-observability'
 import { normalizeKbRedirectPath } from '@/shared/i18n/app-routes'
@@ -69,7 +69,6 @@ export function GuestPassModal() {
   const [showAdminInput, setShowAdminInput] = useState(false)
   const [activePresetLabel, setActivePresetLabel] = useState<string | null>(null)
   const inFlightRef = useRef(false)
-  const handledUnlockQueryRef = useRef<string | null>(null)
 
   const {
     mutateAsync: issueGuestPass,
@@ -121,23 +120,6 @@ export function GuestPassModal() {
     closeModal()
     clearUnlockSearchParams()
   }, [clearUnlockSearchParams, closeModal, resetIssuePass])
-
-  useEffect(() => {
-    const unlockParam = searchParams.get('unlock')
-    const redirectParam = searchParams.get('redirect')
-    const querySignature = `${unlockParam ?? ''}:${redirectParam ?? ''}`
-
-    if (unlockParam === 'knowledge-base') {
-      if (handledUnlockQueryRef.current === querySignature) {
-        return
-      }
-      handledUnlockQueryRef.current = querySignature
-      openModal(normalizeKbRedirectPath(redirectParam))
-      trackEvent('guest_pass_modal_opened', { source: 'middleware_redirect' })
-    } else {
-      handledUnlockQueryRef.current = null
-    }
-  }, [searchParams, openModal])
 
   const onSubmit = async (values: GuestPassFormInput) => {
     // Synchronous ref lock prevents rapid double-clicks from burning the 5 req/min auth throttle quota

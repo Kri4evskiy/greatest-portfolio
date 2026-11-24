@@ -16,48 +16,60 @@ function useActiveHeading(items: readonly ArticleTocItem[]): string {
 
   useEffect(() => {
     if (items.length === 0) return
-    setActiveId(items[0]?.id ?? '')
+    const firstId = items[0]?.id ?? ''
+    setActiveId(firstId)
 
-    let rafId = 0
+    const headingElements = items
+      .map((item) => ({ id: item.id, el: document.getElementById(item.id) }))
+      .filter((entry): entry is { id: string; el: HTMLElement } => entry.el !== null)
 
-    const updateActive = () => {
-      const scrollY = window.scrollY
-      const viewportHeight = window.innerHeight
-      const docHeight = document.documentElement.scrollHeight
+    if (headingElements.length === 0) return
 
-      if (scrollY + viewportHeight >= docHeight - 40) {
-        const last = items[items.length - 1]
-        if (last) setActiveId(last.id)
-        return
-      }
+    const visibleIds = new Set<string>()
+    const lastTopById = new Map<string, number>()
 
-      let current = items[0]?.id ?? ''
-      for (const item of items) {
-        const el = document.getElementById(item.id)
-        if (!el) continue
-        if (el.getBoundingClientRect().top <= 140) {
-          current = item.id
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          const id = entry.target.id
+          lastTopById.set(id, entry.boundingClientRect.top)
+          if (entry.isIntersecting) {
+            visibleIds.add(id)
+          } else {
+            visibleIds.delete(id)
+          }
         }
-      }
-      setActiveId(current)
-    }
 
-    const onScroll = () => {
-      if (rafId !== 0) return
-      rafId = window.requestAnimationFrame(() => {
-        rafId = 0
-        updateActive()
-      })
-    }
+        // Prefer the first heading currently intersecting the upper reading band
+        for (const item of items) {
+          if (visibleIds.has(item.id)) {
+            setActiveId(item.id)
+            return
+          }
+        }
 
-    updateActive()
-    window.addEventListener('scroll', onScroll, { passive: true })
-    window.addEventListener('resize', onScroll, { passive: true })
+        // When reading the body between two headings, keep the last heading passed above the band
+        let current = firstId
+        for (const item of items) {
+          const top = lastTopById.get(item.id)
+          if (top !== undefined && top <= 140) {
+            current = item.id
+          }
+        }
+        setActiveId(current)
+      },
+      {
+        rootMargin: '-88px 0px -65% 0px',
+        threshold: [0, 1],
+      },
+    )
+
+    for (const { el } of headingElements) {
+      observer.observe(el)
+    }
 
     return () => {
-      if (rafId !== 0) window.cancelAnimationFrame(rafId)
-      window.removeEventListener('scroll', onScroll)
-      window.removeEventListener('resize', onScroll)
+      observer.disconnect()
     }
   }, [items])
 

@@ -1,6 +1,12 @@
 'use client'
 
-import { LOCALE_METADATA, SUPPORTED_LOCALES, type SupportedLocale, SupportedLocaleEnum } from '@repo/shared-schemas'
+import {
+  DEFAULT_LOCALE,
+  LOCALE_METADATA,
+  SUPPORTED_LOCALES,
+  type SupportedLocale,
+  SupportedLocaleEnum,
+} from '@repo/shared-schemas'
 import {
   Button,
   Popover,
@@ -19,7 +25,9 @@ import { usePathname, useRouter } from '@/shared/i18n/navigation'
 import { trackEvent } from '@/shared/lib/analytics'
 
 export function LanguageSwitcher() {
-  const locale = useLocale() as SupportedLocale
+  const rawLocale = useLocale()
+  const parsedLocale = SupportedLocaleEnum.safeParse(rawLocale)
+  const locale: SupportedLocale = parsedLocale.success ? parsedLocale.data : DEFAULT_LOCALE
   const t = useTranslations('Header')
   const router = useRouter()
   const pathname = usePathname()

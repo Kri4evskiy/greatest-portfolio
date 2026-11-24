@@ -1,6 +1,13 @@
 'use client'
 
-import { type ColumnDef, flexRender, getCoreRowModel, useReactTable } from '@tanstack/react-table'
+import { type ColumnDef, flexRender, getCoreRowModel, type RowData, useReactTable } from '@tanstack/react-table'
+
+declare module '@tanstack/react-table' {
+  interface ColumnMeta<TData extends RowData, TValue> {
+    headerClassName?: string
+    cellClassName?: string
+  }
+}
 
 interface ObservabilityDataTableProps<TData> {
   data: TData[]
@@ -55,9 +62,9 @@ export function ObservabilityDataTable<TData>({
               className="border-b border-border/70 bg-surface-subtle font-mono text-[11px] text-muted-foreground"
             >
               {headerGroup.headers.map((header) => {
-                const meta = header.column.columnDef.meta as { headerClassName?: string } | undefined
+                const headerClassName = header.column.columnDef.meta?.headerClassName
                 return (
-                  <th key={header.id} className={meta?.headerClassName ?? 'px-3 py-2.5 font-medium'}>
+                  <th key={header.id} className={headerClassName ?? 'px-3 py-2.5 font-medium'}>
                     {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
                   </th>
                 )
@@ -77,9 +84,9 @@ export function ObservabilityDataTable<TData>({
                 }
               >
                 {row.getVisibleCells().map((cell) => {
-                  const meta = cell.column.columnDef.meta as { cellClassName?: string } | undefined
+                  const cellClassName = cell.column.columnDef.meta?.cellClassName
                   return (
-                    <td key={cell.id} className={meta?.cellClassName ?? 'px-3 py-2.5 align-top'}>
+                    <td key={cell.id} className={cellClassName ?? 'px-3 py-2.5 align-top'}>
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </td>
                   )

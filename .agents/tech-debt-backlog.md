@@ -84,24 +84,24 @@ _Область:_ `apps/web/config/security-headers.config.ts`, `apps/web/src/{p
   - В `security-headers.config.ts`: валидировать `publicApiUrl` через `new URL(...).origin`, сузить `connect-src` до явных origin'ов (убрать широкий `https:`), добавить `Cross-Origin-Resource-Policy: same-origin`.
   - В `link-sanitizer.ts`: запретить `/\` (`!trimmed.startsWith('/\\')`). В `mdx-ast-parser.ts`: явно отключить JS-движки в `gray-matter`.
 
-#### Сессия 3A — Frontend RSC/Streaming, Bundle & CWV Optimization _(Recommended Effort: **High**)_
+#### Сессия 3A — Frontend RSC/Streaming, Bundle & CWV Optimization _(Recommended Effort: **High** — ✅ Завершена)_
 
 _Область:_ `packages/shared-schemas/package.json`, `packages/ui/*`, `apps/web/next.config.ts`, `apps/web/src/app/**`, `CvDocumentShowcase`, `D3`, `scrollspy`.
-- [ ] **Устранение утечек клиентского бандла (`H5`, `I4`):**
-  - Добавить `"sideEffects": false` в `packages/shared-schemas/package.json` и `packages/ui/package.json` + `'@repo/shared-schemas'` в `optimizePackageImports` (или subpath exports `@repo/shared-schemas/locale`, `@repo/shared-schemas/tech-radar`), чтобы 43.6 КБ `tech-radar.schema.ts` не утекали в клиентский бандл.
+- [x] **Устранение утечек клиентского бандла (`H5`, `I4`):**
+  - Добавить `"sideEffects": false` в `packages/shared-schemas/package.json` и `"sideEffects": ["*.css"]` в `packages/ui/package.json` + `'@repo/shared-schemas'` в `optimizePackageImports`, чтобы 43.6 КБ `tech-radar.schema.ts` не утекали в клиентский бандл.
   - Заменить `import * as d3 from 'd3'` на точечные импорты (`select`, `hierarchy`, `tree`, `linkHorizontal`), добавить cleanup в `useEffect`, keyboard a11y (`role="button"`, `tabIndex={0}`), убрать мёртвый `pulseCounterRef` и хардкод русских строк в D3-виджетах.
-  - Перевести `NestAiMcpDiagram`, `ArticleImageGrid`, `GuestPassModal` и `CommandPaletteModal` на `next/dynamic` (оставив в layout только лёгкие триггеры).
-- [ ] **Server-Island для `/cv` (`H6`):**
-  - Разбить `CvDocumentShowcase` на Server Component (рендерит структурированное резюме и шапку только для активной локали) + клиентский `<CvViewTabs structuredSlot={...}>`, чтобы поисковики получали полный HTML резюме при SSR, а `author-profile.ts` (18.7 КБ, 3 языка) не попадал в клиентский JS.
-- [ ] **Streaming `<Suspense>`, `NextIntlClientProvider` Slicing, `loading.tsx` & `global-error.tsx` (`H7`):**
-  - Порезать `messages` в `[locale]/layout.tsx` до глобально нужных клиентских неймспейсов, а страничные (`CvPage`, `SystemStatusPage`, `TechRadar`, `Roadmap`) прокидывать локально.
+  - Перевести `NestAiMcpDiagram`, `ArticleImageGrid`, `GuestPassModal` и `CommandPaletteModal` на `next/dynamic` (оставив в layout только лёгкие триггеры `GuestPassModalLoader` и `CommandPaletteLoader`).
+- [x] **Server-Island для `/cv` (`H6`):**
+  - Разбить `CvDocumentShowcase` на Server Component (рендерит структурированное резюме и шапку только для активной локали) + клиентский `<CvViewTabs structuredSlot={...}>` (с `forceMount` + `data-[state=inactive]:hidden`), чтобы поисковики получали полный HTML резюме при SSR, а `author-profile.ts` (18.7 КБ, 3 языка) не попадал в клиентский JS.
+- [x] **Streaming `<Suspense>`, `NextIntlClientProvider` Slicing, `loading.tsx` & `global-error.tsx` (`H7`):**
+  - Порезать `messages` в `[locale]/layout.tsx` до глобально нужных клиентских неймспейсов (`pickIntlMessages`), а страничные (`CvPage`, `SystemStatusPage`, `TechRadar`, `Roadmap`) прокидывать локально.
   - Обернуть `<MdxArticleRenderer>` в `<Suspense fallback={<ArticleBodySkeleton />}>`; экспортировать `export const dynamicParams = false` в `[...slug]/page.tsx`.
   - Добавить `loading.tsx` для `/knowledge-base` и `/system-status`.
-  - Импортировать `./globals.css` (или inline fallback CSS-переменные) в `apps/web/src/app/global-error.tsx`.
-- [ ] **CWV, CLS, `IntersectionObserver` & Table/Cache Hygiene (`H12`, `I4`, `I5`):**
+  - Импортировать `./globals.css` в `apps/web/src/app/global-error.tsx`.
+- [x] **CWV, CLS, `IntersectionObserver` & Table/Cache Hygiene (`H12`, `I4`, `I5`):**
   - Выровнять высоты скелетонов D3 (`min-h-[420px]`) и `KnowledgeDirectoryExplorer` (заменить `fallback={null}` на скелетон).
   - Перевести `useActiveWorkfolioSection` и `useActiveHeading` (TOC) с `getBoundingClientRect()` на `IntersectionObserver`.
-  - Добавить `'use client'` в `packages/ui/src/components/dialog.tsx` и `tabs.tsx`; ключи `segments.join('/')` в `React.cache` (`mdx-fs-loader.ts`); FIFO-вытеснение в `shiki-highlighter.ts`; убрать `router.prefetch` закрытого KB для гостя; стабилизировать `columns` + типизировать `ColumnMeta` в `ObservabilityDataTable`; убрать `useLocale() as SupportedLocale` в `language-switcher.tsx`; локализовать `opengraph-image.tsx` со шрифтом `Inter`.
+  - Добавить `'use client'` в `packages/ui/src/components/dialog.tsx` и `tabs.tsx`; ключи `segments.join('/')` в `React.cache` (`mdx-fs-loader.ts`) и `React.cache` в `cv-file.ts`; FIFO-вытеснение в `shiki-highlighter.ts`; убрать `router.prefetch` KB для гостя; деструктурировать оставшиеся `useQuery`/`useInfiniteQuery` и стабилизировать `columns` + типизировать `ColumnMeta` в `ObservabilityDataTable`; убрать `useLocale() as SupportedLocale` в `language-switcher.tsx`; локализовать `opengraph-image.tsx` со шрифтом `Inter`.
 
 #### Сессия 3B — Синхронизация `this-project` MDX (42 файла), Docs & CI Quick-Wins _(Recommended Effort: **Medium**)_
 

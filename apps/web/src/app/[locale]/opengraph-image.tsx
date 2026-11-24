@@ -1,4 +1,4 @@
-import { SUPPORTED_LOCALES } from '@repo/shared-schemas'
+import { DEFAULT_LOCALE, SUPPORTED_LOCALES, type SupportedLocale, SupportedLocaleEnum } from '@repo/shared-schemas'
 import { ImageResponse } from 'next/og'
 
 export const alt = 'Stanislav Krychevskyi — Senior Frontend / Full-Stack Engineer & Engineering Knowledge Base'
@@ -13,10 +13,83 @@ export const contentType = 'image/png'
 const STACK_ROW_1 = ['Next.js 16 (App Router)', 'React 19 Compiler', 'NestJS 12 ESM', 'TypeScript 7.0'] as const
 const STACK_ROW_2 = ['Prisma 7 ORM (Wasm)', 'Tailwind CSS v4', 'XYFlow & D3.js', 'TCP Microservice + SSE'] as const
 
-const LOCALE_BADGE_MAP: Record<string, string> = {
-  en: 'EN • DEFAULT EDITION',
-  uk: 'UA • UKRAINIAN EDITION',
-  ru: 'RU • RUSSIAN EDITION',
+interface OgLocaleCopy {
+  editionLabel: string
+  statusPill: string
+  roleEyebrow: string
+  fullName: string
+  tagline: string
+  footerBadge: string
+}
+
+const OG_LOCALE_COPY: Record<SupportedLocale, OgLocaleCopy> = {
+  en: {
+    editionLabel: 'EN • DEFAULT EDITION',
+    statusPill: '16 ADRs • Engineering Knowledge Base',
+    roleEyebrow: 'SENIOR FRONTEND / FULL-STACK ENGINEER • 5+ YEARS',
+    fullName: 'Stanislav Krychevskyi',
+    tagline: 'Interactive Editorial Workfolio, Architecture Case Studies & Engineering Knowledge Base',
+    footerBadge: 'pnpm + Turborepo Monorepo',
+  },
+  uk: {
+    editionLabel: 'UA • УКРАЇНСЬКА ВЕРСІЯ',
+    statusPill: '16 ADR • Інженерна База Знань',
+    roleEyebrow: 'SENIOR FRONTEND / FULL-STACK ІНЖЕНЕР • 5+ РОКІВ',
+    fullName: 'Станіслав Кричевський',
+    tagline: 'Інтерактивне Workfolio-резюме, архітектурні кейси та інженерна База Знань',
+    footerBadge: 'pnpm + Turborepo Монорепозиторій',
+  },
+  ru: {
+    editionLabel: 'RU • РУССКАЯ ВЕРСИЯ',
+    statusPill: '16 ADR • Инженерная База Знаний',
+    roleEyebrow: 'SENIOR FRONTEND / FULL-STACK ИНЖЕНЕР • 5+ ЛЕТ',
+    fullName: 'Станислав Кричевский',
+    tagline: 'Интерактивное Workfolio-резюме, архитектурные кейсы и инженерная База Знаний',
+    footerBadge: 'pnpm + Turborepo Монорепозиторий',
+  },
+}
+
+interface SatoriFont {
+  name: string
+  data: ArrayBuffer
+  weight: 400 | 700
+  style: 'normal'
+}
+
+let cachedInterFontsPromise: Promise<SatoriFont[]> | null = null
+
+async function fetchGoogleFontTtf(weight: 400 | 700): Promise<SatoriFont | null> {
+  try {
+    // Requesting Google Fonts CSS without a modern woff2 User-Agent yields direct .ttf URLs supported by Satori
+    const cssRes = await fetch(`https://fonts.googleapis.com/css2?family=Inter:wght@${weight}&display=swap`, {
+      signal: AbortSignal.timeout(4000),
+    })
+    if (!cssRes.ok) return null
+    const css = await cssRes.text()
+    const match = css.match(/src:\s*url\((https:\/\/[^)]+\.ttf)\)/)
+    const fontUrl = match?.[1]
+    if (!fontUrl) return null
+
+    const fontRes = await fetch(fontUrl, { signal: AbortSignal.timeout(4000) })
+    if (!fontRes.ok) return null
+    return {
+      name: 'Inter',
+      data: await fontRes.arrayBuffer(),
+      weight,
+      style: 'normal',
+    }
+  } catch {
+    return null
+  }
+}
+
+function loadInterOgFonts(): Promise<SatoriFont[]> {
+  if (!cachedInterFontsPromise) {
+    cachedInterFontsPromise = Promise.all([fetchGoogleFontTtf(400), fetchGoogleFontTtf(700)]).then((results) =>
+      results.filter((entry): entry is SatoriFont => entry !== null),
+    )
+  }
+  return cachedInterFontsPromise
 }
 
 export function generateStaticParams() {
@@ -25,7 +98,13 @@ export function generateStaticParams() {
 
 export default async function OpenGraphImage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params
-  const editionLabel = LOCALE_BADGE_MAP[locale] ?? LOCALE_BADGE_MAP.en
+  const parsed = SupportedLocaleEnum.safeParse(locale)
+  const resolvedLocale = parsed.success ? parsed.data : DEFAULT_LOCALE
+
+  const fonts = await loadInterOgFonts()
+  const hasCyrillicCapableFont = fonts.length > 0
+  // Fallback to English copy when offline build cannot fetch Inter TTF so Satori never renders tofu glyphs
+  const copy = hasCyrillicCapableFont ? OG_LOCALE_COPY[resolvedLocale] : OG_LOCALE_COPY.en
 
   return new ImageResponse(
     <div
@@ -38,7 +117,7 @@ export default async function OpenGraphImage({ params }: { params: Promise<{ loc
         backgroundColor: '#111110',
         color: '#F5F2EB',
         padding: '44px 56px',
-        fontFamily: 'sans-serif',
+        fontFamily: hasCyrillicCapableFont ? 'Inter, sans-serif' : 'sans-serif',
         position: 'relative',
       }}
     >
@@ -56,7 +135,7 @@ export default async function OpenGraphImage({ params }: { params: Promise<{ loc
           padding: '38px 48px',
         }}
       >
-        {/* Top Bar: Terminal Prompt >_ + Breadcrumb + Protected Status Pill */}
+        {/* Top Bar: Terminal Prompt >_ + Breadcrumb + Status Pill */}
         <div
           style={{
             display: 'flex',
@@ -86,9 +165,9 @@ export default async function OpenGraphImage({ params }: { params: Promise<{ loc
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 18, color: '#A1A19A' }}>
                 <span>workspace</span>
                 <span style={{ color: '#52524E' }}>/</span>
-                <span style={{ color: '#F5F2EB', fontWeight: 600 }}>workfolio-cv</span>
+                <span style={{ color: '#F5F2EB', fontWeight: 700 }}>workfolio-cv</span>
               </div>
-              <span style={{ fontSize: 12, color: '#71716B', letterSpacing: 1.5 }}>{editionLabel}</span>
+              <span style={{ fontSize: 12, color: '#71716B', letterSpacing: 1.5 }}>{copy.editionLabel}</span>
             </div>
           </div>
 
@@ -111,7 +190,7 @@ export default async function OpenGraphImage({ params }: { params: Promise<{ loc
                 backgroundColor: '#10B981',
               }}
             />
-            <span style={{ fontSize: 15, color: '#E4E2DD', fontWeight: 600 }}>16 ADRs • Protected Knowledge Base</span>
+            <span style={{ fontSize: 15, color: '#E4E2DD', fontWeight: 700 }}>{copy.statusPill}</span>
           </div>
         </div>
 
@@ -131,35 +210,35 @@ export default async function OpenGraphImage({ params }: { params: Promise<{ loc
                 fontSize: 15,
                 fontWeight: 700,
                 color: '#10B981',
-                letterSpacing: 2.5,
+                letterSpacing: 2.2,
                 textTransform: 'uppercase',
               }}
             >
-              SENIOR FRONTEND / FULL-STACK ENGINEER • 5+ YEARS
+              {copy.roleEyebrow}
             </span>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             <span
               style={{
-                fontSize: 64,
+                fontSize: 62,
                 fontWeight: 700,
                 color: '#F5F2EB',
-                letterSpacing: -1.8,
+                letterSpacing: -1.6,
                 lineHeight: 1.05,
               }}
             >
-              Stanislav Krychevskyi
+              {copy.fullName}
             </span>
             <span
               style={{
-                fontSize: 26,
+                fontSize: 25,
                 fontWeight: 400,
                 color: '#A1A19A',
                 lineHeight: 1.35,
               }}
             >
-              Interactive Editorial Workfolio, Architecture Case Studies & Engineering Knowledge Base
+              {copy.tagline}
             </span>
           </div>
 
@@ -178,7 +257,7 @@ export default async function OpenGraphImage({ params }: { params: Promise<{ loc
                     padding: '8px 16px',
                     fontSize: 16,
                     color: '#E4E2DD',
-                    fontWeight: 600,
+                    fontWeight: 700,
                   }}
                 >
                   {item}
@@ -198,7 +277,7 @@ export default async function OpenGraphImage({ params }: { params: Promise<{ loc
                     padding: '8px 16px',
                     fontSize: 15,
                     color: '#A1A19A',
-                    fontWeight: 500,
+                    fontWeight: 400,
                   }}
                 >
                   {item}
@@ -231,12 +310,13 @@ export default async function OpenGraphImage({ params }: { params: Promise<{ loc
             <span>IndexedDB Offline-First Cache</span>
           </div>
 
-          <span style={{ color: '#F5F2EB', fontWeight: 600 }}>pnpm + Turborepo Monorepo</span>
+          <span style={{ color: '#F5F2EB', fontWeight: 700 }}>{copy.footerBadge}</span>
         </div>
       </div>
     </div>,
     {
       ...size,
+      ...(fonts.length > 0 ? { fonts } : {}),
     },
   )
 }
