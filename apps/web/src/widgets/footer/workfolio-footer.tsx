@@ -1,11 +1,12 @@
 import type { SupportedLocale } from '@repo/shared-schemas'
 import { Badge } from '@repo/ui'
-import { Database, ExternalLink, FileDown, Github, Linkedin, Mail, MapPin, Send } from 'lucide-react'
+import { Database, ExternalLink, FileDown, Mail, MapPin, Send } from 'lucide-react'
 import { getTranslations } from 'next-intl/server'
 import { AUTHOR_PROFILE, pickLocalized } from '@/entities/workfolio-profile/author-profile'
 import { FooterSseStatus } from '@/features/telemetry-stream/footer-sse-status'
 import { APP_ROUTES } from '@/shared/i18n/app-routes'
 import { Link } from '@/shared/i18n/navigation'
+import { GithubIcon, LinkedinIcon } from '@/shared/ui/brand-icons'
 
 export async function WorkfolioFooter({ locale }: { locale: SupportedLocale }) {
   const t = await getTranslations({ locale, namespace: 'Footer' })
@@ -57,7 +58,7 @@ export async function WorkfolioFooter({ locale }: { locale: SupportedLocale }) {
               rel="noreferrer"
               className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-1.5 font-mono text-xs font-medium text-foreground transition-colors hover:border-primary/40 hover:bg-accent"
             >
-              <Linkedin className="h-3.5 w-3.5 text-primary" />
+              <LinkedinIcon className="h-3.5 w-3.5 text-primary" />
               <span>LinkedIn</span>
               <ExternalLink className="h-3 w-3 text-muted-foreground" />
             </a>
@@ -67,7 +68,7 @@ export async function WorkfolioFooter({ locale }: { locale: SupportedLocale }) {
               rel="noreferrer"
               className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-1.5 font-mono text-xs font-medium text-foreground transition-colors hover:border-primary/40 hover:bg-accent"
             >
-              <Github className="h-3.5 w-3.5 text-primary" />
+              <GithubIcon className="h-3.5 w-3.5 text-primary" />
               <span>GitHub</span>
               <ExternalLink className="h-3 w-3 text-muted-foreground" />
             </a>

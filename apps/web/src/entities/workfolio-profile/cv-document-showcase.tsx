@@ -1,20 +1,9 @@
 import type { SupportedLocale } from '@repo/shared-schemas'
 import { Badge } from '@repo/ui'
-import {
-  ArrowLeft,
-  Award,
-  Briefcase,
-  Github,
-  GraduationCap,
-  Languages,
-  Linkedin,
-  Mail,
-  MapPin,
-  Send,
-  ShieldCheck,
-} from 'lucide-react'
+import { ArrowLeft, Award, Briefcase, GraduationCap, Languages, Mail, MapPin, Send, ShieldCheck } from 'lucide-react'
 import { getTranslations } from 'next-intl/server'
 import { Link } from '@/shared/i18n/navigation'
+import { GithubIcon, LinkedinIcon } from '@/shared/ui/brand-icons'
 import { AUTHOR_PROFILE, AUTHOR_SKILL_GROUPS, COMMERCIAL_EXPERIENCE, pickLocalized } from './author-profile'
 import type { CvFileMetadata } from './cv-file'
 import { CvDownloadActions, CvViewTabs } from './cv-view-tabs'
@@ -225,7 +214,7 @@ export async function CvDocumentShowcase({ cvMeta, locale }: CvDocumentShowcaseP
             rel="noreferrer"
             className="inline-flex items-center gap-1.5 rounded-md border border-border/80 bg-background px-2.5 py-1 font-mono text-xs text-foreground transition-colors hover:border-primary/40 hover:bg-accent"
           >
-            <Linkedin className="h-3 w-3 text-primary" />
+            <LinkedinIcon className="h-3 w-3 text-primary" />
             <span>{AUTHOR_PROFILE.contacts.linkedinHandle}</span>
           </a>
           <a
@@ -234,7 +223,7 @@ export async function CvDocumentShowcase({ cvMeta, locale }: CvDocumentShowcaseP
             rel="noreferrer"
             className="inline-flex items-center gap-1.5 rounded-md border border-border/80 bg-background px-2.5 py-1 font-mono text-xs text-foreground transition-colors hover:border-primary/40 hover:bg-accent"
           >
-            <Github className="h-3 w-3 text-primary" />
+            <GithubIcon className="h-3 w-3 text-primary" />
             <span>{AUTHOR_PROFILE.contacts.githubHandle}</span>
           </a>
           <a

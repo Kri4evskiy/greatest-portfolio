@@ -92,7 +92,8 @@ apps/web/
         ├── i18n/               # app-routes.ts (Hybrid KB policy + __tests__/app-routes.test.ts), pick-messages.ts, navigation.ts, routing.ts, request.ts
         ├── lib/                # api-client.ts (+ __tests__/api-client.test.ts), edge-jwt.ts (+ __tests__/edge-jwt.test.ts), seo.ts, analytics.ts, palette.ts
         ├── providers/          # ThemeProvider, QueryProvider (IDB allowlist + __tests__/query-provider.test.tsx)
-        └── store/              # Zustand (use-ui-store: actions + атомарные use* хуки + uiStore + __tests__/use-ui-store.test.ts)
+        ├── store/              # Zustand (use-ui-store: actions + атомарные use* хуки + uiStore + __tests__/use-ui-store.test.ts)
+        └── ui/                 # brand-icons.tsx (локальные SVG GithubIcon / LinkedinIcon для lucide-react v1)
 ```
 
 ### Золотое правило зависимостей FSD-Modular:

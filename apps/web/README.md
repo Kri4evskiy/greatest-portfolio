@@ -74,7 +74,8 @@ apps/web/
         ├── i18n/                         # app-routes.ts (Hybrid KB access + __tests__/app-routes.test.ts), pick-messages.ts, routing.ts, request.ts, navigation.ts
         ├── lib/                          # api-client.ts (+ __tests__/api-client.test.ts), edge-jwt.ts (+ __tests__/edge-jwt.test.ts), seo.ts, palette.ts, analytics.ts
         ├── providers/                    # ThemeProvider (next-themes), QueryProvider (IDB allowlist ['knowledge'] + __tests__/query-provider.test.tsx)
-        └── store/                        # useUIStore (Zustand — модалки, фильтры, папки сайдбара, palette + __tests__/use-ui-store.test.ts)
+        ├── store/                        # useUIStore (Zustand — модалки, фильтры, папки сайдбара, palette + __tests__/use-ui-store.test.ts)
+        └── ui/                           # brand-icons.tsx (локальные SVG GithubIcon / LinkedinIcon для lucide-react v1)
 ```
 
 ### Почему нет плоских папок `components/`, `hooks/`, `lib/` и как разделены хуки

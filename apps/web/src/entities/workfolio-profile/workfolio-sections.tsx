@@ -3,10 +3,8 @@ import { Badge, Callout, Card, CardContent, CardDescription, CardFooter, CardHea
 import {
   Briefcase,
   GitBranch,
-  Github,
   GraduationCap,
   Languages,
-  Linkedin,
   Mail,
   MapPin,
   Send,
@@ -16,6 +14,7 @@ import {
   Zap,
 } from 'lucide-react'
 import { getTranslations } from 'next-intl/server'
+import { GithubIcon, LinkedinIcon } from '@/shared/ui/brand-icons'
 import {
   AUTHOR_PROFILE,
   AUTHOR_SKILL_GROUPS,
@@ -119,7 +118,7 @@ export async function WorkfolioHeroSection({ locale }: { locale: SupportedLocale
             rel="noreferrer"
             className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 font-mono text-xs font-medium text-foreground shadow-2xs transition-colors hover:border-primary/40 hover:bg-accent"
           >
-            <Linkedin className="h-3.5 w-3.5 text-primary" />
+            <LinkedinIcon className="h-3.5 w-3.5 text-primary" />
             <span>LinkedIn</span>
           </a>
           <a
@@ -128,7 +127,7 @@ export async function WorkfolioHeroSection({ locale }: { locale: SupportedLocale
             rel="noreferrer"
             className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 font-mono text-xs font-medium text-foreground shadow-2xs transition-colors hover:border-primary/40 hover:bg-accent"
           >
-            <Github className="h-3.5 w-3.5 text-primary" />
+            <GithubIcon className="h-3.5 w-3.5 text-primary" />
             <span>GitHub</span>
           </a>
           <a
