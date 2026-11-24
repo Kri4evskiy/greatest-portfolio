@@ -13,6 +13,21 @@ export interface ContentSecurityPolicyOptions {
    * blocking external sites and all other internal routes from being framed.
    */
   allowSameOriginFraming?: boolean
+  /**
+   * Controls whether `upgrade-insecure-requests` and `Strict-Transport-Security` are emitted.
+   * Defaults to `true` only when running in strict production with an explicit `https://` `NEXT_PUBLIC_SITE_URL`
+   * (disabled for local HTTP `next start`, CI Playwright E2E, and `WORKFOLIO_DEMO_MODE=true` Docker demos
+   * so Chromium does not upgrade `http://localhost:3000` fetches to `https://` and fail with `ERR_SSL_PROTOCOL_ERROR`).
+   */
+  enforceHttpsTransport?: boolean
+}
+
+function resolveEnforceHttpsTransport(isProduction: boolean, override?: boolean): boolean {
+  if (typeof override === 'boolean') return override
+  if (!isProduction) return false
+  if (process.env.WORKFOLIO_DEMO_MODE === 'true') return false
+  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? '').trim().toLowerCase()
+  return siteUrl.startsWith('https://')
 }
 
 /**
@@ -32,7 +47,8 @@ export function buildContentSecurityPolicy(
   publicApiUrl = '',
   options: ContentSecurityPolicyOptions = {},
 ): string {
-  const { allowSameOriginFraming = false } = options
+  const { allowSameOriginFraming = false, enforceHttpsTransport } = options
+  const shouldUpgradeHttps = resolveEnforceHttpsTransport(isProduction, enforceHttpsTransport)
   const allowedConnectOrigins = new Set<string>()
   const safeApiOrigin = parseSafeHttpOrigin(publicApiUrl)
   if (safeApiOrigin) {
@@ -97,8 +113,8 @@ export function buildContentSecurityPolicy(
     // Plugins / Objects: Restricted strictly to same-origin ('self') so SPA <Link href="/cv"> navigation renders /cv/*.pdf
     "object-src 'self'",
 
-    // Enforce HTTPS upgrade exclusively in production (do not break local http://localhost)
-    ...(isProduction ? ['upgrade-insecure-requests'] : []),
+    // Enforce HTTPS upgrade exclusively on HTTPS production origins (do not break local http://localhost)
+    ...(shouldUpgradeHttps ? ['upgrade-insecure-requests'] : []),
   ]
 
   return directives.join('; ').trim()
@@ -120,12 +136,14 @@ export function getSecurityHeaders(
   publicApiUrl = process.env.NEXT_PUBLIC_API_URL ?? '',
   options: ContentSecurityPolicyOptions = {},
 ): SecurityHeaderEntry[] {
+  const shouldEmitHsts = resolveEnforceHttpsTransport(isProduction, options.enforceHttpsTransport)
+
   return [
     {
       key: 'Content-Security-Policy',
       value: buildContentSecurityPolicy(isProduction, publicApiUrl, options),
     },
-    ...(isProduction
+    ...(shouldEmitHsts
       ? [
           {
             key: 'Strict-Transport-Security',

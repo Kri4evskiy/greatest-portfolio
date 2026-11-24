@@ -45,6 +45,7 @@ export default defineConfig({
       timeout: 60_000,
       env: {
         NODE_ENV: 'production',
+        WORKFOLIO_DEMO_MODE: 'true',
         API_INTERNAL_URL: 'http://localhost:4000',
         NEXT_PUBLIC_SITE_URL: 'http://localhost:3000',
         JWT_SECRET: DEFAULT_E2E_JWT_SECRET,
