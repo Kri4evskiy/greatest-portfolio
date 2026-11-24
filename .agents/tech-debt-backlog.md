@@ -109,7 +109,7 @@ _Область:_ `apps/web/content/this-project/**`, `.github/**`, `README.md`,
 - [ ] **Фактчекинг и полная синхронизация всех 14 статей (42 файла) `apps/web/content/this-project/**`** под итоговый код после Сессий 1–3A:
   - Поправить расхождения в типах `GET /api/capabilities` и `nextOffset` (`nestjs-12-esm-prisma-7-sse-graceful-architecture`), битые относительные ссылки и укр. слово `«активних»` в `.ru.mdx` (`multi-theme-tokens-tailwind-preset`), сниппет scrollspy/классы (`programmatic-scrollspy-section-nav`), сигнатуру/порядок проверок `verifyEdgeJwtHs256` (`edge-web-crypto-jwt-proxy`), `LOCALE_METADATA` и `/system-status` (`production-seo-i18n-sitemap-architecture`), строки/классы `TechRadarTable` (`react-compiler-config-boundaries`), пропсы `CaseStudyReadButton`/`FooterSseStatus`/файл `bfcache`/`use-ui-store` (`rsc-locale-slicing-client-islands`), префиксы `/en/` и `/uk/`, `theme.css` и `codeToHtml` (`server-mdx-ast-dual-theme-shiki`), актуальные имена функций (`static-search-index-cmdk-palette`), `prepare-codegen`/`allowBuilds`/дубль пункта `4.` в `.en.mdx` (`github-actions-ci-pipeline`), `pnpm prune` в `web.Dockerfile` (`multi-stage-buildkit-docker`), актуальный `turbo.json` (`pnpm-turborepo-tsconfig-biome`), актуальный `main.ts`/SSE `@SkipTimeout()`/актуальное число SSG-роутов/matcher `proxy.ts` + разбор `CsrfOriginMiddleware` и паттернов безопасного расширения под загрузку медиа (Presigned R2 URLs vs scoped multipart allowlist + запрет inline SVG от Stored XSS) (`production-security-hardening-csp-helmet-throttler`), актуальный `vitest.base.ts`/4 `test.step`/Playwright cache key (`vitest-playwright-enterprise-testing-pyramid`).
 - [ ] **Синхронизация системной документации** по чеклисту `AGENTS.md` (`apps/web/README.md`, `apps/api/README.md`, `.agents/frontend/*`, `.agents/backend/*`, `SECURITY.md`).
-- [ ] **CI Security & Workflow Hardening:** добавить еженедельный `schedule:` крон `pnpm audit --prod --audit-level=high`, `.github/dependabot.yml` (`npm` + `github-actions`) и `actionlint` в `lint`.
+- [ ] **CI Security & Workflow Hardening:** добавить еженедельный `schedule:` крон `pnpm audit --prod --audit-level=high`, `.github/dependabot.yml` (`npm` + `github-actions`), `actionlint` в `lint` и проверку отсутствия циклических зависимостей (Biome `noImportCycles` / `madge --circular` для `apps/api`).
 
 ---
 
@@ -137,6 +137,7 @@ _Область:_ `apps/web/content/this-project/**`, `.github/**`, `README.md`,
 > 3. **Не создавать преждевременно `packages/redis`:** подключать `ioredis` напрямую в `apps/api`; выносить в общий пакет только если `apps/telemetry-ms` перейдёт на Redis Pub/Sub.
 
 - [ ] **Архитектурное внедрение Redis (`apps/api`, `docker-compose.yml`, `docker-compose.prod.yml`):**
+  - **Нативный паттерн модуля:** оформить `RedisModule` через нативный `ConfigurableModuleBuilder` (`@nestjs/common`, `setClassMethodName('forRoot')` + `setExtras({ isGlobal: true })`) с выносом DI-токенов в отдельный `redis.constants.ts` (чистый Enterprise-стандарт без 100 строк ручного boilerplate).
   - **Зачем:**
     1. _Distributed Rate Limiting:_ масштабирование защиты от брутфорса (`POST /api/auth/guest-pass`, SSE connect) при работе нескольких реплик API (Upstash Redis на Free Tier / локальный `redis:7-alpine`).
     2. _Response Caching (Cache-Aside + TTL Jitter):_ кэширование аналитических эндпоинтов (`GET /api/knowledge/metrics/paginated`, `GET /api/telemetry/stats`) с TTL `60s ± 10%` (защита от Cache Stampede), снижающее нагрузку на Neon.tech PostgreSQL на ~95%.
@@ -169,7 +170,7 @@ _Область:_ `apps/web/content/this-project/**`, `.github/**`, `README.md`,
 > **Перед стартом проверить:** Приоритеты №0, №0.5 и №1 завершены, боевой HTTPS-домен работает стабильно, Redis активен для rate-limiting и кэширования новых эндпоинтов.
 
 - [ ] **Фаза 1 — `S3-compatible Object Storage` (`@aws-sdk/client-s3` для `Cloudflare R2` + локальный `MinIO`):**
-  - Выделить `StorageService` в `apps/api` (IAM least-privilege ключи, генерация краткоживущих Presigned URLs, стриминг/проксирование с проверкой MIME и размера файла) и подключить легковесный `minio` сервис в `docker-compose`.
+  - Оформить `StorageModule` через нативный `ConfigurableModuleBuilder` (`forRoot` / `forRootAsync`, DI-токены в `storage.constants.ts`), выделить `StorageService` в `apps/api` (IAM least-privilege ключи, генерация краткоживущих Presigned URLs, стриминг/проксирование с проверкой MIME и размера файла) и подключить легковесный `minio` сервис в `docker-compose`.
   - Перевести на `StorageService` отдачу PDF-резюме (`/cv/*.pdf`) с graceful fallback на локальную статику `public/cv/*.pdf` при отсутствии S3-переменных; переключить индикатор `s3ObjectStorage` на `/system-status`.
 - [ ] **Вау-эффект №1 — Public Read-Only `@nestjs/mcp` Server (`Streamable HTTP`) + Live MCP Playground (`$0/мес`):**
   - **Зачем:** дать техлидам и рекрутерам возможность подключить `greatest-portfolio` напрямую к `Cursor` / `Claude Desktop` и интерактивно «опрашивать» архитектуру, 16 ADR и опыт CV через протокол MCP, либо тестировать JSON-RPC вызовы прямо на `/system-status`.
@@ -185,7 +186,10 @@ _Область:_ `apps/web/content/this-project/**`, `.github/**`, `README.md`,
   - **Реализация:** в `LoggingInterceptor` (`apps/api`) добавлять стандартный заголовок `Server-Timing` (`db;dur=..., tcp;dur=..., total;dur=...`); в `apiClient` (`apps/web`) вести кольцевой буфер последних 20 запросов (`X-Request-Id`, статус, latency, `Server-Timing`, источник `IDB Cache vs Network`); вывести компактный Trace Drawer / секцию на `/system-status`.
 - [ ] **Вау-эффект №4 — Live GitHub Engineering Pulse со Streaming `<Suspense>` + ISR (`revalidateTag`):**
   - **Зачем:** нативно продемонстрировать Streaming SSR + ISR + устойчивость к недоступности внешнего API.
-  - **Реализация:** серверный компонент в `<Suspense fallback={<GitHubPulseSkeleton />}>` на главной / в `Engineering Roadmap`, запрашивающий статус CI-воркфлоу, последние коммиты и релизы репозитория (через server-only `GITHUB_TOKEN`, `next: { revalidate: 3600 }`, Redis-кэш и graceful Capability Gating при отсутствии токена).
+  - **Реализация:** серверный компонент в `<Suspense fallback={<GitHubPulseSkeleton />}>` на главной / в `Engineering Roadmap`, запрашивающий статус CI-воркфлоу, последние коммиты и релизы репозитория (через server-only `GITHUB_TOKEN`, `next: { revalidate: 3600 }`, Redis-кэш, **Circuit Breaker** против залипания на таймаутах внешнего API и graceful Capability Gating при отсутствии токена).
+- [ ] **Resilience Upgrade — Circuit Breaker для TCP-моста `telemetry-ms` (`apps/api/src/modules/telemetry/`):**
+  - **Зачем:** сейчас при выключенном `telemetry-ms` каждый вызов `GET /api/capabilities` или `GET /api/telemetry/stats` ждёт `timeout(800)` (800ms) перед уходом в fallback.
+  - **Реализация:** лёгкий Circuit Breaker (`Closed -> Open на 30s после 3 подряд ECONNREFUSED/timeout -> Half-Open проба`, либо `opossum`) вокруг TCP-вызова к `telemetry-ms` (и вынос токена `TELEMETRY_MS_CLIENT` в `telemetry.constants.ts`) ➔ падение задержки fallback-ответа с `800ms` до `<1ms`.
 
 ---
 

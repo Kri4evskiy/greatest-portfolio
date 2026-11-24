@@ -84,6 +84,11 @@ apps/api/
 ## 3. Чеклист при добавлении новых модулей
 
 1. Размещай доменную логику в `modules/<domain>/`, сквозные механизмы — в `common/`, а чистые переиспользуемые хелперы — в `common/utils/`.
-2. Новые env-переменные добавляй в Zod-схему в `config/app.config.ts` или `config/database.config.ts`.
-3. **Синхронизация документации:** при изменении структуры папок или эндпоинтов сразу обновляй `apps/api/README.md`, `.agents/backend/development.md` и этот файл.
-4. Верификация: `pnpm biome check --write .`, `pnpm turbo typecheck`, `pnpm --filter @repo/api test`, `pnpm --filter @repo/api test:e2e` и `pnpm turbo build --filter=@repo/api` (подробности NestJS + `SWC` + `Vitest` см. в `.agents/testing/testing-strategy.md`).
+2. **DI-токены и конфигурируемые модули:**
+   - Выноси DI-токены (`Symbol(...)` / строковые константы) в отдельный `<domain>.constants.ts` (избегая циклических импортов между `*.module.ts` и `*.service.ts`).
+   - Для динамических инфраструктурных модулей (`RedisModule`, `StorageModule` и т.п.) используй нативный `ConfigurableModuleBuilder` из `@nestjs/common` (`forRoot` / `forRootAsync` + `setExtras({ isGlobal: true })`) вместо ручного boilerplate.
+   - Внешние/нестабильные зависимости (TCP-мост к микросервисам, внешние HTTP API) защищай паттерном **Circuit Breaker** (fast-fail вместо повторных таймаутов на каждый запрос).
+   - Сервисы держи синглтонами (`Scope.DEFAULT`) — избегай `Scope.REQUEST` / `ContextId` для сквозного трейсинга (при необходимости неявного request-контекста использовать `AsyncLocalStorage`).
+3. Новые env-переменные добавляй в Zod-схему в `config/app.config.ts` или `config/database.config.ts`.
+4. **Синхронизация документации:** при изменении структуры папок или эндпоинтов сразу обновляй `apps/api/README.md`, `.agents/backend/development.md` и этот файл.
+5. Верификация: `pnpm biome check --write .`, `pnpm turbo typecheck`, `pnpm --filter @repo/api test`, `pnpm --filter @repo/api test:e2e` и `pnpm turbo build --filter=@repo/api` (подробности NestJS + `SWC` + `Vitest` см. в `.agents/testing/testing-strategy.md`).
