@@ -15,7 +15,7 @@ import {
 import { type ReactNode, useState } from 'react'
 import { useVisitorProfile } from '@/features/auth/queries/use-visitor-profile'
 import { useSectionNavigation } from '@/shared/hooks/use-section-navigation'
-import { APP_ROUTES } from '@/shared/i18n/app-routes'
+import { APP_ROUTES, isPublicKnowledgeBasePath } from '@/shared/i18n/app-routes'
 import { Link, useRouter } from '@/shared/i18n/navigation'
 import { trackEvent } from '@/shared/lib/analytics'
 import { useUIActions } from '@/shared/store/use-ui-store'
@@ -32,17 +32,11 @@ export function HeroActionRow({ ctaUnlocked, ctaLocked, ctaCvPdf, ctaTechRadar, 
   const router = useRouter()
   const { scrollToSection } = useSectionNavigation()
   const { data: profile } = useVisitorProfile()
-  const { openGuestPassModal } = useUIActions()
 
   const isUnlocked = profile?.role === 'USER' || profile?.role === 'ADMIN'
 
   const handleOpenKnowledgeBase = () => {
-    if (isUnlocked) {
-      router.push(APP_ROUTES.knowledgeBase)
-      return
-    }
-    trackEvent('guest_pass_modal_opened', { source: 'hero_cta' })
-    openGuestPassModal(APP_ROUTES.knowledgeBase)
+    router.push(APP_ROUTES.knowledgeBase)
   }
 
   return (
@@ -118,9 +112,11 @@ export function CaseStudyReadButton({ category, slug, readUnlockedLabel, readLoc
 
   const isUnlocked = profile?.role === 'USER' || profile?.role === 'ADMIN'
 
+  const targetUrl = `/knowledge-base/${category}/${slug}`
+  const isAccessible = isUnlocked || isPublicKnowledgeBasePath(targetUrl)
+
   const handleReadCaseStudy = () => {
-    const targetUrl = `/knowledge-base/${category}/${slug}`
-    if (isUnlocked) {
+    if (isAccessible) {
       router.push(targetUrl)
       return
     }
@@ -136,7 +132,7 @@ export function CaseStudyReadButton({ category, slug, readUnlockedLabel, readLoc
       onClick={handleReadCaseStudy}
       className="w-full justify-between font-mono text-xs"
     >
-      <span>{isUnlocked ? readUnlockedLabel : readLockedLabel}</span>
+      <span>{isAccessible ? readUnlockedLabel : readLockedLabel}</span>
       <ExternalLink className="h-3.5 w-3.5" />
     </Button>
   )

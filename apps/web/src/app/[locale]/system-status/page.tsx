@@ -3,7 +3,7 @@ import type { Metadata } from 'next'
 import { getTranslations } from 'next-intl/server'
 import { SystemStatusDashboard } from '@/features/telemetry-stream/ui/system-status-dashboard'
 import { APP_ROUTES } from '@/shared/i18n/app-routes'
-import { buildLocalizedUrl, buildPageAlternates, resolveOgLocale } from '@/shared/lib/seo'
+import { buildOpenGraphMetadata, buildPageAlternates } from '@/shared/lib/seo'
 
 export function generateStaticParams() {
   return SUPPORTED_LOCALES.map((locale) => ({ locale }))
@@ -21,13 +21,13 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
     title,
     description,
     alternates: buildPageAlternates(APP_ROUTES.systemStatus, resolvedLocale),
-    openGraph: {
+    openGraph: buildOpenGraphMetadata({
       title,
       description,
-      url: buildLocalizedUrl(APP_ROUTES.systemStatus, resolvedLocale),
-      locale: resolveOgLocale(resolvedLocale),
+      pathname: APP_ROUTES.systemStatus,
+      locale: resolvedLocale,
       type: 'website',
-    },
+    }),
   }
 }
 

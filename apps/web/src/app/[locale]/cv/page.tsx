@@ -5,7 +5,7 @@ import { AUTHOR_PROFILE, AUTHOR_SKILL_GROUPS, pickLocalized } from '@/entities/w
 import { CvDocumentShowcase } from '@/entities/workfolio-profile/cv-document-showcase'
 import { getLatestCvFileMetadata } from '@/entities/workfolio-profile/cv-file'
 import { APP_ROUTES } from '@/shared/i18n/app-routes'
-import { buildLocalizedUrl, buildPageAlternates, buildProfilePageJsonLd, resolveOgLocale } from '@/shared/lib/seo'
+import { buildOpenGraphMetadata, buildPageAlternates, buildProfilePageJsonLd } from '@/shared/lib/seo'
 
 export function generateStaticParams() {
   return SUPPORTED_LOCALES.map((locale) => ({ locale }))
@@ -23,13 +23,13 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
     title,
     description,
     alternates: buildPageAlternates(APP_ROUTES.cv, resolvedLocale),
-    openGraph: {
+    openGraph: buildOpenGraphMetadata({
       title,
       description,
-      url: buildLocalizedUrl(APP_ROUTES.cv, resolvedLocale),
-      locale: resolveOgLocale(resolvedLocale),
+      pathname: APP_ROUTES.cv,
+      locale: resolvedLocale,
       type: 'profile',
-    },
+    }),
   }
 }
 

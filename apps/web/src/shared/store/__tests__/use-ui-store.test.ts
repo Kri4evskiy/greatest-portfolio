@@ -60,6 +60,7 @@ describe('use-ui-store (SSR safety, modals, KB folders & 2D palette)', () => {
 
     actions.closeGuestPassModal()
     expect(uiStore.getState().isGuestPassModalOpen).toBe(false)
+    expect(uiStore.getState().pendingRedirectPath).toBeNull()
 
     actions.toggleKbFolder('this-project')
     expect(uiStore.getState().expandedKbFolders['this-project']).toBe(true)

@@ -79,4 +79,43 @@ describe('verifyEdgeJwtHs256 (Edge Web Crypto JWT guard)', () => {
     await expect(verifyEdgeJwtHs256('only.two')).resolves.toBe(false)
     await expect(verifyEdgeJwtHs256('invalid!.base64!.chars!')).resolves.toBe(false)
   })
+
+  it('rejects GUEST role, missing sub, future nbf, and fails closed in production without a strong non-default JWT_SECRET', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const futureExp = Math.floor(Date.now() / 1000) + 3600
+    const futureNbf = Math.floor(Date.now() / 1000) + 300
+
+    const guestRoleToken = await signHs256Jwt({ sub: 'user-1', role: 'GUEST', exp: futureExp }, DEFAULT_DEV_JWT_SECRET)
+    const missingSubToken = await signHs256Jwt({ role: 'USER', exp: futureExp }, DEFAULT_DEV_JWT_SECRET)
+    const futureNbfToken = await signHs256Jwt(
+      { sub: 'user-1', role: 'USER', nbf: futureNbf, exp: futureExp },
+      DEFAULT_DEV_JWT_SECRET,
+    )
+
+    await expect(verifyEdgeJwtHs256(guestRoleToken)).resolves.toBe(false)
+    await expect(verifyEdgeJwtHs256(missingSubToken)).resolves.toBe(false)
+    await expect(verifyEdgeJwtHs256(futureNbfToken)).resolves.toBe(false)
+
+    // Fail-closed in NODE_ENV=production when JWT_SECRET is missing or default dev secret
+    vi.stubEnv('NODE_ENV', 'production')
+    vi.stubEnv('WORKFOLIO_DEMO_MODE', 'false')
+    vi.stubEnv('JWT_SECRET', '')
+
+    const defaultToken = await signHs256Jwt({ sub: 'user-1', role: 'USER', exp: futureExp }, DEFAULT_DEV_JWT_SECRET)
+    await expect(verifyEdgeJwtHs256(defaultToken)).resolves.toBe(false)
+    expect(errorSpy).toHaveBeenCalled()
+
+    // Explicit WORKFOLIO_DEMO_MODE=true permits local Docker reviewer demo with default secret
+    vi.stubEnv('WORKFOLIO_DEMO_MODE', 'true')
+    await expect(verifyEdgeJwtHs256(defaultToken)).resolves.toBe(true)
+
+    // Strong non-default secret passes in strict production
+    vi.stubEnv('WORKFOLIO_DEMO_MODE', 'false')
+    const prodSecret = 'prod-strong-edge-jwt-secret-key-2026-min-32-chars'
+    vi.stubEnv('JWT_SECRET', prodSecret)
+    const prodToken = await signHs256Jwt({ sub: 'admin-1', role: 'ADMIN', exp: futureExp }, prodSecret)
+    await expect(verifyEdgeJwtHs256(prodToken)).resolves.toBe(true)
+
+    errorSpy.mockRestore()
+  })
 })

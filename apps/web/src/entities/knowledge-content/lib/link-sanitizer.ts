@@ -9,7 +9,11 @@ export function classifySafeMarkdownLink(rawUrl: string): {
   if (trimmed.startsWith('#')) {
     return { href: trimmed, kind: 'hash' }
   }
-  if ((trimmed.startsWith('/') && !trimmed.startsWith('//')) || trimmed.startsWith('./') || trimmed.startsWith('../')) {
+  if (
+    (trimmed.startsWith('/') && !trimmed.startsWith('//') && !trimmed.startsWith('/\\')) ||
+    trimmed.startsWith('./') ||
+    trimmed.startsWith('../')
+  ) {
     return { href: trimmed, kind: 'internal' }
   }
   try {
@@ -28,7 +32,7 @@ export function isSafeMarkdownImageSrc(rawUrl: string): boolean {
   if (!trimmed) {
     return false
   }
-  if (trimmed.startsWith('/') && !trimmed.startsWith('//')) {
+  if (trimmed.startsWith('/') && !trimmed.startsWith('//') && !trimmed.startsWith('/\\')) {
     return true
   }
   try {

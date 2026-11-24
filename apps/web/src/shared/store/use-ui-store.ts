@@ -112,6 +112,7 @@ const useUIStoreBase = create<UIStore>((set) => ({
     closeGuestPassModal: () =>
       set({
         isGuestPassModalOpen: false,
+        pendingRedirectPath: null,
       }),
     openCommandPalette: (initialQuery = '') =>
       set({

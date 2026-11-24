@@ -35,7 +35,7 @@ export function GET() {
     `- [Interactive Workfolio Home (RU)](${buildLocalizedUrl(APP_ROUTES.home, 'ru')}): Русскоязычная версия портфолио и базы знаний.`,
     `- [Full Resume / ATS CV & Downloadable PDF](${buildLocalizedUrl(APP_ROUTES.cv, 'en')}): Complete commercial timeline, hard skills matrix, and original PDF resume.`,
     `- [System Observability & API Inspector](${buildLocalizedUrl(APP_ROUTES.systemStatus, 'en')}): Live capabilities matrix, Cursor-paginated SSE telemetry log, and Offset-paginated Knowledge Base leaderboard.`,
-    `- [Engineering Knowledge Base Hub](${buildLocalizedUrl(APP_ROUTES.knowledgeBase, 'en')}): Continuously expanding multilingual (EN/UA/RU) engineering handbook and architectural reference (unlockable in 1 click via the Guest Pass RBAC demo).`,
+    `- [Engineering Knowledge Base Hub & "This Project" Blueprint](${buildLocalizedUrl(`${APP_ROUTES.knowledgeBase}/this-project`, 'en')}): Public architectural documentation of this monorepo (EN/UA/RU), plus protected personal study notes unlockable in 1 click via Guest Pass.`,
     `- [GitHub Profile](${AUTHOR_PROFILE.contacts.githubUrl}) | [Monorepo Source Code](${AUTHOR_PROFILE.contacts.repoUrl})`,
     `- [LinkedIn](${AUTHOR_PROFILE.contacts.linkedinUrl}) | [Telegram](${AUTHOR_PROFILE.contacts.telegramUrl}) | Email: ${AUTHOR_PROFILE.contacts.email}`,
     '',
@@ -89,9 +89,9 @@ export function GET() {
     '- **Key Deep-Dive Topics:** 5-Tier `FSD-Modular` Next.js 16 architecture, `React 19 Compiler` & atomic Zustand store patterns, Zero-Eval HAST MDX engine with server-side dual-theme `Shiki`, `Edge Web Crypto HS256 JWT` verification, `NestJS 12 ESM` 4-tier enterprise backend, `Prisma 7 Wasm` with resilient In-Memory fallback, `Multi-Stage BuildKit Docker` orchestration, and `A+ CSP / Helmet / Throttler` security hardening.',
   )
   lines.push('')
-  lines.push('### 2. Core Frontend, Backend & System Design Deep-Dives (`/knowledge-base`)')
+  lines.push('### 2. Protected Domain Engineering Study Notes (Guest Pass RBAC)')
   lines.push(
-    'In-depth technical articles (`deep-dive`), rapid-recall references (`cheat-sheet`), and architectural records (`adr`) across core full-stack engineering domains:',
+    'Additional deep-dives (`deep-dive`), cheat sheets (`cheat-sheet`), and ADRs (`adr`) gated behind the Edge Web Crypto JWT Proxy (excluded from crawler indexation):',
   )
   for (const folder of domainFolders) {
     const subtopics = folder.children
@@ -99,7 +99,7 @@ export function GET() {
       .map((child) => child.label)
       .join(', ')
     lines.push(
-      `- **[${folder.label}](${buildLocalizedUrl(`/knowledge-base/${folder.segment}`, 'en')})**: ${subtopics || 'Core engineering notes and production patterns'}.`,
+      `- **${folder.label}** (\`/knowledge-base/${folder.segment}\`, Guest Pass required): ${subtopics || 'Core engineering notes and production patterns'}.`,
     )
   }
 

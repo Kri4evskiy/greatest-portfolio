@@ -125,6 +125,19 @@ export function useIncrementHelpfulMutation() {
             },
           ]
         }
+        const exists = old.some((item) => item.slug === slug)
+        if (!exists) {
+          return [
+            ...old,
+            {
+              slug,
+              category,
+              viewsCount: 1,
+              helpfulCount: 1,
+              updatedAt: now,
+            },
+          ]
+        }
         return old.map((item) =>
           item.slug === slug
             ? {

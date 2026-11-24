@@ -66,9 +66,9 @@ apps/web/
     │
     ├── features/               # [Слой 3: User Scenarios & Interactions]
     │   │                       # Интерактивные фичи с действиями пользователя
-    │   ├── auth/               # GuestPassModal + lib/auth-cross-tab-sync.ts + queries/use-visitor-profile
-    │   ├── search/             # CommandPaletteModal, useSearchIndex, search-client
-    │   ├── telemetry-stream/   # FooterSseStatus, useTelemetryStream,
+    │   ├── auth/               # GuestPassModal + AuthCrossTabSyncBridge + lib/auth-cross-tab-sync.ts + queries/use-visitor-profile
+    │   ├── search/             # CommandPaletteModal, search-index-client.ts (Zod)
+    │   ├── telemetry-stream/   # FooterSseStatus, useTelemetryStream (ref-counted singleton SSE),
     │   │                       # queries/use-system-observability, lib/system-status-helpers,
     │   │                       # ui/{system-status-dashboard,capabilities-matrix-card,live-event-log-card,knowledge-leaderboard-card,observability-data-table}
     │   │                       # + __tests__/knowledge-leaderboard-card.integration.test.tsx (RTL + MSW v3)
@@ -86,10 +86,11 @@ apps/web/
     │
     └── shared/                 # [Слой 5: Infrastructure & Common Tools]
         │                       # Фундамент, не знающий о специфике бизнес-фичей
+        ├── config/             # env.ts (Zod env validation + fail-closed Edge JWT secret resolver)
         ├── hooks/              # Браузерные DOM/ScrollSpy UI-хуки (use-section-navigation.ts)
-        ├── i18n/               # app-routes.ts (+ __tests__/app-routes.test.ts), navigation.ts, routing.ts, request.ts
+        ├── i18n/               # app-routes.ts (Hybrid KB policy + __tests__/app-routes.test.ts), navigation.ts, routing.ts, request.ts
         ├── lib/                # api-client.ts (+ __tests__/api-client.test.ts), edge-jwt.ts (+ __tests__/edge-jwt.test.ts), seo.ts, analytics.ts, palette.ts
-        ├── providers/          # ThemeProvider, QueryProvider (+ __tests__/query-provider.test.tsx)
+        ├── providers/          # ThemeProvider, QueryProvider (IDB allowlist + __tests__/query-provider.test.tsx)
         └── store/              # Zustand (use-ui-store: actions + атомарные use* хуки + uiStore + __tests__/use-ui-store.test.ts)
 ```
 

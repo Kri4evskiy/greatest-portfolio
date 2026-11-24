@@ -1,7 +1,7 @@
 'use client'
 
 import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister'
-import { IsRestoringProvider, QueryCache, QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { IsRestoringProvider, type Query, QueryCache, QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import {
   type Persister,
   persistQueryClientRestore,
@@ -15,6 +15,17 @@ import { ApiClientError, isCancelledRequestError } from '@/shared/lib/api-client
 const CACHE_KEY = 'greatest-portfolio-query-cache'
 const CACHE_BUSTER = 'v1'
 const TWENTY_FOUR_HOURS_MS = 1000 * 60 * 60 * 24
+
+// Strict IndexedDB persistence allowlist:
+// Only offline-safe Knowledge Base metrics are persisted across cold starts.
+// Never persist `['auth', 'me']` (prevents resurrecting expired/revoked sessions for 24h)
+// or volatile live observability streams (`['telemetry', ...]`, `['system', ...]`).
+const PERSISTABLE_QUERY_ROOT_KEYS = new Set(['knowledge'])
+
+export function shouldPersistQueryToIndexedDb(query: Query): boolean {
+  const rootKey = query.queryKey[0]
+  return query.state.status === 'success' && typeof rootKey === 'string' && PERSISTABLE_QUERY_ROOT_KEYS.has(rootKey)
+}
 
 let browserQueryClient: QueryClient | undefined
 let browserPersister: Persister | undefined
@@ -140,6 +151,9 @@ export function QueryProvider({ children }: { children: ReactNode }) {
       queryClient,
       persister: getBrowserPersister(),
       buster: CACHE_BUSTER,
+      dehydrateOptions: {
+        shouldDehydrateQuery: shouldPersistQueryToIndexedDb,
+      },
     })
   }, [queryClient, isRestoring])
 

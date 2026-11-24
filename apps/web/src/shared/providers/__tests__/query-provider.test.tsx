@@ -7,7 +7,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 import { z } from 'zod'
 import * as analytics from '@/shared/lib/analytics'
 import { apiClient, isCancelledRequestError } from '@/shared/lib/api-client'
-import { makeQueryClient, QueryProvider } from '../query-provider'
+import { makeQueryClient, QueryProvider, shouldPersistQueryToIndexedDb } from '../query-provider'
 
 const server = setupServer()
 
@@ -159,5 +159,23 @@ describe('QueryProvider / makeQueryClient error & retry policy', () => {
     )
 
     expect(await screen.findByTestId('provider-child')).toHaveTextContent('ready')
+  })
+
+  it('persists only successful knowledge queries to IndexedDB (never auth or volatile telemetry)', () => {
+    const client = makeQueryClient()
+    client.setQueryData(['knowledge', 'metrics'], [{ slug: 'adr-full-stack-catalog' }])
+    client.setQueryData(['auth', 'me'], { role: 'ADMIN' })
+    client.setQueryData(['telemetry', 'events'], { pages: [] })
+    client.setQueryData(['system', 'capabilities'], { status: 'ok' })
+
+    const knowledgeQuery = client.getQueryCache().find({ queryKey: ['knowledge', 'metrics'] })
+    const authQuery = client.getQueryCache().find({ queryKey: ['auth', 'me'] })
+    const telemetryQuery = client.getQueryCache().find({ queryKey: ['telemetry', 'events'] })
+    const capabilitiesQuery = client.getQueryCache().find({ queryKey: ['system', 'capabilities'] })
+
+    expect(knowledgeQuery && shouldPersistQueryToIndexedDb(knowledgeQuery)).toBe(true)
+    expect(authQuery && shouldPersistQueryToIndexedDb(authQuery)).toBe(false)
+    expect(telemetryQuery && shouldPersistQueryToIndexedDb(telemetryQuery)).toBe(false)
+    expect(capabilitiesQuery && shouldPersistQueryToIndexedDb(capabilitiesQuery)).toBe(false)
   })
 })

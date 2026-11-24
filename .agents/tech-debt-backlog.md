@@ -57,31 +57,31 @@ _Область:_ `packages/shared-schemas/**`, `apps/api/**`, `apps/telemetry-m
   - В локальном `docker-compose.yml`: добавить `WORKFOLIO_DEMO_MODE: ${WORKFOLIO_DEMO_MODE:-true}` в сервис `web` (чтобы `docker compose up --build` работал у тимлида без ручной настройки `.env`), привязать `web` к `127.0.0.1:${WEB_HOST_PORT:-3000}:3000`, сделать хост-порты БД и API параметризуемыми на loopback (`127.0.0.1:${POSTGRES_HOST_PORT:-5432}:5432`, `127.0.0.1:${API_HOST_PORT:-4000}:4000`) против локальных коллизий портов.
   - В `docker-compose.prod.yml`: добавить `security_opt: ["no-new-privileges:true"]`, `cap_drop: ["ALL"]`, `read_only: true` + `tmpfs: [/tmp]`, `pids_limit`, а также `healthcheck` для `web` (`:3000`) и `telemetry-ms`.
 
-#### Сессия 2 — Frontend Security, Auth Modal UX, Cache/SSE/Race Fixes & SEO _(Recommended Effort: **High**)_
+#### Сессия 2 — Frontend Security, Auth Modal UX, Cache/SSE/Race Fixes & SEO _(Recommended Effort: **High** — ✅ Завершена)_
 
 _Область:_ `apps/web/config/security-headers.config.ts`, `apps/web/src/{proxy.ts,shared/*,features/auth/*,features/search/*,features/telemetry-stream/*,entities/knowledge-article/queries/*,app/{sitemap.ts,robots.ts,llms.txt}}`.
-- [ ] **Frontend Zod Env Validation & Fail-Closed Edge JWT (`apps/web/src/shared/config/env.ts`, `edge-jwt.ts`, `proxy.ts`):**
+- [x] **Frontend Zod Env Validation & Fail-Closed Edge JWT (`apps/web/src/shared/config/env.ts`, `edge-jwt.ts`, `proxy.ts`):**
   - Создать Zod-валидатор серверных и клиентских env-переменных фронтенда (`JWT_SECRET`, `WORKFOLIO_DEMO_MODE`, `API_INTERNAL_URL` со стриппингом trailing `/`, `NEXT_PUBLIC_SITE_URL`, `NEXT_PUBLIC_POSTHOG_HOST`).
   - Сделать `verifyEdgeJwtHs256()` **строго fail-closed** при `NODE_ENV === 'production' && WORKFOLIO_DEMO_MODE !== 'true'` (отклонять пустой, `< 32` символов или `DEFAULT_DEV_JWT_SECRET`); добавить проверку claims `sub`, `role` (`'USER' | 'ADMIN'`), `nbf`; сбрасывать `cachedHmacKeyPromise` в `.catch()`.
   - В `proxy.ts` сузить исключение `.*\\..*` до явного списка расширений статики (`\\.(?:ico|png|jpg|jpeg|svg|webp|pdf|css|js|woff2|txt|xml|json)$`), чтобы будущие слаги с точкой (например, `next.js-16`) не обходили Edge Auth.
-- [ ] **IndexedDB Persister Dehydration Allowlist (`apps/web/src/shared/providers/query-provider.tsx`):**
+- [x] **IndexedDB Persister Dehydration Allowlist (`apps/web/src/shared/providers/query-provider.tsx`):**
   - Передать `dehydrateOptions: { shouldDehydrateQuery }` со строгим allowlist (`['knowledge']` и `status === 'success'`), чтобы `['auth', 'me']`, `['system', 'capabilities']` и `['telemetry', ...]` **никогда** не сохранялись в IndexedDB. `CACHE_BUSTER` оставить `'v1'` (локальный IDB на `localhost:3000` очищается вручную в DevTools).
-- [ ] **Гибридная модель доступа Базы Знаний и чистый SEO (`proxy.ts`, `sitemap.ts`, `robots.ts`, `llms.txt/route.ts`):**
+- [x] **Гибридная модель доступа Базы Знаний и чистый SEO (`proxy.ts`, `sitemap.ts`, `robots.ts`, `llms.txt/route.ts`):**
   - **Публично и индексируется:** `/`, `/cv`, `/system-status`, каталог `/knowledge-base` и **весь раздел `/knowledge-base/this-project/**`** (открыто для тимлидов, рекрутеров и Google без 307-редиректов).
   - **Под Edge Web Crypto JWT Auth (`USER` / `ADMIN`):** все остальные конспекты `/knowledge-base/**` (кроме `this-project/**` и корня `/knowledge-base`) и статьи с `visibility: 'private'`.
   - Исключить закрытые разделы из `sitemap.ts` и прямых ссылок `llms.txt`, добавить их в `disallow` в `robots.ts` ➔ **0 ошибок `307 Redirect` в Google Search Console**.
-- [ ] **Auth Modal UX & Race Condition Hardening (`guest-pass-modal.tsx`, `use-ui-store.ts`, `command-palette-modal.tsx`, `search-index-client.ts`):**
+- [x] **Auth Modal UX & Race Condition Hardening (`guest-pass-modal.tsx`, `use-ui-store.ts`, `command-palette-modal.tsx`, `search-index-client.ts`):**
   - Обновить `GuestPassModal`: рендерить подсказку `workfolio-admin-2026` **только** когда `capabilities.mode === 'demo'`; обернуть `mutateAsync` в `try/catch` + `inFlightRef` guard; повесить **`disabled` + спиннер** на все кнопки отправки и пресеты во время мутации; очищать `?unlock` в URL (`router.replace`) и `pendingRedirectPath: null` при закрытии; визуально довести модалку до уровня продакшен-портфолио.
   - В `CommandPaletteModal`: хранить `{ locale, payload }` (убрать stale-locale flash при переключении языка) и валидировать ответ `/search-index/[locale]` через Zod-схему (убрать `as Partial<KnowledgeSearchPayload>`).
-- [ ] **Single Shared SSE Manager & `BroadcastChannel` Deduplication (`use-telemetry-stream.ts`, `use-visitor-profile.ts`, `query-provider.tsx`):**
+- [x] **Single Shared SSE Manager & `BroadcastChannel` Deduplication (`use-telemetry-stream.ts`, `use-visitor-profile.ts`, `auth-cross-tab-sync-bridge.tsx`):**
   - Вынести `EventSource` в единый ref-counted менеджер (подписка через `useSyncExternalStore`) с обработкой `EventSource.CLOSED` + exponential backoff (1 стрим на всю вкладку даже на `/system-status`, с поясняющими комментариями в коде о Free-Tier и лимитах HTTP/1.1).
-  - Перенести `subscribeAuthSessionChange` один раз в `QueryProvider` с `senderId` вкладки (устраняет 8× шторм рефетчей в той же вкладке).
+  - Перенести `subscribeAuthSessionChange` один раз в `AuthCrossTabSyncBridge` (внутри `QueryProvider` в root layout, строго по FSD) с `senderId` вкладки (устраняет 8× шторм рефетчей в той же вкладке).
   - В `fetchVisitorProfile()` возвращать `FALLBACK_GUEST_PROFILE` только на явный `401`/`403` (не кэшировать 5xx/сетевой сбой как `GUEST` на 10 мин); в `useLogoutMutation` добавить `invalidateQueries({ queryKey: ['knowledge'] })`.
-- [ ] **Technical SEO, Strict `apiClient`, CSP & Parser Hardening:**
-  - Создать `buildOpenGraphMetadata(...)` в `seo.ts` (сохраняет `siteName`, добавляет `alternateLocale` на всех дочерних страницах); добавить `mainEntityOfPage`, `publisher`, `image` в `TechArticle` JSON-LD, `BreadcrumbList` для статей, `robots: { index: false, follow: false }` на 404-метадате; предупреждать/падать при prod-билде без `NEXT_PUBLIC_SITE_URL`.
+- [x] **Technical SEO, Strict `apiClient`, CSP & Parser Hardening:**
+  - Создать `buildOpenGraphMetadata(...)` в `seo.ts` (сохраняет `siteName`, добавляет `alternateLocale` на всех дочерних страницах); добавить `mainEntityOfPage`, `publisher`, `image` в `TechArticle` JSON-LD, `BreadcrumbList` для статей, `robots: { index: false, follow: false }` на 404-метадате; предупреждать при prod-билде без `NEXT_PUBLIC_SITE_URL`.
   - В `api-client.ts`: conditional type для `pathParams` (обязателен для параметризованных роутов `:slug`, `never` для остальных).
   - В `use-knowledge-metrics.ts` и `article-metrics-bar.tsx`: починить оптимистичное добавление новой статьи в `useIncrementHelpfulMutation` и заменить фейковые `100`/`25` на `<Skeleton>`.
-  - В `security-headers.config.ts`: валидировать `publicApiUrl` через `new URL(...).origin`, сузить `connect-src` до явных origin'ов, добавить `Cross-Origin-Resource-Policy: same-origin` (плюс SHA-256 hash для `PALETTE_INIT_SCRIPT` вместо `'unsafe-inline'`, если совместимо с Next.js 16 SSG).
+  - В `security-headers.config.ts`: валидировать `publicApiUrl` через `new URL(...).origin`, сузить `connect-src` до явных origin'ов (убрать широкий `https:`), добавить `Cross-Origin-Resource-Policy: same-origin`.
   - В `link-sanitizer.ts`: запретить `/\` (`!trimmed.startsWith('/\\')`). В `mdx-ast-parser.ts`: явно отключить JS-движки в `gray-matter`.
 
 #### Сессия 3A — Frontend RSC/Streaming, Bundle & CWV Optimization _(Recommended Effort: **High**)_

@@ -1,5 +1,36 @@
-import type { SupportedLocale } from '@repo/shared-schemas'
+import { KnowledgeCategoryEnum, KnowledgeNoteFormatEnum, type SupportedLocale } from '@repo/shared-schemas'
+import { z } from 'zod'
 import type { KnowledgeSearchItem } from '@/entities/knowledge-content'
+
+const KnowledgeSearchItemSchema = z.object({
+  slug: z.string(),
+  routePath: z.string(),
+  category: KnowledgeCategoryEnum,
+  topicLabel: z.string(),
+  subtopicLabel: z.string(),
+  title: z.string(),
+  sidebarLabel: z.string(),
+  summary: z.string(),
+  format: KnowledgeNoteFormatEnum,
+  readingTime: z.string(),
+  tags: z.array(z.string()),
+  headings: z.array(
+    z.object({
+      id: z.string(),
+      text: z.string(),
+    }),
+  ),
+})
+
+const KnowledgeSearchPayloadSchema = z.object({
+  items: z.array(KnowledgeSearchItemSchema),
+  topTags: z.array(
+    z.object({
+      tag: z.string(),
+      count: z.number().int().nonnegative(),
+    }),
+  ),
+})
 
 export interface KnowledgeSearchPayload {
   items: readonly KnowledgeSearchItem[]
@@ -37,11 +68,12 @@ export function loadKnowledgeSearchIndex(locale: SupportedLocale): Promise<Knowl
       if (!res.ok) {
         return EMPTY_PAYLOAD
       }
-      const data = (await res.json()) as Partial<KnowledgeSearchPayload>
-      const payload: KnowledgeSearchPayload = {
-        items: Array.isArray(data.items) ? data.items : [],
-        topTags: Array.isArray(data.topTags) ? data.topTags : [],
+      const rawJson: unknown = await res.json()
+      const parsed = KnowledgeSearchPayloadSchema.safeParse(rawJson)
+      if (!parsed.success) {
+        return EMPTY_PAYLOAD
       }
+      const payload: KnowledgeSearchPayload = parsed.data
       resolvedCache.set(locale, payload)
       return payload
     })

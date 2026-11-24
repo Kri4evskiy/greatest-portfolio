@@ -1,7 +1,9 @@
-import { resolveJwtSecret } from '@repo/shared-schemas'
+import { resolveEdgeJwtSecretStrict } from '@/shared/config/env'
 
 let cachedSecretValue: string | null = null
 let cachedHmacKeyPromise: Promise<CryptoKey> | null = null
+
+const ALLOWED_JWT_ROLES = new Set(['USER', 'ADMIN'])
 
 function getHmacKey(secret: string): Promise<CryptoKey> {
   if (cachedSecretValue === secret && cachedHmacKeyPromise) {
@@ -9,13 +11,14 @@ function getHmacKey(secret: string): Promise<CryptoKey> {
   }
 
   cachedSecretValue = secret
-  cachedHmacKeyPromise = crypto.subtle.importKey(
-    'raw',
-    new TextEncoder().encode(secret),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['verify'],
-  )
+  cachedHmacKeyPromise = crypto.subtle
+    .importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['verify'])
+    .catch((error: unknown) => {
+      // Evict rejected key promise so a transient Web Crypto error never permanently poisons the Edge isolate
+      cachedSecretValue = null
+      cachedHmacKeyPromise = null
+      throw error
+    })
   return cachedHmacKeyPromise
 }
 
@@ -78,15 +81,35 @@ export async function verifyEdgeJwtHs256(token: string | undefined): Promise<boo
       return false
     }
 
-    if (!isPlainObject(payloadJson) || typeof payloadJson.exp !== 'number') {
+    if (!isPlainObject(payloadJson)) {
       return false
     }
 
-    if (payloadJson.exp * 1000 <= Date.now()) {
+    const nowMs = Date.now()
+    if (typeof payloadJson.exp !== 'number' || payloadJson.exp * 1000 <= nowMs) {
       return false
     }
 
-    const secret = resolveJwtSecret(process.env.JWT_SECRET)
+    if (payloadJson.nbf !== undefined && (typeof payloadJson.nbf !== 'number' || payloadJson.nbf * 1000 > nowMs)) {
+      return false
+    }
+
+    if (typeof payloadJson.sub !== 'string' || payloadJson.sub.trim().length === 0) {
+      return false
+    }
+
+    if (typeof payloadJson.role !== 'string' || !ALLOWED_JWT_ROLES.has(payloadJson.role)) {
+      return false
+    }
+
+    const secret = resolveEdgeJwtSecretStrict()
+    if (!secret) {
+      console.error(
+        '[Edge JWT Security] Rejected verification: JWT_SECRET must be explicitly set (>= 32 chars, non-default) in production.',
+      )
+      return false
+    }
+
     const hmacKey = await getHmacKey(secret)
     const signingInput = new TextEncoder().encode(`${encodedHeader}.${encodedPayload}`)
     return await crypto.subtle.verify('HMAC', hmacKey, signatureBytes, signingInput)

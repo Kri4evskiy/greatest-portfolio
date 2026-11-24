@@ -2,6 +2,7 @@ import bundleAnalyzer from '@next/bundle-analyzer'
 import type { NextConfig } from 'next'
 import createNextIntlPlugin from 'next-intl/plugin'
 import { getSecurityHeaders } from './config/security-headers.config'
+import { resolveNormalizedApiInternalUrl } from './config/utils/url-origin.util'
 
 const withNextIntl = createNextIntlPlugin('./src/shared/i18n/request.ts')
 
@@ -9,7 +10,7 @@ const withBundleAnalyzer = bundleAnalyzer({
   enabled: process.env.ANALYZE === 'true',
 })
 
-const apiInternalUrl = process.env.API_INTERNAL_URL ?? 'http://localhost:4000'
+const apiInternalUrl = resolveNormalizedApiInternalUrl()
 
 const nextConfig: NextConfig = {
   ...(process.env.DOCKER_STANDALONE === 'true' ? { output: 'standalone' } : {}),

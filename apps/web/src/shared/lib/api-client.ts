@@ -19,14 +19,28 @@ export class ApiClientError extends Error {
 
 export type QueryParamValue = string | number | boolean | null | undefined
 
-export interface ApiRequestOptions<TPath extends ApiEndpointPath> {
-  pathParams?: EndpointPathParams<TPath>
+type ApiBaseRequestOptions = {
   params?: Record<string, QueryParamValue>
   headers?: AxiosRequestConfig['headers']
   signal?: AbortSignal | undefined
   timeoutMs?: number
   onUploadProgress?: (progressEvent: AxiosProgressEvent) => void
 }
+
+/**
+ * Compile-time path parameter enforcement:
+ * - Static endpoints (e.g. `/api/capabilities`) disallow `pathParams`.
+ * - Parameterized endpoints (e.g. `/api/knowledge/:slug/view`) require `pathParams`.
+ */
+export type ApiRequestOptions<TPath extends ApiEndpointPath> =
+  EndpointPathParams<TPath> extends undefined
+    ? ApiBaseRequestOptions & { pathParams?: never }
+    : ApiBaseRequestOptions & { pathParams: EndpointPathParams<TPath> }
+
+type OptionalRequestArgs<TPath extends ApiEndpointPath> =
+  EndpointPathParams<TPath> extends undefined
+    ? [options?: ApiRequestOptions<TPath>]
+    : [options: ApiRequestOptions<TPath>]
 
 export function isCancelledRequestError(error: unknown): boolean {
   if (axios.isCancel(error)) {
@@ -120,20 +134,20 @@ async function requestAndValidate<TPath extends ApiEndpointPath, TSchema extends
   endpoint: TPath,
   schema: TSchema,
   body?: unknown,
-  options: ApiRequestOptions<TPath> = {},
+  options?: ApiRequestOptions<TPath>,
 ): Promise<z.infer<TSchema>> {
-  const url = resolveEndpoint(endpoint, options.pathParams)
-  const params = compactQueryParams(options.params)
+  const url = resolveEndpoint(endpoint, options?.pathParams)
+  const params = compactQueryParams(options?.params)
 
   const response = await axiosInstance.request<unknown>({
     method,
     url,
     ...(params ? { params } : {}),
     ...(body !== undefined ? { data: body } : {}),
-    ...(options.headers ? { headers: options.headers } : {}),
-    ...(options.signal ? { signal: options.signal } : {}),
-    ...(options.timeoutMs !== undefined ? { timeout: options.timeoutMs } : {}),
-    ...(options.onUploadProgress ? { onUploadProgress: options.onUploadProgress } : {}),
+    ...(options?.headers ? { headers: options.headers } : {}),
+    ...(options?.signal ? { signal: options.signal } : {}),
+    ...(options?.timeoutMs !== undefined ? { timeout: options.timeoutMs } : {}),
+    ...(options?.onUploadProgress ? { onUploadProgress: options.onUploadProgress } : {}),
   })
 
   const payload = response.status === 204 ? undefined : response.data
@@ -147,43 +161,43 @@ export const apiClient = {
   get<TPath extends ApiEndpointPath, TSchema extends z.ZodType>(
     endpoint: TPath,
     schema: TSchema,
-    options?: ApiRequestOptions<TPath>,
+    ...args: OptionalRequestArgs<TPath>
   ): Promise<z.infer<TSchema>> {
-    return requestAndValidate('GET', endpoint, schema, undefined, options)
+    return requestAndValidate('GET', endpoint, schema, undefined, args[0])
   },
 
   post<TPath extends ApiEndpointPath, TSchema extends z.ZodType>(
     endpoint: TPath,
     schema: TSchema,
     body?: unknown,
-    options?: ApiRequestOptions<TPath>,
+    ...args: OptionalRequestArgs<TPath>
   ): Promise<z.infer<TSchema>> {
-    return requestAndValidate('POST', endpoint, schema, body, options)
+    return requestAndValidate('POST', endpoint, schema, body, args[0])
   },
 
   put<TPath extends ApiEndpointPath, TSchema extends z.ZodType>(
     endpoint: TPath,
     schema: TSchema,
     body?: unknown,
-    options?: ApiRequestOptions<TPath>,
+    ...args: OptionalRequestArgs<TPath>
   ): Promise<z.infer<TSchema>> {
-    return requestAndValidate('PUT', endpoint, schema, body, options)
+    return requestAndValidate('PUT', endpoint, schema, body, args[0])
   },
 
   patch<TPath extends ApiEndpointPath, TSchema extends z.ZodType>(
     endpoint: TPath,
     schema: TSchema,
     body?: unknown,
-    options?: ApiRequestOptions<TPath>,
+    ...args: OptionalRequestArgs<TPath>
   ): Promise<z.infer<TSchema>> {
-    return requestAndValidate('PATCH', endpoint, schema, body, options)
+    return requestAndValidate('PATCH', endpoint, schema, body, args[0])
   },
 
   delete<TPath extends ApiEndpointPath, TSchema extends z.ZodType>(
     endpoint: TPath,
     schema: TSchema,
-    options?: ApiRequestOptions<TPath>,
+    ...args: OptionalRequestArgs<TPath>
   ): Promise<z.infer<TSchema>> {
-    return requestAndValidate('DELETE', endpoint, schema, undefined, options)
+    return requestAndValidate('DELETE', endpoint, schema, undefined, args[0])
   },
 }

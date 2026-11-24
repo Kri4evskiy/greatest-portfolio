@@ -8,9 +8,13 @@ import { useLocale, useTranslations } from 'next-intl'
 import { useLogoutMutation, useVisitorProfile } from '@/features/auth/queries/use-visitor-profile'
 import { prefetchKnowledgeSearchIndex } from '@/features/search/search-index-client'
 import { useSectionNavigation } from '@/shared/hooks/use-section-navigation'
-import { APP_ROUTES, isRouteActive, resolveHeaderRouteBadge } from '@/shared/i18n/app-routes'
+import {
+  APP_ROUTES,
+  isProtectedKnowledgeBasePath,
+  isRouteActive,
+  resolveHeaderRouteBadge,
+} from '@/shared/i18n/app-routes'
 import { Link, usePathname, useRouter } from '@/shared/i18n/navigation'
-import { trackEvent } from '@/shared/lib/analytics'
 import { useUIActions } from '@/shared/store/use-ui-store'
 import { LanguageSwitcher } from './language-switcher'
 import { ThemeToggle } from './theme-toggle'
@@ -29,22 +33,19 @@ export function WorkfolioHeader() {
   const { data: profile, isPending: isProfilePending } = useVisitorProfile()
   const isRestoring = useIsRestoring()
   const isSessionChecking = isRestoring || (isProfilePending && profile === undefined)
-  const logoutMutation = useLogoutMutation()
-  const { openGuestPassModal, openCommandPalette } = useUIActions()
+  const { mutateAsync: logoutSession, isPending: isLoggingOut } = useLogoutMutation()
+  const { openCommandPalette } = useUIActions()
 
   const currentRole = profile?.role ?? 'GUEST'
   const isUnlocked = currentRole === 'USER' || currentRole === 'ADMIN'
   const isInsideKnowledgeBase = isRouteActive(pathname, APP_ROUTES.knowledgeBase, true)
+  const isInsideProtectedKb = isProtectedKnowledgeBasePath(pathname)
   const isOnCvPage = isRouteActive(pathname, APP_ROUTES.cv)
   const headerRouteBadge = resolveHeaderRouteBadge(pathname)
 
   const handleKnowledgeBaseClick = () => {
-    if (isUnlocked) {
-      router.push(APP_ROUTES.knowledgeBase)
-      return
-    }
-    trackEvent('guest_pass_modal_opened', { source: 'sticky_header_button' })
-    openGuestPassModal(APP_ROUTES.knowledgeBase)
+    // Knowledge Base hub & /this-project/** are public; navigate directly without auth friction.
+    router.push(APP_ROUTES.knowledgeBase)
   }
 
   return (
@@ -129,10 +130,11 @@ export function WorkfolioHeader() {
                     type="button"
                     variant="ghost"
                     size="icon-sm"
+                    disabled={isLoggingOut}
                     aria-label={t('logoutTitle', { name: profile?.displayName ?? 'Guest' })}
                     onClick={() => {
-                      void logoutMutation.mutateAsync().then(() => {
-                        if (isInsideKnowledgeBase) {
+                      void logoutSession().then(() => {
+                        if (isInsideProtectedKb) {
                           router.push('/')
                         }
                       })
@@ -214,7 +216,7 @@ export function WorkfolioHeader() {
         </div>
       </div>
 
-      {!isSessionChecking && !isUnlocked && isInsideKnowledgeBase ? (
+      {!isSessionChecking && !isUnlocked && isInsideProtectedKb ? (
         <div className="border-t border-warning/30 bg-warning/10 px-4 py-1 text-center text-xs text-warning">
           <ShieldAlert className="mr-1 inline h-3.5 w-3.5" />
           {t('guestBanner')}

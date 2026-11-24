@@ -43,12 +43,47 @@ export function buildKnowledgeBasePath(routePath?: string): string {
   return normalized ? `${APP_ROUTES.knowledgeBase}/${normalized}` : APP_ROUTES.knowledgeBase
 }
 
+export const PUBLIC_KB_ROOT_SEGMENTS = ['this-project'] as const
+
+const LOCALE_PREFIX_REGEX = /^\/(en|ua|uk|ru)(?=\/|$)/
+
+function stripLocalePrefix(pathname: string): string {
+  const stripped = pathname.replace(LOCALE_PREFIX_REGEX, '')
+  return stripped || '/'
+}
+
+/**
+ * Hybrid Knowledge Base access policy:
+ * - Public & SEO-indexed: `/knowledge-base` hub and `/knowledge-base/this-project/**`
+ *   (transparent architecture blueprint open to crawlers, recruiters, and Team Leads with zero 307 redirects).
+ * - Protected behind Edge Web Crypto JWT Proxy: all other domain study notes (`/knowledge-base/react/**`, etc.).
+ */
+export function isPublicKnowledgeBasePath(pathname: string): boolean {
+  const normalized = stripLocalePrefix(pathname).replace(/\/+$/, '') || '/'
+  if (normalized === APP_ROUTES.knowledgeBase) {
+    return true
+  }
+  return PUBLIC_KB_ROOT_SEGMENTS.some(
+    (segment) =>
+      normalized === `${APP_ROUTES.knowledgeBase}/${segment}` ||
+      normalized.startsWith(`${APP_ROUTES.knowledgeBase}/${segment}/`),
+  )
+}
+
+export function isProtectedKnowledgeBasePath(pathname: string): boolean {
+  const normalized = stripLocalePrefix(pathname).replace(/\/+$/, '') || '/'
+  if (!isRouteActive(normalized, APP_ROUTES.knowledgeBase, true)) {
+    return false
+  }
+  return !isPublicKnowledgeBasePath(normalized)
+}
+
 export function normalizeKbRedirectPath(rawPath: string | null | undefined): string {
   const trimmed = rawPath?.trim()
-  if (!trimmed?.startsWith('/') || trimmed.startsWith('//')) {
+  if (!trimmed?.startsWith('/') || trimmed.startsWith('//') || trimmed.startsWith('/\\')) {
     return APP_ROUTES.knowledgeBase
   }
 
-  const withoutLocale = trimmed.replace(/^\/(en|ua|uk|ru)(?=\/|$)/, '')
+  const withoutLocale = trimmed.replace(LOCALE_PREFIX_REGEX, '')
   return isRouteActive(withoutLocale, APP_ROUTES.knowledgeBase, true) ? withoutLocale : APP_ROUTES.knowledgeBase
 }

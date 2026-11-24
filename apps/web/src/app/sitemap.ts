@@ -1,7 +1,7 @@
 import { DEFAULT_LOCALE, SUPPORTED_LOCALES } from '@repo/shared-schemas'
 import type { MetadataRoute } from 'next'
 import { getAllKnowledgeFrontmatters, getAllStaticKnowledgeSlugArrays } from '@/entities/knowledge-content'
-import { APP_ROUTES, buildKnowledgeBasePath } from '@/shared/i18n/app-routes'
+import { APP_ROUTES, buildKnowledgeBasePath, isPublicKnowledgeBasePath } from '@/shared/i18n/app-routes'
 import { buildLanguageAlternatesMap, buildLocalizedUrl } from '@/shared/lib/seo'
 
 export const dynamic = 'force-static'
@@ -59,11 +59,18 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const kbSlugArrays = getAllStaticKnowledgeSlugArrays()
   for (const slugSegments of kbSlugArrays) {
     const routeKey = slugSegments.join('/')
+    const pathname = buildKnowledgeBasePath(routeKey)
+    // Only include public KB routes (`this-project/**`) in sitemap.xml so search engines
+    // never encounter 307 auth redirects on protected domain study-note routes.
+    if (!isPublicKnowledgeBasePath(pathname)) {
+      continue
+    }
+
     const articleLastMod = articleDateByRoute.get(routeKey)
     const isArticle = articleLastMod !== undefined
 
     staticRoutes.push({
-      pathname: buildKnowledgeBasePath(routeKey),
+      pathname,
       changeFrequency: isArticle ? 'monthly' : 'weekly',
       priority: isArticle ? 0.8 : 0.7,
       lastModified: articleLastMod ?? FALLBACK_LAST_MODIFIED,

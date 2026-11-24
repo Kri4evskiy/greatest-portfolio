@@ -28,9 +28,14 @@ import {
   type MdxArticleFrontmatter,
 } from '@/entities/knowledge-content'
 import { AUTHOR_PROFILE, pickLocalized } from '@/entities/workfolio-profile/author-profile'
-import { buildKnowledgeBasePath } from '@/shared/i18n/app-routes'
+import { APP_ROUTES, buildKnowledgeBasePath } from '@/shared/i18n/app-routes'
 import { Link } from '@/shared/i18n/navigation'
-import { buildLocalizedUrl, buildPageAlternates, buildTechArticleJsonLd, resolveOgLocale } from '@/shared/lib/seo'
+import {
+  buildBreadcrumbListJsonLd,
+  buildOpenGraphMetadata,
+  buildPageAlternates,
+  buildTechArticleJsonLd,
+} from '@/shared/lib/seo'
 
 interface CatchAllKnowledgePageProps {
   params: Promise<{
@@ -62,15 +67,15 @@ export async function generateMetadata({ params }: CatchAllKnowledgePageProps): 
       title,
       description: article.summary,
       alternates: buildPageAlternates(pathname, resolvedLocale),
-      openGraph: {
+      openGraph: buildOpenGraphMetadata({
         title,
         description: article.summary,
-        url: buildLocalizedUrl(pathname, resolvedLocale),
-        locale: resolveOgLocale(resolvedLocale),
+        pathname,
+        locale: resolvedLocale,
         type: 'article',
         publishedTime: article.publishedAt,
-        tags: [...article.tags],
-      },
+        tags: article.tags,
+      }),
     }
   }
 
@@ -82,18 +87,22 @@ export async function generateMetadata({ params }: CatchAllKnowledgePageProps): 
       title,
       description,
       alternates: buildPageAlternates(pathname, resolvedLocale),
-      openGraph: {
+      openGraph: buildOpenGraphMetadata({
         title,
         description,
-        url: buildLocalizedUrl(pathname, resolvedLocale),
-        locale: resolveOgLocale(resolvedLocale),
+        pathname,
+        locale: resolvedLocale,
         type: 'website',
-      },
+      }),
     }
   }
 
   return {
     title: 'Not Found | Knowledge Base',
+    robots: {
+      index: false,
+      follow: false,
+    },
   }
 }
 
@@ -213,11 +222,17 @@ export default async function KnowledgeCatchAllPage({ params }: CatchAllKnowledg
       authorName: pickLocalized(AUTHOR_PROFILE.fullName, resolvedLocale),
       tags: article.tags,
     })
+    const breadcrumbJsonLd = buildBreadcrumbListJsonLd(resolvedLocale, [
+      { label: t('breadcrumbsRoot'), pathname: APP_ROUTES.knowledgeBase },
+      ...breadcrumbs.map((crumb) => ({ label: crumb.label, pathname: crumb.href })),
+    ])
 
     return (
       <div className="flex flex-col gap-6 xl:flex-row xl:items-start">
         {/* biome-ignore lint/security/noDangerouslySetInnerHtml: Server-serialized JSON-LD escaped against < script injection */}
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: articleJsonLd }} />
+        {/* biome-ignore lint/security/noDangerouslySetInnerHtml: Server-serialized BreadcrumbList JSON-LD escaped against < script injection */}
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: breadcrumbJsonLd }} />
         <article
           data-testid="kb-article-content"
           className="min-w-0 flex-1 rounded-xl border border-border bg-card p-5 shadow-xs sm:p-8"

@@ -7,10 +7,12 @@ import { notFound } from 'next/navigation'
 import { NextIntlClientProvider } from 'next-intl'
 import { getMessages, getTranslations } from 'next-intl/server'
 import { type ReactNode, Suspense } from 'react'
+import { AuthCrossTabSyncBridge } from '@/features/auth/auth-cross-tab-sync-bridge'
 import { GuestPassModal } from '@/features/auth/guest-pass-modal'
 import { CommandPaletteModal } from '@/features/search/command-palette-modal'
+import { resolvePublicSiteUrl } from '@/shared/config/env'
 import { PALETTE_INIT_SCRIPT } from '@/shared/lib/palette'
-import { buildLocalizedUrl, buildPageAlternates, resolveOgLocale, resolveSiteUrl } from '@/shared/lib/seo'
+import { buildOpenGraphMetadata, buildPageAlternates } from '@/shared/lib/seo'
 import { QueryProvider } from '@/shared/providers/query-provider'
 import { ThemeProvider } from '@/shared/providers/theme-provider'
 import { WorkfolioFooter } from '@/widgets/footer/workfolio-footer'
@@ -49,7 +51,7 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
   const description = t('description')
 
   return {
-    metadataBase: new URL(resolveSiteUrl()),
+    metadataBase: new URL(resolvePublicSiteUrl()),
     title,
     description,
     authors: [{ name: 'Stanislav Krychevskyi', url: 'https://github.com/Kri4evskiy' }],
@@ -67,14 +69,13 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
       },
     },
     alternates: buildPageAlternates('/', resolvedLocale),
-    openGraph: {
+    openGraph: buildOpenGraphMetadata({
       title,
       description,
-      url: buildLocalizedUrl('/', resolvedLocale),
-      siteName: 'Stanislav Krychevskyi — Workfolio & Knowledge Base',
-      locale: resolveOgLocale(resolvedLocale),
+      pathname: '/',
+      locale: resolvedLocale,
       type: 'website',
-    },
+    }),
   }
 }
 
@@ -111,6 +112,7 @@ export default async function LocaleRootLayout({
         <NextIntlClientProvider locale={parsed.data} messages={messages}>
           <ThemeProvider>
             <QueryProvider>
+              <AuthCrossTabSyncBridge />
               <TooltipProvider delayDuration={300} skipDelayDuration={200}>
                 <div className="flex min-h-screen flex-col">
                   <WorkfolioHeader />

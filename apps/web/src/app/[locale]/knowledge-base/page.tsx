@@ -12,7 +12,7 @@ import {
   type MdxArticleFrontmatter,
 } from '@/entities/knowledge-content'
 import { APP_ROUTES } from '@/shared/i18n/app-routes'
-import { buildLocalizedUrl, buildPageAlternates, resolveOgLocale } from '@/shared/lib/seo'
+import { buildOpenGraphMetadata, buildPageAlternates } from '@/shared/lib/seo'
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const { locale } = await params
@@ -26,13 +26,13 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
     title,
     description,
     alternates: buildPageAlternates(APP_ROUTES.knowledgeBase, resolvedLocale),
-    openGraph: {
+    openGraph: buildOpenGraphMetadata({
       title,
       description,
-      url: buildLocalizedUrl(APP_ROUTES.knowledgeBase, resolvedLocale),
-      locale: resolveOgLocale(resolvedLocale),
+      pathname: APP_ROUTES.knowledgeBase,
+      locale: resolvedLocale,
       type: 'website',
-    },
+    }),
   }
 }
 

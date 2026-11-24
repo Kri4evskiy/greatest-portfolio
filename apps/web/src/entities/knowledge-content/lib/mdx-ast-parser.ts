@@ -469,7 +469,13 @@ export function parseFrontmatterOnly(
   locale: SupportedLocale,
   isFallback: boolean,
 ): { frontmatter: MdxArticleFrontmatter; content: string } {
-  const parsedMatter = matter(raw)
+  // Explicitly disable gray-matter's legacy `js`/`javascript` eval engines (defense-in-depth RCE guard)
+  const parsedMatter = matter(raw, {
+    engines: {
+      js: () => ({}),
+      javascript: () => ({}),
+    },
+  })
   const meta = parsedMatter.data as Record<string, unknown>
 
   const parsedCategory = KnowledgeCategoryEnum.safeParse(meta.category)

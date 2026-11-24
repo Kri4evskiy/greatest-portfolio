@@ -13,7 +13,8 @@
 ```text
 apps/web/
 ├── config/
-│   └── security-headers.config.ts        # Генератор CSP, HSTS, X-Frame-Options, Permissions-Policy
+│   ├── security-headers.config.ts        # Генератор CSP, HSTS, X-Frame-Options, CORP, Permissions-Policy
+│   └── utils/url-origin.util.ts          # Общие валидаторы origin и API_INTERNAL_URL для next.config.ts и CSP
 ├── content/                              # Colocated MDX-статьи (*.{en,uk,ru}.mdx) по категориям
 ├── e2e/                                  # Playwright E2E (Page Object Model + test.step)
 │   ├── fixtures/app.fixture.ts           # Типизированные фикстуры страниц
@@ -53,9 +54,9 @@ apps/web/
     │   └── section-nav/                  # PageSectionNavigator (плавающий outline / мобильная pill-кнопка)
     │
     ├── features/                         # [Слой 3: User Scenarios & Interactions]
-    │   ├── auth/                         # GuestPassModal + lib/auth-cross-tab-sync.ts + queries/use-visitor-profile.ts
-    │   ├── search/                       # CommandPaletteModal (на базе @repo/ui Dialog) + search-index-client.ts
-    │   ├── telemetry-stream/             # FooterSseStatus + use-telemetry-stream.ts + queries/use-system-observability.ts
+    │   ├── auth/                         # GuestPassModal + AuthCrossTabSyncBridge + lib/auth-cross-tab-sync.ts (senderId) + queries/use-visitor-profile.ts
+    │   ├── search/                       # CommandPaletteModal (на базе @repo/ui Dialog) + search-index-client.ts (Zod)
+    │   ├── telemetry-stream/             # FooterSseStatus + use-telemetry-stream.ts (single ref-counted EventSource + backoff) + queries/use-system-observability.ts
     │   │                                 # + lib/system-status-helpers.ts + ui/{system-status-dashboard,capabilities-matrix-card,live-event-log-card,knowledge-leaderboard-card,observability-data-table}.tsx
     │   │                                 # + __tests__/knowledge-leaderboard-card.integration.test.tsx (RTL + MSW v3)
     │   └── kb-sandboxes/ui/              # Ленивые клиентские острова (mdx-client-widgets.tsx, D3, MCP)
@@ -67,10 +68,11 @@ apps/web/
     │   └── knowledge-article/            # Рендеринг статей (MdxArticleRenderer, Sidebar, TOC) + queries/use-knowledge-metrics.ts
     │
     └── shared/                           # [Слой 5: Infrastructure & Common Tools]
+        ├── config/                       # env.ts (Zod env validation + fail-closed resolveEdgeJwtSecretStrict)
         ├── hooks/                        # Чистые браузерные DOM/ScrollSpy-хуки (use-section-navigation.ts)
-        ├── i18n/                         # app-routes.ts (+ __tests__/app-routes.test.ts), routing.ts, request.ts, navigation.ts
-        ├── lib/                          # api-client.ts (+ __tests__/api-client.test.ts), edge-jwt.ts (+ __tests__/edge-jwt.test.ts), seo.ts, palette.ts, analytics.ts (PostHog + prod-only Sentry captureClientException)
-        ├── providers/                    # ThemeProvider (next-themes), QueryProvider (+ __tests__/query-provider.test.tsx)
+        ├── i18n/                         # app-routes.ts (Hybrid KB access + __tests__/app-routes.test.ts), routing.ts, request.ts, navigation.ts
+        ├── lib/                          # api-client.ts (+ __tests__/api-client.test.ts), edge-jwt.ts (+ __tests__/edge-jwt.test.ts), seo.ts, palette.ts, analytics.ts
+        ├── providers/                    # ThemeProvider (next-themes), QueryProvider (IDB allowlist ['knowledge'] + __tests__/query-provider.test.tsx)
         └── store/                        # useUIStore (Zustand — модалки, фильтры, папки сайдбара, palette + __tests__/use-ui-store.test.ts)
 ```
 

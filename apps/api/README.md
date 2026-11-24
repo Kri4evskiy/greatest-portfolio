@@ -145,22 +145,22 @@ apps/api/
 
 ## 5. Эндпоинты API (префикс `/api`)
 
-| Метод и путь                             | Доступ / Лимит                                   | Назначение                                                                               |
-| :--------------------------------------- | :----------------------------------------------- | :--------------------------------------------------------------------------------------- |
-| `GET /api/health`                        | Public (`60/min`)                                | Проверка состояния сервиса и подключения к PostgreSQL                                    |
-| `GET /api/capabilities`                  | Public (`60/min`)                                | Безопасная матрица возможностей системы (`SystemCapabilities`, без секретов)             |
-| `POST /api/auth/guest-pass`              | Public (`5/min` общий бакет с `/login`)          | Выдача `Guest Pass` (`USER` или `ADMIN` по пасскоду, `403` на неверный код), `1d` cookie |
-| `POST /api/auth/login`                   | Public (`5/min` общий бакет с `/guest-pass`)     | Алиас `guest-pass`                                                                       |
-| `GET /api/auth/me`                       | Public (`60/min`)                                | Чтение текущего профиля из cookie (возвращает `GUEST`, если cookie нет)                  |
-| `POST /api/auth/logout`                  | Public (`60/min`, CSRF Origin guard)             | Очистка `kb_access_token` cookie                                                         |
-| `GET /api/knowledge/metrics`             | Public (`60/min`, Read-Only)                     | Список метрик статей Базы Знаний                                                         |
-| `GET /api/knowledge/metrics/paginated`   | Public (`60/min`, Read-Only, `offset <= 500`)    | Offset-пагинация рейтинга статей (`limit`, `offset`, `category`, `sortBy`)               |
-| `POST /api/knowledge/:slug/view`         | `@Roles('USER', 'ADMIN')` + slug allowlist       | Атомарный инкремент просмотров (`404` для неизвестных слагов) + событие в `telemetry-ms` |
-| `POST /api/knowledge/:slug/helpful`      | `@Roles('USER', 'ADMIN')` + slug allowlist/dedup | Атомарный инкремент «полезно» (дедупликация на сессию) + событие в `telemetry-ms`        |
-| `GET /api/telemetry/stream`              | `5/min` handshake, `@SkipTimeout()`              | SSE-поток событий телеметрии (макс. `2`/IP, `50` глобально, TTL `15 мин`)                |
-| `GET /api/telemetry/events`              | Public (`60/min`)                                | Cursor-пагинация системных событий (`limit`, `cursor`, `eventType`)                      |
-| `GET /api/telemetry/stats`               | Public (`60/min`)                                | Статистика из TCP-микросервиса `apps/telemetry-ms`                                       |
-| `GET /api/telemetry/admin-diagnostics`   | `@Roles('ADMIN')`                                | Диагностика SSE-слотов, in-memory буферов и БД (заготовка прав `ADMIN`)                  |
+| Метод и путь                           | Доступ / Лимит                                   | Назначение                                                                               |
+| :------------------------------------- | :----------------------------------------------- | :--------------------------------------------------------------------------------------- |
+| `GET /api/health`                      | Public (`60/min`)                                | Проверка состояния сервиса и подключения к PostgreSQL                                    |
+| `GET /api/capabilities`                | Public (`60/min`)                                | Безопасная матрица возможностей системы (`SystemCapabilities`, без секретов)             |
+| `POST /api/auth/guest-pass`            | Public (`5/min` общий бакет с `/login`)          | Выдача `Guest Pass` (`USER` или `ADMIN` по пасскоду, `403` на неверный код), `1d` cookie |
+| `POST /api/auth/login`                 | Public (`5/min` общий бакет с `/guest-pass`)     | Алиас `guest-pass`                                                                       |
+| `GET /api/auth/me`                     | Public (`60/min`)                                | Чтение текущего профиля из cookie (возвращает `GUEST`, если cookie нет)                  |
+| `POST /api/auth/logout`                | Public (`60/min`, CSRF Origin guard)             | Очистка `kb_access_token` cookie                                                         |
+| `GET /api/knowledge/metrics`           | Public (`60/min`, Read-Only)                     | Список метрик статей Базы Знаний                                                         |
+| `GET /api/knowledge/metrics/paginated` | Public (`60/min`, Read-Only, `offset <= 500`)    | Offset-пагинация рейтинга статей (`limit`, `offset`, `category`, `sortBy`)               |
+| `POST /api/knowledge/:slug/view`       | `@Roles('USER', 'ADMIN')` + slug allowlist       | Атомарный инкремент просмотров (`404` для неизвестных слагов) + событие в `telemetry-ms` |
+| `POST /api/knowledge/:slug/helpful`    | `@Roles('USER', 'ADMIN')` + slug allowlist/dedup | Атомарный инкремент «полезно» (дедупликация на сессию) + событие в `telemetry-ms`        |
+| `GET /api/telemetry/stream`            | `5/min` handshake, `@SkipTimeout()`              | SSE-поток событий телеметрии (макс. `2`/IP, `50` глобально, TTL `15 мин`)                |
+| `GET /api/telemetry/events`            | Public (`60/min`)                                | Cursor-пагинация системных событий (`limit`, `cursor`, `eventType`)                      |
+| `GET /api/telemetry/stats`             | Public (`60/min`)                                | Статистика из TCP-микросервиса `apps/telemetry-ms`                                       |
+| `GET /api/telemetry/admin-diagnostics` | `@Roles('ADMIN')`                                | Диагностика SSE-слотов, in-memory буферов и БД (заготовка прав `ADMIN`)                  |
 
 ---
 

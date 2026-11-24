@@ -21,13 +21,14 @@ import {
   ToggleGroup,
   ToggleGroupItem,
 } from '@repo/ui'
-import { KeyRound, LockOpen, ShieldCheck, Sparkles, Terminal } from 'lucide-react'
+import { KeyRound, Loader2, LockOpen, ShieldCheck, Sparkles, Terminal } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
+import { useSystemCapabilities } from '@/features/telemetry-stream/queries/use-system-observability'
 import { normalizeKbRedirectPath } from '@/shared/i18n/app-routes'
-import { useRouter } from '@/shared/i18n/navigation'
+import { usePathname, useRouter } from '@/shared/i18n/navigation'
 import { trackEvent } from '@/shared/lib/analytics'
 import { useIsGuestPassModalOpen, usePendingRedirectPath, useUIActions } from '@/shared/store/use-ui-store'
 import { useIssueGuestPassMutation } from './queries/use-visitor-profile'
@@ -59,13 +60,29 @@ const VISITOR_ROLES: readonly VisitorRoleType[] = ['TEAM_LEAD', 'RECRUITER', 'DE
 export function GuestPassModal() {
   const t = useTranslations('GuestPassModal')
   const router = useRouter()
+  const pathname = usePathname()
   const searchParams = useSearchParams()
   const isOpen = useIsGuestPassModalOpen()
   const pendingRedirectPath = usePendingRedirectPath()
   const { openGuestPassModal: openModal, closeGuestPassModal: closeModal } = useUIActions()
 
   const [showAdminInput, setShowAdminInput] = useState(false)
-  const issuePassMutation = useIssueGuestPassMutation()
+  const [activePresetLabel, setActivePresetLabel] = useState<string | null>(null)
+  const inFlightRef = useRef(false)
+  const handledUnlockQueryRef = useRef<string | null>(null)
+
+  const {
+    mutateAsync: issueGuestPass,
+    reset: resetIssuePass,
+    isPending: isIssuingPass,
+    isError: isIssuePassError,
+    error: issuePassError,
+  } = useIssueGuestPassMutation()
+  const { data: capabilities } = useSystemCapabilities()
+
+  // Only reveal the local demo admin passcode hint when explicitly running in demo/dev mode
+  const showDemoPasscodeHint = capabilities?.mode === 'demo' || process.env.NODE_ENV !== 'production'
+  const isBusy = isIssuingPass || activePresetLabel !== null
 
   const {
     register,
@@ -87,27 +104,71 @@ export function GuestPassModal() {
     name: 'visitorType',
   })
 
+  const clearUnlockSearchParams = useCallback(() => {
+    if (searchParams.get('unlock') !== 'knowledge-base') {
+      return
+    }
+    const nextParams = new URLSearchParams(searchParams.toString())
+    nextParams.delete('unlock')
+    nextParams.delete('redirect')
+    const queryString = nextParams.toString()
+    router.replace(queryString ? `${pathname}?${queryString}` : pathname, { scroll: false })
+  }, [pathname, router, searchParams])
+
+  const handleCloseModal = useCallback(() => {
+    resetIssuePass()
+    setActivePresetLabel(null)
+    closeModal()
+    clearUnlockSearchParams()
+  }, [clearUnlockSearchParams, closeModal, resetIssuePass])
+
   useEffect(() => {
     const unlockParam = searchParams.get('unlock')
     const redirectParam = searchParams.get('redirect')
+    const querySignature = `${unlockParam ?? ''}:${redirectParam ?? ''}`
+
     if (unlockParam === 'knowledge-base') {
+      if (handledUnlockQueryRef.current === querySignature) {
+        return
+      }
+      handledUnlockQueryRef.current = querySignature
       openModal(normalizeKbRedirectPath(redirectParam))
       trackEvent('guest_pass_modal_opened', { source: 'middleware_redirect' })
+    } else {
+      handledUnlockQueryRef.current = null
     }
   }, [searchParams, openModal])
 
   const onSubmit = async (values: GuestPassFormInput) => {
-    const profile = await issuePassMutation.mutateAsync(values)
-    trackEvent('guest_pass_unlocked', {
-      visitorType: profile.visitorType,
-      role: profile.role,
-    })
-    closeModal()
-    router.push(normalizeKbRedirectPath(pendingRedirectPath))
-    router.refresh()
+    // Synchronous ref lock prevents rapid double-clicks from burning the 5 req/min auth throttle quota
+    if (inFlightRef.current) {
+      return
+    }
+    inFlightRef.current = true
+    const redirectTarget = normalizeKbRedirectPath(pendingRedirectPath)
+
+    try {
+      const profile = await issueGuestPass(values)
+      trackEvent('guest_pass_unlocked', {
+        visitorType: profile.visitorType,
+        role: profile.role,
+      })
+      closeModal()
+      router.push(redirectTarget)
+      router.refresh()
+    } catch {
+      // Handled reactively via `isIssuePassError` / `issuePassError` (no unhandled rejection)
+    } finally {
+      inFlightRef.current = false
+      setActivePresetLabel(null)
+    }
   }
 
-  const applyPresetAndUnlock = async (preset: { displayName: string; visitorType: VisitorRoleType }) => {
+  const applyPresetAndUnlock = async (preset: { label: string; displayName: string; visitorType: VisitorRoleType }) => {
+    if (inFlightRef.current) {
+      return
+    }
+    setActivePresetLabel(preset.label)
     setValue('displayName', preset.displayName, { shouldValidate: true })
     setValue('visitorType', preset.visitorType, { shouldValidate: true })
     await onSubmit({
@@ -118,18 +179,18 @@ export function GuestPassModal() {
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => (open ? openModal() : closeModal())}>
+    <Dialog open={isOpen} onOpenChange={(open) => (open ? openModal() : handleCloseModal())}>
       <DialogContent
         data-testid="guest-pass-dialog"
         className="max-h-[90dvh] w-[calc(100vw-1.5rem)] overflow-y-auto p-4 sm:max-w-lg sm:p-6"
       >
         <DialogHeader>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-1.5">
             <Badge variant="outline" className="font-mono text-[11px]">
-              RBAC • JWT HttpOnly Cookie
+              HS256 • 24h TTL
             </Badge>
             <Badge variant="secondary" className="font-mono text-[11px]">
-              packages/shared-schemas
+              HttpOnly • SameSite=Lax
             </Badge>
           </div>
           <DialogTitle className="mt-2 flex items-center gap-2 text-xl">
@@ -151,19 +212,23 @@ export function GuestPassModal() {
         <div className="space-y-2">
           <p className="text-xs font-medium text-muted-foreground">{t('presetsLabel')}</p>
           <div className="flex flex-wrap gap-1.5">
-            {ONE_CLICK_PRESETS.map((preset) => (
-              <Button
-                key={preset.label}
-                type="button"
-                variant="secondary"
-                size="sm"
-                disabled={isSubmitting || issuePassMutation.isPending}
-                onClick={() => void applyPresetAndUnlock(preset)}
-                className="h-7 text-xs font-medium"
-              >
-                {preset.label}
-              </Button>
-            ))}
+            {ONE_CLICK_PRESETS.map((preset) => {
+              const isPresetLoading = activePresetLabel === preset.label
+              return (
+                <Button
+                  key={preset.label}
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  disabled={isSubmitting || isBusy}
+                  onClick={() => void applyPresetAndUnlock(preset)}
+                  className="h-7 gap-1.5 text-xs font-medium"
+                >
+                  {isPresetLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                  <span>{preset.label}</span>
+                </Button>
+              )
+            })}
           </div>
         </div>
 
@@ -172,7 +237,12 @@ export function GuestPassModal() {
             <label htmlFor="guest-display-name" className="text-xs font-medium">
               {t('nameLabel')}
             </label>
-            <Input id="guest-display-name" placeholder={t('namePlaceholder')} {...register('displayName')} />
+            <Input
+              id="guest-display-name"
+              disabled={isSubmitting || isBusy}
+              placeholder={t('namePlaceholder')}
+              {...register('displayName')}
+            />
             {errors.displayName ? <p className="text-xs text-destructive">{errors.displayName.message}</p> : null}
           </div>
 
@@ -182,6 +252,7 @@ export function GuestPassModal() {
               type="single"
               variant="outline"
               size="sm"
+              disabled={isSubmitting || isBusy}
               value={selectedVisitorType}
               aria-label={t('roleLabel')}
               onValueChange={(nextValue) => {
@@ -209,6 +280,7 @@ export function GuestPassModal() {
               type="button"
               variant="ghost"
               size="sm"
+              disabled={isSubmitting || isBusy}
               onClick={() => setShowAdminInput((prev) => !prev)}
               className="h-auto gap-1.5 px-1.5 py-1 text-xs font-normal text-muted-foreground hover:text-foreground"
             >
@@ -218,33 +290,44 @@ export function GuestPassModal() {
 
             {showAdminInput ? (
               <div className="mt-2 space-y-1">
-                <Input type="password" placeholder={t('adminPlaceholder')} {...register('adminPasscode')} />
-                <p className="text-[11px] text-muted-foreground">
-                  {t('adminHint')} <code>workfolio-admin-2026</code>
-                </p>
+                <Input
+                  type="password"
+                  autoComplete="current-password"
+                  disabled={isSubmitting || isBusy}
+                  placeholder={t('adminPlaceholder')}
+                  {...register('adminPasscode')}
+                />
+                {showDemoPasscodeHint ? (
+                  <p className="text-[11px] text-muted-foreground">
+                    {t('adminHint')} <code>workfolio-admin-2026</code>
+                  </p>
+                ) : null}
               </div>
             ) : null}
           </div>
 
-          {issuePassMutation.isError ? (
-            <p className="rounded-md bg-destructive/10 p-2 text-xs text-destructive">
-              {issuePassMutation.error instanceof Error ? issuePassMutation.error.message : t('errorFallback')}
+          {isIssuePassError ? (
+            <p
+              role="alert"
+              className="rounded-md border border-destructive/30 bg-destructive/10 p-2.5 text-xs text-destructive"
+            >
+              {issuePassError instanceof Error ? issuePassError.message : t('errorFallback')}
             </p>
           ) : null}
 
           <DialogFooter className="gap-2 sm:justify-between">
             <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
               <ShieldCheck className="h-3.5 w-3.5 text-success" />
-              <span>Set-Cookie: HttpOnly; SameSite=Lax</span>
+              <span>Edge Web Crypto Verified</span>
             </div>
             <Button
               type="submit"
               data-testid="guest-pass-submit-btn"
-              disabled={isSubmitting || issuePassMutation.isPending}
+              disabled={isSubmitting || isBusy}
               className="gap-1.5"
             >
-              <Sparkles className="h-4 w-4" />
-              {issuePassMutation.isPending ? t('submittingBtn') : t('submitBtn')}
+              {isSubmitting || isBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+              {isSubmitting || isBusy ? t('submittingBtn') : t('submitBtn')}
             </Button>
           </DialogFooter>
         </form>

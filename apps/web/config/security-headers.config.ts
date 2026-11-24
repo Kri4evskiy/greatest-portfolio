@@ -1,3 +1,5 @@
+import { parseSafeHttpOrigin } from './utils/url-origin.util'
+
 export interface SecurityHeaderEntry {
   key: string
   value: string
@@ -31,13 +33,29 @@ export function buildContentSecurityPolicy(
   options: ContentSecurityPolicyOptions = {},
 ): string {
   const { allowSameOriginFraming = false } = options
-  const normalizedPublicApi = publicApiUrl.trim() ? ` ${publicApiUrl.trim()}` : ''
+  const allowedConnectOrigins = new Set<string>()
+  const safeApiOrigin = parseSafeHttpOrigin(publicApiUrl)
+  if (safeApiOrigin) {
+    allowedConnectOrigins.add(safeApiOrigin)
+  }
 
-  // In production, internal ports must NEVER be leaked in HTTP response headers.
+  // Allow explicitly configured PostHog / Sentry ingestion origins without opening blanket `https:` exfiltration
+  const posthogOrigin = parseSafeHttpOrigin(process.env.NEXT_PUBLIC_POSTHOG_HOST)
+  if (posthogOrigin) {
+    allowedConnectOrigins.add(posthogOrigin)
+  }
+  const sentryOrigin = parseSafeHttpOrigin(process.env.NEXT_PUBLIC_SENTRY_DSN)
+  if (sentryOrigin) {
+    allowedConnectOrigins.add(sentryOrigin)
+  }
+
+  const extraConnectSrc = allowedConnectOrigins.size > 0 ? ` ${Array.from(allowedConnectOrigins).join(' ')}` : ''
+
+  // In production, internal ports and blanket `https:` must NEVER be allowed in connect-src.
   // In development, localhost API and microservice ports are allowed for local developer workflow.
   const connectSrc = isProduction
-    ? `'self' https:${normalizedPublicApi}`
-    : `'self' http://localhost:4000 http://localhost:4001 http://127.0.0.1:4000 http://127.0.0.1:4001 ws: wss: https:${normalizedPublicApi}`
+    ? `'self'${extraConnectSrc}`
+    : `'self' http://localhost:4000 http://localhost:4001 http://127.0.0.1:4000 http://127.0.0.1:4001 ws: wss:${extraConnectSrc}`
 
   // In production, 'unsafe-eval' MUST NOT be enabled — our MDX pipeline compiles to HAST
   // without dynamic eval/new Function, closing XSS eval gadgets.
@@ -117,6 +135,10 @@ export function getSecurityHeaders(
       : []),
     {
       key: 'Cross-Origin-Opener-Policy',
+      value: 'same-origin',
+    },
+    {
+      key: 'Cross-Origin-Resource-Policy',
       value: 'same-origin',
     },
     {

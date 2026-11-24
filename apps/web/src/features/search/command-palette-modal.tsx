@@ -23,7 +23,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { KnowledgeSearchItem } from '@/entities/knowledge-content'
 import { useVisitorProfile } from '@/features/auth/queries/use-visitor-profile'
 import { useSectionNavigation } from '@/shared/hooks/use-section-navigation'
-import { APP_ROUTES } from '@/shared/i18n/app-routes'
+import { APP_ROUTES, buildKnowledgeBasePath, isPublicKnowledgeBasePath } from '@/shared/i18n/app-routes'
 import { useRouter } from '@/shared/i18n/navigation'
 import { trackEvent } from '@/shared/lib/analytics'
 import { useCommandPaletteInitialQuery, useIsCommandPaletteOpen, useUIActions } from '@/shared/store/use-ui-store'
@@ -63,13 +63,19 @@ export function CommandPaletteModal({ locale }: CommandPaletteModalProps) {
 
   const [query, setQuery] = useState('')
   const [activeIndex, setActiveIndex] = useState(0)
-  const [indexPayload, setIndexPayload] = useState<KnowledgeSearchPayload | null>(() =>
-    getCachedKnowledgeSearchIndex(locale),
-  )
+  const [indexState, setIndexState] = useState<{
+    locale: SupportedLocale
+    payload: KnowledgeSearchPayload
+  } | null>(() => {
+    const cached = getCachedKnowledgeSearchIndex(locale)
+    return cached ? { locale, payload: cached } : null
+  })
   const inputRef = useRef<HTMLInputElement | null>(null)
   const listContainerRef = useRef<HTMLDivElement | null>(null)
   const shouldScrollActiveRef = useRef(false)
 
+  // Match payload strictly against active locale to prevent stale-locale flashes & missing spinner
+  const indexPayload = indexState?.locale === locale ? indexState.payload : null
   const items = indexPayload?.items ?? []
   const topTags = indexPayload?.topTags ?? []
   const isLoadingIndex = isOpen && indexPayload === null
@@ -80,7 +86,7 @@ export function CommandPaletteModal({ locale }: CommandPaletteModalProps) {
   useEffect(() => {
     const cached = getCachedKnowledgeSearchIndex(locale)
     if (cached) {
-      setIndexPayload(cached)
+      setIndexState({ locale, payload: cached })
       return
     }
     if (!isOpen) return
@@ -88,7 +94,7 @@ export function CommandPaletteModal({ locale }: CommandPaletteModalProps) {
     let active = true
     void loadKnowledgeSearchIndex(locale).then((payload) => {
       if (active) {
-        setIndexPayload(payload)
+        setIndexState({ locale, payload })
       }
     })
     return () => {
@@ -234,27 +240,24 @@ export function CommandPaletteModal({ locale }: CommandPaletteModalProps) {
           return
         }
         if (entry.actionType === 'kb-overview') {
-          if (isUnlocked) {
-            router.push(APP_ROUTES.knowledgeBase)
-          } else {
-            openGuestPassModal(APP_ROUTES.knowledgeBase)
-          }
+          router.push(APP_ROUTES.knowledgeBase)
           return
         }
       }
 
       if (entry.kind === 'article') {
+        const baseArticlePath = buildKnowledgeBasePath(entry.item.routePath)
         const hashSuffix = entry.matchedHeading ? `#${entry.matchedHeading.id}` : ''
-        const targetHref = `/knowledge-base/${entry.item.routePath}${hashSuffix}`
+        const targetHref = `${baseArticlePath}${hashSuffix}`
         trackEvent('command_palette_article_selected', {
           routePath: entry.item.routePath,
           query: query.trim(),
         })
 
-        if (isUnlocked) {
+        if (isUnlocked || isPublicKnowledgeBasePath(baseArticlePath)) {
           router.push(targetHref)
         } else {
-          openGuestPassModal(`/knowledge-base/${entry.item.routePath}`)
+          openGuestPassModal(baseArticlePath)
         }
       }
     },
@@ -440,7 +443,7 @@ export function CommandPaletteModal({ locale }: CommandPaletteModalProps) {
                             <Badge variant="outline" className="px-1.5 py-0 font-mono text-[10px]">
                               {getKnowledgeFormatLabel(entry.item.format, locale)}
                             </Badge>
-                            {!isUnlocked ? (
+                            {!isUnlocked && !isPublicKnowledgeBasePath(buildKnowledgeBasePath(entry.item.routePath)) ? (
                               <span className="inline-flex items-center gap-1 rounded-sm bg-warning/15 px-1.5 py-0.5 font-mono text-[10px] text-warning">
                                 <Lock className="h-2.5 w-2.5" />
                                 {t('cmdLockedBadge')}

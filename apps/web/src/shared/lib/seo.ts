@@ -1,23 +1,8 @@
-import { DEFAULT_LOCALE, LOCALE_METADATA, type SupportedLocale } from '@repo/shared-schemas'
+import { DEFAULT_LOCALE, LOCALE_METADATA, SUPPORTED_LOCALES, type SupportedLocale } from '@repo/shared-schemas'
+import type { Metadata } from 'next'
+import { resolvePublicSiteUrl } from '@/shared/config/env'
 
-const DEFAULT_SITE_URL = 'http://localhost:3000'
-
-export function resolveSiteUrl(): string {
-  const raw = process.env.NEXT_PUBLIC_SITE_URL?.trim()
-  if (!raw) {
-    return DEFAULT_SITE_URL
-  }
-
-  try {
-    const parsed = new URL(raw)
-    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-      return DEFAULT_SITE_URL
-    }
-    return parsed.origin
-  } catch {
-    return DEFAULT_SITE_URL
-  }
-}
+export const SITE_NAME = 'Stanislav Krychevskyi — Workfolio & Knowledge Base'
 
 export function normalizeSeoPathname(pathname: string): string {
   const trimmed = pathname.trim()
@@ -39,7 +24,7 @@ export function buildLocalizedPath(pathname: string, locale: SupportedLocale = D
 }
 
 export function buildLocalizedUrl(pathname: string, locale: SupportedLocale = DEFAULT_LOCALE): string {
-  return `${resolveSiteUrl()}${buildLocalizedPath(pathname, locale)}`
+  return `${resolvePublicSiteUrl()}${buildLocalizedPath(pathname, locale)}`
 }
 
 export function buildLanguageAlternatesMap(pathname: string): Record<string, string> {
@@ -62,6 +47,51 @@ export function resolveOgLocale(locale: SupportedLocale): string {
   return LOCALE_METADATA[locale].ogLocale
 }
 
+export function resolveAlternateOgLocales(locale: SupportedLocale): string[] {
+  return SUPPORTED_LOCALES.filter((candidate) => candidate !== locale).map(
+    (candidate) => LOCALE_METADATA[candidate].ogLocale,
+  )
+}
+
+export interface OpenGraphMetadataInput {
+  title: string
+  description: string
+  pathname: string
+  locale: SupportedLocale
+  type?: 'website' | 'profile' | 'article'
+  publishedTime?: string
+  tags?: readonly string[]
+}
+
+/**
+ * Shared OpenGraph metadata builder preventing Next.js shallow-merge loss of `siteName`
+ * and populating `alternateLocale` consistently across all localized routes.
+ */
+export function buildOpenGraphMetadata(input: OpenGraphMetadataInput): NonNullable<Metadata['openGraph']> {
+  const base = {
+    title: input.title,
+    description: input.description,
+    url: buildLocalizedUrl(input.pathname, input.locale),
+    siteName: SITE_NAME,
+    locale: resolveOgLocale(input.locale),
+    alternateLocale: resolveAlternateOgLocales(input.locale),
+  }
+
+  if (input.type === 'article') {
+    return {
+      ...base,
+      type: 'article',
+      ...(input.publishedTime ? { publishedTime: input.publishedTime } : {}),
+      ...(input.tags && input.tags.length > 0 ? { tags: [...input.tags] } : {}),
+    }
+  }
+
+  return {
+    ...base,
+    type: input.type ?? 'website',
+  }
+}
+
 export interface ProfilePageJsonLdInput {
   locale: SupportedLocale
   pathname: string
@@ -82,8 +112,18 @@ export interface TechArticleJsonLdInput {
   tags: readonly string[]
 }
 
+export interface BreadcrumbJsonLdItem {
+  label: string
+  pathname: string
+}
+
 export function serializeSafeJsonLd(payload: Record<string, unknown>): string {
-  return JSON.stringify(payload).replace(/</g, '\\u003c')
+  return JSON.stringify(payload)
+    .replace(/</g, '\\u003c')
+    .replace(/>/g, '\\u003e')
+    .replace(/&/g, '\\u0026')
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029')
 }
 
 export function buildProfilePageJsonLd(input: ProfilePageJsonLdInput): string {
@@ -109,6 +149,8 @@ export function buildProfilePageJsonLd(input: ProfilePageJsonLdInput): string {
 
 export function buildTechArticleJsonLd(input: TechArticleJsonLdInput): string {
   const articleUrl = buildLocalizedUrl(input.pathname, input.locale)
+  const homeUrl = buildLocalizedUrl('/', input.locale)
+  const ogImageUrl = buildLocalizedUrl('/opengraph-image', input.locale)
 
   return serializeSafeJsonLd({
     '@context': 'https://schema.org',
@@ -116,6 +158,11 @@ export function buildTechArticleJsonLd(input: TechArticleJsonLdInput): string {
     headline: input.title,
     description: input.description,
     url: articleUrl,
+    mainEntityOfPage: {
+      '@type': 'WebPage',
+      '@id': articleUrl,
+    },
+    image: ogImageUrl,
     inLanguage: input.locale,
     datePublished: input.publishedAt,
     dateModified: input.publishedAt,
@@ -123,7 +170,25 @@ export function buildTechArticleJsonLd(input: TechArticleJsonLdInput): string {
     author: {
       '@type': 'Person',
       name: input.authorName,
-      url: buildLocalizedUrl('/', input.locale),
+      url: homeUrl,
     },
+    publisher: {
+      '@type': 'Person',
+      name: input.authorName,
+      url: homeUrl,
+    },
+  })
+}
+
+export function buildBreadcrumbListJsonLd(locale: SupportedLocale, items: readonly BreadcrumbJsonLdItem[]): string {
+  return serializeSafeJsonLd({
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: items.map((item, index) => ({
+      '@type': 'ListItem',
+      position: index + 1,
+      name: item.label,
+      item: buildLocalizedUrl(item.pathname, locale),
+    })),
   })
 }
