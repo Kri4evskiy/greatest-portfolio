@@ -5,6 +5,7 @@ import { createOffsetPaginatedResponseSchema, OffsetPaginationQuerySchema } from
 export const KnowledgeCategoryEnum = z.enum([
   'this-project',
   'react',
+  'nextjs',
   'typescript',
   'nestjs',
   'nestjs-prisma',
@@ -19,6 +20,7 @@ export type KnowledgeCategory = z.infer<typeof KnowledgeCategoryEnum>
 export const KNOWLEDGE_CATEGORY_LABELS: Record<KnowledgeCategory, string> = {
   'this-project': 'This Project',
   react: 'React',
+  nextjs: 'Next.js',
   typescript: 'TypeScript',
   nestjs: 'NestJS',
   'nestjs-prisma': 'NestJS & Prisma',
@@ -33,6 +35,7 @@ const LOCALIZED_CATEGORY_LABELS: Record<SupportedLocale, Record<KnowledgeCategor
   en: {
     'this-project': 'This Project',
     react: 'React',
+    nextjs: 'Next.js',
     typescript: 'TypeScript',
     nestjs: 'NestJS',
     'nestjs-prisma': 'NestJS & Prisma',
@@ -45,6 +48,7 @@ const LOCALIZED_CATEGORY_LABELS: Record<SupportedLocale, Record<KnowledgeCategor
   uk: {
     'this-project': 'Цей проєкт',
     react: 'React',
+    nextjs: 'Next.js',
     typescript: 'TypeScript',
     nestjs: 'NestJS',
     'nestjs-prisma': 'NestJS та Prisma',
@@ -57,6 +61,7 @@ const LOCALIZED_CATEGORY_LABELS: Record<SupportedLocale, Record<KnowledgeCategor
   ru: {
     'this-project': 'Этот проект',
     react: 'React',
+    nextjs: 'Next.js',
     typescript: 'TypeScript',
     nestjs: 'NestJS',
     'nestjs-prisma': 'NestJS и Prisma',
@@ -81,6 +86,8 @@ const LOCALIZED_SUBTOPIC_LABELS: Record<SupportedLocale, Record<string, string>>
     'react-19': 'React 19',
     'react-18-vs-19': 'React 18 vs 19',
     hooks: 'Hooks & Lifecycle',
+    'rendering-caching': 'Rendering & Caching (SSG/SSR/ISR)',
+    'app-router-internals': 'App Router Internals & Boundaries',
     'zod-contracts': 'Strict TS & Zod',
     'adr-catalog': 'ADR Catalog',
     'state-management': 'State & Offline Cache',
@@ -108,6 +115,8 @@ const LOCALIZED_SUBTOPIC_LABELS: Record<SupportedLocale, Record<string, string>>
     'react-19': 'React 19',
     'react-18-vs-19': 'React 18 vs 19',
     hooks: 'Хуки та життєвий цикл',
+    'rendering-caching': 'Рендеринг та Кешування (SSG/SSR/ISR)',
+    'app-router-internals': 'Внутрішня будова App Router',
     'zod-contracts': 'Суворий TS та Zod',
     'adr-catalog': 'Каталог ADR',
     'state-management': 'Стейт та Offline-кеш',
@@ -135,6 +144,8 @@ const LOCALIZED_SUBTOPIC_LABELS: Record<SupportedLocale, Record<string, string>>
     'react-19': 'React 19',
     'react-18-vs-19': 'React 18 vs 19',
     hooks: 'Хуки и жизненный цикл',
+    'rendering-caching': 'Рендеринг и Кэширование (SSG/SSR/ISR)',
+    'app-router-internals': 'Устройство App Router и Границы',
     'zod-contracts': 'Строгий TS и Zod',
     'adr-catalog': 'Каталог ADR',
     'state-management': 'Стейт и Offline-кэш',

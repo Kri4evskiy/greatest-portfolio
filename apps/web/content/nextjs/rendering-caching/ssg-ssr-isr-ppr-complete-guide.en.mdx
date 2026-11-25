@@ -1,0 +1,182 @@
+---
+title: "Next.js 16 Rendering Strategies: SSG, SSR, ISR, Streaming & PPR — Complete Reference"
+sidebarLabel: "SSG, SSR, ISR & Streaming"
+summary: "Exhaustive architectural comparison of Next.js App Router rendering modes: when HTML is generated, exact APIs and opt-in triggers (generateStaticParams, cookies/headers, revalidate, 'use cache', Suspense), RSC vs Client Component roles, real route mapping in this project, and a 10-second decision guide."
+category: "nextjs"
+format: "deep-dive"
+tags: ["nextjs", "ssg", "ssr", "isr", "ppr", "rsc", "streaming", "performance"]
+readingTime: "10 min"
+publishedAt: "2026-11-25"
+order: 1
+tldr:
+  - "Next.js App Router defaults to **Static Rendering (SSG)** at build time and automatically switches a route to **Dynamic Rendering (SSR)** the moment you read request-time APIs (`cookies()`, `headers()`, `connection()`, `searchParams`) or opt out of caching."
+  - "**ISR** bridges static speed and fresh data via Time-Based (`export const revalidate = 60`) or On-Demand (`revalidateTag` / `revalidatePath`) regeneration; **Next.js 16** adds component-level caching with `'use cache'`, `cacheLife()`, and `cacheTag()`."
+  - "**Server Components (RSC)** own data fetching and heavy logic (`0 KB` client JS), while **Client Components (`'use client'`)** own interactivity and browser APIs—and can still wrap RSC children via the **Slot / Composition Pattern**."
+---
+
+## 1. Master Comparison Table: SSG vs SSR vs ISR vs Streaming vs CSR vs PPR
+
+Every route in Next.js App Router falls into one of these rendering strategies—or combines them on the same page:
+
+| Strategy | When HTML Is Built | Primary Trigger / APIs | Data Freshness | TTFB & Scalability | SEO | Typical Pages |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **SSG (Static Rendering)** | At `next build` (once per deploy) | Default for routes without dynamic APIs; `generateStaticParams()`, `dynamic = 'force-static'`, `dynamicParams = false` | Snapshot at build time | **Fastest** (CDN / disk, ~10–30 ms, virtually infinite scale) | **Excellent** | Landing pages, CV/Resume, Docs, Blogs, Pricing, `/robots.txt`, `/sitemap.xml`, static JSON indexes |
+| **ISR (Incremental Static Regeneration)** | At `next build` OR on first request, then rebuilt in background | **Time-based:** `export const revalidate = 60`, `fetch(..., { next: { revalidate: 60 } })`<br>**On-Demand:** `revalidateTag()`, `revalidatePath()` | Fresh within TTL window or instant after webhook | **Near-SSG** (stale-while-revalidate from CDN/server cache) | **Excellent** | E-commerce product catalogs (10k+ SKUs), News portals, CMS blogs, large Knowledge Bases |
+| **SSR (Dynamic Rendering)** | On **every** HTTP request on the server | `cookies()`, `headers()`, `connection()`, `await searchParams` (in `page.tsx`), `export const dynamic = 'force-dynamic'`, `fetch(..., { cache: 'no-store' })` | **Always real-time** (per user / per request) | Slower (depends on DB/API latency + server CPU) | **Good** (full HTML, slower TTFB) | Personalized dashboards, Cart/Checkout, Auth-gated user feeds, Live search result pages |
+| **Streaming SSR (`<Suspense>`)** | Shell sent immediately; slow subtrees streamed as HTML chunks over the same HTTP response | `loading.tsx` (route-level) or explicit `<Suspense fallback={...}>` wrapping async Server Components | Real-time per chunk | **Fast TTFB** (user sees layout/skeleton immediately instead of blank screen) | **Good** (crawlers wait for streamed chunks) | Complex dashboards, Product pages with slow reviews/recommendations, MDX bodies with heavy syntax highlighting |
+| **CSR (Client Islands / SPA)** | Empty/skeleton shell in HTML; data fetched & rendered in browser | `'use client'` + `TanStack Query` / `useEffect` / `EventSource`, or `next/dynamic(..., { ssr: false })` | Real-time in browser (polling, SSE, WebSockets, mutations) | Instant shell; data loads after JS hydration | **Poor** for data fetched only in browser | Live telemetry logs, Admin tables with filters/pagination, interactive Canvas/D3/XYFlow playgrounds, Modals |
+| **PPR & `'use cache'` (Next.js 15–16)** | Static shell pre-rendered at build time + dynamic `<Suspense>` holes filled at request time + cached sub-components | `cacheComponents: true` (`next.config.ts`), `'use cache'` directive, `cacheLife()`, `cacheTag()` | Hybrid: static shell + cached blocks + live holes | **Best of SSG + SSR** on a single route | **Excellent** | E-commerce PDP (static description + cached reviews + live cart/user greeting), Hybrid SaaS shells |
+
+---
+
+## 2. Which Components Participate in Each Strategy?
+
+A common source of confusion is mixing up **Rendering Strategy (SSG / SSR / ISR)** with **Component Type (Server Component vs Client Component)**. They are orthogonal axes:
+
+| Component Type | Where It Runs | What It Can Do | What It CANNOT Do | Role Across SSG / SSR / ISR |
+| :--- | :--- | :--- | :--- | :--- |
+| **Server Component (RSC)** _(default, no directive)_ | **Server only** (at build time in SSG, or per request in SSR) | `async/await` directly in component body, read `fs`, query PostgreSQL/Prisma, use secrets/env vars, run heavy libs (`shiki`, `unified`, `gray-matter`) at **`0 KB` client JS** | No `useState`, `useEffect`, `onClick`, `window`, `localStorage`, or browser APIs | Generates the static HTML (SSG/ISR) or dynamic HTML (SSR) and streams RSC payloads |
+| **Client Component** _(`'use client'`)_ | **Both!** Pre-rendered to initial HTML on server (SSR/SSG) **AND** hydrated in browser | `useState`, `useRef`, `useEffect`, event handlers, `TanStack Query`, `Zustand`, `Radix UI`, `EventSource`, `window`/`document` | Cannot be an `async` function component; cannot import `node:fs` or server secrets | Provides interactive islands (`Header`, `ThemeToggle`, `Tables`, `Modals`, `Filters`) on top of SSG/ISR/SSR shells |
+| **Client-Only Lazy Island** _(`next/dynamic(..., { ssr: false })`)_ | **Browser only** (skipped during SSR/SSG HTML generation) | Safely mount DOM-heavy or browser-only libs (`D3.js`, `XYFlow`, `Canvas`, `Monaco`, lazy `Dialog` modals) with `0 KB` in initial route chunk | Renders `loading` fallback on server (not visible to non-JS crawlers) | Keeps initial bundle tiny for heavy visualizations and modals |
+
+### The Composition (Slot) Pattern: Combining RSC + Client Components
+
+A Client Component **cannot directly `import` a Server Component**, **but** a Server Component **can pass another Server Component as `children` or a named prop (`ReactNode`) into a Client Component!**
+
+```tsx title="Pattern used in /cv (CvDocumentShowcase -> CvViewTabs)"
+// Server Component (0 KB client JS — reads fs & formats active locale)
+export function CvDocumentShowcase({ locale }: { locale: SupportedLocale }) {
+  const structuredResumeNode = <StructuredResumeServerView locale={locale} />
+
+  // Client Component handles interactive tabs, while structuredResumeNode stays pure RSC!
+  return <CvViewTabs pdfUrl={pdfUrl} structuredSlot={structuredResumeNode} />
+}
+```
+
+Result: Search engines receive the full semantic HTML of the resume in SSG, while the heavy multi-language resume dictionary never ships to the browser JS bundle.
+
+---
+
+## 3. Exact Next.js 16 Methods & Triggers (Code Cheat Sheet)
+
+### A. Static Rendering (SSG)
+Used whenever content is identical for all users of a given URL/locale.
+
+```tsx
+// 1. Pre-build dynamic URL segments at build time:
+export function generateStaticParams() {
+  return [
+    { locale: 'en', slug: ['this-project', 'knowledge-engine'] },
+    { locale: 'ru', slug: ['this-project', 'knowledge-engine'] },
+  ]
+}
+
+// 2. Return 404 for any slug not returned by generateStaticParams (no on-demand SSR):
+export const dynamicParams = false
+
+// 3. Force static generation for Route Handlers (e.g., /search-index/[locale], /llms.txt):
+export const dynamic = 'force-static'
+```
+
+### B. Dynamic Rendering (SSR)
+In Next.js App Router, you rarely need `export const dynamic = 'force-dynamic'` manually—calling **any Dynamic Request API** automatically opts the route into per-request SSR:
+
+```tsx
+import { cookies, headers } from 'next/headers'
+import { connection } from 'next/server'
+
+export default async function DynamicUserPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string }>
+}) {
+  // Any ONE of these switches the route from SSG -> SSR:
+  const cookieStore = await cookies()          // 1. Reading cookies
+  const headerList = await headers()           // 2. Reading HTTP headers
+  const { tab } = await searchParams           // 3. Reading URL query params in page.tsx
+  await connection()                           // 4. Explicit opt-in to request-time rendering (Next.js 15+)
+
+  // 5. Uncached fetch (default in Next.js 15+ is uncached unless opted in):
+  const res = await fetch('https://api.example.com/me', { cache: 'no-store' })
+  // ...
+}
+```
+
+> [!WARNING]
+> **The #1 Next.js Trap — Accidental SSR Cascade from `layout.tsx`:**
+> Calling `await cookies()` or `await headers()` inside your root `app/[locale]/layout.tsx` opts **every single child page in the entire application** out of Static Rendering (SSG)!
+> That is why this project never reads `kb_access_token` inside `layout.tsx`: authentication checks happen either at the **Edge (`src/proxy.ts`)** before the route renders, or reactively on the client via **TanStack Query (`GET /api/auth/me`)**, keeping all layouts and pages 100% SSG-fast.
+
+### C. Incremental Static Regeneration (ISR) & Next.js 16 `'use cache'`
+
+```tsx
+// 1. Time-based ISR at route level (rebuild at most once every 60 seconds):
+export const revalidate = 60
+
+// 2. Tag-based fetch caching (rebuilt on demand via revalidateTag):
+const res = await fetch('https://api.example.com/posts', {
+  next: { revalidate: 3600, tags: ['posts'] },
+})
+
+// 3. On-Demand ISR (inside a Route Handler webhook or Server Action):
+import { revalidatePath, revalidateTag } from 'next/cache'
+
+export async function POST() {
+  revalidateTag('posts', 'max') // Next.js 16 profile argument
+  revalidatePath('/knowledge-base')
+  return Response.json({ revalidated: true })
+}
+
+// 4. Next.js 16 Component / Function-level caching ('use cache' with cacheComponents):
+import { cacheLife, cacheTag } from 'next/cache'
+
+async function getPublishedCatalog() {
+  'use cache'
+  cacheLife('hours')
+  cacheTag('catalog')
+  return db.article.findMany({ where: { published: true } })
+}
+```
+
+### D. Streaming SSR with `<Suspense>` and `loading.tsx`
+
+Instead of blocking the entire HTML response until the slowest query/parser finishes, wrap the slow async Server Component in `<Suspense>`:
+
+```tsx
+// Route-level streaming: place `loading.tsx` beside `page.tsx` (auto-wraps page in <Suspense>)
+// Component-level streaming: wrap only the heavy block so title, breadcrumbs & TL;DR render instantly!
+export default async function ArticlePage() {
+  return (
+    <article>
+      <ArticleHeader /> {/* Sent immediately in initial HTML chunk */}
+      <Suspense fallback={<ArticleBodySkeleton />}>
+        <MdxArticleRenderer hast={article.hast} codeBlocks={article.codeBlocks} />
+      </Suspense>
+    </article>
+  )
+}
+```
+
+---
+
+## 4. How Every Route in This Project (`greatest-portfolio`) Is Rendered
+
+| Route in `apps/web/src/app` | Strategy Used | Key APIs / Mechanisms | Why This Strategy Was Chosen |
+| :--- | :--- | :--- | :--- |
+| `/[locale]` (`/`, `/ua`, `/ru`) | **SSG + Client Islands** | `generateStaticParams()`, Server Components (`pickLocalized`), scoped `<NextIntlClientProvider>` | Instant landing-page TTFB & perfect SEO; interactive Tech Radar & Roadmap hydrate selectively |
+| `/[locale]/cv` | **SSG + Server-Island Slot** | `CvDocumentShowcase` (RSC) ➔ `CvViewTabs` (`forceMount`) + `React.cache` PDF lookup | Crawlers index full ATS resume HTML while `0 KB` of 3-language profile data enters client JS |
+| `/[locale]/knowledge-base` | **SSG + Client Filter Island** | `getKnowledgeTree()`, `<Suspense fallback={<KnowledgeDirectorySkeleton />}>` | Fast static catalog; `#tag` and format filters run locally with instant response |
+| `/[locale]/knowledge-base/[...slug]` | **SSG + Streaming `<Suspense>` + Edge Proxy** | `generateStaticParams()`, `dynamicParams = false`, `React.cache` + `mtimeMs`, `<Suspense>`, `proxy.ts` HS256 JWT | Zero runtime MDX/DB cost; `proxy.ts` enforces auth on protected trees in `< 0.2 ms` without breaking SSG |
+| `/[locale]/system-status` | **SSG Shell + CSR Live Inspector** | Static RSC layout + `TanStack Query` (`useQuery` / `useInfiniteQuery`) + singleton `EventSource` (SSE) | Shell builds cleanly offline in Docker/CI; live API capabilities, pagination & SSE stream hydrate on client |
+| `/search-index/[locale]`, `/llms.txt`, `/robots.txt`, `/sitemap.xml` | **Static Route Handlers (`force-static`)** | `export const dynamic = 'force-static'`, `generateStaticParams()` | Pre-generated JSON/TXT/XML artifacts served at CDN speed with zero runtime compute |
+| `/[locale]/opengraph-image` | **Static / On-Demand Image Route (`next/og`)** | `ImageResponse` (Satori + bundled `Inter` TTF) | Deterministic localized 1200×630 social cards without external font network calls |
+
+---
+
+## 5. 10-Second Decision Cheat Sheet
+
+1. **Same content for all visitors & changes only on deploy?** ➔ **SSG** (`generateStaticParams` / `force-static`).
+2. **Same content for all visitors, but updates from a CMS/DB/API periodically or via webhook?** ➔ **ISR** (`revalidate` / `revalidateTag` / `'use cache'`).
+3. **Content depends on the logged-in user, cookies, headers, or live URL filters that must be SEO-indexed?** ➔ **SSR + Streaming `<Suspense>`**.
+4. **Heavy interactive widget, live SSE stream, modal, or authenticated admin/inspector table where SEO is not needed?** ➔ **SSG Shell + Client Island (`'use client'` + `TanStack Query` / `next/dynamic({ ssr: false })`)**.
+5. **Mix of static shell + small personalized/live blocks on the same URL?** ➔ **SSG/PPR Shell + `<Suspense>`** (or `'use cache'` for shared blocks + dynamic/client island for user-specific data).

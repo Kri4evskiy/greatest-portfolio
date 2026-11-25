@@ -1,0 +1,116 @@
+---
+title: "Next.js 16 Core Internals: 4-Layer Caching, RSC Boundaries, proxy.ts & Server Actions"
+sidebarLabel: "4-Layer Cache, Boundaries & proxy.ts"
+summary: "Essential Next.js App Router internals beyond basic file routing: the 4 caching layers, why 'use client' still runs on SSR, Server-to-Client serialization rules, Edge proxy.ts (ex-middleware.ts), Server Actions vs Route Handlers vs NestJS API, and Error/Prefetching pitfalls."
+category: "nextjs"
+format: "deep-dive"
+tags: ["nextjs", "caching", "rsc", "proxy", "server-actions", "hydration", "architecture"]
+readingTime: "9 min"
+publishedAt: "2026-11-25"
+order: 2
+tldr:
+  - "Next.js has **4 distinct caching layers** (`Request Memoization`, `Data Cache`, `Full Route Cache`, `Router Cache`)—understanding their scope and lifetime solves 90% of 'why didn't my data update?' bugs."
+  - "`'use client'` does **not** mean 'CSR-only': it marks the **Server ➔ Client network boundary**. Client Components still pre-render to HTML on the server and must be hydration-safe unless wrapped in `next/dynamic(..., { ssr: false })`."
+  - "In Next.js 16, Edge interception moved to `src/proxy.ts` (before caches/routes), dynamic route params are async (`await params`), and choosing between **Server Actions**, **Route Handlers**, and an **external NestJS API** depends on your backend topology."
+---
+
+## 1. The 4 Caching Layers in Next.js App Router
+
+Most Next.js confusion comes from treating "caching" as one toggle. In reality, four separate layers work at different scopes:
+
+| Layer | Where It Lives | What It Caches | Lifetime | How to Control / Invalidate |
+| :--- | :--- | :--- | :--- | :--- |
+| **1. Request Memoization** | Server RAM (per render) | Return values of identical `GET fetch()` calls and `React.cache(fn)` calls | **Single HTTP request** (freed right after response) | Automatic; use primitive keys in `React.cache` (e.g., `segments.join('/')` instead of an array reference) |
+| **2. Data Cache** | Server / CDN persistent store | Responses of opted-in `fetch(..., { cache: 'force-cache' })` or `'use cache'` functions | Persists **across requests and deploys** until revalidated | `revalidate`, `revalidateTag()`, `revalidatePath()`, `cacheLife()`, `cacheTag()` |
+| **3. Full Route Cache** | Server disk / CDN | Pre-rendered **HTML + RSC Payload** for static routes (SSG / ISR) | Until next deploy or ISR revalidation | Automatically bypassed on dynamic SSR routes (`cookies()`, `headers()`, `no-store`) |
+| **4. Router Cache** | **Browser RAM** (client) | RSC payloads of visited or prefetched `<Link>` segments during SPA navigation | Current browser session (or until `router.refresh()`) | `router.refresh()`, `revalidatePath()` from a Server Action, or `<Link prefetch={false}>` |
+
+### Why `React.cache()` Needed Primitive Keys in This Project
+
+During one page request, Next.js calls `generateMetadata({ params })` and `Page({ params })` separately—passing two different array instances for `slug: string[]`. Because `React.cache()` compares arguments with `Object.is`:
+
+```typescript title="Primitive key deduplication (mdx-fs-loader.ts)"
+// ❌ Cache MISS between generateMetadata() and Page() because ['a', 'b'] !== ['a', 'b']
+const badLoader = cache((segments: string[]) => parseArticle(segments))
+
+// ✅ Cache HIT: primitive string key 'a/b' === 'a/b'
+const getArticleByRouteKey = cache((routeKey: string, locale: SupportedLocale) => {
+  return loadArticle(routeKey, locale)
+})
+```
+
+---
+
+## 2. The `'use client'` Boundary, Hydration & Serialization Rules
+
+### Myth: "`'use client'` means this component only runs in the browser"
+**False.** `'use client'` marks a **module boundary** between the Server Component graph and the Client Component graph:
+1. During **SSG or SSR**, Next.js **still executes** Client Components on the server to produce initial HTML (for fast FCP and SEO).
+2. In the browser, React downloads the JS chunk and **hydrates** that HTML (attaches event listeners and runs `useEffect`).
+3. **Rule of thumb:** anything imported by a `'use client'` file automatically becomes part of the client JS bundle—so keep `'use client'` as low down the component tree as possible ("leaf islands").
+
+### Avoiding Hydration Mismatches
+Never read browser-only or non-deterministic values during the initial render of a Client Component:
+
+- ❌ Reading `localStorage.getItem(...)`, `window.innerWidth`, `Date.now()`, or `Math.random()` directly in the render body causes server HTML !== client HTML hydration warnings.
+- ✅ Read browser storage inside `useEffect` (like our `hydrateKbFoldersFromSession()`), inject a tiny synchronous `<script>` before hydration for Zero-FOUC theming (`PALETTE_INIT_SCRIPT`), or isolate browser-only widgets via `next/dynamic(() => import('./widget'), { ssr: false })`.
+
+### What Can Cross the Server ➔ Client Prop Boundary?
+
+| Allowed Props (Serializable by React Flight) | Forbidden Props (Throws Serialization Error) |
+| :--- | :--- |
+| Primitives (`string`, `number`, `boolean`, `null`, `undefined`) | Plain functions / callbacks (`onClick={() => ...}`) created in a Server Component |
+| Plain objects & arrays (`MdxArticleFrontmatter[]`) | Class instances (`new PrismaClient()`, custom classes with methods) |
+| `Date`, `TypedArray`, `Promise` (unwrapped with React 19 `use()`) | DOM nodes, Symbols (non-global), Node streams |
+| **`ReactNode` / JSX slots** (pre-rendered RSC trees passed as `children` or `structuredSlot`) | Raw unserialized DB connection objects |
+| **Server Actions** (`'use server'` functions) | Closures capturing server modules |
+
+> [!NOTE]
+> **Security Rule (`NEXT_PUBLIC_`):** Only environment variables prefixed with `NEXT_PUBLIC_` are inlined into client bundles. Secrets (`JWT_SECRET`, `DATABASE_URL`, `API_INTERNAL_URL`) without that prefix stay strictly on the server—and adding `import 'server-only'` guarantees a build error if anyone accidentally imports a server module into a `'use client'` file.
+
+---
+
+## 3. Next.js 16 Edge `proxy.ts` & Async Request APIs
+
+### `src/proxy.ts` (Replaces `middleware.ts` in Next.js 16)
+`proxy.ts` runs **before** the Full Route Cache, Route Handlers, and Server Components on every matching request:
+
+```text
+Incoming HTTP Request
+  ➔ 1. next.config.ts headers() / redirects()
+  ➔ 2. src/proxy.ts (Edge Web Crypto HS256 JWT + next-intl locale routing)
+  ➔ 3. next.config.ts rewrites() (/api/* ➔ NestJS :4000)
+  ➔ 4. Full Route Cache / Route Handler / RSC Render
+```
+
+**Three Critical Rules for `proxy.ts`:**
+1. **Keep it sub-millisecond:** never run heavy Prisma queries or large libraries in `proxy.ts`. Verify stateless JWT signatures with native Web Crypto `crypto.subtle` (`< 0.2 ms`, `0 KB` dependencies).
+2. **Exclude metadata & static routes explicitly in `config.matcher`:** file-based metadata routes without file extensions (`icon`, `apple-icon`, `opengraph-image`, `search-index`, `api`, `_next`) must be excluded so `next-intl` never treats them as locale paths.
+3. **Never use blanket `.*\\..*` exclusions if slugs can contain dots:** explicitly list static file extensions (`ico|png|svg|css|js|woff2|...`) so a future slug like `/knowledge-base/next.js-16` never bypasses Edge Auth.
+
+### Async `params`, `searchParams` & `next/root-params`
+In Next.js 15–16, `params`, `searchParams`, `cookies()`, and `headers()` are **asynchronous Promises** (`const { locale, slug } = await params`). In Next.js 16, `next/root-params` (`await rootParams.locale()`) also replaces legacy `next-intl` workarounds like `setRequestLocale()`, allowing Server Components and `request.ts` to resolve the root locale natively without breaking SSG.
+
+---
+
+## 4. Data Mutations & Endpoints: Server Actions vs Route Handlers vs External API
+
+| Mechanism | Best For | Pros | Trade-Offs / When NOT to Use |
+| :--- | :--- | :--- | :--- |
+| **Server Actions (`'use server'`)** | Simple full-stack Next.js apps without a separate backend (forms, CRUD directly to DB) | Zero manual API boilerplate, built-in `revalidatePath` / `revalidateTag`, works with React 19 `useActionState` / `useOptimistic` | Uses internal POST protocol (not clean REST for external clients), serializes one action queue at a time per client, poor fit for SSE streams or multi-service microservices |
+| **Next.js Route Handlers (`route.ts`)** | Static artifacts (`/search-index/[locale]`, `/llms.txt`), webhooks, OAuth callbacks, thin BFF proxies | Full control over HTTP methods, status codes, `Cache-Control`, `force-static` SSG JSON | Not a substitute for a dedicated domain backend when you need NestJS DI, TCP microservices, or long-lived SSE |
+| **External Backend (`NestJS` + `Axios` + `TanStack Query`)** | Multi-client / microservice platforms, long-lived SSE, distributed Redis rate limiting, RBAC APIs | Clean separation of concerns, independent scaling, Swagger/Zod contracts, reusable by mobile/MCP/external clients | Requires same-origin `/api/*` rewrite (or CORS) and explicit client query/cache management |
+
+In `greatest-portfolio`, we combine the best of both: **Route Handlers (`force-static`)** for zero-runtime static JSON/SEO endpoints, and **NestJS + Axios + TanStack Query** for HttpOnly JWT auth, article analytics, and live SSE telemetry.
+
+---
+
+## 5. Error Boundaries, `notFound()` & `<Link>` Prefetching Nuances
+
+1. **Error Hierarchy:**
+   - `app/[locale]/error.tsx` — **must be `'use client'`**, catches runtime errors inside `[locale]/*` while keeping the root `LocaleRootLayout` (header/footer/theme) intact and offering `reset()`.
+   - `app/global-error.tsx` — catches crashes inside the root layout itself; **must render its own `<html>` and `<body>`** and import `./globals.css`.
+   - `app/[locale]/not-found.tsx` — pure Server Component triggered by `notFound()` (or a `[...rest]/page.tsx` catch-all) with `robots: { index: false, follow: false }`.
+2. **`<Link>` Prefetching Pitfall:**
+   - By default, Next.js prefetches every visible `<Link>` entering the viewport. On sidebars or directories with 50–100 links—or protected links for unauthenticated guests—default prefetching triggers dozens of unnecessary RSC requests or premature `307` redirects.
+   - Setting `prefetch={false}` on sidebar tree links (as in `KnowledgeTreeItem`) keeps network noise at zero while still delivering fast SPA transitions on click.

@@ -1,0 +1,182 @@
+---
+title: "Стратегии рендеринга в Next.js 16: SSG, SSR, ISR, Streaming и PPR — полное руководство"
+sidebarLabel: "SSG, SSR, ISR и Streaming"
+summary: "Исчерпывающий справочник по режимам рендеринга Next.js App Router: когда строится HTML, какие именно API и директивы включают каждый режим (generateStaticParams, cookies/headers, revalidate, 'use cache', Suspense), роль RSC и Client Components, карта маршрутов нашего проекта и алгоритм выбора за 10 секунд."
+category: "nextjs"
+format: "deep-dive"
+tags: ["nextjs", "ssg", "ssr", "isr", "ppr", "rsc", "streaming", "performance"]
+readingTime: "10 мин"
+publishedAt: "2026-11-25"
+order: 1
+tldr:
+  - "Next.js App Router по умолчанию использует **Static Rendering (SSG)** на этапе сборки и автоматически переключает маршрут в **Dynamic Rendering (SSR)**, как только в коде читаются request-time API (`cookies()`, `headers()`, `connection()`, `searchParams`) или отключён кэш."
+  - "**ISR** объединяет скорость статики и свежесть данных через Time-Based (`export const revalidate = 60`) или On-Demand (`revalidateTag` / `revalidatePath`) регенерацию; в **Next.js 16** добавлено кэширование на уровне компонентов и функций через `'use cache'`, `cacheLife()` и `cacheTag()`."
+  - "**Server Components (RSC)** отвечают за загрузку данных и тяжёлую логику (`0 КБ` клиентского JS), а **Client Components (`'use client'`)** — за интерактивность и браузерные API, причём RSC можно безопасно прокидывать внутрь клиентских компонентов через **Slot / Composition Pattern**."
+---
+
+## 1. Сводная таблица: SSG vs SSR vs ISR vs Streaming vs CSR vs PPR
+
+Каждый маршрут в Next.js App Router работает по одной из этих стратегий — либо комбинирует их на одной странице:
+
+| Стратегия | Когда строится HTML | Основные методы / триггеры | Свежесть данных | TTFB и масштаб | SEO | На каких страницах используется |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **SSG (Static Rendering)** | На `next build` (один раз при деплое) | По умолчанию без динамических API; `generateStaticParams()`, `dynamic = 'force-static'`, `dynamicParams = false` | Снимок на момент сборки | **Максимальный** (CDN / диск, ~10–30 мс, почти бесконечный трафик) | **Отличное** | Лендинги, резюме/CV, документация, блоги, тарифы, `/robots.txt`, `/sitemap.xml`, статические JSON-индексы |
+| **ISR (Incremental Static Regeneration)** | На `next build` ИЛИ при первом запросе, далее пересборка в фоне | **По таймеру:** `export const revalidate = 60`, `fetch(..., { next: { revalidate: 60 } })`<br>**По событию:** `revalidateTag()`, `revalidatePath()` | Свежие в пределах TTL или сразу после вебхука | **Почти как SSG** (stale-while-revalidate из кэша CDN/сервера) | **Отличное** | Каталоги e-commerce (10 000+ товаров), новостные порталы, CMS-блоги, крупные Базы Знаний |
+| **SSR (Dynamic Rendering)** | На **каждый** HTTP-запрос на сервере | `cookies()`, `headers()`, `connection()`, `await searchParams` (в `page.tsx`), `export const dynamic = 'force-dynamic'`, `fetch(..., { cache: 'no-store' })` | **Всегда актуальные** (под конкретного юзера / запрос) | Ниже (зависит от задержки БД/API и CPU сервера) | **Хорошее** (полный HTML, но выше TTFB) | Личные кабинеты, корзина/чекаут, персонализированные ленты, страницы живой поисковой выдачи |
+| **Streaming SSR (`<Suspense>`)** | Каркас отправляется сразу; медленные блоки досылаются чанками HTML в том же HTTP-ответе | `loading.tsx` (на уровне маршрута) или явный `<Suspense fallback={...}>` вокруг `async` Server Components | Актуальные по каждому блоку | **Быстрый TTFB** (пользователь сразу видит layout и скелетон вместо белого экрана) | **Хорошее** (краулеры дожидаются стрима) | Сложные дашборды, карточки товаров с медленными отзывами/рекомендациями, MDX с тяжёлой подсветкой кода |
+| **CSR (Client Islands / SPA)** | Пустая/скелетонная оболочка в HTML; данные грузятся и рисуются в браузере | `'use client'` + `TanStack Query` / `useEffect` / `EventSource`, либо `next/dynamic(..., { ssr: false })` | Реальное время в браузере (polling, SSE, WebSockets, мутации) | Мгновенный каркас; данные после гидратации JS | **Слабое** для данных, грузящихся только в браузере | Живые логи телеметрии, админские таблицы с фильтрами/пагинацией, Canvas/D3/XYFlow песочницы, модалки |
+| **PPR и `'use cache'` (Next.js 15–16)** | Статический каркас строится на билде + динамические «дыры» `<Suspense>` заполняются на запросе + кэшированные подкомпоненты | `cacheComponents: true` (`next.config.ts`), директива `'use cache'`, `cacheLife()`, `cacheTag()` | Гибрид: статика + кэш блоков + живые вставки | **Лучшее от SSG и SSR** на одном URL | **Отличное** | Карточка товара (статическое описание + кэш отзывов + живая корзина/приветствие), гибридные SaaS-страницы |
+
+---
+
+## 2. Какие компоненты используются в каждом режиме?
+
+Очень частая путаница — смешивать **стратегию рендеринга (SSG / SSR / ISR)** и **тип компонента (Server Component vs Client Component)**. Это две разные, независимые оси:
+
+| Тип компонента | Где исполняется | Что умеет делать | Чего делать НЕ может | Роль в SSG / SSR / ISR |
+| :--- | :--- | :--- | :--- | :--- |
+| **Server Component (RSC)** _(по умолчанию, без директив)_ | **Только на сервере** (на билде в SSG или на запросе в SSR) | `async/await` прямо в теле компонента, чтение `fs`, запросы в PostgreSQL/Prisma, доступ к секретам/env, тяжёлые либы (`shiki`, `unified`, `gray-matter`) при **`0 КБ` клиентского JS** | Нет `useState`, `useEffect`, `onClick`, `window`, `localStorage` и DOM-событий | Генерирует статический HTML (SSG/ISR) или динамический HTML (SSR) и отдаёт RSC-пейлоад |
+| **Client Component** _(`'use client'`)_ | **И там, и там!** Пререндерится в начальный HTML на сервере (SSG/SSR) **И** гидратируется в браузере | `useState`, `useRef`, `useEffect`, обработчики событий, `TanStack Query`, `Zustand`, `Radix UI`, `EventSource`, `window`/`document` | Не может быть `async`-компонентом; не может импортировать `node:fs` и серверные секреты | Создаёт интерактивные «острова» (`Header`, `ThemeToggle`, таблицы, модалки, фильтры) поверх SSG/ISR/SSR |
+| **Client-Only Lazy Island** _(`next/dynamic(..., { ssr: false })`)_ | **Только в браузере** (пропускается при генерации HTML на сервере) | Безопасно монтирует тяжёлые или строго браузерные библиотеки (`D3.js`, `XYFlow`, `Canvas`, ленивые `Dialog`-модалки) с `0 КБ` в стартовом чанке | На сервере рендерит только `loading`-заглушку (не виден без JS) | Держит начальный бандл минимальным для сложных визуализаций и модалок |
+
+### Паттерн композиции (Slot Pattern): как соединить RSC и Client Component
+
+Клиентский компонент **не может напрямую сделать `import` серверного компонента**, **но** серверный компонент **может передать другой серверный компонент через `children` или именованный проп (`ReactNode`) внутрь клиентского!**
+
+```tsx title="Паттерн в нашем /cv (CvDocumentShowcase -> CvViewTabs)"
+// Server Component (0 КБ клиентского JS — читает fs и выбирает активную локаль)
+export function CvDocumentShowcase({ locale }: { locale: SupportedLocale }) {
+  const structuredResumeNode = <StructuredResumeServerView locale={locale} />
+
+  // Client Component управляет вкладками, а structuredResumeNode остаётся чистым RSC!
+  return <CvViewTabs pdfUrl={pdfUrl} structuredSlot={structuredResumeNode} />
+}
+```
+
+Итог: поисковые роботы получают полный семантический HTML резюме при SSG, а трёхъязычный словарь резюме (`18.7 КБ`) вообще не попадает в клиентский JS-бандл.
+
+---
+
+## 3. Точные методы и API в Next.js 16 (шпаргалка с кодом)
+
+### A. Static Rendering (SSG)
+Используется, когда страница одинакова для всех посетителей данного URL/локали.
+
+```tsx
+// 1. Предгенерация динамических сегментов URL на этапе сборки:
+export function generateStaticParams() {
+  return [
+    { locale: 'en', slug: ['this-project', 'knowledge-engine'] },
+    { locale: 'ru', slug: ['this-project', 'knowledge-engine'] },
+  ]
+}
+
+// 2. Мгновенный 404 для любого слага вне generateStaticParams (запрет on-demand SSR):
+export const dynamicParams = false
+
+// 3. Принудительный SSG для Route Handlers (например, /search-index/[locale], /llms.txt):
+export const dynamic = 'force-static'
+```
+
+### B. Dynamic Rendering (SSR)
+В Next.js App Router редко нужно вручную писать `export const dynamic = 'force-dynamic'` — вызов **любого динамического Request API** автоматически переводит маршрут в SSR на каждый запрос:
+
+```tsx
+import { cookies, headers } from 'next/headers'
+import { connection } from 'next/server'
+
+export default async function DynamicUserPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string }>
+}) {
+  // ЛЮБАЯ из этих строк переключает маршрут из SSG -> SSR:
+  const cookieStore = await cookies()          // 1. Чтение cookie
+  const headerList = await headers()           // 2. Чтение HTTP-заголовков
+  const { tab } = await searchParams           // 3. Чтение query-параметров в page.tsx
+  await connection()                           // 4. Явный отказ от статики (Next.js 15+)
+
+  // 5. Некэшируемый fetch (в Next.js 15+ по умолчанию не кэшируется без явного opt-in):
+  const res = await fetch('https://api.example.com/me', { cache: 'no-store' })
+  // ...
+}
+```
+
+> [!WARNING]
+> **Главная ловушка Next.js — случайный каскадный SSR из `layout.tsx`:**
+> Если вызвать `await cookies()` или `await headers()` в корневом `app/[locale]/layout.tsx`, это **автоматически отключит SSG для ВСЕХ дочерних страниц всего сайта**!
+> Именно поэтому в нашем проекте `kb_access_token` **не читается** в `layout.tsx`: проверка авторизации идёт либо на **Edge (`src/proxy.ts`)** до рендера страницы, либо реактивно на клиенте через **TanStack Query (`GET /api/auth/me`)** — благодаря этому все страницы остаются быстрым SSG.
+
+### C. Incremental Static Regeneration (ISR) и `'use cache'` в Next.js 16
+
+```tsx
+// 1. Time-based ISR на уровне маршрута (пересборка не чаще раза в 60 секунд):
+export const revalidate = 60
+
+// 2. Кэширование fetch с тегами (сброс по требованию через revalidateTag):
+const res = await fetch('https://api.example.com/posts', {
+  next: { revalidate: 3600, tags: ['posts'] },
+})
+
+// 3. On-Demand ISR (внутри вебхука Route Handler или Server Action):
+import { revalidatePath, revalidateTag } from 'next/cache'
+
+export async function POST() {
+  revalidateTag('posts', 'max') // профиль инвалидации в Next.js 16
+  revalidatePath('/knowledge-base')
+  return Response.json({ revalidated: true })
+}
+
+// 4. Next.js 16 — кэширование на уровне функции/компонента ('use cache' + cacheComponents):
+import { cacheLife, cacheTag } from 'next/cache'
+
+async function getPublishedCatalog() {
+  'use cache'
+  cacheLife('hours')
+  cacheTag('catalog')
+  return db.article.findMany({ where: { published: true } })
+}
+```
+
+### D. Streaming SSR через `<Suspense>` и `loading.tsx`
+
+Чтобы не задерживать весь HTML до завершения самого медленного запроса или парсера, медленный `async` Server Component оборачивается в `<Suspense>`:
+
+```tsx
+// На уровне маршрута: файл `loading.tsx` рядом с `page.tsx` автоматически оборачивает страницу в <Suspense>.
+// Точечно на уровне блока: заголовок, хлебные крошки и TL;DR уходят в браузер мгновенно!
+export default async function ArticlePage() {
+  return (
+    <article>
+      <ArticleHeader /> {/* Уходит в первом чанке HTML мгновенно */}
+      <Suspense fallback={<ArticleBodySkeleton />}>
+        <MdxArticleRenderer hast={article.hast} codeBlocks={article.codeBlocks} />
+      </Suspense>
+    </article>
+  )
+}
+```
+
+---
+
+## 4. Карта рендеринга маршрутов в нашем проекте (`greatest-portfolio`)
+
+| Маршрут в `apps/web/src/app` | Стратегия | Используемые API / механизмы | Почему выбрано именно так |
+| :--- | :--- | :--- | :--- |
+| `/[locale]` (`/`, `/ua`, `/ru`) | **SSG + Client Islands** | `generateStaticParams()`, Server Components (`pickLocalized`), нарезанный `<NextIntlClientProvider>` | Мгновенный TTFB главной и идеальное SEO; интерактивные Tech Radar и Roadmap гидратируются точечно |
+| `/[locale]/cv` | **SSG + Server-Island Slot** | `CvDocumentShowcase` (RSC) ➔ `CvViewTabs` (`forceMount`) + `React.cache` поиска PDF | Краулеры индексируют весь ATS-HTML резюме, а 3-язычный словарь профиля весит `0 КБ` в клиентском JS |
+| `/[locale]/knowledge-base` | **SSG + Client Filter Island** | `getKnowledgeTree()`, `<Suspense fallback={<KnowledgeDirectorySkeleton />}>` | Мгновенный статический каталог; фильтры по `#тегам` и форматам работают локально без задержек |
+| `/[locale]/knowledge-base/[...slug]` | **SSG + Streaming `<Suspense>` + Edge Proxy** | `generateStaticParams()`, `dynamicParams = false`, `React.cache` + `mtimeMs`, `<Suspense>`, `proxy.ts` HS256 JWT | Нулевая нагрузка на БД в рантайме; `proxy.ts` проверяет права на закрытых ветках за `< 0.2 мс`, не ломая SSG |
+| `/[locale]/system-status` | **SSG-каркас + CSR Live Inspector** | Статический RSC-каркас + `TanStack Query` (`useQuery` / `useInfiniteQuery`) + синглтон `EventSource` (SSE) | Каркас собирается без доступа к БД в Docker/CI; живые capabilities, пагинация и SSE грузятся на клиенте |
+| `/search-index/[locale]`, `/llms.txt`, `/robots.txt`, `/sitemap.xml` | **Static Route Handlers (`force-static`)** | `export const dynamic = 'force-static'`, `generateStaticParams()` | Предсобранные JSON/TXT/XML файлы отдаются на скорости CDN без вычислений в рантайме |
+| `/[locale]/opengraph-image` | **Image Route (`next/og`)** | `ImageResponse` (Satori + встроенный шрифт `Inter` TTF) | Детерминированные локализованные превью-карточки 1200×630 без сетевых запросов за шрифтами |
+
+---
+
+## 5. Шпаргалка выбора стратегии за 10 секунд
+
+1. **Контент одинаков для всех и меняется только при деплое?** ➔ **SSG** (`generateStaticParams` / `force-static`).
+2. **Контент одинаков для всех, но обновляется из CMS/БД/API по расписанию или вебхуку?** ➔ **ISR** (`revalidate` / `revalidateTag` / `'use cache'`).
+3. **Страница зависит от текущего юзера, cookie, заголовков или фильтров URL и должна индексироваться?** ➔ **SSR + Streaming `<Suspense>`**.
+4. **Интерактивный виджет, живой SSE-поток, модалка или админская таблица, которым не нужно SEO?** ➔ **SSG-каркас + Client Island (`'use client'` + `TanStack Query` / `next/dynamic({ ssr: false })`)**.
+5. **На одном URL смешаны статический каркас и маленькие персональные/живые блоки?** ➔ **SSG/PPR-каркас + `<Suspense>`** (либо `'use cache'` для общих блоков + динамический/клиентский остров для пользовательских данных).

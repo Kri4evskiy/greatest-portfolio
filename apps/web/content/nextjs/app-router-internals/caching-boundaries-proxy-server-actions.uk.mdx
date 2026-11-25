@@ -1,0 +1,116 @@
+---
+title: "Внутрішня будова Next.js 16: 4 шари кешу, межі RSC, proxy.ts та Server Actions"
+sidebarLabel: "4 шари кешу, межі та proxy.ts"
+summary: "Ключові механізми Next.js App Router, без яких складно розуміти реальний production-код: 4 шари кешування, чому 'use client' усе одно виконується на SSR, правила серіалізації пропсів, Edge proxy.ts (колишній middleware.ts), Server Actions vs Route Handlers vs NestJS API, а також нюанси помилок і prefetch."
+category: "nextjs"
+format: "deep-dive"
+tags: ["nextjs", "caching", "rsc", "proxy", "server-actions", "hydration", "architecture"]
+readingTime: "9 хв"
+publishedAt: "2026-11-25"
+order: 2
+tldr:
+  - "У Next.js працюють **4 незалежні шари кешування** (`Request Memoization`, `Data Cache`, `Full Route Cache`, `Router Cache`) — розуміння їхньої області життя вирішує 90% загадок «чому дані не оновилися?»."
+  - "`'use client'` **не означає** «тільки CSR у браузері»: директива задає **мережеву межу Server ➔ Client**. Клієнтські компоненти все одно пререндеряться в HTML на сервері, якщо не ізольовані через `next/dynamic(..., { ssr: false })`."
+  - "У Next.js 16 Edge-перехоплення перенесено у `src/proxy.ts` (виконується до кешу та роутів), `params`/`searchParams` стали асинхронними (`await params`), а вибір між **Server Actions**, **Route Handlers** і **зовнішнім NestJS API** визначається архітектурою бекенду."
+---
+
+## 1. Чотири шари кешування в Next.js App Router
+
+Більшість незрозумілих ситуацій у Next.js виникають через те, що «кеш» сприймають як один перемикач. Насправді працюють **4 різні шари**:
+
+| Шар кешу | Де живе | Що кешує | Час життя | Як керувати / скидати |
+| :--- | :--- | :--- | :--- | :--- |
+| **1. Request Memoization** | RAM сервера (на один рендер) | Результати однакових `GET fetch()` і викликів `React.cache(fn)` | **Один HTTP-запит** (очищується одразу після відповіді) | Автоматично; у `React.cache` передавай примітивні ключі (`segments.join('/')`), а не нові масиви |
+| **2. Data Cache** | Диск / CDN / сховище сервера | Відповіді `fetch(..., { cache: 'force-cache' })` і функцій із `'use cache'` | Живе **між запитами та деплоями** до ревалідації | `revalidate`, `revalidateTag()`, `revalidatePath()`, `cacheLife()`, `cacheTag()` |
+| **3. Full Route Cache** | Диск сервера / CDN | Попередньо зібраний **HTML + RSC Payload** для статичних маршрутів (SSG / ISR) | До нового деплою або фонової ISR-перебудови | Автоматично обходиться на динамічних SSR-роутах (`cookies()`, `headers()`, `no-store`) |
+| **4. Router Cache** | **RAM браузера** (клієнт) | RSC-пейлоади відвіданих і передзавантажених `<Link>` під час SPA-навігації | Поточна сесія вкладки (до `router.refresh()`) | `router.refresh()`, `revalidatePath()` із Server Action або `<Link prefetch={false}>` |
+
+### Чому в нашому проєкті `React.cache()` використовує рядковий ключ
+
+За один запит сторінки Next.js окремо викликає `generateMetadata({ params })` і `Page({ params })` — і передає туди **два різні екземпляри масиву** `slug: string[]`. Оскільки `React.cache()` порівнює аргументи через `Object.is`:
+
+```typescript title="Дедуплікація за примітивним ключем (mdx-fs-loader.ts)"
+// ❌ Промах кешу між generateMetadata() і Page(), бо ['a', 'b'] !== ['a', 'b']
+const badLoader = cache((segments: string[]) => parseArticle(segments))
+
+// ✅ Влучання в кеш: примітивний рядок 'a/b' === 'a/b'
+const getArticleByRouteKey = cache((routeKey: string, locale: SupportedLocale) => {
+  return loadArticle(routeKey, locale)
+})
+```
+
+---
+
+## 2. Межа `'use client'`, гідратація та правила серіалізації
+
+### Головний міф: «`'use client'` означає, що компонент виконується тільки в браузері»
+**Ні.** Директива `'use client'` позначає **межу модулів** між серверним графом (RSC) і клієнтським графом:
+1. Під час **SSG або SSR** Next.js **усе одно виконує** клієнтський компонент на сервері, щоб віддати готовий початковий HTML (для швидкого FCP і SEO).
+2. У браузері React завантажує JS-чанк і **гідратує** цей HTML (приєднує `onClick` і запускає `useEffect`).
+3. **Золоте правило:** усе, що імпортовано всередині `'use client'` файлу, автоматично потрапляє до браузерного JS-бандлу — тому опускай `'use client'` максимально вниз до «листків» дерева (client islands).
+
+### Як уникати помилок гідратації (Hydration Mismatch)
+Ніколи не читай браузерні або недетерміновані значення безпосередньо в тілі рендера Client Component:
+
+- ❌ Пряме читання `localStorage.getItem(...)`, `window.innerWidth`, `Date.now()` чи `Math.random()` у тілі компонента дасть різний HTML на сервері та в браузері.
+- ✅ Читай `sessionStorage`/`localStorage` у `useEffect` (як наш `hydrateKbFoldersFromSession()`), для Zero-FOUC тем використовуй синхронний `<script>` у `<head>` (`PALETTE_INIT_SCRIPT`), а суто браузерні віджети (`D3`, `XYFlow`, модалки) виноси через `next/dynamic(() => import('./widget'), { ssr: false })`.
+
+### Що можна передавати через межу Server ➔ Client у пропсах?
+
+| Дозволено (серіалізується React Flight) | Заборонено (помилка серіалізації) |
+| :--- | :--- |
+| Примітиви (`string`, `number`, `boolean`, `null`, `undefined`) | Звичайні функції/колбеки (`onClick={() => ...}`), створені у Server Component |
+| Прості об'єкти та масиви (`MdxArticleFrontmatter[]`) | Екземпляри класів (`new PrismaClient()`, класи з методами) |
+| `Date`, `TypedArray`, `Promise` (розпаковується через React 19 `use()`) | DOM-вузли, локальні `Symbol`, Node-стріми |
+| **`ReactNode` / JSX-слоти** (готові RSC-дерева через `children` або `structuredSlot`) | Сирі з'єднання з БД |
+| **Server Actions** (функції з `'use server'`) | Замикання на серверні модулі |
+
+> [!NOTE]
+> **Правило безпеки (`NEXT_PUBLIC_`):** у клієнтський JS-бандл інлайняться **лише** змінні з префіксом `NEXT_PUBLIC_`. Секрети (`JWT_SECRET`, `DATABASE_URL`, `API_INTERNAL_URL`) без префікса залишаються суворо на сервері, а `import 'server-only'` гарантовано зупинить збірку, якщо хтось випадково імпортує серверний файл у `'use client'`.
+
+---
+
+## 3. Edge `proxy.ts` у Next.js 16 та асинхронні Request API
+
+### `src/proxy.ts` (заміна `middleware.ts` у Next.js 16)
+`proxy.ts` спрацьовує **до** Full Route Cache, Route Handlers і Server Components на кожному відповідному запиті:
+
+```text
+Вхідний HTTP-запит
+  ➔ 1. headers() / redirects() із next.config.ts
+  ➔ 2. src/proxy.ts (Edge Web Crypto HS256 JWT + next-intl роутинг локалей)
+  ➔ 3. rewrites() із next.config.ts (/api/* ➔ NestJS :4000)
+  ➔ 4. Full Route Cache / Route Handler / рендер RSC
+```
+
+**Три жорсткі правила для `proxy.ts`:**
+1. **Час виконання `< 1 мс`:** жодних важких запитів до Prisma чи великих бібліотек усередині `proxy.ts`. Перевіряй stateless JWT через нативний Web Crypto `crypto.subtle` (`< 0.2 мс`, `0 КБ` залежностей).
+2. **Явні виключення в `config.matcher`:** метадані без розширення файлу (`icon`, `apple-icon`, `opengraph-image`, `search-index`, `api`, `_next`) обов'язково виключаються в `matcher`, інакше `next-intl` перехопить їх як локаль.
+3. **Не виключай усе підряд маскою `.*\\..*`:** перелічуй конкретні розширення статики (`ico|png|svg|css|js|woff2|...`), інакше майбутній слаг із крапкою (наприклад, `/knowledge-base/next.js-16`) обійде Edge-авторизацію.
+
+### Асинхронні `params`, `searchParams` і `next/root-params`
+У Next.js 15–16 `params`, `searchParams`, `cookies()` і `headers()` — це **Promise** (`const { locale, slug } = await params`). А в Next.js 16 нативний API `next/root-params` (`await rootParams.locale()`) замінює застарілий `setRequestLocale()` із `next-intl`, дозволяючи Server Components і `request.ts` читати кореневу локаль без зламу SSG.
+
+---
+
+## 4. Мутації та API: Server Actions vs Route Handlers vs Зовнішній бекенд (`NestJS`)
+
+| Механізм | Для чого підходить найкраще | Плюси | Компроміси / коли НЕ використовувати |
+| :--- | :--- | :--- | :--- |
+| **Server Actions (`'use server'`)** | Невеликі full-stack Next.js-застосунки без окремого бекенду (форми, CRUD прямо в БД) | Мінімум бойлерплейту, вбудовані `revalidatePath` / `revalidateTag`, інтеграція з React 19 `useActionState` / `useOptimistic` | Внутрішній POST-протокол (не REST для зовнішніх клієнтів), послідовна черга викликів, не підходить для SSE та мікросервісів |
+| **Route Handlers (`route.ts`)** | Статичні JSON/TXT артефакти (`/search-index/[locale]`, `/llms.txt`), вебхуки, OAuth-колбеки, тонкий BFF | Повний контроль над HTTP-методами, статусами, `Cache-Control`, директива `force-static` | Не замінює повноцінний доменний бекенд із NestJS DI, TCP-мікросервісами та довгоживучим SSE |
+| **Зовнішній API (`NestJS` + `Axios` + `TanStack Query`)** | Мультиклієнтські й мікросервісні системи, живий SSE, розподілений Redis rate limiter, RBAC API | Чітке розділення шарів, незалежне масштабування, спільні Zod-контракти, доступність для мобілок/MCP | Потребує same-origin rewrite `/api/*` (або CORS) та явного керування клієнтським кешем |
+
+У `greatest-portfolio` ми свідомо поєднуємо два підходи: **`route.ts` (`force-static`)** для статичного `/search-index/[locale]` і `/llms.txt`, та **`NestJS + Axios + TanStack Query`** для HttpOnly JWT-авторизації, аналітики статей і живого SSE-потоку.
+
+---
+
+## 5. Межі помилок, `notFound()` та пастка `<Link prefetch>`
+
+1. **Ієрархія обробки помилок:**
+   - `app/[locale]/error.tsx` — **має бути `'use client'`**, ловить помилки всередині `[locale]/*`, зберігаючи робочий `LocaleRootLayout` (хедер, футер, тему) та кнопку `reset()`.
+   - `app/global-error.tsx` — аварійний fallback при падінні самого кореневого layout; **має рендерити власні `<html>` і `<body>`** та імпортувати `./globals.css`.
+   - `app/[locale]/not-found.tsx` — чистий Server Component, що викликається через `notFound()` (або catch-all `[...rest]/page.tsx`) із `robots: { index: false, follow: false }`.
+2. **Пастка дефолтного `<Link prefetch>`:**
+   - За замовчуванням Next.js передзавантажує кожен `<Link>`, який потрапив у viewport. У сайдбарі або каталозі з 50–100 посилань (а тим більше на закритих роутах для гостей) це створює десятки зайвих RSC-запитів і зайві `307`-редиректи.
+   - Явний `prefetch={false}` на посиланнях дерева сайдбару (як у нашому `KnowledgeTreeItem`) тримає вкладку Network чистою, зберігаючи швидкі SPA-переходи за кліком.

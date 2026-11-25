@@ -78,6 +78,8 @@ export const INITIAL_ARTICLE_SEEDS: readonly ArticleMetricSeed[] = [
 export const KNOWN_KNOWLEDGE_SLUGS: ReadonlySet<string> = new Set([
   ...INITIAL_ARTICLE_SEEDS.map((item) => item.slug),
   'gof-design-patterns-in-typescript-and-nestjs',
+  'nextjs--app-router-internals--caching-boundaries-proxy-server-actions',
+  'nextjs--rendering-caching--ssg-ssr-isr-ppr-complete-guide',
   'others--security--zero-trust-web-security-in-ai-agent-era',
   'react--compiler--auto-memoization-rules',
   'react--compiler--debugging-opt-out-directives',

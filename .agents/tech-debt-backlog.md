@@ -163,10 +163,19 @@ _Область:_ `apps/web/content/this-project/**`, `.github/**`, `README.md`,
 - [ ] **Авторский редизайн Workfolio (`UI v2`):** глубокое визуальное и типографическое переосмысление интерфейса поверх готового фундамента (`Tailwind CSS v4`, 2D-палитры `Warm Paper / Graphite / Sepia`, Zero-CLS шрифты `Inter` + `JetBrains Mono`, `@starting-style`, `@container`), включая точечное применение современных примитивов React 19.2+ (`<Activity>` для сохранения состояния скрытых табов без размонтирования, `useEffectEvent` для чтения актуальных значений в эффектах без лишних переподписок и опциональные `<ViewTransition>`), строго следуя `.agents/frontend/*` (Mobile-First с опорой на `360px`).
 - [ ] **Новый роут `/[locale]/lab` (Engineering Lab / Interactive Playground):**
   - **Зачем:** отделить тяжёлые интерактивные песочницы от текстовых `.mdx`-статей, получить полноэкранный canvas вместо узкой `prose`-колонки и изолировать бандлы через route-level code-splitting.
-  - **Структура (FSD-Modular):** новый слайс `apps/web/src/features/interactive-labs/*` + роуты `apps/web/src/app/[locale]/lab/page.tsx` и `apps/web/src/app/[locale]/lab/[slug]/page.tsx`, кнопка перехода в шапке (`APP_ROUTES.lab`).
-  - **Первые лаборатории:**
-    1. _React Ecosystem — `@xyflow/react` Interactive Architecture Canvas:_ drag-and-drop узлы, кастомные edges, переключение режимов (Monorepo / Request Lifecycle / Edge Auth), мини-карта, экспорт графа + боковая карточка со ссылкой на соответствующую статью в `/knowledge-base/this-project/*`.
-    2. _React Render Tree & TanStack Query Cache Lab:_ перенос/расширение интерактивных D3-демо в полноценную песочницу с двусторонними ссылками из Базы Знаний.
+  - **Структура (FSD-Modular):** новый слайс `apps/web/src/features/interactive-labs/*` + реестр `entities/interactive-lab/lab-registry.ts` + роуты `apps/web/src/app/[locale]/lab/page.tsx` и `apps/web/src/app/[locale]/lab/[slug]/page.tsx`, кнопка перехода в шапке (`APP_ROUTES.lab`).
+  - **Двусторонняя синхронизация `Knowledge Base ↔ Lab` (без ручного дублирования и битых ссылок):**
+    - Единый типизированный реестр `LAB_REGISTRY` хранит `slug`, локализованные метаданные, `relatedArticlePaths` (массив `routePath` из Базы Знаний) и `backendCapabilities` (например, `['redisCache']`).
+    - **`KB ➔ Lab` (автоматически):** на странице статьи `[...slug]/page.tsx` сервер вызывает `getLabsForArticle(article.routePath)` и автоматически рендерит карточку-переход **«Open Interactive Lab ➔ `/lab/<slug>?from=<routePath>`»** без ручных правок в 3 локалях `.mdx` (плюс опциональная директива `::lab{slug="..."}` для точечной вставки в текст).
+    - **`Lab ➔ KB`:** внутри `/lab/[slug]` отображается кнопка возврата `← Back to Article` (из `?from=...`), боковая панель со всеми `relatedArticlePaths`, а в `XYFlow` клик по конкретному узлу открывает карточку со ссылкой на соответствующую статью.
+    - **CI-страховка:** unit-тест в Vitest проверяет, что каждый `routePath` из `LAB_REGISTRY` существует среди реальных `.mdx`-файлов (0 битых ссылок при рефакторинге статей).
+  - **Связка с бэкендом (`NestJS` + `Redis` + `PostgreSQL` + `SSE`) и Capability Gating:**
+    - _Клиентские лаборатории (работают всегда, включая offline/demo):_
+      1. `@xyflow/react` Interactive Architecture Canvas — drag-and-drop узлы, кастомные edges, режимы Monorepo / Request Lifecycle / Edge Auth, мини-карта, экспорт графа + переходы в `/knowledge-base/this-project/*`.
+      2. React 19 Compiler & Render Tree Lab — расширение D3-демо в интерактивную песочницу мемоизации и TanStack Query кэша.
+    - _Full-Stack лаборатории (поверх Приоритета №1 — Redis):_
+      3. **Redis Rate Limiter & Cache-Aside Sandbox (`/lab/redis-playground`):** кнопка «Burst 10 requests» в песочный эндпоинт NestJS — в UI в реальном времени видны `Cache MISS (PostgreSQL)` ➔ `Cache HIT (Redis)` через `Server-Timing`, остаток окна лимитера, реальный `429 Too Many Requests` и живые события в SSE-логе (с graceful fallback в `In-Memory Simulation Mode` по `/api/capabilities`, если `REDIS_URL` не задан).
+      4. _(Опционально)_ сохранение пользовательских пресетов/графов в PostgreSQL (Prisma) для `USER`/`ADMIN`.
 
 ---
 
