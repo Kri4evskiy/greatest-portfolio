@@ -1,26 +1,29 @@
 ---
-title: "Global Cmd+K Search: Static SSG Route Index & On-Demand Lazy Prefetching"
-sidebarLabel: "Cmd+K Search & SSG Index"
-summary: "How to architect instant global search across 100+ engineering notes without an external database or initial HTML/JS bloat: a static Route Handler, lazy next/dynamic modal loading, Zod-validated client caching, stale-locale protection, and Hybrid KB lock badges."
+title: "Global Cmd+K Search: Static SSG Index, MiniSearch & Docs-as-Code Trade-Offs"
+sidebarLabel: "Cmd+K Search, MiniSearch & ADR"
+summary: "How Workfolio delivers instant fuzzy Cmd+K search with zero initial HTML/JS bloat: static /search-index/[locale] SSG route, shared Zod contract, bounded module-scope caching, MiniSearch engine, Hybrid KB soft-lock UX, and the ADR comparing Git MDX + SSG vs PostgreSQL CMS."
 category: "this-project"
 format: "deep-dive"
-tags: ["cmdk", "search", "nextjs", "ssg", "performance"]
-readingTime: "6 min"
-publishedAt: "2026-11-10"
+tags: ["cmdk", "search", "minisearch", "zod", "nextjs", "ssg", "performance", "adr"]
+readingTime: "8 min"
+publishedAt: "2026-11-25"
 order: 2
 tldr:
-  - "Decouples the search index from the root `layout.tsx` into a static SSG endpoint (`/search-index/[locale]`), eliminating `100%` of index payload overhead from initial page HTML."
-  - "Keeps `CommandPaletteModal` and Radix `Dialog` completely out of the initial route JS bundle via `CommandPaletteLoader` (`next/dynamic` with `ssr: false`)."
-  - "Validates fetched JSON at runtime with Zod (`KnowledgeSearchPayloadSchema`), deduplicates in-flight promises in `search-index-client.ts`, guards against stale-locale flashes via `{ locale, payload }` state, and applies Hybrid KB lock rules (`isPublicKnowledgeBasePath`)."
+  - "Decouples the search index from root `layout.tsx` into a static SSG route (`/search-index/[locale]`) and lazy-loads `ui/command-palette-modal.tsx` via `CommandPaletteLoader` (`next/dynamic`, `ssr: false`), keeping initial page HTML/JS overhead at `0 KB`."
+  - "Validates fetched JSON against the single-source-of-truth `KnowledgeSearchPayloadSchema` from `@repo/shared-schemas`, deduplicates concurrent fetches with bounded module-scope `Map` caches (`resolvedCache` + `inflightCache`), and reads cache synchronously via `getCachedKnowledgeSearchIndex()` to prevent 1-frame spinner flashes."
+  - "Runs typo-tolerant fuzzy + prefix search in `< 1 ms` via `MiniSearch` (`lib/filter-command-entries.ts`) with Hybrid KB soft-lock grouping (`This Project` vs protected notes), and documents the explicit ADR on why Docs-as-Code (Git MDX + SSG) beats a full PostgreSQL CMS up to ~300–500 articles."
 ---
 
 ## 1. Zero Initial HTML & JS Overhead in the Root `layout.tsx`
 
-If the root `apps/web/src/app/[locale]/layout.tsx` serialized a full `searchIndex` array as props—or imported `CommandPaletteModal` and its Radix `Dialog` primitives eagerly—every visitor would pay for the entire Knowledge Base index in HTML/RSC payloads and modal UI JavaScript on initial page load, even if they never press `Cmd+K`.
+If the root `apps/web/src/app/[locale]/layout.tsx` serialized a full `searchIndex` array as props—or imported `CommandPaletteModal` and its Radix `Dialog` + `MiniSearch` code eagerly—every visitor would pay for the entire Knowledge Base index in HTML/RSC payloads and modal UI JavaScript on initial page load, even if they never press `Cmd+K`.
 
-We eliminate both costs with a two-part split:
+We eliminate both costs with a modular split inside `apps/web/src/features/search/`:
 
-1. **Lazy UI Shell (`CommandPaletteLoader`):** `app/[locale]/layout.tsx` mounts only the tiny `CommandPaletteLoader` shortcut listener, which dynamically imports `CommandPaletteModal` with `ssr: false` on first open:
+- `command-palette-loader.tsx` — tiny global `Cmd+K` / `Ctrl+K` listener mounted in `layout.tsx`.
+- `search-index-client.ts` — client fetch, deduplication, Zod validation, and in-memory cache.
+- `lib/filter-command-entries.ts` — pure `MiniSearch` engine, `#tag` mode, and Public/Protected grouping (unit-tested in `__tests__/filter-command-entries.test.ts`).
+- `ui/command-palette-modal.tsx` & `ui/command-palette-item.tsx` — lazy-loaded Radix `Dialog` shell and result row atoms.
 
 ```tsx title="apps/web/src/features/search/command-palette-loader.tsx"
 'use client'
@@ -31,7 +34,7 @@ import { useEffect, useState } from 'react'
 import { useIsCommandPaletteOpen, useUIActions } from '@/shared/store/use-ui-store'
 
 const LazyCommandPaletteModal = dynamic(
-  () => import('./command-palette-modal').then((m) => m.CommandPaletteModal),
+  () => import('./ui/command-palette-modal').then((m) => m.CommandPaletteModal),
   { ssr: false },
 )
 
@@ -61,13 +64,13 @@ export function CommandPaletteLoader({ locale }: { locale: SupportedLocale }) {
 }
 ```
 
-2. **Decoupled Static Index:** article metadata is served from a dedicated static JSON endpoint (`/search-index/[locale]`) instead of being embedded in layout props.
-
 ---
 
-## 2. Static SSG Route Handler (`/search-index/[locale]`)
+## 2. Static SSG Route Handler (`/search-index/[locale]`) & Shared Zod Contract
 
-The route handler `apps/web/src/app/search-index/[locale]/route.ts` declares `export const dynamic = 'force-static'` alongside `generateStaticParams()`. During `next build`, it invokes the React `cache()`-memoized projections `getKnowledgeSearchIndex(resolvedLocale)` and `getAllKnowledgeTags(resolvedLocale)` from `apps/web/src/entities/knowledge-content/lib/mdx-search-index.ts` (without serializing HAST content trees) and sets CDN-friendly `Cache-Control` headers:
+In Next.js App Router, HTTP Route Handlers are mapped by folder structure: `apps/web/src/app/search-index/[locale]/route.ts` serves `GET /search-index/en`, `/search-index/uk`, and `/search-index/ru` (explicitly excluded from `next-intl` redirects inside `apps/web/src/proxy.ts` `config.matcher`).
+
+With `export const dynamic = 'force-static'` and `generateStaticParams()`, `next build` pre-renders all three localized JSON payloads at build time—zero runtime disk reads or database queries:
 
 ```typescript title="apps/web/src/app/search-index/[locale]/route.ts"
 import { DEFAULT_LOCALE, SUPPORTED_LOCALES, SupportedLocaleEnum } from '@repo/shared-schemas'
@@ -99,15 +102,17 @@ export async function GET(_request: Request, context: { params: Promise<{ locale
 }
 ```
 
-Each `KnowledgeSearchItem` contains the article `routePath`, localized `topicLabel` and `subtopicLabel`, `sidebarLabel`, `summary`, `format`, `readingTime`, `#tags`, and `h2/h3` heading anchors (`id` + `text`) for deep-linking directly to a specific subsection (`/en/knowledge-base/...#section-id`).
+Both the server projection (`mdx-types.ts` re-exporting `KnowledgeSearchItem`) and the browser validator import `KnowledgeSearchPayloadSchema` from `@repo/shared-schemas/src/knowledge.schema.ts`. Sharing a single Zod schema prevents silent structural drift between server JSON and client validation.
 
 ---
 
-## 3. Zod-Validated In-Memory Loader & Hover Prefetch
+## 3. Bounded Module-Scope Cache, Deduplication & Zero-Flash Hydration
 
-In `apps/web/src/features/search/search-index-client.ts`, two `Map` instances (`resolvedCache` and `inflightCache`) cache resolved payloads and deduplicate concurrent requests. Instead of trusting `res.json()` with an unsafe type assertion, the client validates the raw payload at runtime against `KnowledgeSearchPayloadSchema` (reusing `KnowledgeCategoryEnum` and `KnowledgeNoteFormatEnum` from `@repo/shared-schemas`) and falls back gracefully to `EMPTY_PAYLOAD` on HTTP errors, network failures, or schema drift:
+In `apps/web/src/features/search/search-index-client.ts`, two module-scope `Map` instances (`resolvedCache` and `inflightCache`) cache fetched indexes across SPA route transitions and deduplicate concurrent requests:
 
 ```typescript title="apps/web/src/features/search/search-index-client.ts"
+import { type KnowledgeSearchPayload, KnowledgeSearchPayloadSchema, type SupportedLocale } from '@repo/shared-schemas'
+
 const resolvedCache = new Map<SupportedLocale, KnowledgeSearchPayload>()
 const inflightCache = new Map<SupportedLocale, Promise<KnowledgeSearchPayload>>()
 
@@ -127,15 +132,26 @@ export function loadKnowledgeSearchIndex(locale: SupportedLocale): Promise<Knowl
     credentials: 'same-origin',
   })
     .then(async (res): Promise<KnowledgeSearchPayload> => {
-      if (!res.ok) return EMPTY_PAYLOAD
+      if (!res.ok) {
+        if (process.env.NODE_ENV !== 'production') {
+          console.error(`[search-index-client] Failed to load /search-index/${locale}: HTTP ${res.status}`)
+        }
+        return EMPTY_PAYLOAD
+      }
+
       const rawJson: unknown = await res.json()
       const parsed = KnowledgeSearchPayloadSchema.safeParse(rawJson)
-      if (!parsed.success) return EMPTY_PAYLOAD
-      const payload: KnowledgeSearchPayload = parsed.data
-      resolvedCache.set(locale, payload)
-      return payload
+      if (!parsed.success) {
+        if (process.env.NODE_ENV !== 'production') {
+          console.error(`[search-index-client] Invalid /search-index/${locale} payload:`, parsed.error.issues)
+        }
+        return EMPTY_PAYLOAD
+      }
+
+      resolvedCache.set(locale, parsed.data)
+      return parsed.data
     })
-    .catch((): KnowledgeSearchPayload => EMPTY_PAYLOAD)
+    .catch(() => EMPTY_PAYLOAD)
     .finally(() => {
       inflightCache.delete(locale)
     })
@@ -143,39 +159,56 @@ export function loadKnowledgeSearchIndex(locale: SupportedLocale): Promise<Knowl
   inflightCache.set(locale, requestPromise)
   return requestPromise
 }
-
-export function prefetchKnowledgeSearchIndex(locale: SupportedLocale): void {
-  if (typeof window === 'undefined') return
-  void loadKnowledgeSearchIndex(locale)
-}
 ```
 
-The search trigger in `WorkfolioHeader` invokes `prefetchKnowledgeSearchIndex(locale)` on `onMouseEnter` and `onFocus`, ensuring the index is already warm in memory before the modal opens.
+> [!TIP]
+> **Why this module-scope cache never leaks memory and never flashes a spinner:**
+> - **Bounded footprint:** `inflightCache` deletes its `Promise` in `.finally()` (size `0` at rest), and `resolvedCache` is keyed strictly by `SupportedLocale` (`en | uk | ru` — at most `3` entries, ~45 KB total for the tab lifetime). It runs exclusively in the browser (`'use client'` + `typeof window === 'undefined'` guard in `prefetchKnowledgeSearchIndex`), never sharing state across SSR requests.
+> - **Hover/focus prefetch + synchronous read:** Search triggers in both `WorkfolioHeader` and `KnowledgeSidebarPanel` call `prefetchKnowledgeSearchIndex(locale)` on `onMouseEnter` / `onFocus`. When `CommandPaletteModal` mounts, its `useState(() => getCachedKnowledgeSearchIndex(locale))` initializer reads the warm cache **synchronously** on frame 1—avoiding the 1-frame `<Loader2 />` spinner flash and extra re-render that an async `Promise` in `useEffect` would cause.
 
 ---
 
-## 4. Stale-Locale Protection & Hybrid KB Lock Badges in `CommandPaletteModal`
+## 4. `MiniSearch` Fuzzy Engine, Stale-Locale Guard & Hybrid KB Soft-Lock UX
 
-Two edge cases appear when global search spans three locales (`en`, `ru`, `uk`) and a Hybrid public/protected Knowledge Base:
+### Pure `MiniSearch` Filtering (`lib/filter-command-entries.ts`)
 
-1. **Stale-Locale Guard (`{ locale, payload }`):** `CommandPaletteModal` stores the loaded index paired with its locale key rather than a bare payload object:
+Instead of coupling substring scoring to React state, search indexing and ranking live in a pure TypeScript module powered by `MiniSearch`:
 
-```typescript title="apps/web/src/features/search/command-palette-modal.tsx"
-const [indexState, setIndexState] = useState<{
-  locale: SupportedLocale
-  payload: KnowledgeSearchPayload
-} | null>(() => {
-  const cached = getCachedKnowledgeSearchIndex(locale)
-  return cached ? { locale, payload: cached } : null
-})
+- **Prefix + Typo-Tolerant Fuzzy Search:** `prefix: true` matches partial words immediately (including English, Ukrainian, and Russian Cyrillic), while `fuzzy: (term) => (term.length >= 4 ? 0.2 : false)` catches typos like `compler -> compiler` without noisy false positives on short tokens (`js`, `ts`, `ui`).
+- **Weighted Multi-Field Ranking & `AND -> OR` Fallback:** boosts prioritize `title (4) > sidebarLabel (3.5) > subtopicLabel (3) > tags (2.5) > topicLabel / headings (2) > summary (1.2)`. Multi-word queries try strict `combineWith: 'AND'` first and fall back to `'OR'` only when `AND` yields zero hits.
+- **Dedicated `#tag` Mode & Deep-Link Heading Anchors:** queries prefixed with `#` filter tags directly (`#zod`, `#jwt`), and matched `h2/h3` headings attach `matchedHeading` so pressing `Enter` jumps straight to `/knowledge-base/...#section-id`.
 
-// Match payload strictly against active locale to prevent stale-locale flashes & missing spinner
-const indexPayload = indexState?.locale === locale ? indexState.payload : null
-const isLoadingIndex = isOpen && indexPayload === null
-```
+### Stale-Locale Protection & Soft-Lock Grouping (`ui/command-palette-modal.tsx`)
 
-When a visitor switches locales (e.g., `en` -> `ru`) and re-opens `Cmd+K`, the mismatched locale state is ignored immediately, the `Loader2` spinner appears until `loadKnowledgeSearchIndex(locale)` resolves, and an `active` effect cleanup flag discards late responses from previous locales.
+1. **Stale-Locale Guard (`{ locale, payload }`):** pairing the loaded payload with its `locale` ensures switching languages (`en -> uk`) discards mismatched state immediately, shows `Loader2` while fetching the new locale, and uses an `active` cleanup flag to drop out-of-order responses.
+2. **Hybrid KB Soft-Lock UX (`isPublicKnowledgeBasePath`):**
+   - For unauthenticated guests with an empty query, articles split into **Public Notes (`This Project`)** and **Protected Notes • 1-Click Pass** with a horizontal divider and a compact 1-line unlock banner.
+   - Protected rows render a `Lock` icon + `1-Click Unlock` badge, the keyboard hints footer switches dynamically from `↵ open` to `↵ unlock & open`, and selecting a locked result opens `GuestPassModal` in place (`openGuestPassModal(baseArticlePath)`) instead of triggering a jarring `307` redirect.
 
-2. **Hybrid KB Lock Badge & Navigation Guard (`isPublicKnowledgeBasePath`):** public architecture articles under `/knowledge-base/this-project/**` are readable without authentication. Before rendering the lock badge or intercepting selection, `CommandPaletteModal` evaluates `isPublicKnowledgeBasePath(buildKnowledgeBasePath(entry.item.routePath))`:
-   - **Badge visibility:** `!isUnlocked && !isPublicKnowledgeBasePath(buildKnowledgeBasePath(entry.item.routePath))` shows the lock indicator only on protected domain notes.
-   - **Click / Enter routing:** if `isUnlocked || isPublicKnowledgeBasePath(baseArticlePath)`, the palette navigates directly to `${baseArticlePath}${hashSuffix}` (deep-linking matched headings); otherwise it opens `GuestPassModal` with `openGuestPassModal(baseArticlePath)` so guests authenticate seamlessly without hitting an unexpected `307` redirect.
+---
+
+## 5. Architectural Decision (ADR): Why Git MDX + Static Search Instead of a PostgreSQL CMS?
+
+A common Tech Lead question is: *"As the Knowledge Base grows across 3 locales (currently ~90 MDX files = 30 articles × 3 languages), why not move articles, sidebar taxonomy, and search into NestJS + PostgreSQL?"*
+
+### Industry Context: Docs-as-Code
+
+Keeping technical documentation in Git as Markdown/MDX and compiling it to static assets is a proven industry pattern (**Docs-as-Code**) used by large engineering documentation platforms—including **Cloudflare Docs** (`cloudflare/cloudflare-docs`), **Next.js Docs** (`vercel/next.js`), **Tailwind CSS Docs** (`tailwindlabs/tailwindcss.com`), and **Stripe Docs** (via its open-source **Markdoc** framework).
+
+### Trade-Off Matrix
+
+| Dimension | A. Git MDX + SSG (Current Choice) | B. Full PostgreSQL + NestJS CMS | C. Hybrid Evolution Path (Future) |
+| :--- | :--- | :--- | :--- |
+| **TTFB & SEO** | Instant static HTML/RSC (`0` DB queries per page) | Exposed to DB latency & Neon free-tier cold starts (300–800 ms) without heavy ISR/Redis caching | Instant SSG for public hubs + On-Demand ISR for deep notes |
+| **Fault Isolation** | **100% resilient:** KB, sidebar & `Cmd+K` keep working even if API/DB restarts | DB/API outage breaks sidebar & articles unless fallback cache exists | Content stays decoupled; backend enhances search & interactive labs |
+| **Authoring & AI Workflow** | Native IDE editing, `git diff`, PR review, direct AI-agent edits; trade-off: requires commit + deploy | Browser editing without redeploy, `draft/published` states; trade-off: loses `git diff` and requires building Admin UI + S3/R2 image upload | Static notes stay versioned in Git; mutable features live in DB |
+| **Search Scope & Speed** | Client `MiniSearch`: `< 1 ms` fuzzy/prefix over metadata + `h2/h3` (~4 KB gzip at 30 articles; ~25–30 KB gzip at 300 articles) | PostgreSQL `tsvector` + `pg_trgm`: full-body paragraph search + strict server-side RBAC filtering | Sync MDX body into Postgres FTS at deploy time once index exceeds ~150–200 KB |
+| **Interactive Widgets** | Zero-Eval HAST maps `<ReactRenderGraphD3 />` & `::sandbox{}` safely without DB XSS risk | Requires pre-compiling HAST on save + strict sanitization pipeline | Native MDX widgets + DB-backed interactive Lab state |
+| **Implementation Cost** | Shipped & battle-tested | High (XL: Prisma schema, Admin CRUD, Shiki runtime cache, S3 media, ISR webhooks) | Incremental (S–M per milestone) |
+
+### Explicit Scale Inflection Points
+
+1. **Today through ~300 articles (~900 MDX files):** Git MDX + static `/search-index/[locale]` + client `MiniSearch` is the optimal sweet spot—fastest TTFB, zero cold-start risk, tiny gzipped index, and effortless Git/AI maintainability.
+2. **At ~500–1,000+ MDX files (if `next build` Shiki time becomes noticeable):** keep Git as Source of Truth, but switch protected `[...slug]` routes to **On-Demand ISR** (pre-building only public `this-project` routes at build time).
+3. **When full-body paragraph search or strict server-side search RBAC is required:** add a deploy-time sync job pushing MDX text into PostgreSQL (`tsvector` + `pg_trgm`) behind `GET /api/knowledge/search`, reusing the exact same `KnowledgeSearchPayloadSchema` from `@repo/shared-schemas`.
+4. **Where NestJS + PostgreSQL delivers maximum value right now:** genuinely mutable runtime domains—article analytics/reactions, live SSE telemetry, user bookmarks/progress, and upcoming interactive **Engineering Lab** playgrounds.
