@@ -114,6 +114,12 @@ services:
     build:
       context: .
       dockerfile: docker/web.Dockerfile
+      args:
+        WORKFOLIO_DEMO_MODE: "false"
+        NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:?Set NEXT_PUBLIC_SITE_URL (e.g. https://your-domain.com) in environment or .env.prod}
+        NEXT_PUBLIC_SENTRY_DSN: ${NEXT_PUBLIC_SENTRY_DSN:-}
+        NEXT_PUBLIC_POSTHOG_KEY: ${NEXT_PUBLIC_POSTHOG_KEY:-}
+        NEXT_PUBLIC_POSTHOG_HOST: ${NEXT_PUBLIC_POSTHOG_HOST:-https://app.posthog.com}
     container_name: workfolio-web-prod
     restart: always
     read_only: true

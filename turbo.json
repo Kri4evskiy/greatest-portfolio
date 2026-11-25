@@ -7,6 +7,13 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
+      "env": [
+        "DOCKER_STANDALONE",
+        "WORKFOLIO_DEMO_MODE",
+        "NEXT_PUBLIC_SENTRY_DSN",
+        "NEXT_PUBLIC_POSTHOG_KEY",
+        "NEXT_PUBLIC_POSTHOG_HOST"
+      ],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
       "outputs": [".next/**", "!.next/cache/**", "dist/**", "src/generated/**", "storybook-static/**"],
       "passThroughEnv": ["SWC_NATIVE_BINDING_CACHE"]
