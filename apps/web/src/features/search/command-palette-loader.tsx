@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic'
 import { useEffect, useState } from 'react'
 import { useIsCommandPaletteOpen, useUIActions } from '@/shared/store/use-ui-store'
 
-const LazyCommandPaletteModal = dynamic(() => import('./command-palette-modal').then((m) => m.CommandPaletteModal), {
+const LazyCommandPaletteModal = dynamic(() => import('./ui/command-palette-modal').then((m) => m.CommandPaletteModal), {
   ssr: false,
 })
 

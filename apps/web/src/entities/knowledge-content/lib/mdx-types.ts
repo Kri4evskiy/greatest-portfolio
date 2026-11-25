@@ -1,7 +1,7 @@
-import type { KnowledgeCategory, KnowledgeNoteFormat, SupportedLocale } from '@repo/shared-schemas'
+import type { KnowledgeCategory, KnowledgeNoteFormat, KnowledgeSearchItem, SupportedLocale } from '@repo/shared-schemas'
 import type { Root as HastRoot } from 'hast'
 
-export type { HastRoot }
+export type { HastRoot, KnowledgeSearchItem }
 
 export interface ArticleTocEntry {
   id: string
@@ -80,18 +80,4 @@ export type KnowledgeTreeNode = KnowledgeTreeFolderNode | KnowledgeTreeArticleNo
 export interface KnowledgeBreadcrumbItem {
   label: string
   href: string
-}
-
-export interface KnowledgeSearchItem {
-  routePath: string
-  title: string
-  sidebarLabel: string
-  summary: string
-  category: KnowledgeCategory
-  topicLabel: string
-  subtopicLabel: string
-  format: KnowledgeNoteFormat
-  tags: string[]
-  readingTime: string
-  headings: Array<{ id: string; text: string }>
 }

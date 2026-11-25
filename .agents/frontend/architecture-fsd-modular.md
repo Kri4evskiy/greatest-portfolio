@@ -67,7 +67,9 @@ apps/web/
     ├── features/               # [Слой 3: User Scenarios & Interactions]
     │   │                       # Интерактивные фичи с действиями пользователя
     │   ├── auth/               # GuestPassModalLoader (next/dynamic) + GuestPassModal + AuthCrossTabSyncBridge + lib/auth-cross-tab-sync.ts + queries/use-visitor-profile
-    │   ├── search/             # CommandPaletteLoader (Cmd+K, next/dynamic) + CommandPaletteModal, search-index-client.ts (Zod)
+    │   ├── search/             # CommandPaletteLoader (Cmd+K, next/dynamic) + search-index-client.ts (Zod),
+    │   │                       # lib/filter-command-entries.ts (MiniSearch), ui/{command-palette-modal,command-palette-item},
+    │   │                       # + __tests__/filter-command-entries.test.ts
     │   ├── telemetry-stream/   # FooterSseStatus, useTelemetryStream (ref-counted singleton SSE),
     │   │                       # queries/use-system-observability, lib/system-status-helpers,
     │   │                       # ui/{system-status-dashboard,capabilities-matrix-card,live-event-log-card,knowledge-leaderboard-card},
@@ -78,7 +80,9 @@ apps/web/
     ├── entities/               # [Слой 4: Business Data Representation]
     │   │                       # Отображение данных предметной области (без глобальных сайд-эффектов)
     │   ├── knowledge-article/  # HAST RSC-рендер (mdx-article-renderer, code-block, callout-config, knowledge-skeletons),
-    │   │                       # ArticleToc (IntersectionObserver), MetricsBar, AccessCallout, DirectoryExplorer, KnowledgeSidebar,
+    │   │                       # ArticleToc (IntersectionObserver), MetricsBar, AccessCallout,
+    │   │                       # ui/sidebar/{knowledge-sidebar,knowledge-sidebar-panel,knowledge-tree-item,use-kb-sidebar-tree},
+    │   │                       # ui/directory/{knowledge-directory-explorer,directory-filter-bar,filtered-article-card,topic-directory-section,subtopic-preview-card},
     │   │                       # queries/use-knowledge-metrics (metrics, paginated metrics, mutations)
     │   ├── knowledge-content/  # mdx-fs-loader (primitive React.cache), mdx-ast-parser (remark/rehype HAST), mdx-search-index,
     │   │                       # link-sanitizer, shiki-highlighter (FIFO), mdx-types

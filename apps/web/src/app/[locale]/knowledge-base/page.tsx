@@ -4,8 +4,8 @@ import { Database } from 'lucide-react'
 import type { Metadata } from 'next'
 import { getTranslations } from 'next-intl/server'
 import { Suspense } from 'react'
+import { KnowledgeDirectoryExplorer } from '@/entities/knowledge-article/ui/directory/knowledge-directory-explorer'
 import { KnowledgeAccessCallout } from '@/entities/knowledge-article/ui/knowledge-access-callout'
-import { KnowledgeDirectoryExplorer } from '@/entities/knowledge-article/ui/knowledge-directory-explorer'
 import { KnowledgeDirectorySkeleton } from '@/entities/knowledge-article/ui/knowledge-skeletons'
 import {
   getAllKnowledgeFrontmatters,

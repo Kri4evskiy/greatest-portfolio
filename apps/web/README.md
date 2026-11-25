@@ -55,7 +55,9 @@ apps/web/
     │
     ├── features/                         # [Слой 3: User Scenarios & Interactions]
     │   ├── auth/                         # GuestPassModalLoader (next/dynamic) + GuestPassModal + AuthCrossTabSyncBridge + lib/auth-cross-tab-sync.ts + queries/use-visitor-profile.ts
-    │   ├── search/                       # CommandPaletteLoader (Cmd+K, next/dynamic) + CommandPaletteModal + search-index-client.ts (Zod)
+    │   ├── search/                       # CommandPaletteLoader (Cmd+K, next/dynamic) + search-index-client.ts (Zod)
+    │   │                                 # + lib/filter-command-entries.ts (MiniSearch fuzzy/prefix) + ui/{command-palette-modal,command-palette-item}.tsx
+    │   │                                 # + __tests__/filter-command-entries.test.ts
     │   ├── telemetry-stream/             # FooterSseStatus + use-telemetry-stream.ts (single ref-counted EventSource + backoff) + queries/use-system-observability.ts
     │   │                                 # + lib/system-status-helpers.ts + ui/{system-status-dashboard,capabilities-matrix-card,live-event-log-card,knowledge-leaderboard-card}.tsx
     │   │                                 # + ui/table/{observability-data-table,knowledge-leaderboard-columns,live-event-log-columns}.tsx
@@ -66,7 +68,10 @@ apps/web/
     │   ├── workfolio-profile/            # author-profile.ts, cv-file.ts (React.cache), workfolio-sections.tsx, CvDocumentShowcase (RSC) + CvViewTabs (Client Island)
     │   ├── engineering-roadmap/          # engineering-roadmap.ts, EngineeringRoadmapBoard, TechRadarTable + table/{tech-radar-data-table,tech-radar-columns}.tsx
     │   ├── knowledge-content/            # Серверный MDX/HAST-движок (mdx-fs-loader с примитивным React.cache, mdx-ast-parser, shiki FIFO, sanitizer)
-    │   └── knowledge-article/            # Рендеринг статей (MdxArticleRenderer, Sidebar, AccessCallout, DirectoryExplorer, TOC на IntersectionObserver, knowledge-skeletons) + queries/use-knowledge-metrics.ts
+    │   └── knowledge-article/            # Рендеринг статей (MdxArticleRenderer, AccessCallout, TOC на IntersectionObserver, knowledge-skeletons),
+    │                                     # ui/sidebar/{knowledge-sidebar,knowledge-sidebar-panel,knowledge-tree-item,use-kb-sidebar-tree},
+    │                                     # ui/directory/{knowledge-directory-explorer,directory-filter-bar,filtered-article-card,topic-directory-section,subtopic-preview-card},
+    │                                     # + queries/use-knowledge-metrics.ts
     │
     └── shared/                           # [Слой 5: Infrastructure & Common Tools]
         ├── config/                       # env.ts (Zod env validation + fail-closed resolveEdgeJwtSecretStrict)

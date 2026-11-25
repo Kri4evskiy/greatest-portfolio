@@ -1,6 +1,6 @@
 import { DEFAULT_LOCALE, SupportedLocaleEnum } from '@repo/shared-schemas'
 import type { ReactNode } from 'react'
-import { KnowledgeSidebar } from '@/entities/knowledge-article/ui/knowledge-sidebar'
+import { KnowledgeSidebar } from '@/entities/knowledge-article/ui/sidebar/knowledge-sidebar'
 import { getKnowledgeTree } from '@/entities/knowledge-content'
 
 export default async function KnowledgeBaseLayout({

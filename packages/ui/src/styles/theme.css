@@ -315,6 +315,28 @@
   }
 }
 
+@keyframes ui-collapsible-down {
+  from {
+    height: 0;
+    opacity: 0;
+  }
+  to {
+    height: var(--radix-collapsible-content-height);
+    opacity: 1;
+  }
+}
+
+@keyframes ui-collapsible-up {
+  from {
+    height: var(--radix-collapsible-content-height);
+    opacity: 1;
+  }
+  to {
+    height: 0;
+    opacity: 0;
+  }
+}
+
 @layer components {
   .shiki,
   .shiki span {
@@ -400,5 +422,17 @@
 
   [data-tooltip-content][data-state="closed"] {
     animation: ui-popper-out 130ms cubic-bezier(0.4, 0, 1, 1) forwards;
+  }
+
+  [data-collapsible-content] {
+    overflow: hidden;
+  }
+
+  [data-collapsible-content][data-state="open"] {
+    animation: ui-collapsible-down 180ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  [data-collapsible-content][data-state="closed"] {
+    animation: ui-collapsible-up 140ms cubic-bezier(0.4, 0, 1, 1);
   }
 }
