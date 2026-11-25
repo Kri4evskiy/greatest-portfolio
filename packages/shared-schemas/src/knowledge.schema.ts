@@ -235,3 +235,36 @@ export type PaginatedArticleMetricsQuery = z.infer<typeof PaginatedArticleMetric
 
 export const PaginatedArticleMetricsResponseSchema = createOffsetPaginatedResponseSchema(ArticleMetaSchema)
 export type PaginatedArticleMetricsResponse = z.infer<typeof PaginatedArticleMetricsResponseSchema>
+
+export const KnowledgeSearchHeadingSchema = z.object({
+  id: z.string(),
+  text: z.string(),
+})
+export type KnowledgeSearchHeading = z.infer<typeof KnowledgeSearchHeadingSchema>
+
+export const KnowledgeSearchItemSchema = z.object({
+  routePath: z.string(),
+  title: z.string(),
+  sidebarLabel: z.string(),
+  summary: z.string(),
+  category: KnowledgeCategoryEnum,
+  topicLabel: z.string(),
+  subtopicLabel: z.string(),
+  format: KnowledgeNoteFormatEnum,
+  readingTime: z.string(),
+  tags: z.array(z.string()),
+  headings: z.array(KnowledgeSearchHeadingSchema),
+})
+export type KnowledgeSearchItem = z.infer<typeof KnowledgeSearchItemSchema>
+
+export const KnowledgeSearchTagCountSchema = z.object({
+  tag: z.string(),
+  count: z.number().int().nonnegative(),
+})
+export type KnowledgeSearchTagCount = z.infer<typeof KnowledgeSearchTagCountSchema>
+
+export const KnowledgeSearchPayloadSchema = z.object({
+  items: z.array(KnowledgeSearchItemSchema),
+  topTags: z.array(KnowledgeSearchTagCountSchema),
+})
+export type KnowledgeSearchPayload = z.infer<typeof KnowledgeSearchPayloadSchema>

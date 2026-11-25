@@ -8,6 +8,7 @@ import {
   getTechRadarItems,
   JwtSessionPayloadSchema,
   KB_COOKIE_MAX_AGE_MS,
+  KnowledgeSearchPayloadSchema,
   LOCALE_METADATA,
   PaginatedArticleMetricsQuerySchema,
   PaginatedArticleMetricsResponseSchema,
@@ -255,5 +256,28 @@ describe('Auth, Knowledge, Locale & TechRadar contracts', () => {
       }
       expect(items.some((item) => item.id === 'tanstack-table-compiler')).toBe(true)
     }
+  })
+
+  it('validates KnowledgeSearchPayloadSchema without requiring an extraneous slug field', () => {
+    const validPayload = {
+      items: [
+        {
+          routePath: 'typescript/zod-contracts/zod-runtime-validation',
+          title: 'Strict TypeScript & Zod Contracts',
+          sidebarLabel: 'Zod Contracts',
+          summary: 'End-to-end runtime validation across apps/web and apps/api.',
+          category: 'typescript' as const,
+          topicLabel: 'TypeScript',
+          subtopicLabel: 'Strict TS & Zod',
+          format: 'deep-dive' as const,
+          readingTime: '6 min read',
+          tags: ['zod', 'typescript'],
+          headings: [{ id: 'schema-first', text: 'Schema-First Design' }],
+        },
+      ],
+      topTags: [{ tag: 'zod', count: 4 }],
+    }
+
+    expect(KnowledgeSearchPayloadSchema.parse(validPayload)).toEqual(validPayload)
   })
 })

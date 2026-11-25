@@ -38,6 +38,7 @@
   - `viewsCount`: `z.number().int().nonnegative()`
   - `helpfulCount`: `z.number().int().nonnegative()`
   - `updatedAt`: `z.iso.datetime()`
+- `KnowledgeSearchItemSchema` и `KnowledgeSearchPayloadSchema` — единый контракт ответа `/search-index/[locale]` и клиентского `Cmd+K` (`items`, `topTags`, без дублирования локальных Zod-схем в `apps/web`).
 
 ### 4. События телеметрии и SSE (`telemetry.schema.ts`)
 
