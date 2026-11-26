@@ -53,6 +53,12 @@
       - `Sentry.setUser({ id: profile.id, username: profile.displayName ?? undefined })` + `Sentry.setTag('visitorType', ...)` / `Sentry.setTag('role', ...)` — любая пойманная ошибка сразу привязана к конкретному посетителю.
     - При выходе (`useLogoutMutation` / возврате `role === 'GUEST'`) обязательно вызывать `posthog.reset()` и `Sentry.setUser(null)` (чтобы следующий пользователь в том же браузере не склеился с предыдущим).
   - Перевести существующий хелпер `apps/web/src/shared/lib/analytics.ts` (`trackEvent`) на реальный `posthog.capture(...)` с graceful no-op без `NEXT_PUBLIC_POSTHOG_KEY`.
+- [ ] **Интеграция в нашу телеметрию (`/system-status`) и Zero-Manual-Check алерты:**
+  - Настроить нативные алерты в **Sentry (`Monitors` ➔ `Alerts`)** и **PostHog (`Alerts` / Webhook)** на Email/Telegram, чтобы не проверять дашборды руками.
+  - _(Опционально, через серверные Read-Only ключи с кэшем 5–10 мин)_ добавить в `apps/api` безопасный агрегатор: публичная сводка на `/system-status` (`unresolvedIssues24h` без стектрейсов и PII + агрегированные счётчики), а детальный список ошибок/профилей и прямые deep-links в Sentry/PostHog — строго под `@Roles('ADMIN')`.
+- [ ] **Две обязательные статьи-шпаргалки в Базе Знаний по новому UI 2025/2026 (`en` / `ru` / `uk`):**
+  1. `architecture-devops/observability/sentry-modern-ui-and-fullstack-tracing.{en,ru,uk}.mdx` — **Sentry (новый UI 2025/2026):** пошаговый разбор вкладок `Issues` (`Issue Views`), `Explore`, `Insights`, новая архитектура `Monitors` + `Alerts`, чтение Stack Trace + Breadcrumbs + `X-Request-Id`, Source Maps и REST API/Webhooks.
+  2. `architecture-devops/observability/posthog-modern-ui-identification-and-replays.{en,ru,uk}.mdx` — **PostHog (новый 5-секционный UI 2025/2026):** разбор `Home`, `Analytics` (`Web Analytics` vs `Product Analytics` + `HogQL SQL`), `People ➔ Persons` (`identify()` + `reset()` + `identified_only`), `Session Replay` (`maskAllInputs`), `Alerts` и Query API.
 
 ---
 
