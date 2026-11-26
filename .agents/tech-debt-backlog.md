@@ -33,7 +33,30 @@
 
 ---
 
-### Приоритет №2: Внедрение Redis (Distributed Rate Limiting, Response Cache & Session Revocation)
+### Приоритет №2 (Сразу после боевого деплоя): Production Observability — Live Sentry (`web` + `api`) & PostHog (Analytics, Replays & User Identification)
+
+> **Почему сразу после деплоя (Приоритет №2):** как только боевая ссылка пойдёт рекрутерам и тимлидам, критично видеть реальные ошибки на фронте и бэке и понимать, кто именно заходил и что смотрел. Оба сервиса **100% бесплатны с жёстким hard-cap (без неожиданных счетов)**:
+> - **Sentry Free (Developer Plan):** 1 организация, 1 seat, **несколько проектов** (`workfolio-web` + `workfolio-api` с двумя отдельными DSN), общий пул `5 000` errors/мес, `5M` performance spans/мес, `50` replays/мес, 30 дней хранения.
+> - **PostHog Free:** 1 проект (индустриальный стандарт продуктовой аналитики + Session Replays), `1 000 000` events/мес, `5 000` web replays/мес, `1 000 000` feature flags/мес, 1 год хранения.
+
+- [ ] **Sentry Full-Stack (`@sentry/nextjs` + `@sentry/nestjs`):**
+  - Подключить два проекта в одной бесплатной организации Sentry: `workfolio-web` (`NEXT_PUBLIC_SENTRY_DSN`) и `workfolio-api` (`SENTRY_DSN`).
+  - Заменить обёртки-заглушки (`captureClientException`, `SentryExceptionFilter`) на реальный SDK с graceful no-op при пустом DSN, `sendDefaultPii: false`, корректными `CSP` (`connect-src` / `worker-src` / опциональный `tunnelRoute` против ad-blocker'ов) и upload source maps в CI/Vercel.
+  - На бэкенде в `SentryExceptionFilter` крепить `X-Request-Id` (`scope.setTag('requestId', requestId)`) и контекст авторизованного пользователя (`id`, `username: displayName`, `role`, `visitorType`) для сквозной трассировки `Next.js ➔ NestJS`.
+  - Автоматически переключить индикатор `sentryObservability` в `/system-status` на активный при заданном `SENTRY_DSN`.
+- [ ] **PostHog Analytics + Session Replay + Учебная идентификация пользователей (`posthog-js`):**
+  - Инициализация с `person_profiles: 'identified_only'` (анонимные визиты и боты не плодят мусорные профили и не тратят лишнюю квоту; хранятся агрегированно) и `session_recording: { maskAllInputs: true }` (чтобы никогда не записать `adminPasscode` или личные вводы).
+  - **Правильный цикл идентификации (чтобы видеть имена и роли вместо голых UUID):**
+    - Вынести единый `<ObservabilityIdentityBridge />` рядом с `AuthCrossTabSyncBridge` в корневом `[locale]/layout.tsx` (строго по FSD, без дублирования в компонентах).
+    - При появлении авторизованной сессии (`profile.id && profile.role !== 'GUEST'` после `GuestPassModal` или восстановления через `/api/auth/me`) вызывать:
+      - `posthog.identify(profile.id, { name: profile.displayName, visitorType: profile.visitorType, role: profile.role })` — PostHog автоматически склеивает всю анонимную историю кликов до логина с читаемым профилем (`Alex • Team Lead`), позволяя чётко разделять параллельных посетителей в дашборде и Session Replays.
+      - `Sentry.setUser({ id: profile.id, username: profile.displayName ?? undefined })` + `Sentry.setTag('visitorType', ...)` / `Sentry.setTag('role', ...)` — любая пойманная ошибка сразу привязана к конкретному посетителю.
+    - При выходе (`useLogoutMutation` / возврате `role === 'GUEST'`) обязательно вызывать `posthog.reset()` и `Sentry.setUser(null)` (чтобы следующий пользователь в том же браузере не склеился с предыдущим).
+  - Перевести существующий хелпер `apps/web/src/shared/lib/analytics.ts` (`trackEvent`) на реальный `posthog.capture(...)` с graceful no-op без `NEXT_PUBLIC_POSTHOG_KEY`.
+
+---
+
+### Приоритет №3: Внедрение Redis (Distributed Rate Limiting, Response Cache & Session Revocation)
 
 > **⛔ Pre-Flight Readiness Gate (проверить ДО написания первой строчки Redis-кода):**
 > 1. Завершён `Приоритет №1` (боевой HTTPS стабильно работает; `TRUST_PROXY_HOPS`, fail-closed `edge-jwt.ts`, IndexedDB allowlist, allowlist слагов и лимиты SSE уже готовы в `v0.10.0`).
@@ -55,7 +78,7 @@
 
 ---
 
-### Приоритет №3: Визуальный редизайн (`UI v2`) + Интерактивная лаборатория `/[locale]/lab` (XYFlow & Sandboxes)
+### Приоритет №4: Визуальный редизайн (`UI v2`) + Интерактивная лаборатория `/[locale]/lab` (XYFlow & Sandboxes)
 
 > База знаний (`/knowledge-base`) остаётся быстрой статической документацией (0 KB лишнего JS, удобно копировать статьи как промпты), а тяжёлые интерактивные библиотеки переезжают в выделенный полноэкранный раздел `/lab`.
 
@@ -72,15 +95,15 @@
     - _Клиентские лаборатории (работают всегда, включая offline/demo):_
       1. `@xyflow/react` Interactive Architecture Canvas — drag-and-drop узлы, кастомные edges, режимы Monorepo / Request Lifecycle / Edge Auth, мини-карта, экспорт графа + переходы в `/knowledge-base/this-project/*`.
       2. React 19 Compiler & Render Tree Lab — расширение D3-демо в интерактивную песочницу мемоизации и TanStack Query кэша.
-    - _Full-Stack лаборатории (поверх Приоритета №2 — Redis):_
+    - _Full-Stack лаборатории (поверх Приоритета №3 — Redis):_
       3. **Redis Rate Limiter & Cache-Aside Sandbox (`/lab/redis-playground`):** кнопка «Burst 10 requests» в песочный эндпоинт NestJS — в UI в реальном времени видны `Cache MISS (PostgreSQL)` ➔ `Cache HIT (Redis)` через `Server-Timing`, остаток окна лимитера, реальный `429 Too Many Requests` и живые события в SSE-логе (с graceful fallback в `In-Memory Simulation Mode` по `/api/capabilities`, если `REDIS_URL` не задан).
       4. _(Опционально)_ сохранение пользовательских пресетов/графов в PostgreSQL (Prisma) для `USER`/`ADMIN`.
 
 ---
 
-### Приоритет №4: `S3/R2 Object Storage` (Фаза 1) + 4 инженерных «Вау-эффекта»
+### Приоритет №5: `S3/R2 Object Storage` (Фаза 1) + 4 инженерных «Вау-эффекта»
 
-> **Перед стартом проверить:** Приоритеты №1 и №2 завершены, боевой HTTPS-домен работает стабильно, Redis активен для rate-limiting и кэширования новых эндпоинтов.
+> **Перед стартом проверить:** Приоритеты №1–№3 завершены, боевой HTTPS-домен работает стабильно, Sentry/PostHog и Redis активны для мониторинга, rate-limiting и кэширования новых эндпоинтов.
 
 - [ ] **Фаза 1 — `S3-compatible Object Storage` (`@aws-sdk/client-s3` для `Cloudflare R2` + локальный `MinIO`):**
   - Оформить `StorageModule` через `ConfigurableModuleBuilder` (`forRoot` / `forRootAsync`, DI-токены в `storage.constants.ts`), выделить `StorageService` в `apps/api` (IAM least-privilege, Presigned URLs, проверка MIME/размера) и подключить `minio` в `docker-compose`.
@@ -98,7 +121,7 @@
 
 ---
 
-### Приоритет №5 (Deferred / Learning Track): Nginx Reverse Proxy (VPS) & Re-Scoped Postgres KB Index
+### Приоритет №6 (Deferred / Learning Track): Nginx Reverse Proxy (VPS) & Re-Scoped Postgres KB Index
 
 > **Почему отложено в конец:** текущие `.mdx` статьи занимают `< 1 MB` (~96 файлов / 32 статьи × 3 локали), а Git + Zero-Eval HAST SSG даёт нулевой TTFB, PR-диффы и `$0` инфраструктуры. При росте до 500–1000+ файлов первый шаг — On-Demand ISR; перенос метаданных/поиска в Postgres `tsvector` — только при необходимости поиска по абзацам или серверной фильтрации RBAC.
 
@@ -128,7 +151,6 @@
 
 ### 2. Observability & Deployment Extensions
 
-- [ ] **Live Sentry & PostHog SDK:** заменить заглушки на реальные транспорты `@sentry/nextjs`, `@sentry/nestjs` и `posthog-js`, включаемые при наличии ключей в `.env`.
 - [ ] **Расширение Capability-Gated UI для новых фич (Redis, S3/R2, MCP, GitHub Pulse, Telegram Bot):** показывать фичу `disabled` / `aria-disabled` с локализованной плашкой при отсутствии ключа.
 - [ ] **Cross-Domain API Deployment (`NEXT_PUBLIC_API_URL`):** при выносе `apps/api` на отдельный домен добавить `NEXT_PUBLIC_API_URL` в `.env`, `.env.example`, `turbo.json`, пробросить `baseURL` в `apiClient` и `EventSource`, и добавить домен в CSP `connect-src`.
 - [ ] **Article-Level OpenGraph Previews (`/knowledge-base/[...slug]/opengraph-image.tsx`):** опциональный генератор превью второго уровня из `title`, `category` и `#tags`.
@@ -141,7 +163,7 @@
 > Инфраструктура `.mdx` (`Zero-Eval HAST`) и клиентские острова полностью готовы. Тяжёлые песочницы развиваются в `/[locale]/lab` с двусторонними ссылками из статей.
 
 - [ ] **Новые архитектурные статьи в `this-project/`:**
-  1. `this-project/backend-architecture/redis-rate-limiting-cache-and-session-revocation.{en,ru,uk}.mdx` — **Redis & Pre-Flight Readiness Checklist** (создаётся в Приоритете №2).
+  1. `this-project/backend-architecture/redis-rate-limiting-cache-and-session-revocation.{en,ru,uk}.mdx` — **Redis & Pre-Flight Readiness Checklist** (создаётся в Приоритете №3).
   2. `this-project/frontend-architecture/system-status-observability-and-offline-query-cache.{en,ru,uk}.mdx` — **System Observability (`/system-status`), Capability-Gated UI, Offline `TanStack Query` + `IndexedDB` Allowlist, `BroadcastChannel` Sync & Native `next/root-params`** (плюс CJS/ESM `Reflector` мост в NestJS 12).
 - [ ] **Цикл из 3 профильных статей по безопасности в `others/security/`:**
   1. `frontend-browser-security-playbook.{en,ru,uk}.mdx` — CSP, `HttpOnly`/`__Host-`, DOM/AST-санитизация, Open Redirect, Clickjacking, WebAuthn/Turnstile.
