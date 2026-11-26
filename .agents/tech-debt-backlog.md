@@ -33,11 +33,13 @@
 
 ---
 
-### Приоритет №2 (Сразу после боевого деплоя): Production Observability — Live Sentry (`web` + `api`) & PostHog (Analytics, Replays & User Identification)
+### Приоритет №2 (Сразу после боевого деплоя): Production Observability — Live Sentry (`web` + `api`), PostHog & Telegram Admin Ops Bot (Фаза 1)
 
-> **Почему сразу после деплоя (Приоритет №2):** как только боевая ссылка пойдёт рекрутерам и тимлидам, критично видеть реальные ошибки на фронте и бэке и понимать, кто именно заходил и что смотрел. Оба сервиса **100% бесплатны с жёстким hard-cap (без неожиданных счетов)**:
-> - **Sentry Free (Developer Plan):** 1 организация, 1 seat, **несколько проектов** (`workfolio-web` + `workfolio-api` с двумя отдельными DSN), общий пул `5 000` errors/мес, `5M` performance spans/мес, `50` replays/мес, 30 дней хранения.
-> - **PostHog Free:** 1 проект (индустриальный стандарт продуктовой аналитики + Session Replays), `1 000 000` events/мес, `5 000` web replays/мес, `1 000 000` feature flags/мес, 1 год хранения.
+> **Почему сразу после деплоя (Приоритет №2):** как только боевая ссылка пойдёт рекрутерам и тимлидам, критично видеть реальные ошибки на фронте и бэке, понимать, кто именно заходил и что смотрел, и получать мгновенные алерты прямо в свой приватный Telegram-канал за `$0/мес`.
+> - **Sentry Free (Developer Plan):** 1 организация, 1 seat, **несколько проектов** (`workfolio-web` + `workfolio-api` с двумя отдельными DSN), общий пул `5 000` errors/мес, `5M` performance spans/мес, `50` replays/мес, 30 дней хранения (hard-cap).
+> - **PostHog Free:** 1 проект (индустриальный стандарт продуктовой аналитики + Session Replays), `1 000 000` events/мес, `5 000` web replays/мес, `1 000 000` feature flags/мес, 1 год хранения (hard-cap).
+> - **Telegram Bot API (`@GreatestWorkfolioBot`, 1 бот на всё):** 100% бесплатно; Фаза 1 — приватный Admin Ops канал (`TELEGRAM_ADMIN_CHAT_ID`), Фаза 2 — персональный Welcome и беспарольный вход для гостей через Deep Link (`?start=welcome_<nonce>` / `?start=auth_<nonce>`).
+> - **📚 Обязательное напоминание для ИИ-агента при старте Приоритета №2 (и Telegram Фазы 2):** в начале реализации обязательно скинуть пользователю подборку ссылок (официальная документация Telegram Bot API Deep Linking `t.me/<bot>?start=<payload>` и `secret_token` webhooks, Sentry/PostHog Webhooks, а также проверенные инженерные статьи/разборы про паттерн *Passwordless Telegram Deep Link Auth + SSE tab unlock*), чтобы пользователь мог спокойно изучить механику.
 
 - [ ] **Sentry Full-Stack (`@sentry/nextjs` + `@sentry/nestjs`):**
   - Подключить два проекта в одной бесплатной организации Sentry: `workfolio-web` (`NEXT_PUBLIC_SENTRY_DSN`) и `workfolio-api` (`SENTRY_DSN`).
@@ -53,8 +55,10 @@
       - `Sentry.setUser({ id: profile.id, username: profile.displayName ?? undefined })` + `Sentry.setTag('visitorType', ...)` / `Sentry.setTag('role', ...)` — любая пойманная ошибка сразу привязана к конкретному посетителю.
     - При выходе (`useLogoutMutation` / возврате `role === 'GUEST'`) обязательно вызывать `posthog.reset()` и `Sentry.setUser(null)` (чтобы следующий пользователь в том же браузере не склеился с предыдущим).
   - Перевести существующий хелпер `apps/web/src/shared/lib/analytics.ts` (`trackEvent`) на реальный `posthog.capture(...)` с graceful no-op без `NEXT_PUBLIC_POSTHOG_KEY`.
-- [ ] **Интеграция в нашу телеметрию (`/system-status`) и Zero-Manual-Check алерты:**
-  - Настроить нативные алерты в **Sentry (`Monitors` ➔ `Alerts`)** и **PostHog (`Alerts` / Webhook)** на Email/Telegram, чтобы не проверять дашборды руками.
+- [ ] **Telegram Admin Ops Channel — Фаза 1 (`TelegramNotifierService` в `apps/api`, zero-dep `fetch`):**
+  - Один бот `@GreatestWorkfolioBot` (`TELEGRAM_BOT_TOKEN` + `TELEGRAM_ADMIN_CHAT_ID`, опционально `message_thread_id` для топиков `#errors` / `#visitors` / `#alerts`), graceful no-op без токена + in-memory cooldown/dedup против флуда одинаковых ошибок.
+  - Отправлять в твой приватный канал: новые входы визиторов (`GuestPass`), `ADMIN_ESCALATION_FAILED`, реакции `ARTICLE_HELPFUL`, а также входящие вебхуки **Sentry (`POST /api/webhooks/sentry` с проверкой HMAC-SHA256 `Sentry-Hook-Signature` и кнопкой `[Open in Sentry]`)** и **PostHog Alerts (`POST /api/webhooks/posthog`)**.
+- [ ] **Интеграция в `/system-status` и Admin-Only UI Guard:**
   - _(Опционально, через серверные Read-Only ключи с кэшем 5–10 мин)_ добавить в `apps/api` безопасный агрегатор: публичная сводка на `/system-status` (`unresolvedIssues24h` без стектрейсов и PII + агрегированные счётчики), а детальный список ошибок/профилей, `GET /api/telemetry/admin-diagnostics` и прямые deep-links в Sentry/PostHog — строго под `@Roles('ADMIN')`.
   - **Admin-Only UI Guard на `/system-status`:** на клиенте запрашивать приватные админ-метрики строго при `enabled: profile?.role === 'ADMIN'` (для `GUEST` и `USER` запросы вообще не отправляются — ноль лишних `403` в Network), а вместо данных показывать заблюренную плашку (`Admin-Only Diagnostics`) с кнопкой открытия `GuestPassModal` для входа по `ADMIN_SECRET_PASSCODE`.
 - [ ] **Две обязательные статьи-шпаргалки в Базе Знаний по новому UI 2025/2026 (`en` / `ru` / `uk`):**
@@ -89,7 +93,9 @@
 
 > База знаний (`/knowledge-base`) остаётся быстрой статической документацией (0 KB лишнего JS, удобно копировать статьи как промпты), а тяжёлые интерактивные библиотеки переезжают в выделенный полноэкранный раздел `/lab`.
 
-- [ ] **Авторский редизайн Workfolio (`UI v2`):** глубокое визуальное и типографическое переосмысление поверх готового фундамента (`Tailwind CSS v4`, 2D-палитры, Zero-CLS шрифты, `@starting-style`, `@container`), включая точечное применение примитивов React 19.2+ (`<Activity>`, `useEffectEvent`, опциональные `<ViewTransition>`), Mobile-First от `360px`.
+- [ ] **Авторский редизайн Workfolio (`UI v2`) + Feature Discoverability UX:**
+  - Глубокое визуальное и типографическое переосмысление поверх готового фундамента (`Tailwind CSS v4`, 2D-палитры, Zero-CLS шрифты, `@starting-style`, `@container`, примитивы React 19.2+ `<Activity>`, `useEffectEvent`, опциональные `<ViewTransition>`), Mobile-First от `360px`.
+  - **Нативная витрина скрытых возможностей («Under the Hood / Try Live» без навязчивых попапов):** чтобы рекрутер или техлид, пришедший только за PDF CV, сразу видел масштаб системы — компактная интерактивная полоса на главной и на странице `/cv` с быстрыми действиями: `⌘K Fuzzy Search`, `● Live SSE & API Inspector (/system-status)`, `✦ 14 Architecture Deep-Dives (This Project)`, `✈ Welcome & CV in Telegram`, `◈ Interactive Lab` + опциональный ненавязчивый переключатель фокуса / 60-секундный тур «For Recruiters / For Tech Leads».
 - [ ] **Новый роут `/[locale]/lab` (Engineering Lab / Interactive Playground):**
   - **Зачем:** отделить тяжёлые интерактивные песочницы от текстовых `.mdx`-статей, получить полноэкранный canvas вместо узкой `prose`-колонки и изолировать бандлы через route-level code-splitting.
   - **Структура (FSD-Modular):** новый слайс `apps/web/src/features/interactive-labs/*` + реестр `entities/interactive-lab/lab-registry.ts` + роуты `apps/web/src/app/[locale]/lab/page.tsx` и `apps/web/src/app/[locale]/lab/[slug]/page.tsx`, кнопка перехода в шапке (`APP_ROUTES.lab`).
@@ -148,11 +154,13 @@
 
 ### 1. Security & Auth Extensions (`apps/web`, `apps/api`)
 
-- [ ] **Next-Gen Auth & Telegram Bot Access для закрытых разделов Базы Знаний (`apps/api`, `PostgreSQL`, `Telegram Bot API`):**
-  1. `TELEGRAM_BOT_TOKEN`, 32+ символьный `TELEGRAM_WEBHOOK_SECRET`, опционально `TELEGRAM_ADMIN_CHAT_ID`; `grammy` (native ESM) или zero-dep `fetch` + модели в Prisma 7.
-  2. Deep Link `https://t.me/<bot>?start=<nonce>` (`POST /api/auth/telegram/init` с `SHA-256` хэшем 24-байтного `nonce` TTL `10 мин` + QR-код; `POST /api/auth/telegram/exchange` ➔ `HttpOnly` JWT) + одноразовый хэшированный invite-код для рекрутеров без Telegram.
+- [ ] **Telegram Bot — Фаза 2: Персональный Welcome + Беспарольный вход через Deep Link & SSE (`@GreatestWorkfolioBot`, `apps/api`, `PostgreSQL`):**
+  1. Переиспользовать того же бота из Приоритета №2 (`TELEGRAM_BOT_TOKEN`, 32+ символьный `TELEGRAM_WEBHOOK_SECRET`, `TELEGRAM_ADMIN_CHAT_ID`); `grammy` (native ESM) или zero-dep `fetch` + модели одноразовых токенов в Prisma 7.
+  2. **Два сценария Deep Link (обход антиспам-запрета Telegram писать первым по `@username`/телефону):**
+     - `?start=welcome_<nonce>`: кнопка *«Получить Welcome и PDF CV в Telegram»* ➔ пользователь жмёт `Start` ➔ бот присылает персональное приветствие по имени из `VisitorSession` с Inline-кнопками (`PDF CV`, `16 ADR`, `Написать @Kri4evskiy`).
+     - `?start=auth_<nonce>`: *«Войти в 1 клик через Telegram»* (`POST /api/auth/telegram/init` сохраняет `SHA-256` хэш 24-байтного `nonce` на `10 мин` + QR-код) ➔ пользователь жмёт `Start` ➔ бот шлёт Welcome, а вкладка на сайте **автоматически разблокируется через SSE** (`POST /api/auth/telegram/exchange` ➔ `HttpOnly` JWT) + резервный одноразовый invite-код для рекрутеров без Telegram.
   3. Dev: Long Polling (`getUpdates`); Prod: `POST /api/auth/telegram/webhook` с `crypto.timingSafeEqual` по `X-Telegram-Bot-Api-Secret-Token`.
-  4. Приватность, строгий `@Throttle` и Capability Gating при отсутствии `TELEGRAM_BOT_TOKEN`.
+  4. Приватность, строгий `@Throttle`, Capability Gating при отсутствии `TELEGRAM_BOT_TOKEN` и **обязательная подборка ссылок/статей пользователю** для изучения паттерна.
 - [ ] **Throttler ESM Upgrade Cleanup (`apps/api`):** отслеживать переход `@nestjs/throttler` на нативный ESM и удалить временный CJS/ESM мост для `Reflector` в `apps/api/src/app.module.ts`.
 - [ ] **`next-themes` React 19 Dev Warning Cleanup (`apps/web`):** отслеживать upstream-фикс `pacocoursey/next-themes#385` и удалить закомментированный блок из `apps/web/src/shared/providers/theme-provider.tsx`.
 
