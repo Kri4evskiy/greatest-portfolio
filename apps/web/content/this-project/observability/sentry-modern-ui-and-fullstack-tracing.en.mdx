@@ -1,0 +1,215 @@
+---
+title: "Sentry Production Playbook: Modern UI, AdBlock Tunneling, Quota Defense & Full-Stack Tracing"
+sidebarLabel: "Sentry: Tracing, Quotas & Modern UI"
+summary: "Senior/Staff guide and Priority #2 architectural blueprint for production Sentry across Next.js 16 and NestJS 12 ESM: Free Developer plan quotas (2 projects in 1 org), tunnelRoute vs AdBlockers, quota defense, backend instrument.ts + 5xx-only SentryExceptionFilter, Prisma tracing, graceful shutdown, and navigating the redesigned Sentry UI."
+category: "this-project"
+format: "deep-dive"
+tags: ["sentry", "observability", "nextjs", "nestjs", "security", "performance", "tracing"]
+readingTime: "12 min"
+publishedAt: "2026-11-26"
+order: 1
+tldr:
+  - "One free **Sentry Developer** organization supports **both** `workfolio-web` (Next.js) and `workfolio-api` (NestJS) via two separate DSNs sharing a hard-capped monthly pool (`5,000` errors, `5M` spans, `50` replays, `30d` retention—zero surprise billing)."
+  - "On the frontend, routing through **`tunnelRoute: '/monitoring'`** (excluded in `src/proxy.ts`), filtering noise via `ignoreErrors`/`denyUrls`, and enabling `deleteSourcemapsAfterUpload: true` prevents ~70% AdBlock loss and source-map leaks."
+  - "On the backend (`NestJS 12 ESM`), production reliability requires an **early `instrument.ts`** (`node --import ./dist/instrument.js`), **5xx-only** capture in `SentryExceptionFilter` (no `4xx` spam, keeping the SSE `headersSent` guard), server-side `Cookie`/`adminPasscode` scrubbing, and `await Sentry.close(2000)` on shutdown."
+  - "When paired with PostHog (`5,000` free replays/mo), disabling Sentry's `replayIntegration()` saves **~30 KB** of client JS while attaching `posthog.get_session_replay_url()` in `Sentry.beforeSend` gives 1-click video replay on every error."
+---
+
+> [!NOTE]
+> **Implementation Status (Priority #2 Blueprint):** The observability foundation (`SentryExceptionFilter` with `X-Request-Id` & log sanitization, `captureClientException`, `QueryCache.onError` filtering, and `GET /api/capabilities` `sentryObservability` flag) is already shipped in `v0.10.0`. Installing live `@sentry/nextjs` + `@sentry/nestjs` transports, `/monitoring` tunneling, and Telegram webhook forwarding is scheduled as **Priority #2** (immediately after initial production deploy).
+
+---
+
+## 1. Free Tier Economics: Frontend + Backend in One Organization
+
+Sentry's **Free Developer Plan** is ideal for a solo-owned Senior portfolio & full-stack monorepo because it enforces **hard caps** (events are simply dropped if a monthly ceiling is reached—never billed automatically):
+
+| Quota Resource | Monthly Allowance (Free Developer) | Scope & Practical Strategy |
+| :--- | :--- | :--- |
+| **Projects** | **Multiple projects** in 1 organization (`1` user seat) | Create **`workfolio-web`** (`NEXT_PUBLIC_SENTRY_DSN`) + **`workfolio-api`** (`SENTRY_DSN`) |
+| **Error Events** | **5,000 errors / month** (shared pool) | Protect aggressively with `ignoreErrors` + `denyUrls` + `beforeSend` |
+| **Performance Spans** | **5,000,000 spans / month** | Set `tracesSampleRate: 0.2` in production (`0` in local `dev`) |
+| **Session Replays** | **50 replays / month** | Use `replaysSessionSampleRate: 0` + `replaysOnErrorSampleRate: 1.0`, **OR** disable Sentry Replay (-30 KB JS) and cross-link to PostHog (`5,000` replays/mo) |
+| **Logs & Retention** | **5 GB logs**, **30-day retention** | Sufficient for production incident triage and release regression checks |
+
+---
+
+## 2. Six Production Patterns (Beyond "Paste the DSN")
+
+### Pattern 1: Bypassing AdBlockers with `tunnelRoute: '/monitoring'` (+ `proxy.ts` Trap!)
+Roughly 70–80% of engineers and Tech Leads browse with **uBlock Origin**, **AdGuard**, or **Brave Shields**. Because `sentry.io` sits on *EasyPrivacy* blocklists, direct browser requests fail with `ERR_BLOCKED_BY_CLIENT`—making real bugs invisible.
+
+```typescript title="apps/web/next.config.ts (Priority #2 target)"
+export default withSentryConfig(withNextIntl(withBundleAnalyzer(nextConfig)), {
+  tunnelRoute: '/monitoring',
+  sourcemaps: {
+    deleteSourcemapsAfterUpload: true,
+  },
+})
+```
+
+> [!WARNING]
+> **Critical Next.js 16 + `next-intl` Gotcha:**
+> Whenever you enable `tunnelRoute: '/monitoring'`, you **must** exclude `monitoring` in `apps/web/src/proxy.ts` (`config.matcher`), right alongside `api` and `search-index`! Otherwise `next-intl` intercepts `/monitoring` as a missing-locale path and breaks Sentry ingestion with a redirect.
+> **CSP Bonus:** Tunneling through `/monitoring` routes all Sentry traffic through `'self'`, so `security-headers.config.ts` does not need to widen `connect-src`.
+
+### Pattern 2: Quota Defense (`ignoreErrors`, `denyUrls` & `beforeSend`)
+On public websites, **60–80% of browser exceptions come from third-party extensions, crawlers, or transient network drops**, not your application code. One noisy browser extension can burn 5,000 monthly events in a single day.
+
+```typescript title="Noise & secret defense blueprint (sentry.client.config.ts)"
+Sentry.init({
+  dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
+  enabled: process.env.NODE_ENV === 'production' && Boolean(process.env.NEXT_PUBLIC_SENTRY_DSN),
+  sendDefaultPii: false,
+  tracesSampleRate: 0.2,
+  denyUrls: [
+    /^chrome-extension:\/\//i,
+    /^moz-extension:\/\//i,
+    /^safari-web-extension:\/\//i,
+  ],
+  ignoreErrors: [
+    'ResizeObserver loop limit exceeded',
+    'ResizeObserver loop completed with undelivered notifications',
+    'AbortError',
+    /^NetworkError when attempting to fetch resource/i,
+    /^Failed to fetch$/i,
+  ],
+  beforeSend(event) {
+    // Attach 1-click link to PostHog Session Replay (5,000 free replays/mo)
+    const replayUrl = posthog?.get_session_replay_url?.({ withTimestamp: true })
+    if (replayUrl) {
+      event.tags = { ...event.tags, posthogReplay: 'attached' }
+      event.contexts = { ...event.contexts, posthog: { replay_url: replayUrl } }
+    }
+    return event
+  },
+})
+```
+
+### Pattern 3: Smart Session Replay Sampling (50 Sentry Replays vs 5,000 PostHog Replays)
+You have two clean production options—choose **one**, never pay double bundle weight for both:
+
+1. **Recommended Hybrid (with PostHog enabled):** Do **not** register `Sentry.replayIntegration()` at all. You save **~30 KB gzipped** in the client bundle and get video recordings of every error via the `posthog.get_session_replay_url()` cross-link inside `Sentry.beforeSend` (powered by PostHog's `5,000`/mo free tier).
+2. **Standalone Sentry (without PostHog):** Register `replayIntegration({ maskAllText: false, maskAllInputs: true })` with **`replaysSessionSampleRate: 0`** and **`replaysOnErrorSampleRate: 1.0`**. Sentry buffers the last 60 seconds in memory and consumes a replay quota slot **only when an error actually fires**.
+
+### Pattern 4: Secure Source Maps (`deleteSourcemapsAfterUpload: true`)
+Without Source Maps, Sentry stack traces show unreadable minified chunks (`chunk-8a9f.js:1:48219`). Uploading Source Maps at build time via `SENTRY_AUTH_TOKEN` restores exact TypeScript file/line frames inside Sentry—and setting **`deleteSourcemapsAfterUpload: true`** removes `.js.map` files from `.next/static` before deploy so original source maps are never publicly downloadable.
+
+### Pattern 5: Full-Stack User & Request Correlation (`X-Request-Id` + `setUser`)
+- **Frontend (`<ObservabilityIdentityBridge />`):** When `useVisitorProfile()` resolves an authenticated session (`profile.role !== 'GUEST'`), call `Sentry.setUser({ id: profile.id, username: profile.displayName ?? undefined })` plus `Sentry.setTag('visitorType', ...)` and `Sentry.setTag('role', ...)`. On logout, **always** call `Sentry.setUser(null)`.
+- **Backend (`apps/api/src/common/filters/sentry-exception.filter.ts`):** Bind `scope.setTag('requestId', requestId)` and `req.user` (`id`, `displayName`, `role`) before capturing 5xx exceptions—connecting frontend errors, Koyeb container logs, and NestJS traces into one timeline.
+
+### Pattern 6: Zero-Manual-Monitoring via Telegram Webhook
+Instead of refreshing Sentry daily, configure a Sentry Internal Integration / Alert Webhook pointing to `POST /api/webhooks/sentry` (verified via HMAC-SHA256 `Sentry-Hook-Signature`) so new production errors immediately post to your private `TELEGRAM_ADMIN_CHAT_ID` channel with `[Open in Sentry]`, `X-Request-Id`, and the visitor label.
+
+---
+
+## 3. Backend Implementation & Pitfalls (`@sentry/nestjs` in `apps/api` & `apps/telemetry-ms`)
+
+Wiring Sentry into a `NestJS 12 ESM` (`"type": "module"`) backend requires far more care than dropping `Sentry.init()` inside `main.ts`. Below are the four backend pitfalls Priority #2 explicitly addresses.
+
+### Pitfall 1: Early `instrument.ts` Before Any App Imports + Node ESM `--import`
+In Node.js ESM, Sentry's OpenTelemetry auto-instrumentation must load **before** `express`, `@nestjs/core`, or `@prisma/client` are imported. Calling `Sentry.init()` inside `bootstrap()` still catches exceptions, but **silently breaks HTTP spans, Prisma SQL tracing, and end-to-end frontend-to-backend trace waterfalls**.
+
+```typescript title="apps/api/src/instrument.ts (Priority #2 target implementation)"
+import * as Sentry from '@sentry/nestjs'
+import { appConfig } from './config/app.config.js'
+
+const SENSITIVE_HEADERS = new Set([
+  'cookie',
+  'authorization',
+  'x-telegram-bot-api-secret-token',
+  'sentry-hook-signature',
+])
+
+Sentry.init({
+  dsn: appConfig.sentryDsn,
+  enabled: appConfig.isProduction && Boolean(appConfig.sentryDsn),
+  environment: appConfig.nodeEnv,
+  sendDefaultPii: false,
+  tracesSampleRate: 0.2,
+  integrations: [Sentry.prismaIntegration()],
+  beforeSend(event) {
+    if (event.request) {
+      delete event.request.cookies
+      if (event.request.headers) {
+        for (const key of Object.keys(event.request.headers)) {
+          if (SENSITIVE_HEADERS.has(key.toLowerCase())) {
+            event.request.headers[key] = '[Filtered]'
+          }
+        }
+      }
+      if (event.request.data && typeof event.request.data === 'object') {
+        const sanitized = { ...(event.request.data as Record<string, unknown>) }
+        for (const secretKey of ['adminPasscode', 'passcode', 'password', 'token']) {
+          if (secretKey in sanitized) sanitized[secretKey] = '[Filtered]'
+        }
+        event.request.data = sanitized
+      }
+    }
+    return event
+  },
+})
+```
+
+- **Entrypoint:** Import `import './instrument.js'` as line 1 of `apps/api/src/main.ts`, and in `docker/api.Dockerfile` boot Node with **`node --import ./dist/instrument.js dist/main.js`** so OpenTelemetry ESM loader hooks patch Express and Prisma cleanly.
+- **Module registration:** Register `SentryModule.forRoot()` inside `apps/api/src/app.module.ts`.
+
+### Pitfall 2: Custom `SentryExceptionFilter` Conflict (Capture `5xx` Only—Zero `4xx` Spam!)
+`apps/api/src/common/filters/sentry-exception.filter.ts` already defines our global `@Catch()` filter with URL sanitization and the `if (response.headersSent) return` guard protecting active SSE streams.
+
+> [!WARNING]
+> **Classic Production Mistake:** Blindly applying `@SentryExceptionCaptured()` onto a global `@Catch()` filter without status filtering. Every validation error (`400`), unauthenticated hit (`401`), wrong `adminPasscode` (`403`), missing route (`404`), and `ThrottlerGuard` hit (`429`) would flood Sentry—letting one scanner bot burn the entire `5,000`/month quota in an hour!
+
+The production pattern inside `SentryExceptionFilter` captures **strictly `status >= 500`** with full request scope:
+
+```typescript title="apps/api/src/common/filters/sentry-exception.filter.ts (5xx branch)"
+if (status >= 500) {
+  Sentry.withScope((scope) => {
+    scope.setTag('requestId', requestId ?? 'n/a')
+    scope.setTag('http.status_code', String(status))
+    scope.setExtra('path', safeUrl)
+    if (request.user) {
+      scope.setUser({
+        id: request.user.id,
+        username: request.user.displayName ?? undefined,
+      })
+      scope.setTag('role', request.user.role)
+    }
+    Sentry.captureException(exception)
+  })
+}
+```
+
+All `4xx` errors stay in structured logs (while security signals like `ADMIN_ESCALATION_FAILED` route to Telegram and `posthog-node`), and `if (response.headersSent) return` keeps `/api/telemetry/stream` safe from `ERR_HTTP_HEADERS_SENT`.
+
+### Pitfall 3: Distributed Tracing (`Next.js ➔ NestJS ➔ Prisma 7`) & CORS Headers
+- To link a browser click, NestJS Express route, and Neon PostgreSQL query into **one unified waterfall** in `Explore ➔ Traces`, `@sentry/nextjs` attaches **`sentry-trace`** and **`baggage`** headers (configure `tracePropagationTargets: ['localhost', /^\/api\//, process.env.NEXT_PUBLIC_SITE_URL]` in `sentry.client.config.ts`).
+- **CORS Gotcha:** `apps/api/src/main.ts` currently omits a restrictive `allowedHeaders` list (reflecting requested headers), but if you ever lock down `allowedHeaders`, you **must** include `'sentry-trace'` and `'baggage'`—otherwise browser CORS preflight `OPTIONS` requests will fail!
+- `Sentry.prismaIntegration()` traces Prisma 7 (`@prisma/adapter-pg`) queries automatically, populating **`Insights ➔ Queries`**.
+
+### Pitfall 4: Graceful Shutdown (`Sentry.close`) & `apps/telemetry-ms` TCP Microservice
+- `apps/api/src/main.ts` already calls `app.enableShutdownHooks()`. During container redeploys (`SIGTERM` on Koyeb/Docker), in-flight Sentry events can be dropped unless we flush them: implement `onApplicationShutdown() { return Sentry.close(2000) }` in `ObservabilityModule`, and call `Sentry.captureException(error)` + `await Sentry.close(2000)` in `bootstrap().catch(...)` before `process.exit(1)`.
+- **`apps/telemetry-ms` (Docker / VPS):** On Koyeb Free, `telemetry-ms` is not deployed separately (`apps/api` falls back to in-memory telemetry). In self-hosted Docker/VPS topologies, load the same `instrument.ts` tagged with `service: 'telemetry-ms'` (reusing the `workfolio-api` DSN or adding a 3rd `workfolio-telemetry-ms` project in the same free org), capture RPC errors in `RpcExceptionFilter`, and call `await Sentry.close(2000)` on `SIGTERM`.
+
+---
+
+## 4. Navigating the Redesigned Sentry UI (2025/2026)
+
+Sentry overhauled its sidebar navigation and split alerting into **Monitors + Alerts**. Here is where to look first when an incident happens:
+
+| Sidebar Section | Primary Purpose | What to Inspect First |
+| :--- | :--- | :--- |
+| **`Issues`** | Central stream of grouped errors | Save a custom **Issue View** (`is:unresolved environment:production`) right in the sidebar. Inside an issue, read top-to-bottom: **Tags** (`requestId`, `role`, `browser`) ➔ **User** (`Alex • Team Lead`) ➔ **Stack Trace** (TypeScript via Source Maps) ➔ **Breadcrumbs** (clicks & `fetch` calls 30s before crash). |
+| **`Insights`** | Out-of-the-box performance & anomaly dashboards | Check **Frontend** (LCP/INP/CLS regressions), **Backend / Queries** (slow Neon PostgreSQL queries via Prisma), and **Requests** (slow upstream hops). You can create an Alert directly from any chart in 2 clicks. |
+| **`Explore`** | Deep-dive slicing & raw telemetry | Drill into **Traces** (`Next.js ➔ NestJS ➔ Prisma` waterfalls), **Logs**, and **Replays** by release, OS, or route. |
+| **`Monitors` & `Alerts`** | Split monitoring rules vs notification routing | Define **what** triggers an issue in **Monitors** (new error, metric threshold, uptime) and **where** it routes in **Alerts** (Email / Webhook to Telegram). |
+| **`Settings ➔ Projects`** | Admin & keys | Manage `workfolio-web` & `workfolio-api`, copy **Client Keys (DSN)**, configure **Inbound Filters** (bots/legacy browsers), and rotate **Auth Tokens**. |
+
+---
+
+## 5. Security Rule for `/system-status` Integration
+
+If you later query the Sentry REST API (`GET /api/0/projects/{org}/{project}/issues/?query=is:unresolved`) from `apps/api` to enrich `/system-status`:
+- **Public view (`GUEST` / `USER`):** expose **only** a sanitized aggregate counter (e.g., `unresolvedIssues24h: 0`, cached 5–10 min)—**never** expose raw stack traces, internal paths, or user identities publicly.
+- **Admin view (`@Roles('ADMIN')`):** gate detailed issue lists and deep-links behind both `JwtRolesGuard` on the backend and `enabled: profile?.role === 'ADMIN'` in `TanStack Query` on the frontend (with a blurred Admin-Only placeholder for non-admins).

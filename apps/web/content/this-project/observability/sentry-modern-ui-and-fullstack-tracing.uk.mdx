@@ -1,0 +1,215 @@
+---
+title: "Плейбук Sentry для продакшену: новий UI 2025/2026, тунелювання від AdBlock, захист квот та трасування"
+sidebarLabel: "Sentry: трасування, квоти та новий UI"
+summary: "Senior/Staff-посібник і архітектурний план Пріоритету №2 для продакшен-інтеграції Sentry у Next.js 16 + NestJS 12 ESM: Developer Plan на 2 проєкти, tunnelRoute проти AdBlockers, захист квоти, instrument.ts і 5xx-only SentryExceptionFilter на бекенді, Prisma tracing, graceful shutdown та розбір нового UI Sentry."
+category: "this-project"
+format: "deep-dive"
+tags: ["sentry", "observability", "nextjs", "nestjs", "security", "performance", "tracing"]
+readingTime: "12 хв"
+publishedAt: "2026-11-26"
+order: 1
+tldr:
+  - "Одна безкоштовна організація **Sentry Developer** підтримує **обидва** проєкти (`workfolio-web` на Next.js та `workfolio-api` на NestJS) із двома різними DSN та спільним жорстким лімітом без списань (`5 000` помилок, `5 млн` спанів, `50` реплеїв на місяць, 30 днів зберігання)."
+  - "На фронтенді без **`tunnelRoute: '/monitoring'`** (із виключенням у `src/proxy.ts`) uBlock/Brave ріжуть ~70% помилок; квоту захищають `ignoreErrors`/`denyUrls`, а вихідний код ховає `deleteSourcemapsAfterUpload: true`."
+  - "На бекенді (`NestJS 12 ESM`) критичні **ранній `instrument.ts`** (`node --import ./dist/instrument.js`), захоплення **суворо `status >= 500`** у `SentryExceptionFilter` (без спаму `4xx` та із захистом SSE `headersSent`), очищення `Cookie`/`adminPasscode` у `beforeSend` і `await Sentry.close(2000)` при shutdown."
+  - "У парі з PostHog (`5 000` безкоштовних записів/міс) можна взагалі вимкнути `Sentry.replayIntegration()` (економія **~30 КБ** клієнтського JS) і додавати посилання `posthog.get_session_replay_url()` у `Sentry.beforeSend`."
+---
+
+> [!NOTE]
+> **Статус реалізації (Blueprint для Пріоритету №2):** базовий контур спостережуваності (`SentryExceptionFilter` із `X-Request-Id` і санітизацією логів, `captureClientException`, фільтрація в `QueryCache.onError` та прапорець `sentryObservability` у `GET /api/capabilities`) уже працює у `v0.10.0`. Підключення живих SDK `@sentry/nextjs` + `@sentry/nestjs`, тунелю `/monitoring` і Telegram-вебхука заплановано на **Пріоритет №2** (одразу після першого бойового деплою).
+
+---
+
+## 1. Економіка Free Tier: фронт і бек в одній організації
+
+Безкоштовний тариф **Sentry Developer Plan** ідеально підходить для full-stack монорепозиторію одного розробника — у нього **жорсткий hard-cap** (після вичерпання місячного ліміту зайві події просто відкидаються, жодних несподіваних списань):
+
+| Ресурс | Ліміт на місяць (Free Developer) | Як використовувати на практиці |
+| :--- | :--- | :--- |
+| **Проєкти** | **Кілька проєктів** в 1 організації (`1` seat) | Створюємо **`workfolio-web`** (`NEXT_PUBLIC_SENTRY_DSN`) + **`workfolio-api`** (`SENTRY_DSN`) |
+| **Помилки (Errors)** | **5 000 подій / міс** (спільний пул) | Обов'язково фільтрувати шум через `ignoreErrors` + `denyUrls` + `beforeSend` |
+| **Performance Spans** | **5 000 000 спанів / міс** | Ставимо `tracesSampleRate: 0.2` у `production` (і `0` у локальному `dev`) |
+| **Session Replays** | **50 записів / міс** | Або `replaysSessionSampleRate: 0` + `replaysOnErrorSampleRate: 1.0`, **або** вимикаємо Replay у Sentry (-30 КБ JS) і даємо посилання на PostHog (`5 000` записів/міс) |
+| **Логи та зберігання** | **5 ГБ логів**, **30 днів зберігання** | Достатньо для розбору інцидентів та контролю регресій після релізів |
+
+---
+
+## 2. Шість продакшн-патернів (глибше базового «вставив DSN»)
+
+### Патерн 1: Обхід AdBlockers через `tunnelRoute: '/monitoring'` (+ пастка `proxy.ts`!)
+У 70–80% розробників і техлідів встановлено **uBlock Origin**, **AdGuard** або **Brave Shields**. Домен `sentry.io` входить до списків *EasyPrivacy*, тому прямі запити браузера обриваються з `ERR_BLOCKED_BY_CLIENT` — і реальні баги просто не доходять до Sentry.
+
+```typescript title="apps/web/next.config.ts (цільова конфігурація Пріоритету №2)"
+export default withSentryConfig(withNextIntl(withBundleAnalyzer(nextConfig)), {
+  tunnelRoute: '/monitoring',
+  sourcemaps: {
+    deleteSourcemapsAfterUpload: true,
+  },
+})
+```
+
+> [!WARNING]
+> **Критична пастка для Next.js 16 + `next-intl`:**
+> При увімкненні `tunnelRoute: '/monitoring'` потрібно **обов'язково** виключити `monitoring` у `apps/web/src/proxy.ts` (`config.matcher`) поруч із `api` та `search-index`! Інакше `next-intl` сприйме `/monitoring` як шлях без локалі й зламає проксіювання редиректом.
+> **Бонус для CSP:** проксіювання через `/monitoring` іде на `'self'`, тож не доводиться послаблювати `connect-src` зовнішніми доменами в `security-headers.config.ts`.
+
+### Патерн 2: Захист квоти від шуму (`ignoreErrors`, `denyUrls` та `beforeSend`)
+На публічних сайтах **60–80% помилок прилітають не з вашого коду**, а від сторонніх розширень браузера, старих ботів та обривів мережі. Один глючний плагін здатний спалити всю квоту `5 000` подій за один день.
+
+```typescript title="Захист квоти та зв'язка з PostHog (sentry.client.config.ts)"
+Sentry.init({
+  dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
+  enabled: process.env.NODE_ENV === 'production' && Boolean(process.env.NEXT_PUBLIC_SENTRY_DSN),
+  sendDefaultPii: false,
+  tracesSampleRate: 0.2,
+  denyUrls: [
+    /^chrome-extension:\/\//i,
+    /^moz-extension:\/\//i,
+    /^safari-web-extension:\/\//i,
+  ],
+  ignoreErrors: [
+    'ResizeObserver loop limit exceeded',
+    'ResizeObserver loop completed with undelivered notifications',
+    'AbortError',
+    /^NetworkError when attempting to fetch resource/i,
+    /^Failed to fetch$/i,
+  ],
+  beforeSend(event) {
+    // Додаємо 1-клік посилання на запис сесії в PostHog (5 000 безкоштовних записів/міс)
+    const replayUrl = posthog?.get_session_replay_url?.({ withTimestamp: true })
+    if (replayUrl) {
+      event.tags = { ...event.tags, posthogReplay: 'attached' }
+      event.contexts = { ...event.contexts, posthog: { replay_url: replayUrl } }
+    }
+    return event
+  },
+})
+```
+
+### Патерн 3: Розумний Sampling відеозаписів (50 у Sentry vs 5 000 у PostHog)
+Не варто вантажити два відеорекордери одночасно й платити подвійною вагою JS. Обираємо одну з двох стратегій:
+
+1. **Рекомендований гібрид (коли підключений PostHog):** узагалі **не підключаємо** `Sentry.replayIntegration()`. Економимо **~30 КБ gzip** у клієнтському бандлі й отримуємо відеозапис будь-якої помилки прямо з картки Sentry за посиланням `posthog.get_session_replay_url()` (із квоти PostHog `5 000` записів/міс).
+2. **Автономний Sentry (якщо PostHog не використовується):** вмикаємо `replayIntegration({ maskAllText: false, maskAllInputs: true })` суворо в режимі **`replaysSessionSampleRate: 0`** + **`replaysOnErrorSampleRate: 1.0`**. Sentry тримає останні 60 секунд у кільцевому буфері пам'яті й витрачає квоту **лише при реальному падінні**.
+
+### Патерн 4: Безпечні Source Maps (`deleteSourcemapsAfterUpload: true`)
+Без Source Maps стектрейс у Sentry нечитабельний (`chunk-8a9f.js:1:48219`). Завантаження карт під час білду через `SENTRY_AUTH_TOKEN` повертає точні TypeScript-файли й рядки, а опція **`deleteSourcemapsAfterUpload: true`** одразу видаляє `.js.map` із публічної папки `.next/static`, щоб ніхто не міг завантажити вихідний код через браузер.
+
+### Патерн 5: Наскрізна кореляція `Next.js ➔ NestJS` (`X-Request-Id` + `setUser`)
+- **Фронтенд (`<ObservabilityIdentityBridge />`):** коли `useVisitorProfile()` повертає авторизований профіль (`role !== 'GUEST'`), викликається `Sentry.setUser({ id: profile.id, username: profile.displayName ?? undefined })` + теги `visitorType` та `role`. При `logout` — обов'язкове скидання `Sentry.setUser(null)`.
+- **Бекенд (`apps/api/src/common/filters/sentry-exception.filter.ts`):** перед відправкою 5xx-винятків додаються `scope.setTag('requestId', requestId)` та `req.user` ➔ помилка в Sentry миттєво пов'язується з логами Koyeb та фронтенд-подією.
+
+### Патерн 6: Нуль ручного моніторингу через Telegram Webhook
+Щоб не заходити в Sentry щодня, налаштовується Webhook на `POST /api/webhooks/sentry` (із перевіркою HMAC-SHA256 підпису `Sentry-Hook-Signature`) ➔ нова помилка на проді сама прилітає у твій приватний `TELEGRAM_ADMIN_CHAT_ID` із `X-Request-Id`, ім'ям відвідувача та кнопкою **`[Open in Sentry]`**.
+
+---
+
+## 3. Бекенд-реалізація та нюанси (`@sentry/nestjs` в `apps/api` і `apps/telemetry-ms`)
+
+Підключити Sentry на бекенді `NestJS 12 ESM` (`"type": "module"`) складніше, ніж просто викликати `Sentry.init()` у `main.ts`. Нижче — чотири продакшен-пастки, які потрібно закрити під час реалізації Пріоритету №2.
+
+### Нюанс 1: Ранній `instrument.ts` до всіх імпортів + Node ESM `--import`
+У Node.js ESM OpenTelemetry-інструментація Sentry має завантажитися **до того**, як імпортуються `express`, `@nestjs/core` і `@prisma/client`. Якщо викликати `Sentry.init()` усередині `bootstrap()`, помилки зловляться, але **повністю зникнуть HTTP-спани, SQL-трасування Prisma й наскрізний водоспад із фронтендом**.
+
+```typescript title="apps/api/src/instrument.ts (цільова реалізація Пріоритету №2)"
+import * as Sentry from '@sentry/nestjs'
+import { appConfig } from './config/app.config.js'
+
+const SENSITIVE_HEADERS = new Set([
+  'cookie',
+  'authorization',
+  'x-telegram-bot-api-secret-token',
+  'sentry-hook-signature',
+])
+
+Sentry.init({
+  dsn: appConfig.sentryDsn,
+  enabled: appConfig.isProduction && Boolean(appConfig.sentryDsn),
+  environment: appConfig.nodeEnv,
+  sendDefaultPii: false,
+  tracesSampleRate: 0.2,
+  integrations: [Sentry.prismaIntegration()],
+  beforeSend(event) {
+    if (event.request) {
+      delete event.request.cookies
+      if (event.request.headers) {
+        for (const key of Object.keys(event.request.headers)) {
+          if (SENSITIVE_HEADERS.has(key.toLowerCase())) {
+            event.request.headers[key] = '[Filtered]'
+          }
+        }
+      }
+      if (event.request.data && typeof event.request.data === 'object') {
+        const sanitized = { ...(event.request.data as Record<string, unknown>) }
+        for (const secretKey of ['adminPasscode', 'passcode', 'password', 'token']) {
+          if (secretKey in sanitized) sanitized[secretKey] = '[Filtered]'
+        }
+        event.request.data = sanitized
+      }
+    }
+    return event
+  },
+})
+```
+
+- **Точка входу:** імпортуємо `import './instrument.js'` найпершим рядком `apps/api/src/main.ts`, а в `docker/api.Dockerfile` запускаємо процес через **`node --import ./dist/instrument.js dist/main.js`** (це гарантує спрацювання ESM-хуків OpenTelemetry до завантаження Express і Prisma).
+- **Реєстрація модуля:** додаємо `SentryModule.forRoot()` у `apps/api/src/app.module.ts`.
+
+### Нюанс 2: Конфлікт із кастомним `SentryExceptionFilter` (лише `5xx`, нуль спаму `4xx`!)
+В `apps/api/src/common/filters/sentry-exception.filter.ts` уже працює глобальний `@Catch()`-фільтр із захистом SSE (`if (response.headersSent) return`) та санітизацією URL.
+
+> [!WARNING]
+> **Небезпечна помилка новачків:** повісити стандартний декоратор `@SentryExceptionCaptured()` поверх глобального `@Catch()` без фільтрації статусів. Тоді кожен невалідний запит (`400`), неавторизований виклик (`401`), хибний `adminPasscode` (`403`), битий URL (`404`) та спрацювання `ThrottlerGuard` (`429`) полетять у Sentry — один скан бота спалить квоту `5 000` подій за годину!
+
+Правильний патерн у нашому `SentryExceptionFilter` — надсилати в Sentry **виключно `status >= 500`** із контекстом запиту:
+
+```typescript title="apps/api/src/common/filters/sentry-exception.filter.ts (гілка 5xx)"
+if (status >= 500) {
+  Sentry.withScope((scope) => {
+    scope.setTag('requestId', requestId ?? 'n/a')
+    scope.setTag('http.status_code', String(status))
+    scope.setExtra('path', safeUrl)
+    if (request.user) {
+      scope.setUser({
+        id: request.user.id,
+        username: request.user.displayName ?? undefined,
+      })
+      scope.setTag('role', request.user.role)
+    }
+    Sentry.captureException(exception)
+  })
+}
+```
+
+Усі `4xx` залишаються в локальних логах (а security-події на кшталт `ADMIN_ESCALATION_FAILED` ідуть у Telegram і `posthog-node`), а перевірка `if (response.headersSent) return` і надалі захищає процес від `ERR_HTTP_HEADERS_SENT` при обриві SSE-потоку `/api/telemetry/stream`.
+
+### Нюанс 3: Наскрізний Distributed Tracing (`Next.js ➔ NestJS ➔ Prisma 7`) та CORS
+- Щоб Sentry склеїв браузерний клік, Express-маршрут у NestJS і SQL-запит у Neon PostgreSQL в **один водоспад** (`Explore ➔ Traces`), `@sentry/nextjs` додає до запитів заголовки **`sentry-trace`** та **`baggage`** (налаштовуємо `tracePropagationTargets: ['localhost', /^\/api\//, process.env.NEXT_PUBLIC_SITE_URL]` у `sentry.client.config.ts`).
+- **Пастка CORS:** в `apps/api/src/main.ts` зараз не задано жорсткий `allowedHeaders` (CORS віддзеркалює запитані заголовки), але якщо колись додати явний список `allowedHeaders`, до нього **обов'язково** потрібно включити `'sentry-trace'` та `'baggage'` — інакше preflight `OPTIONS` заблокує всі API-запити!
+- `Sentry.prismaIntegration()` автоматично фіксує тривалість запитів Prisma 7 (`@prisma/adapter-pg`), наповнюючи розділ **`Insights ➔ Queries`**.
+
+### Нюанс 4: Graceful Shutdown (`Sentry.close`) і TCP-мікросервіс `apps/telemetry-ms`
+- В `apps/api/src/main.ts` уже увімкнено `app.enableShutdownHooks()`. Під час редеплою (`SIGTERM` на Koyeb/Docker) асинхронна черга Sentry може не встигнути скинути останню помилку — додаємо `onApplicationShutdown() { return Sentry.close(2000) }` в `ObservabilityModule`, а в `bootstrap().catch(...)` викликаємо `Sentry.captureException(error)` + `await Sentry.close(2000)` перед `process.exit(1)`.
+- **`apps/telemetry-ms` (Docker / VPS):** на Koyeb Free окремий контейнер мікросервісу не піднімається (`apps/api` використовує локальний in-memory fallback). У self-hosted Docker/VPS-топології підключаємо такий самий `instrument.ts` із тегом `service: 'telemetry-ms'` (можна в той самий DSN `workfolio-api` або 3-й проєкт `workfolio-telemetry-ms` у тій самій безкоштовній організації), ловимо RPC-винятки через `RpcExceptionFilter` і викликаємо `await Sentry.close(2000)` при `SIGTERM`.
+
+---
+
+## 4. Навігація оновленим UI Sentry (2025/2026)
+
+Після масштабного редизайну Sentry оновив сайдбар і розділив моніторинг та алерти на **Monitors + Alerts**. Ось куди дивитися передусім:
+
+| Розділ сайдбару | Призначення | Що перевіряти в першу чергу |
+| :--- | :--- | :--- |
+| **`Issues`** | Головний потік згрупованих помилок | Збережи свій фільтр **Issue View** (`is:unresolved environment:production`) у сайдбар. Усередині помилки читай зверху вниз: **Tags** (`requestId`, `role`, `browser`) ➔ **User** (`Alex • Team Lead`) ➔ **Stack Trace** (TypeScript за Source Maps) ➔ **Breadcrumbs** (кліки та `fetch` за 30 с до падіння). |
+| **`Insights`** | Готові графіки продуктивності та аномалій | Дивись **Frontend** (LCP/INP/CLS), **Backend / Queries** (повільні SQL-запити Neon/Prisma) та **Requests** (повільні зовнішні виклики). З будь-якого графіка за 2 кліки вішається алерт. |
+| **`Explore`** | Глибокі зрізи та сирі дані | **Traces** (водоспад `Next.js ➔ NestJS ➔ Prisma`), **Logs** та **Replays** із фільтрацією за релізом, ОС і маршрутом. |
+| **`Monitors` і `Alerts`** | Розділення правил і доставки сповіщень | У **Monitors** задається умова (нова помилка, поріг p95 latency, uptime), в **Alerts** — куди надсилати (Email / Webhook у Telegram). |
+| **`Settings ➔ Projects`** | Адміністрування та ключі | Керування `workfolio-web` і `workfolio-api`, копіювання **Client Keys (DSN)**, увімкнення **Inbound Filters** (боти/старі браузери) та випуск **Auth Tokens**. |
+
+---
+
+## 5. Правило безпеки при виводі в `/system-status`
+
+Якщо згодом підключати Sentry REST API (`GET /api/0/projects/{org}/{project}/issues/?query=is:unresolved`) в `apps/api`:
+- **Публічно (`GUEST` / `USER`):** віддавати **лише** безпечний агрегований лічильник (`unresolvedIssues24h: 0`, кеш 5–10 хв) — **ніколи** не розкривати стектрейси, внутрішні шляхи чи імена користувачів.
+- **Для власника (`@Roles('ADMIN')`):** захищати детальний список помилок і deep-links гвардом `JwtRolesGuard` на бекенді та `enabled: profile?.role === 'ADMIN'` у `TanStack Query` на фронтенді (із заблюреною плашкою для не-адмінів).

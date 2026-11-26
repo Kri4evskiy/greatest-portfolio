@@ -97,6 +97,8 @@ export const KNOWN_KNOWLEDGE_SLUGS: ReadonlySet<string> = new Set([
   'this-project--monorepo-docker--github-actions-ci-pipeline',
   'this-project--monorepo-docker--multi-stage-buildkit-docker',
   'this-project--monorepo-docker--pnpm-turborepo-tsconfig-biome',
+  'this-project--observability--posthog-modern-ui-identification-and-replays',
+  'this-project--observability--sentry-modern-ui-and-fullstack-tracing',
   'this-project--security--production-security-hardening-csp-helmet-throttler',
   'this-project--testing-qa--vitest-playwright-enterprise-testing-pyramid',
 ])

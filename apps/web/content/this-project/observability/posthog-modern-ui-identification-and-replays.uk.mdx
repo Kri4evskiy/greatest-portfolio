@@ -1,0 +1,202 @@
+---
+title: "Плейбук PostHog для продакшену: новий UI 2025/2026, ідентифікація користувачів, Reverse Proxy та Session Replays"
+sidebarLabel: "PostHog: identify, Replays і новий UI"
+summary: "Senior/Staff-посібник і архітектурний план Пріоритету №2 для PostHog у Next.js 16 + NestJS 12: ліміти Free Tier, EU Cloud + Reverse Proxy /ingest від AdBlockers, цикл identify()/reset(), маскування записів, серверна аналітика через posthog-node із graceful shutdown та розбір нового 5-секційного UI PostHog."
+category: "this-project"
+format: "deep-dive"
+tags: ["posthog", "observability", "analytics", "nextjs", "nestjs", "privacy", "session-replay", "security"]
+readingTime: "12 хв"
+publishedAt: "2026-11-26"
+order: 2
+tldr:
+  - "**PostHog Free Tier** дає `1 000 000` подій/міс, `5 000` web Session Replays/міс, `1 000 000` feature flags/міс та 1 рік зберігання із жорстким hard-cap — найкращий all-in-one стандарт продакшену в парі зі Sentry."
+  - "На фронтенді проксіювання `posthog-js` через **`/ingest` (`next.config.ts` `rewrites()` + виключення в `src/proxy.ts`)** на **EU Cloud (`eu.i.posthog.com`)** зберігає суворий `'self'` CSP і не дає uBlock/Brave зрізати ~70% трафіку."
+  - "Зв'язка `person_profiles: 'identified_only'` + `<ObservabilityIdentityBridge />` (`posthog.identify(profile.id, ...)` при вході + `posthog.reset()` при виході) склеює дологінову історію з читабельними іменами (`Alex • Team Lead`), а `maskAllInputs: true` + `data-ph-no-capture` захищають секрети."
+  - "На бекенді (`apps/api`, `posthog-node`) реалізується `PostHogService implements OnModuleDestroy` із `await client.shutdown()`, єдиним `distinctId: profile.id` для склеювання з браузером і `$process_person_profile: false` для анонімних security-подій — 100% точність, яку неможливо заблокувати або підробити."
+---
+
+> [!NOTE]
+> **Статус реалізації (Blueprint для Пріоритету №2):** абстракція клієнтської аналітики (`apps/web/src/shared/lib/analytics.ts` із викликами `trackEvent` у `GuestPassModal` та `CommandPaletteModal`) і Zod-валідація `NEXT_PUBLIC_POSTHOG_KEY` / `NEXT_PUBLIC_POSTHOG_HOST` уже реалізовані у `v0.10.0`. Встановлення живих `posthog-js` (фронт) + `posthog-node` (`PostHogService` в `apps/api`), налаштування `/ingest` rewrites, `<ObservabilityIdentityBridge />` та алертів заплановано на **Пріоритет №2**.
+
+---
+
+## 1. Ліміти PostHog Free Tier та порівняння з альтернативами
+
+| Можливість / Квота | PostHog (Free Plan, Hard-Cap) | Mixpanel / Amplitude | Plausible / Umami |
+| :--- | :--- | :--- | :--- |
+| **Події аналітики** | **1 000 000 подій / міс** | Сильні воронки та когорти | Лише перегляди сторінок (без глибоких воронок) |
+| **Web Session Replays** | **5 000 записів / міс** (із логами Console та Network) | Обмежено або платний аддон | Немає |
+| **Профілі користувачів (`identify()`)** | Повне склеювання аноніма з профілем + `HogQL` SQL | Так | Немає (лише анонімні агрегати) |
+| **Feature Flags та опитування** | **1 000 000 запитів / міс** + Surveys | Окремі сервіси / платно | Немає |
+| **Зберігання та білінг** | **1 рік**, жорсткий hard-cap (просто стоп при ліміті, без списань) | Залежить від тарифу | Платний SaaS або self-host |
+
+**Інженерний висновок:** зв'язка **Sentry** (глибокий Error Tracking, Source Maps, трасування `Next.js ➔ NestJS`) + **PostHog** (Web Analytics, продуктові воронки, іменовані профілі, `5 000` Session Replays) закриває 100% спостережуваності за `$0/міс`.
+
+---
+
+## 2. Шість продакшн-патернів для PostHog у Next.js 16
+
+### Патерн 1: EU Cloud + Reverse Proxy `/ingest` проти AdBlockers (+ виключення в `proxy.ts`!)
+Як і `sentry.io`, домен `posthog.com` внесено до списків *EasyPrivacy* у uBlock Origin та Brave Shields. Замість прямих запитів із браузера на `eu.i.posthog.com` проксіюємо трафік через власний домен:
+
+```typescript title="apps/web/next.config.ts (цільова конфігурація Пріоритету №2)"
+async rewrites() {
+  return [
+    {
+      source: '/ingest/static/:path*',
+      destination: 'https://eu-assets.i.posthog.com/static/:path*',
+    },
+    {
+      source: '/ingest/:path*',
+      destination: 'https://eu.i.posthog.com/:path*',
+    },
+    {
+      source: '/api/:path*',
+      destination: `${apiInternalUrl}/api/:path*`,
+    },
+  ]
+}
+```
+
+При ініціалізації `posthog-js` задаємо `api_host: '/ingest'` і `ui_host: 'https://eu.posthog.com'` (щоб метод `get_session_replay_url()` формував валідні посилання на твій EU-дашборд!).
+
+> [!WARNING]
+> **Критична перевірка для Next.js 16 + `next-intl`:**
+> Обов'язково виключи `ingest` у `apps/web/src/proxy.ts` (`config.matcher`) поруч з `api`, `search-index` і `monitoring`. А при реєстрації обирай **EU Cloud (`eu.i.posthog.com`)** — швидше для Європи та чистіше за GDPR.
+
+### Патерн 2: Анонімні vs Ідентифіковані профілі (`person_profiles: 'identified_only'`)
+Не варто створювати важкі профілі користувачів для ботів, краулерів і випадкових 2-секундних візитів. Опція **`person_profiles: 'identified_only'`** рахує анонімні перегляди агреговано, і створює повноцінний іменований профіль **лише в момент `posthog.identify()`** — при цьому PostHog **автоматично склеює** всю дологінову історію кліків із цим ім'ям!
+
+### Патерн 3: Еталонний цикл ідентифікації (`<ObservabilityIdentityBridge />`)
+Щоб не дивитися на знеособлені UUID (`019a2f...`) і легко розділяти 10 одночасних відвідувачів, прив'язуємо PostHog і Sentry до нашого `SessionProfile` (`useVisitorProfile()`) в **одному кореневому мості** поруч із `AuthCrossTabSyncBridge` у `app/[locale]/layout.tsx`:
+
+```tsx title="Blueprint ObservabilityIdentityBridge (Пріоритет №2)"
+useEffect(() => {
+  if (profile?.id && profile.role !== 'GUEST') {
+    posthog.identify(profile.id, {
+      name: profile.displayName ?? 'Visitor',
+      visitorType: profile.visitorType ?? 'OTHER',
+      role: profile.role,
+    })
+    Sentry.setUser({
+      id: profile.id,
+      username: profile.displayName ?? undefined,
+    })
+    return
+  }
+
+  // При явному logout (GUEST) ОБОВ'ЯЗКОВО скидаємо, щоб наступний юзер у тому ж браузері не склеївся!
+  if (profile?.role === 'GUEST') {
+    posthog.reset()
+    Sentry.setUser(null)
+  }
+}, [profile?.id, profile?.displayName, profile?.visitorType, profile?.role])
+```
+
+Результат: у дашборді PostHog, воронках і Session Replays кожен авторизований гість відображається як **`Alex • Team Lead (TEAM_LEAD)`** або **`Maria • Tech Recruiter (RECRUITER)`**, а після виходу сесії чисто розділяються.
+
+### Патерн 4: Коректні SPA Pageviews у Next.js App Router (`capture_pageview: false`)
+Переходи через `<Link>` в App Router не перезавантажують сторінку. Тому ініціалізуємо PostHog із `capture_pageview: false` + `capture_pageleave: true` і монтуємо компактний `<PostHogPageView />` (обгорнутий у `<Suspense>`), який стежить за `usePathname()` та `useSearchParams()` і надсилає точний `$pageview` на кожен SPA-перехід.
+
+### Патерн 5: Приватність відеозаписів і захист секретів (`maskAllInputs` + `data-ph-no-capture`)
+Session Replays безцінні для пошуку UX-багів (rage clicks, мертві кнопки, зламана верстка на мобілках), **якщо гарантовано виключити витік секретів**:
+- Вмикаємо глобально `session_recording: { maskAllInputs: true }` (автоматично маскує `adminPasscode` і будь-які текстові поля).
+- Вішаємо `data-ph-no-capture` (або клас `ph-no-capture`) на чутливі блоки на кшталт адмінської діагностики на `/system-status`.
+- Ніколи не передаємо паролі, токени чи телефони у властивості `trackEvent()`.
+
+### Патерн 6: Зв'язка зі Sentry та алерти в Telegram
+- У `Sentry.beforeSend` додаємо `posthog.get_session_replay_url({ withTimestamp: true })`, щоб із будь-якої помилки Sentry за 1 клік відкривати точну секунду відеозапису в PostHog.
+- Налаштовуємо в PostHog **Alerts / Webhook Destinations** (`POST /api/webhooks/posthog`), щоб ключові події (наприклад, вхід `TEAM_LEAD` / `FOUNDER`) одразу прилітали у твій приватний Telegram-канал (`TELEGRAM_ADMIN_CHAT_ID`).
+
+---
+
+## 3. Бекенд-реалізація та нюанси (`posthog-node` у NestJS 12 `apps/api`)
+
+Навіщо підключати PostHog на бекенді, якщо `posthog-js` уже працює у браузері? Тому що клієнтська аналітика ідеальна для **UX** (кліки, скрол, Session Replay), але **ненадійна для критичних бізнес- і security-фактів**: користувач може закрити вкладку через 50 мс після `POST`-запиту, зайти через `curl`/MCP-клієнт або вимкнути JS-скрипти. Серверний `posthog-node` в `apps/api` дає **100% точність та імунітет до підробки**.
+
+### Чітке розділення подій: Фронт vs Бек (нуль дублювання!)
+
+| Шар | SDK | Які події надсилає | Чому саме цей шар |
+| :--- | :--- | :--- | :--- |
+| **Frontend (`apps/web`)** | `posthog-js` | `$pageview`, `$pageleave`, `command_palette_opened`, `command_palette_article_selected`, `cv_pdf_downloaded`, `theme_changed`, Session Replays, rage clicks | Знає про DOM, рендер, скрол, UI-кліки та таймінги браузера |
+| **Backend (`apps/api`)** | `posthog-node` | `guest_pass_issued`, `admin_escalation_succeeded`, `admin_escalation_failed`, `article_helpful_recorded`, `rate_limit_triggered`, `telegram_bot_linked` | Неможливо заблокувати або сфальсифікувати; фіксує реальні серверні транзакції та спроби зламу |
+
+### Реалізація `PostHogService` у NestJS 12 ESM (`apps/api`)
+
+Додаємо опціональні `POSTHOG_API_KEY` і `POSTHOG_HOST` (`https://eu.i.posthog.com`) в `AppEnvSchema` (`apps/api/src/config/app.config.ts`) і виносимо сервіс в `apps/api/src/common/observability/posthog.service.ts`:
+
+```typescript title="apps/api/src/common/observability/posthog.service.ts (цільова реалізація Пріоритету №2)"
+import { Injectable, Logger, type OnModuleDestroy } from '@nestjs/common'
+import { PostHog } from 'posthog-node'
+import { appConfig } from '../../config/app.config.js'
+
+@Injectable()
+export class PostHogService implements OnModuleDestroy {
+  private readonly logger = new Logger(PostHogService.name)
+  private readonly client: PostHog | null
+
+  constructor() {
+    if (appConfig.isProduction && appConfig.posthogApiKey) {
+      this.client = new PostHog(appConfig.posthogApiKey, {
+        host: appConfig.posthogHost, // https://eu.i.posthog.com
+        flushAt: 20,                 // батчинг для довгоживучого NestJS-сервера
+        flushInterval: 10_000,       // автоскидання кожні 10 секунд
+      })
+    } else {
+      this.client = null // graceful no-op у dev / test / без ключа
+    }
+  }
+
+  captureForUser(distinctId: string, event: string, properties?: Record<string, unknown>): void {
+    if (!this.client) return
+    try {
+      this.client.capture({ distinctId, event, properties })
+    } catch (error) {
+      this.logger.warn(`PostHog capture skipped (${event}): ${String(error)}`)
+    }
+  }
+
+  captureAnonymous(event: string, properties?: Record<string, unknown>): void {
+    if (!this.client) return
+    try {
+      this.client.capture({
+        distinctId: 'system:anonymous',
+        event,
+        properties: {
+          ...properties,
+          $process_person_profile: false, // не плодимо сміттєві профілі від ботів!
+        },
+      })
+    } catch (error) {
+      this.logger.warn(`PostHog anonymous capture skipped (${event}): ${String(error)}`)
+    }
+  }
+
+  async onModuleDestroy(): Promise<void> {
+    if (!this.client) return
+    await this.client.shutdown() // гарантований flush батча при SIGTERM!
+  }
+}
+```
+
+### Чотири критичні бекенд-нюанси `posthog-node`
+
+1. **Батчинг (`flushAt` / `flushInterval`) та `onModuleDestroy()`:** у Node.js виклик `client.capture()` неблокуючий (`< 0.1 мс`) — події накопичуються в буфері та відправляються пачкою. Для довгоживучого NestJS-контейнера (Koyeb/Docker) ставимо `flushAt: 20, flushInterval: 10_000`, а оскільки в `apps/api/src/main.ts` увімкнено `app.enableShutdownHooks()`, метод `onModuleDestroy()` через `await this.client.shutdown()` гарантовано дошле буфер при `SIGTERM`. *(Контраст: якщо викликати `posthog-node` усередині serverless Route Handler на Vercel, потрібно ставити `flushAt: 1, flushInterval: 0` і викликати `await client.shutdown()` в `after()`.)*
+2. **Автоматичне склеювання Фронту й Беку через єдиний `distinctId`:** на фронті `posthog.identify(profile.id, ...)` прив'язує браузерну сесію до `profile.id` (UUID із `VisitorProfile`), а на бекенді `AuthService` і `KnowledgeService` передають **той самий `profile.id`** у `posthogService.captureForUser(profile.id, 'guest_pass_issued', ...)`. PostHog автоматично об'єднує кліки, Session Replay і серверні події в єдину стрічку однієї людини (`Alex • Team Lead`).
+3. **Захист `People ➔ Persons` прапорцем `$process_person_profile: false`:** для неавторизованих security-подій (`admin_escalation_failed`, `rate_limit_triggered`) без `profile.id` **обов'язково** передавати `$process_person_profile: false` — інакше кожен бот створить окремий порожній профіль і зіпсує продуктову аналітику (повний паритет із `person_profiles: 'identified_only'` на клієнті).
+4. **Правильний ключ і гігієна PII:** у `POSTHOG_API_KEY` кладеться **Project API Key (`phc_...`)** — він write-only і такий самий, як на фронтенді (секретний **Personal API Key `phx_...`** потрібен лише якщо бекенд виконує read-запити до PostHog Query API для `/system-status`). У `properties` суворо заборонено передавати `adminPasscode`, `Cookie`, JWT чи сиру IP-адресу, а будь-які мережеві збої PostHog поглинаються в `try/catch`, щоб аналітика **ніколи** не могла покласти API.
+
+---
+
+## 4. Навігація оновленим UI PostHog (5-секційна панель, 2025/2026)
+
+PostHog замінив старий перевантажений сайдбар на компактну 5-секційну ліву панель + глобальний пошук `Cmd+K`:
+
+| Розділ навігації | Що всередині | Куди дивитися передусім |
+| :--- | :--- | :--- |
+| **`Home`** | Розумне зведення-брифінг | Спарклайни ключових метрик «At a glance», динаміка візитів і помітні зміни. |
+| **`Analytics ➔ Web Analytics`** | Легка заміна Google Analytics | Унікальні відвідувачі, джерела трафіку (`LinkedIn`, `GitHub`, `Telegram`, `Google`), найпопулярніші сторінки (`/cv`, `/knowledge-base/this-project/...`), відмови. |
+| **`People ➔ Persons`** | Іменовані профілі та когорти | Перевірка роботи `identify()`: клікни на `Alex • Team Lead`, щоб побачити всю склеєну хронологію (анонімний захід ➔ активація Guest Pass ➔ які статті читав) + кнопку **Watch Recordings** прямо в профілі! |
+| **`Session Replay`** | Відеозаписи візитів + DevTools-логи | Фільтр за **Rage clicks**, **Console errors** або `visitorType`; синхронізовані вкладки Console і Network для налагодження реальних UX-проблем. |
+| **`Analytics ➔ Product Analytics`** | `Trends`, `Funnels`, `User Paths`, **`HogQL SQL`** | Збери 1 головну воронку портфоліо: `$pageview (/)` ➔ `guest_pass_unlocked` ➔ `command_palette_article_selected` ➔ `article_helpful`, і повісь **Alert** на ключовий графік. |
+| **`Project Settings` (шестерня)** | Ключі, Replays і квоти | Копіювання **Project API Key** (`phc_...`), перевірка EU Host (`https://eu.i.posthog.com`), Authorized URLs і контроль витрати безкоштовної квоти. |
